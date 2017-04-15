@@ -20,8 +20,8 @@
 #include <okvis/IMUOdometry.h>
 
 //the following 3 headers are only for testing
-#include "okvis/rand_sampler.h"
-#include "okvis/IMUErrorModel.cpp"
+#include "vio/rand_sampler.h"
+#include "vio/IMUErrorModel.cpp"
 #include <okvis/timing/Timer.hpp>
 
 #include "vio/eigen_utils.h"
@@ -1461,7 +1461,7 @@ void HybridFilter::updateStates(const Eigen::Matrix<double, Eigen::Dynamic, 1> &
                 mapPtr_->parameterBlockPtr(stateId));
     kinematics::Transformation T_WS = poseParamBlockPtr->estimate();
     Eigen::Vector3d deltaAlpha = deltaX.segment<3>(3);
-    Eigen::Quaterniond deltaq= quaternionFromSmallAngle(deltaAlpha); //rvec2quat(deltaAlpha);
+    Eigen::Quaterniond deltaq= vio::quaternionFromSmallAngle(deltaAlpha); //rvec2quat(deltaAlpha);
     T_WS = kinematics::Transformation(T_WS.r() + deltaX.head<3>(), deltaq* T_WS.q());// in effect this amounts to PoseParameterBlock::plus()
     poseParamBlockPtr->setEstimate(T_WS);
 
@@ -1540,7 +1540,7 @@ void HybridFilter::updateStates(const Eigen::Matrix<double, Eigen::Dynamic, 1> &
                     mapPtr_->parameterBlockPtr(stateId));
         T_WS = poseParamBlockPtr->estimate();
         deltaAlpha = deltaX.segment<3>(qStart);
-        deltaq= quaternionFromSmallAngle(deltaAlpha); //rvec2quat(deltaAlpha);
+        deltaq= vio::quaternionFromSmallAngle(deltaAlpha); //rvec2quat(deltaAlpha);
         T_WS = kinematics::Transformation(T_WS.r() + deltaX.segment<3>(qStart - 3), deltaq* T_WS.q());// in effect this amounts to PoseParameterBlock::plus()
         poseParamBlockPtr->setEstimate(T_WS);
 

@@ -28,7 +28,7 @@
 
 #include "okvis/CsvReader.h"
 #include <okvis/timing/Timer.hpp>
-#include <okvis/IMUErrorModel.h>
+#include <vio/IMUErrorModel.h>
 #include <okvis/initialpvandstd.hpp>
 
 /// \brief okvis Main namespace of this package.

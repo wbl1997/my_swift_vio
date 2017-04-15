@@ -3,7 +3,7 @@
 #include <Eigen/Geometry>
 #include <iostream>
 
-#include "okvis/rand_sampler.h"
+#include "vio/rand_sampler.h"
 #include "vio/eigen_utils.h"
 #include <okvis/timing/Timer.hpp>
 

@@ -19,8 +19,8 @@
 
 #include <okvis/IMUOdometry.h>
 //the following 3 lines are only for testing
-#include "okvis/rand_sampler.h"
-#include "okvis/IMUErrorModel.cpp"
+#include "vio/rand_sampler.h"
+#include "vio/IMUErrorModel.cpp"
 #include <okvis/timing/Timer.hpp>
 #include "vio/eigen_utils.h"
 
@@ -1325,7 +1325,7 @@ bool MSCKF2::computeHoi(const uint64_t hpbid, const MapPoint & mp,
         Ri(saga2+1, saga2+1)= vRi[saga2+1]*vRi[saga2+1];
     }
 
-    Eigen::MatrixXd nullQ= nullspace(H_fi);// 2nx(2n-3), n==numValidObs
+    Eigen::MatrixXd nullQ= vio::nullspace(H_fi);// 2nx(2n-3), n==numValidObs
     OKVIS_ASSERT_EQ_DBG(Exception, nullQ.cols(), (int)(2*numValidObs-3), "Nullspace of Hfi should have 2n-3 columns");
     //    OKVIS_ASSERT_LT(Exception, (nullQ.transpose()* H_fi).norm(), 1e-6, "nullspace is not correct!");
     r_oi.noalias()= nullQ.transpose()*ri;
@@ -1575,7 +1575,7 @@ void MSCKF2::updateStates(const Eigen::Matrix<double, Eigen::Dynamic, 1> &deltaX
                 mapPtr_->parameterBlockPtr(stateId));
     kinematics::Transformation T_WS = poseParamBlockPtr->estimate();
     Eigen::Vector3d deltaAlpha = deltaX.segment<3>(3);
-    Eigen::Quaterniond deltaq= quaternionFromSmallAngle(deltaAlpha); //rvec2quat(deltaAlpha);
+    Eigen::Quaterniond deltaq= vio::quaternionFromSmallAngle(deltaAlpha); //rvec2quat(deltaAlpha);
     T_WS = kinematics::Transformation(T_WS.r() + deltaX.head<3>(), deltaq* T_WS.q());// in effect this amounts to PoseParameterBlock::plus()
     poseParamBlockPtr->setEstimate(T_WS);
 
@@ -1654,7 +1654,7 @@ void MSCKF2::updateStates(const Eigen::Matrix<double, Eigen::Dynamic, 1> &deltaX
                     mapPtr_->parameterBlockPtr(stateId));
         T_WS = poseParamBlockPtr->estimate();
         deltaAlpha = deltaX.segment<3>(qStart);
-        deltaq= quaternionFromSmallAngle(deltaAlpha); //rvec2quat(deltaAlpha);
+        deltaq= vio::quaternionFromSmallAngle(deltaAlpha); //rvec2quat(deltaAlpha);
         T_WS = kinematics::Transformation(T_WS.r() + deltaX.segment<3>(qStart - 3), deltaq* T_WS.q());// in effect this amounts to PoseParameterBlock::plus()
         poseParamBlockPtr->setEstimate(T_WS);
 

@@ -25,8 +25,9 @@ Player::Player(okvis::VioInterface* vioInterfacePtr,
       vioParameters_(params),
       mVideoFile(params.input.videoFile),
       mImuFile(params.input.imuFile),
-      mIG(mImuFile, SensorStreamCSV,0.005),
-      mFG(mVideoFile, params.input.startIndex, params.input.finishIndex)
+      mIG(mImuFile, vio::SensorStreamCSV,0.005),
+      mFG(mVideoFile, params.input.startIndex, params.input.finishIndex),
+      mSG(NULL)
 {
 
 }
@@ -38,20 +39,11 @@ Player::Player(okvis::VioInterface* vioInterfacePtr,
       mImageFolder(params.input.imageFolder),
       mTimeFile(params.input.timeFile),
       mImuFile(params.input.imuFile),
-      mIG(mImuFile, PlainText,0.01),
-      mFG(mImageFolder, mTimeFile, params.input.startIndex, params.input.finishIndex)
+      mIG(mImuFile, vio::PlainText,0.01),
+      mFG(mImageFolder, mTimeFile, params.input.startIndex, params.input.finishIndex),
+      mSG(NULL)
 {
 
-}
-void testTimeGrabber(std::string timeFile)
-{
-    TimeGrabber tg(timeFile);
-    double timestamp = tg.readTimestamp(0);
-    std::cout << "timestamp for 0 "<< timestamp<< std::endl;
-    timestamp = tg.readTimestamp(1799);
-    std::cout << "timestamp for 1799 "<< timestamp<< std::endl;
-    timestamp = tg.readTimestamp(1800);
-    std::cout << "timestamp for 1800 "<< timestamp<< std::endl;
 }
 
 void Player::Run()
@@ -66,7 +58,6 @@ void Player::Run()
     int frameCounter(0);
 
     while(mFG.grabFrame(frame, frameTime)){
-
 
         cv::Mat filtered;
         if (vioParameters_.optimization.useMedianFilter) {
@@ -140,8 +131,7 @@ void Player::RunWithSavedTracks()
     VIOStage stage(NotInitialized);
     okvis::Time initStateTime = vioParameters_.initialState.stateTime;
 
-
-    mSG= new StatesGrabber(orbvo_output, 17);
+    mSG= new vio::StatesGrabber(orbvo_output, 17);
 
     while(mFG.grabFrame(frame, frameTime)){
 

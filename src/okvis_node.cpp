@@ -66,8 +66,8 @@
 int main(int argc, char **argv)
 {
 
-  testHybridFilterSinusoid();
-  return 0;
+//  testHybridFilterSinusoid();
+//  return 0;
 
   ros::init(argc, argv, "okvis_node");
 

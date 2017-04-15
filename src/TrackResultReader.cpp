@@ -62,7 +62,8 @@ bool TrackResultReader::getNextFrame(const double timeStamp, std::vector<cv::Key
     return true;
 }
 
-void readKeyPointsFromStream(std::ifstream& kp_stream, std::vector<cv::KeyPoint> &keypoints,
+//TODO: handle the rare exception that only a fraction of all keypoints are logged
+bool readKeyPointsFromStream(std::ifstream& kp_stream, std::vector<cv::KeyPoint> &keypoints,
                              std::vector<size_t> &mapPointIds, std::vector<Eigen::Vector3d> &mapPointPositions,
                              double & timeStamp, size_t & frameId, int & status, Eigen::Matrix<double,7,1> & tq_wc)
 {
@@ -98,4 +99,5 @@ void readKeyPointsFromStream(std::ifstream& kp_stream, std::vector<cv::KeyPoint>
             mapPointPositions[jack] = dummy3;
         }
     }
+    return true;
 }

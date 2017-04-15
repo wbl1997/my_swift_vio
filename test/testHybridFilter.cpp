@@ -20,7 +20,7 @@
 #include <okvis/ceres/RelativePoseError.hpp>
 #include <okvis/assert_macros.hpp>
 
-#include <vio_common/rand_sampler.h>
+#include <vio/rand_sampler.h>
 #include <okvis/ceres/ShapeMatrixParamBlock.hpp>
 #include <okvis/ceres/CameraDistortionParamBlock.hpp>
 #include <okvis/ceres/CameraIntrinsicParamBlock.hpp>
@@ -902,7 +902,7 @@ void testHybridFilterSinusoid(){
             uint64_t currFrameId = estimator.currentFrameId();
             estimator.get_T_WS(currFrameId, T_WS_est);
             Eigen::Vector3d delta = T_WS.r() - T_WS_est.r();
-            Eigen::Vector3d alpha = okvis::unskew3d(T_WS.C()*T_WS_est.C().transpose()- Eigen::Matrix3d::Identity());
+            Eigen::Vector3d alpha = vio::unskew3d(T_WS.C()*T_WS_est.C().transpose()- Eigen::Matrix3d::Identity());
             Eigen::Matrix<double,6,1> deltaPose;
             deltaPose<< delta, alpha;
 

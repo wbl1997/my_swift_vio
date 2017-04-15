@@ -39,7 +39,7 @@
 #ifndef INCLUDE_OKVIS_CERES_ODE_ODE_HPP_
 #define INCLUDE_OKVIS_CERES_ODE_ODE_HPP_
 
-#include "IMUErrorModel.h"
+#include "vio/IMUErrorModel.h"
 
 #include <Eigen/Core>
 #include <okvis/kinematics/Transformation.hpp>

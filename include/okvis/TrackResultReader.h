@@ -28,7 +28,7 @@ private:
     std::ifstream stream; //sensor data stream
 };
 
-void readKeyPointsFromStream(std::ifstream& kp_stream, std::vector<cv::KeyPoint> &keypoints,
+bool readKeyPointsFromStream(std::ifstream& kp_stream, std::vector<cv::KeyPoint> &keypoints,
                              std::vector<size_t> &mapPointIds, std::vector<Eigen::Vector3d> &mapPointPositions,
                              double & timeStamp, size_t & frameId, int & status, Eigen::Matrix<double,7,1> & tq_wc);
 

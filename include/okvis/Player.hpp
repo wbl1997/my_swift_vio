@@ -84,9 +84,9 @@ class Player
   std::string mTimeFile;
   std::string mImuFile;
 
-  IMUGrabber mIG;
-  FrameGrabber mFG;
-  StatesGrabber* mSG;
+  vio::IMUGrabber mIG;
+  vio::FrameGrabber mFG;
+  vio::StatesGrabber* mSG;
 private:
   Player(const Player & rhs);
   Player & operator=(const Player &)=delete;

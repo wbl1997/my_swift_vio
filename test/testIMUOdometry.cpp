@@ -1,6 +1,6 @@
 
-#include "okvis/rand_sampler.h"
-#include "vio_g2o/IMUErrorModel.cpp"
+#include "vio/rand_sampler.h"
+#include "vio/IMUErrorModel.cpp"
 #include "okvis/IMUOdometry.h"
 #include <okvis/timing/Timer.hpp>
 #include <okvis/ceres/ImuError.hpp>

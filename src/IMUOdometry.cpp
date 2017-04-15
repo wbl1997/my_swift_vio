@@ -1,5 +1,5 @@
 #include "okvis/IMUOdometry.h"
-#include "okvis/IMUErrorModel.cpp"
+#include "vio/IMUErrorModel.cpp"
 
 #include <glog/logging.h>
 

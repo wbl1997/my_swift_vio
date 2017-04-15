@@ -40,8 +40,8 @@ set(OKVIS_SOURCE_PATH $ENV{HOME}/catkin_ws/src/okvis_ros/okvis)
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS}  -Wall -O3 -march=native ")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -O3 -march=native")
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -msse3")
-MESSAGE ("sse3 ON")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mssse3")
+MESSAGE ("ssse3 ON")
 
 find_package(catkin REQUIRED  
   roscpp
@@ -77,12 +77,14 @@ file(MAKE_DIRECTORY ${CATKIN_DEVEL_PREFIX}/include)
 list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
 find_package( Eigen REQUIRED )
 find_package (Sophus REQUIRED )
+find_package(vio_common REQUIRED)
 
 include_directories(
   include
   ${Sophus_INCLUDE_DIR}
   ${EIGEN_INCLUDE_DIR}
   ${catkin_INCLUDE_DIRS}
+  ${vio_common_INCLUDE_DIRS}
 )
 
 LINK_DIRECTORIES(${CATKIN_DEVEL_PREFIX}/lib)
@@ -97,8 +99,7 @@ LIST(APPEND SOURCEFILES
     src/Publisher.cpp
     src/HybridVioParametersReader.cpp
     src/RosParametersReader.cpp
-    src/IMUOdometry.cpp
-    include/okvis/IMUErrorModel.cpp
+    src/IMUOdometry.cpp  
     src/CameraIntrinsicParamBlock.cpp
     src/CameraDistortionParamBlock.cpp
     src/CameraTimeParamBlock.cpp
@@ -171,6 +172,7 @@ target_link_libraries(${PROJECT_NAME}
   okvis_frontend 
   okvis_multisensor_processing
   pthread
+  ${vio_common_LIBRARIES}
 )
 
 

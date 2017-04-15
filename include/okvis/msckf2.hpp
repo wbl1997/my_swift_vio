@@ -26,9 +26,9 @@
 #include <okvis/cameras/PinholeCamera.hpp>
 #include <okvis/cameras/RadialTangentialDistortion.hpp>
 
-#include "okvis/CsvReader.h"
+#include "vio/CsvReader.h"
 #include <okvis/timing/Timer.hpp>
-#include <okvis/IMUErrorModel.h>
+#include "vio/IMUErrorModel.h"
 #include <okvis/initialpvandstd.hpp>
 
 /// \brief okvis Main namespace of this package.
