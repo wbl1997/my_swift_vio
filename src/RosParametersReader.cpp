@@ -47,7 +47,7 @@ namespace okvis {
 
 // The default constructor.
 RosParametersReader::RosParametersReader()
-    : VioParametersReader() {
+    : HybridVioParametersReader() {
 }
 
 // The constructor. This calls readConfigFile().
@@ -118,7 +118,7 @@ bool RosParametersReader::getCalibrationViaRosService(
           calibrations.clear();
           return false;
         } else {
-          calibrations.push_back(okvis::VioParametersReader::CameraCalibration());
+          calibrations.push_back(okvis::HybridVioParametersReader::CameraCalibration());
 #ifdef USE_VISENSORNODE_V1_1 // TODO: remove this as soon as the public visensor_node gets updated!
           geometry_msgs::Pose& T_IC = srv.response.calibration[i].T_IC;
           Eigen::Vector3d t(T_IC.position.x,
@@ -196,7 +196,7 @@ bool RosParametersReader::getCalibrationViaRosTopic (
           ros::WallDuration(topicTimeout));
 
     if (receivedMessage) {
-      calibrations.push_back(okvis::VioParametersReader::CameraCalibration());
+      calibrations.push_back(okvis::HybridVioParametersReader::CameraCalibration());
 #ifdef USE_VISENSORNODE_V1_1
       geometry_msgs::Pose& T_IC = message.T_IC;
       Eigen::Vector3d t(T_IC.position.x,

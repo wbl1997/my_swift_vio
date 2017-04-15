@@ -43,7 +43,7 @@
 
 #include <string>
 
-#include <okvis/VioParametersReader.hpp>
+#include <okvis/HybridVioParametersReader.hpp>
 #include <okvis/assert_macros.hpp>
 #include <okvis/Parameters.hpp>
 
@@ -71,9 +71,9 @@
 namespace okvis {
 
 /**
- * @brief This class extends the VioParametersReader class in order to use ROS services and topics.
+ * @brief This class extends the HybridVioParametersReader class in order to use ROS services and topics.
  */
-class RosParametersReader : public VioParametersReader {
+class RosParametersReader : public HybridVioParametersReader {
  public:
 
   OKVIS_DEFINE_EXCEPTION(Exception,std::runtime_error)

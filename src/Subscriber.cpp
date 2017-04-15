@@ -54,7 +54,7 @@ Subscriber::~Subscriber()
 }
 
 Subscriber::Subscriber(ros::NodeHandle& nh, okvis::VioInterface* vioInterfacePtr,
-                       const okvis::VioParametersReader& param_reader)
+                       const okvis::HybridVioParametersReader& param_reader)
     : vioInterface_(vioInterfacePtr)
 {
   param_reader.getParameters(vioParameters_);
@@ -196,7 +196,7 @@ void Subscriber::startSensors(const std::vector<unsigned int>& camRate,
 
 #ifdef HAVE_LIBVISENSOR
 void Subscriber::directImuCallback(
-    boost::shared_ptr<visensor::ViImuMsg> imu_ptr, visensor::ViErrorCode error)
+    std::shared_ptr<visensor::ViImuMsg> imu_ptr, visensor::ViErrorCode error)
 {
   if (error == visensor::ViErrorCodes::MEASUREMENT_DROPPED) {
     LOG(WARNING) << "dropped imu measurement on sensor "

@@ -32,7 +32,7 @@
 
 /**
  * @file dataset_convertor.cpp
- * @brief Source file for the VioParametersReader class.
+ * @brief convert ROS bag file to csv files in a folder.
  * @author Stefan Leutenegger
  * @author Andrea Nicastro
  */
@@ -386,7 +386,7 @@ int main(int argc, char **argv)
     cout
         << colouredString(
             "Relative path are not supported. Use an absolute path instead."
-            "For example: roslaunch okvis_ros convert_datasert.launch bag:= /absolute/path/here",
+            "For example: roslaunch msckf2 convert_datasert.launch bag:= /absolute/path/here",
             RED, BOLD) << endl;
     exit (EXIT_FAILURE);
   } else {

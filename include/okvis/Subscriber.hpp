@@ -44,13 +44,12 @@
 #include <deque>
 #include <memory>
 
-#include <boost/shared_ptr.hpp>
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wnon-virtual-dtor"
 #include <ros/ros.h>
 #include <image_geometry/pinhole_camera_model.h>
 #include <dynamic_reconfigure/server.h>
-#include <okvis_ros/CameraConfig.h> // generated
+#include <msckf2/CameraConfig.h> // generated
 #pragma GCC diagnostic pop
 #include <image_transport/image_transport.h>
 #include "sensor_msgs/Imu.h"
@@ -67,10 +66,10 @@
 #include <okvis/Time.hpp>
 #include <okvis/cameras/NCameraSystem.hpp>
 #include <okvis/VioInterface.hpp>
-#include <okvis/ThreadedKFVio.hpp>
+#include <okvis/HybridVio.hpp>
 #include <okvis/assert_macros.hpp>
 #include <okvis/Publisher.hpp>
-#include <okvis/VioParametersReader.hpp>
+#include <okvis/HybridVioParametersReader.hpp>
 #include <okvis/kinematics/Transformation.hpp>
 
 /// \brief okvis Main namespace of this package.
@@ -94,7 +93,7 @@ class Subscriber
    * @param param_reader  Parameter reader.
    */
   Subscriber(ros::NodeHandle& nh, okvis::VioInterface* vioInterfacePtr,
-             const okvis::VioParametersReader& param_reader);
+             const okvis::HybridVioParametersReader& param_reader);
 
   /// @brief Set the node handle. This sets up the callbacks. This is called in the constructor.
   void setNodeHandle(ros::NodeHandle& nh);
@@ -129,7 +128,7 @@ class Subscriber
   void startSensors(const std::vector<unsigned int>& camRate,
                     const unsigned int imuRate);
   /// @brief The IMU callback.
-  void directImuCallback(boost::shared_ptr<visensor::ViImuMsg> imu_ptr,
+  void directImuCallback(std::shared_ptr<visensor::ViImuMsg> imu_ptr,
                          visensor::ViErrorCode error);
   /// @brief The image callback.
   void directFrameCallback(visensor::ViFrame::Ptr frame_ptr,
@@ -158,8 +157,8 @@ class Subscriber
   dynamic_reconfigure::Server<okvis_ros::CameraConfig> cameraConfigReconfigureService_; ///< dynamic reconfigure service.
 #endif
 
-  okvis::VioInterface* vioInterface_;   ///< The VioInterface. (E.g. ThreadedKFVio)
-  okvis::VioParameters vioParameters_;  ///< The parameters and settings.
+  okvis::VioInterface* vioInterface_;   ///< The VioInterface. (E.g. HybridVio)
+  okvis::VioParameters vioParameters_;  ///< The parameters and settings. //huai: although cameraGeometry info is included but not used through this member
 };
 }
 

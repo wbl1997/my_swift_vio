@@ -44,17 +44,17 @@
 #include <fstream>
 #include <memory>
 
-#include <pcl/point_types.h>
+//#include <pcl/point_types.h>
 
 #include <geometry_msgs/PoseStamped.h>
-#include <sensor_msgs/PointCloud2.h>
+//#include <sensor_msgs/PointCloud2.h>
 #include <visualization_msgs/Marker.h>
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wnon-virtual-dtor"
 #include <opencv2/core/core.hpp>
 #include <ros/ros.h>
 #include <tf/transform_broadcaster.h>
-#include <pcl_ros/point_cloud.h>
+// #include <pcl_ros/point_cloud.h>
 #pragma GCC diagnostic pop
 #include <nav_msgs/Odometry.h>
 #include <nav_msgs/Path.h>
@@ -214,7 +214,7 @@ class Publisher
   void csvSaveFullStateAsCallback(
       const okvis::Time & t, const okvis::kinematics::Transformation & T_WS,
       const Eigen::Matrix<double, 9, 1> & speedAndBiases,
-      const Eigen::Matrix<double, 3, 1> & omega_S);
+      const Eigen::Matrix<double, 3, 1> & omega_S, const int frameIdInSource = -1);
 
   /**
    * @brief Set and write full state including camera extrinsics to file.
@@ -230,9 +230,32 @@ class Publisher
       const okvis::kinematics::Transformation & T_WS,
       const Eigen::Matrix<double, 9, 1> & speedAndBiases,
       const Eigen::Matrix<double, 3, 1> & omega_S,
+      const int frameIdInSource,
       const std::vector<okvis::kinematics::Transformation,
           Eigen::aligned_allocator<okvis::kinematics::Transformation> > & extrinsics);
 
+  /**
+   * @brief Set and write full state including call calibration parameters to file.
+   * @remark This can be registered with the VioInterface.
+   * @param t Timestamp of state.
+   * @param T_WS The pose.
+   * @param speedAndBiases The speeds and IMU biases.
+   * @param omega_S Rotation speed of the sensor frame.
+   * @param extrinsics Camera extrinsics.
+   * @param vTgsa
+   * @param vfckptdr
+   */
+  void csvSaveFullStateWithAllCalibrationAsCallback(
+      const okvis::Time & t,
+      const okvis::kinematics::Transformation & T_WS,
+      const Eigen::Matrix<double, 9, 1> & speedAndBiases,
+      const Eigen::Matrix<double, 3, 1> & omega_S,
+      const int frameIdInSource,
+      const std::vector<okvis::kinematics::Transformation,
+          Eigen::aligned_allocator<okvis::kinematics::Transformation> > & extrinsics,
+      const Eigen::Matrix<double, 27, 1>& vTgsa,
+      const Eigen::Matrix<double, 10, 1>& vfckptdr,
+      const Eigen::Matrix<double, 55, 1>& vVariance);
   /**
    * @brief Set and write landmarks to file.
    * @remark This can be registered with the VioInterface.
@@ -273,6 +296,7 @@ class Publisher
   ros::Publisher pubObometry_;  ///< The publisher for the odometry.
   ros::Publisher pubPath_;  ///< The publisher for the path.
   ros::Publisher pubTransform_; ///< The publisher for the transform.
+//  ros::Publisher pubMesh_; ///< The publisher for a robot / camera mesh.
   std::vector<image_transport::Publisher> pubImagesVector_; ///< The publisher for the images.
   std::vector<image_transport::ImageTransport> imageTransportVector_; ///< The image transporters.
 
@@ -284,11 +308,18 @@ class Publisher
   geometry_msgs::TransformStamped poseMsg_; ///< Pose message.
   nav_msgs::Odometry odometryMsg_;  ///< Odometry message.
   okvis::MapPointVector pointsMatched2_;  ///< Matched points vector.
-  pcl::PointCloud<pcl::PointXYZRGB> pointsMatched_; ///< Point cloud for matched points.
-  pcl::PointCloud<pcl::PointXYZRGB> pointsUnmatched_; ///< Point cloud for unmatched points.
-  pcl::PointCloud<pcl::PointXYZRGB> pointsTransferred_; ///< Point cloud for transferred/marginalised points.
+//  pcl::PointCloud<pcl::PointXYZRGB> pointsMatched_; ///< Point cloud for matched points.
+//  pcl::PointCloud<pcl::PointXYZRGB> pointsUnmatched_; ///< Point cloud for unmatched points.
+//  pcl::PointCloud<pcl::PointXYZRGB> pointsTransferred_; ///< Point cloud for transferred/marginalised points.
+
+  visualization_msgs::Marker pointsMatched_; ///< Point cloud for matched points.
+  visualization_msgs::Marker pointsUnmatched_; ///< Point cloud for unmatched points.
+  visualization_msgs::Marker pointsTransferred_; ///< Point cloud for transferred/marginalised points.
+
+
   std::vector<cv::Mat> images_; ///< The images.
   nav_msgs::Path path_; ///< The path message.
+//  visualization_msgs::Marker meshMsg_; ///< Mesh message.
 
   /// @}
 

@@ -1,27 +1,21 @@
 README                        {#mainpage}
 ======
 
-Welcome to OKVIS: Open Keyframe-based Visual-Inertial SLAM. 
+Welcome to MSCKF2/Hybrid Filter. 
 
-This is the Author's implementation of the [1] and [3] with more results in [2].
+This is the Author's implementation of the [1] and [2] with detailed derivation in [3]. It is developed based on the OKVIS library.
 
-[1] Stefan Leutenegger, Simon Lynen, Michael Bosse, Roland Siegwart and Paul 
-    Timothy Furgale. Keyframe-based visual–inertial odometry using nonlinear 
-    optimization. The International Journal of Robotics Research, 2015.
+[1] Li, M., Yu, H., Zheng, X., & Mourikis, A. I. (2014, May). High-fidelity sensor modeling and self-calibration in vision-aided inertial navigation. In 2014 IEEE International Conference on Robotics and Automation (ICRA) (pp. 409-416). IEEE.
 
-[2] Stefan Leutenegger. Unmanned Solar Airplanes: Design and Algorithms for 
-    Efficient and Robust Autonomous Operation. Doctoral dissertation, 2014.
+[2] Li, M., & Mourikis, A. I. (2013, July). Optimization-based estimator design for vision-aided inertial navigation. In Proc. of the Robotics: Science and Systems Conference (pp. 241-248).
 
-[3] Stefan Leutenegger, Paul Timothy Furgale, Vincent Rabaud, Margarita Chli, 
-    Kurt Konolige, Roland Siegwart. Keyframe-Based Visual-Inertial SLAM using 
-    Nonlinear Optimization. In Proceedings of Robotics: Science and Systems, 
-    2013.
+[3] Michael Andrew Shelley. Monocular Visual Inertial Odometry on a Mobile Device. Master thesis, Technical University of Munich, 2014.
 
 Note that the codebase that you are provided here is free of charge and without 
 any warranty. This is bleeding edge research software.
 
 Also note that the quaternion standard has been adapted to match Eigen/ROS, 
-thus some related mathematical description in [1,2,3] will not match the 
+thus some related mathematical description in [1,2] will not match the 
 implementation here.
 
 If you publish work that relates to this software, please cite at least [1].
@@ -47,28 +41,18 @@ You will need to install the following dependencies,
         sudo apt-get install libatlas-base-dev libeigen3-dev libsuitesparse-dev 
         sudo apt-get install libopencv-dev libboost-dev libboost-filesystem-dev
 
-* Optional: use the the package with the Skybotix VI sensor.
-  Note that this requires a system install, not just as ROS package. Also note 
-  that Skybotix OSX support is experimental (checkout the feature/osx branch).
 
-        git clone https://github.com/ethz-asl/libvisensor.git
-        cd libvisensor
-        ./install_libvisensor.sh
+then clone the repository from github into your catkin workspace:
 
-then download and expand the archive into your catkin workspace:
-
-    wget https://www.doc.ic.ac.uk/~sleutene/software/okvis_ros-1.1.1.zip
-    unzip okvis_ros-1.1.1.zip && rm okvis_ros-1.1.1.zip
-
-Or, clone the repository from github into your catkin workspace:
-
-    git clone --recursive git@github.com:ethz-asl/okvis_ros.git
+    git clone --recursive git@github.com:JzHuai0108/msckf2.git
 
 or
 
-    git clone --recursive https://github.com/ethz-asl/okvis_ros.git
+    git clone --recursive https://github.com/JzHuai0108/msckf2.git
 
 ### Building the project ###
+
+If you have installed okvis_ros in the catkin workspace, then you may need to disable that package by renaming its package.xml file in order to avoid confusing catkin.
 
 From the catkin workspace root, type 
 
@@ -157,6 +141,8 @@ To perform a calibration yourself, we recommend the following:
 
 * Follow https://github.com/ethz-asl/kalibr/wiki/camera-imu-calibration to get 
   estimates for the spatial parameters of the cameras with respect to the IMU.
+
+* MSCKF2/Hybrid filter does not support pure rotation, and cannot start from static mode, because it uses delayed triangulation. But it supports infinity points.
 
 ### Contribution guidelines ###
 

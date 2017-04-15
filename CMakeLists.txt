@@ -1,10 +1,53 @@
 cmake_minimum_required(VERSION 2.8.3)
-project(okvis_ros)
+project(msckf2)
+
+SET(USE_ROS TRUE)
+SET(CATKIN_DEVEL_PREFIX $ENV{HOME}/catkin_ws/devel) # this ensures binaries are put into correct location of catkin_ws
+SET(MSCKF2 true) # build with msck2 or hybridfilter
+SET(FIRST_ESTIMATE true) # use the first estimate technique for propagation matrix and measurement Jacobian?
+SET(KLT_MATCHER false) #use calcOpticalFlowPyrLK to track features instead of brisk feature matching
+
+IF(NOT CMAKE_BUILD_TYPE)
+  SET(CMAKE_BUILD_TYPE Release)
+ENDIF()
+IF(CMAKE_BUILD_TYPE MATCHES Release)
+  ADD_DEFINITIONS(-DNDEBUG)
+ENDIF()
+
+IF(MSCKF2)
+  ADD_DEFINITIONS(-DUSE_MSCKF2)
+ENDIF()
+IF(USE_ROS)
+  add_definitions(-DSLAM_USE_ROS)
+ENDIF()
+
+IF(FIRST_ESTIMATE)
+  ADD_DEFINITIONS(-DUSE_FIRST_ESTIMATE)
+ENDIF()
+
+IF(KLT_MATCHER)
+  ADD_DEFINITIONS(-DUSE_KLT)
+ELSEIF(1)
+  #ADD_DEFINITIONS(-DUSE_BRISK)
+  #ADD_DEFINITIONS(-DDEACTIVATE_TIMERS)
+ENDIF()
+
+message(STATUS "Building MSCKF2 with ${CMAKE_BUILD_TYPE}")
+
+set(OKVIS_EXTERNAL_DEP_PATH $ENV{HOME}/catkin_ws/build)
+
+set(OKVIS_SOURCE_PATH $ENV{HOME}/catkin_ws/src/okvis_ros/okvis)
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS}  -Wall -O3 -march=native ")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -O3 -march=native")
+
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -msse3")
+MESSAGE ("sse3 ON")
 
 find_package(catkin REQUIRED  
-  pcl_conversions
-  pcl_ros
   roscpp
+  rosbag
+  tf
+  std_msgs
   sensor_msgs
   image_transport
   cv_bridge
@@ -18,60 +61,105 @@ generate_dynamic_reconfigure_options(cfg/Camera.cfg)
 
 catkin_package(
     DEPENDS
-    CATKIN_DEPENDS
+    CATKIN_DEPENDS rosbag tf roscpp cv_bridge message_runtime std_msgs sensor_msgs
     INCLUDE_DIRS include
     LIBRARIES ${PROJECT_NAME}
 )
-
-# we really want to use Release here
-set(CMAKE_BUILD_TYPE Release)
-
-message(STATUS "Building with ${CMAKE_BUILD_TYPE}")
 
 # The configure step fails at catkin_package() if this directory
 # doesn't exist yet. Create it at configure time!
 file(MAKE_DIRECTORY ${CATKIN_DEVEL_PREFIX}/include)
 
-# let's pull in the okvis plain cmake project
-set(BUILD_SHARED_LIBS OFF)
-add_subdirectory(okvis)
+# let's pull in the okvis plain cmake project, if okvis has not been built in catkin
+#set(BUILD_SHARED_LIBS OFF)
+#add_subdirectory(okvis)
 
+list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
+find_package( Eigen REQUIRED )
+find_package (Sophus REQUIRED )
 
-# libvisensor
-list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/okvis/cmake")
-find_package(VISensor)
-
-if(VISENSORDRIVER_FOUND)
-  add_definitions(-DHAVE_LIBVISENSOR)
-  message(STATUS "Found libvisensor in ROS interface.")
-  include_directories(${VISensorDriver_INCLUDE_DIR})
-else()
-  message(WARNING "libvisensor not found")
-endif()
-
-include_directories(include)
 include_directories(
+  include
+  ${Sophus_INCLUDE_DIR}
+  ${EIGEN_INCLUDE_DIR}
   ${catkin_INCLUDE_DIRS}
-  ${CMAKE_BINARY_DIR}/include
 )
+
+LINK_DIRECTORIES(${CATKIN_DEVEL_PREFIX}/lib)
 
 # compile the ROS dependent stuff into a library
 add_definitions(-fPIC -march=native -Wextra -Winit-self -Woverloaded-virtual
                 -Wnon-virtual-dtor -Wsign-promo -Wno-long-long -std=c++0x)
-add_library(${PROJECT_NAME} STATIC src/Subscriber.cpp
-                               src/Publisher.cpp
-                               src/RosParametersReader.cpp
-                               include/okvis/Subscriber.hpp
-                               include/okvis/Publisher.hpp
-                               include/okvis/RosParametersReader.hpp)
 
-add_dependencies(${PROJECT_NAME} okvis_multisensor_processing)
+LIST(APPEND SOURCEFILES
+    src/Subscriber.cpp  
+    src/Player.cpp
+    src/Publisher.cpp
+    src/HybridVioParametersReader.cpp
+    src/RosParametersReader.cpp
+    src/IMUOdometry.cpp
+    include/okvis/IMUErrorModel.cpp
+    src/CameraIntrinsicParamBlock.cpp
+    src/CameraDistortionParamBlock.cpp
+    src/CameraTimeParamBlock.cpp
+    src/ShapeMatrixParamBlock.cpp
+    src/CameraIntrinsicError.cpp   
+    src/HybridVio.cpp
+    src/initialpvandstd.cpp
+    src/HybridFrontend.cpp
+    src/triangulate.cpp
+    src/triangulateFast.cpp
+    src/VioFrameMatchingAlgorithm.cpp
+    src/HybridFrameRelativeAdapter.cpp
+    src/HybridFrameNoncentralAbsoluteAdapter.cpp
+    src/ImuSimulator.cpp
+    src/TrackResultReader.cpp
+
+    include/okvis/Subscriber.hpp   
+    include/okvis/Player.hpp
+    include/okvis/Publisher.hpp
+    include/okvis/HybridVioParametersReader.hpp
+    include/okvis/RosParametersReader.hpp
+    include/okvis/HybridVio.hpp
+    include/okvis/odeHybrid.hpp
+    include/okvis/ImuSimulator.h
+)
+
+IF(MSCKF2)
+  LIST(APPEND SOURCEFILES
+    include/okvis/msckf2.hpp
+    src/msckf2.cpp
+  )
+ELSE()
+  LIST(APPEND SOURCEFILES
+    include/okvis/HybridFilter.hpp
+    src/HybridFilter.cpp
+  )
+ENDIF()
+
+add_library(${PROJECT_NAME} STATIC
+  ${SOURCEFILES}
+)
+
+include_directories(
+  ${OKVIS_SOURCE_PATH}/okvis_util/include
+  ${OKVIS_SOURCE_PATH}/okvis_kinematics/include
+  ${OKVIS_SOURCE_PATH}/okvis_time/include
+  ${OKVIS_SOURCE_PATH}/okvis_cv/include
+  ${OKVIS_SOURCE_PATH}/okvis_common/include
+  ${OKVIS_SOURCE_PATH}/okvis_ceres/include
+  ${OKVIS_SOURCE_PATH}/okvis_timing/include
+  ${OKVIS_SOURCE_PATH}/okvis_matcher/include
+  ${OKVIS_SOURCE_PATH}/okvis_frontend/include
+  ${OKVIS_SOURCE_PATH}/okvis_multisensor_processing/include
+  ${OKVIS_EXTERNAL_DEP_PATH}/include
+)
 
 # make sure configure headers are built before any node using them
 add_dependencies(${PROJECT_NAME} ${PROJECT_NAME}_gencfg)
 
 target_link_libraries(${PROJECT_NAME}  
-  ${catkin_LIBRARIES}
+  ${catkin_LIBRARIES}  
   okvis_util
   okvis_kinematics
   okvis_time
@@ -85,28 +173,10 @@ target_link_libraries(${PROJECT_NAME}
   pthread
 )
 
-if(VISENSORDRIVER_FOUND)
-  target_link_libraries(${PROJECT_NAME} ${VISensorDriver_LIBRARY})
-endif()
-
-include_directories(
-  okvis/okvis_util/include
-  okvis/okvis_kinematics/include
-  okvis/okvis_time/include
-  okvis/okvis_cv/include
-  okvis/okvis_common/include
-  okvis/okvis_ceres/include
-  okvis/okvis_timing/include
-  okvis/okvis_matcher/include
-  okvis/okvis_frontend/include 
-  okvis/okvis_multisensor_processing/include
-)
 
 # now the actual applications
-add_executable(okvis_node src/okvis_node.cpp )
-target_link_libraries(okvis_node ${PROJECT_NAME} )
-add_executable(okvis_node_synchronous src/okvis_node_synchronous.cpp)
-target_link_libraries(okvis_node_synchronous ${PROJECT_NAME} )
-add_executable(dataset_convertor src/dataset_convertor.cpp)
-target_link_libraries(dataset_convertor ${PROJECT_NAME} )
+add_executable(msckf2_node src/okvis_node.cpp )
+target_link_libraries(msckf2_node ${PROJECT_NAME} )
 
+catkin_add_gtest(allTests test/test_main.cpp)
+target_link_libraries(allTests ${PROJECT_NAME})
