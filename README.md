@@ -41,23 +41,25 @@ You will need to install the following dependencies,
         sudo apt-get install libatlas-base-dev libeigen3-dev libsuitesparse-dev 
         sudo apt-get install libopencv-dev libboost-dev libboost-filesystem-dev
 
-
 then clone the repository from github into your catkin workspace:
 
-    git clone --recursive git@github.com:JzHuai0108/msckf2.git
-
-or
-
     git clone --recursive https://github.com/JzHuai0108/msckf2.git
+
+Also vio_common
+```
+cd workspace/src
+git clone https://github.com/JzHuai0108/vio_common.git
+# then open CMakeLists.txt of vio_common, on line 9, SET(USE_ROS True)
+```
 
 ### Building the project ###
 
 If you have installed okvis_ros in the catkin workspace, then you may need to disable that package by renaming its package.xml file in order to avoid confusing catkin.
 
 From the catkin workspace root, type 
-
-    catkin_make
-    
+```
+    catkin_make --pkg vio_common msckf2
+```
 You will find a demo application in okvis_apps. It can process datasets in the 
 ASL/ETH format.
 
@@ -73,8 +75,7 @@ In order to run a minimal working example, follow the steps below:
 
         ./okvis_apps path/to/okvis_ros/okvis/config/config_fpga_p2_euroc.yaml path/to/MH_01_easy/
 				
-You can also run a dataset processing ros node that will publish topics that can 
-be visualized with rviz
+You can also run a dataset processing ros node that will publish topics that can be visualized with rviz
 
     rosrun okvis_ros okvis_node_synchronous path/to/okvis_ros/okvis/config/config_fpga_p2_euroc.yaml path/to/MH_01_easy/
 

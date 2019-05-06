@@ -97,8 +97,8 @@ int main(int argc, char **argv)
                   "To remap the topics in terminal during rosbag play, in our case, "<< std::endl<<
                   "rosbag play --pause --start=0.0 --rate=1.0 MH_01_easy.bag /cam0/image_raw:=/camera0 /imu0:=/imu"<<std::endl;
       std::cout <<"To run the tests, go to terminal,"<<std::endl<<" catkin_make tests msckf2"<<std::endl<<
-                  "then to run them "<<std::endl<<"rosrun run_tests msckf2";
-      std::cout<<"to visualize it in RVIZ "<<
+                  "then to run them "<<std::endl<<"rosrun run_tests msckf2" << std::endl;
+      std::cout<<"To visualize it in RVIZ "<<
                  "rosrun rviz rviz -d config/rviz.rviz"<<std::endl;
       std::cout <<"To run msckf2 on image sequences or a video and their associated inertial data, "<< std::endl<<
                   "enable the corresponding section in this file, then in a terminal, input "<<std::endl<<

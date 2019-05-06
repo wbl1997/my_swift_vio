@@ -1018,7 +1018,10 @@ bool HybridFrontend::TrailTracking_Start()
   cv::Size subPixWinSize(nSubPixWinWidth,nSubPixWinWidth);
 
   cv::TermCriteria termcrit(CV_TERMCRIT_ITER|CV_TERMCRIT_EPS, 10, 0.03);
-  cv::goodFeaturesToTrack(mCurrentPyramid[0], vfPoints, nToAdd, 0.01, 10, cv::Mat(), 3, 0, 0.04);
+  cv::goodFeaturesToTrack(
+      mCurrentPyramid[0], vfPoints, nToAdd, 
+      0.01, 10, cv::Mat(), 
+      3, false, 0.04);
   cv::cornerSubPix(mCurrentPyramid[0], vfPoints, subPixWinSize, cv::Size(-1,-1), termcrit);
   if(vfPoints.size()<nToThrow)
   {
@@ -1273,7 +1276,10 @@ int HybridFrontend::TrailTracking_DetectAndInsert(const cv::Mat &currentFrame, i
         cv::circle(mMask, lTcIt->fCurrPose, 11, cv::Scalar(0), CV_FILLED);
     }
     double minDist=std::min(currentFrame.size().width/100+1.0, 15.0);
-    cv::goodFeaturesToTrack(currentFrame, vfPoints, nToAdd, 0.01, minDist, mMask, 3, 0, 0.04);
+    cv::goodFeaturesToTrack(
+        currentFrame, vfPoints, nToAdd, 
+        0.01, minDist, mMask,
+        3, false, 0.04);
     cornerSubPix(currentFrame, vfPoints, subPixWinSize, cv::Size(-1,-1), termcrit);
 
     std::cout << "Detected additional " << vfPoints.size() << " points" << std::endl;
@@ -1434,7 +1440,7 @@ void HybridFrontend::printNumFeatureDistribution(std::ofstream & stream){
 
     double total = 0.0;
     stream<<"histogram of number of features in images (bin lower bound, value)"<< std::endl;
-    for( int i = 0; i < hist.size(); i++ )
+    for( size_t i = 0; i < hist.size(); i++ )
     {
         stream << hist[i].first << " " << hist[i].second << std::endl;
         total += hist[i].second;

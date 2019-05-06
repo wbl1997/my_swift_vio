@@ -2,7 +2,6 @@ cmake_minimum_required(VERSION 2.8.3)
 project(msckf2)
 
 SET(USE_ROS TRUE)
-SET(CATKIN_DEVEL_PREFIX $ENV{HOME}/catkin_ws/devel) # this ensures binaries are put into correct location of catkin_ws
 SET(MSCKF2 true) # build with msck2 or hybridfilter
 SET(FIRST_ESTIMATE true) # use the first estimate technique for propagation matrix and measurement Jacobian?
 SET(KLT_MATCHER false) #use calcOpticalFlowPyrLK to track features instead of brisk feature matching
@@ -34,9 +33,7 @@ ENDIF()
 
 message(STATUS "Building MSCKF2 with ${CMAKE_BUILD_TYPE}")
 
-set(OKVIS_EXTERNAL_DEP_PATH $ENV{HOME}/catkin_ws/build)
-
-set(OKVIS_SOURCE_PATH $ENV{HOME}/catkin_ws/src/okvis_ros/okvis)
+set(OKVIS_SOURCE_PATH okvis)
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS}  -Wall -O3 -march=native ")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -O3 -march=native")
 
@@ -56,12 +53,17 @@ find_package(catkin REQUIRED
   image_geometry
 )
 
+find_package(vio_common)
+
+set(CERES_INCLUDE_DIRS ${CMAKE_BINARY_DIR}/include)
+
 # generate dynamic reconfigure stuff
 generate_dynamic_reconfigure_options(cfg/Camera.cfg)
 
 catkin_package(
     DEPENDS
-    CATKIN_DEPENDS rosbag tf roscpp cv_bridge message_runtime std_msgs sensor_msgs
+    CATKIN_DEPENDS rosbag tf roscpp cv_bridge message_runtime 
+        std_msgs sensor_msgs vio_common
     INCLUDE_DIRS include
     LIBRARIES ${PROJECT_NAME}
 )
@@ -70,24 +72,18 @@ catkin_package(
 # doesn't exist yet. Create it at configure time!
 file(MAKE_DIRECTORY ${CATKIN_DEVEL_PREFIX}/include)
 
-# let's pull in the okvis plain cmake project, if okvis has not been built in catkin
-#set(BUILD_SHARED_LIBS OFF)
-#add_subdirectory(okvis)
+# let's pull in the okvis plain cmake project
+set(BUILD_SHARED_LIBS OFF)
+add_subdirectory(okvis)
 
 list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
-find_package( Eigen REQUIRED )
-find_package (Sophus REQUIRED )
-find_package(vio_common REQUIRED)
+find_package(Eigen REQUIRED)
 
 include_directories(
   include
-  ${Sophus_INCLUDE_DIR}
   ${EIGEN_INCLUDE_DIR}
   ${catkin_INCLUDE_DIRS}
-  ${vio_common_INCLUDE_DIRS}
 )
-
-LINK_DIRECTORIES(${CATKIN_DEVEL_PREFIX}/lib)
 
 # compile the ROS dependent stuff into a library
 add_definitions(-fPIC -march=native -Wextra -Winit-self -Woverloaded-virtual
@@ -153,8 +149,12 @@ include_directories(
   ${OKVIS_SOURCE_PATH}/okvis_matcher/include
   ${OKVIS_SOURCE_PATH}/okvis_frontend/include
   ${OKVIS_SOURCE_PATH}/okvis_multisensor_processing/include
-  ${OKVIS_EXTERNAL_DEP_PATH}/include
+  sophus
+  ${vio_common_INCLUDE_DIRS}
+  ${CERES_INCLUDE_DIRS}
 )
+
+add_dependencies(${PROJECT_NAME} okvis_multisensor_processing)
 
 # make sure configure headers are built before any node using them
 add_dependencies(${PROJECT_NAME} ${PROJECT_NAME}_gencfg)
@@ -174,7 +174,6 @@ target_link_libraries(${PROJECT_NAME}
   pthread
   ${vio_common_LIBRARIES}
 )
-
 
 # now the actual applications
 add_executable(msckf2_node src/okvis_node.cpp )

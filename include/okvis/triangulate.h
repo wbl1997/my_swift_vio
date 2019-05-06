@@ -143,7 +143,7 @@ template<class Derived>
   inline typename Derived::Scalar norm_max(const Eigen::MatrixBase<Derived> & v)
   {
       typename Derived::Scalar max = typename Derived::Scalar(-1);
-      for (size_t i=0; i<v.size(); ++i)
+      for (int i=0; i<v.size(); ++i)
       {
         typename Derived::Scalar abs = fabs(v[i]);
         if(abs>max){

@@ -1086,7 +1086,7 @@ void testHybridFilterSinusoid(){
 
     double total = 0.0;
     truthStream<<"histogram of number of features in images (bin lower bound, value)"<< std::endl;
-    for( int i = 0; i < hist.size(); i++ )
+    for( size_t i = 0; i < hist.size(); i++ )
     {
       truthStream << hist[i].first << " " << hist[i].second << std::endl;
       total += hist[i].second;

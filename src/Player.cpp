@@ -82,7 +82,9 @@ void Player::Run()
             rate.sleep();
             continue;
         }
-        std::vector<Eigen::Matrix<double, 7,1> > imuObservations = mIG.measurement;
+        std::vector<Eigen::Matrix<double, 7, 1>, 
+            Eigen::aligned_allocator<Eigen::Matrix<double, 7, 1> > >
+            imuObservations = mIG.measurement;
 
         imuObservations.pop_back(); //remove the first entry which was the last in the previous observations
 
@@ -184,7 +186,8 @@ void Player::RunWithSavedTracks()
             continue;
         }
 
-        std::vector<Eigen::Matrix<double, 7,1> > imuObservations = mIG.measurement;
+        std::vector<Eigen::Matrix<double, 7, 1>, Eigen::aligned_allocator<Eigen::Matrix<double, 7, 1> > >
+            imuObservations = mIG.measurement;
         imuObservations.pop_back(); //remove the first entry which was the last in the previous observations
 
         std::cout <<" start and finish timestamp " <<std::setprecision(12)<< imuObservations.front()[0] <<" "<< imuObservations.back()[0]<<std::endl;

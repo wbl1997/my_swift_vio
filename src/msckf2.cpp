@@ -20,7 +20,7 @@
 #include <okvis/IMUOdometry.h>
 //the following 3 lines are only for testing
 #include "vio/rand_sampler.h"
-#include "vio/IMUErrorModel.cpp"
+#include "vio/IMUErrorModel.h"
 #include <okvis/timing/Timer.hpp>
 #include "vio/eigen_utils.h"
 

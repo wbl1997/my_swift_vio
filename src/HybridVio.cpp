@@ -231,6 +231,7 @@ bool HybridVio::addImuMeasurement(const okvis::Time & stamp,
     if(imuMeasurementsReceived_.Size()>1)
     return imuMeasurementsReceived_.Size() == 1;
   }
+  return true;
 }
 
 // Add a position measurement.

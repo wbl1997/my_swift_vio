@@ -4,3 +4,6 @@
 [submodule "tools/linter"]
 	path = tools/linter
 	url = https://github.com/ethz-asl/linter
+[submodule "sophus"]
+	path = sophus
+	url = https://github.com/stevenlovegrove/Sophus.git
