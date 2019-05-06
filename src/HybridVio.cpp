@@ -2,6 +2,7 @@
 #include <map>
 
 #include <glog/logging.h>
+#include <gflags/gflags.h>
 
 #include <okvis/HybridVio.hpp>
 #include <okvis/assert_macros.hpp>
@@ -12,6 +13,12 @@
 #include <okvis/ceres/CameraDistortionParamBlock.hpp>
 #include <okvis/ceres/CameraTimeParamBlock.hpp>
 #include <okvis/ceres/ShapeMatrixParamBlock.hpp>
+
+DEFINE_bool(
+    use_mahalanobis, true, 
+    "use malalanobis gating test in optimize or a simple projection distance"
+    " threshold in computing jacobians. true by default, set false"
+    " in simulation as it may prune many valid correspondences");
 
 /// \brief okvis Main namespace of this package.
 namespace okvis {

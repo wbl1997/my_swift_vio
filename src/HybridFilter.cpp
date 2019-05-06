@@ -21,14 +21,14 @@
 
 //the following 3 headers are only for testing
 #include "vio/rand_sampler.h"
-#include "vio/IMUErrorModel.cpp"
+#include "vio/IMUErrorModel.h"
 #include <okvis/timing/Timer.hpp>
 
 #include "vio/eigen_utils.h"
 
+DECLARE_bool(use_mahalanobis);
 /// \brief okvis Main namespace of this package.
 namespace okvis {
-#define USE_MAHALANOBIS //use malalanobis gating test in filtering or a simple projection distance threshold in computing jacobians
 const double maxProjTolerance = 10; // maximum tolerable discrepancy between predicted and measured point coordinates in image in pixel units
 
 // Constructor if a ceres map is already available.
@@ -1065,12 +1065,9 @@ bool HybridFilter::computeHxf(const uint64_t hpbid, const MapPoint & mp,
                         " and [r,q]_CA" << T_CA.coeffs().transpose();
         computeHTimer.stop();
         return false;
-    }
-
-#ifndef USE_MAHALANOBIS
-    // either filter outliers with this simple heuristic in here or the mahalanobis distance in optimize
-    else
-    {
+    } else if (!FLAGS_use_mahalanobis) { 
+        // either filter outliers with this simple heuristic in here or 
+        // the mahalanobis distance in optimize
         Eigen::Vector2d discrep = obsInPixel - imagePoint;
         if( std::fabs (discrep[0]) > maxProjTolerance || std::fabs (discrep[1]) > maxProjTolerance)
         {
@@ -1078,7 +1075,6 @@ bool HybridFilter::computeHxf(const uint64_t hpbid, const MapPoint & mp,
             return false;
         }
     }
-#endif
 
     r_i=obsInPixel - imagePoint;
 
@@ -1306,12 +1302,9 @@ bool HybridFilter::computeHoi(const uint64_t hpbid, const MapPoint & mp,
             itFrameIds = frameIds.erase(itFrameIds);
             itRoi = vRi.erase(itRoi); itRoi = vRi.erase(itRoi);
             continue;
-        }
-
-#ifndef USE_MAHALANOBIS
-        //either filter outliers with this simple heuristic in here or the mahalanobis distance in optimize
-        else
-        {
+        } else if (!FLAGS_use_mahalanobis) {
+            // either filter outliers with this simple heuristic in here or 
+            // the mahalanobis distance in optimize
             Eigen::Vector2d discrep = obsInPixel[kale] - imagePoint;
             if( std::fabs (discrep[0]) > maxProjTolerance || std::fabs (discrep[1]) > maxProjTolerance)
             {
@@ -1320,7 +1313,7 @@ bool HybridFilter::computeHoi(const uint64_t hpbid, const MapPoint & mp,
                 continue;
             }
         }
-#endif
+
         vri.push_back(obsInPixel[kale] - imagePoint);    
 
         okvis::kinematics::Transformation lP_T_WB = T_WB;
@@ -1658,14 +1651,14 @@ void HybridFilter::optimize(bool verbose)
             if(!isValidJacobian)
                 continue;
 
-#ifdef USE_MAHALANOBIS
-            // the below test looks time consuming as it involves matrix inversion. alternatively,
-            // some heuristics in computeHoi is used, e.g., ignore correspondences of too large discrepancy
-            /// remove outliders, cf. Li RSS12 optimization based ... eq 6
-            double gamma = r_oi.transpose()*(H_oi*variableCov*H_oi.transpose() + R_oi).inverse()* r_oi;
-            if(gamma > chi2_95percentile[r_oi.rows()])
-                continue;
-#endif
+            if (FLAGS_use_mahalanobis) {
+                // the below test looks time consuming as it involves matrix inversion. alternatively,
+                // some heuristics in computeHoi is used, e.g., ignore correspondences of too large discrepancy
+                /// remove outliders, cf. Li RSS12 optimization based ... eq 6
+                double gamma = r_oi.transpose()*(H_oi*variableCov*H_oi.transpose() + R_oi).inverse()* r_oi;
+                if(gamma > chi2_95percentile[r_oi.rows()])
+                    continue;
+            }
 
             vr_o.push_back(r_oi);
             vR_o.push_back(R_oi);
@@ -1859,16 +1852,16 @@ void HybridFilter::optimize(bool verbose)
                 H_o = Q2.transpose()*H_i;
                 R_o = Q2.transpose()*R_i*Q2;
 
-#ifdef USE_MAHALANOBIS
-                // the below test looks time consuming as it involves matrix inversion. alternatively,
-                // some heuristics in computeHoi is used, e.g., ignore correspondences of too large discrepancy
-                /// remove outliders, cf. Li RSS12 optimization based ... eq 6
-                double gamma = z_o.transpose()*(H_o*variableCov*H_o.transpose() + R_o).inverse()* z_o;
-                if(gamma > chi2_95percentile[z_o.rows()]){
-                    mLandmarkID2Residualize[tempCounter].second = NotInState_NotTrackedNow;
-                    continue;
+                if (FLAGS_use_mahalanobis) {
+                    // the below test looks time consuming as it involves matrix inversion. alternatively,
+                    // some heuristics in computeHoi is used, e.g., ignore correspondences of too large discrepancy
+                    /// remove outliders, cf. Li RSS12 optimization based ... eq 6
+                    double gamma = z_o.transpose()*(H_o*variableCov*H_o.transpose() + R_o).inverse()* z_o;
+                    if(gamma > chi2_95percentile[z_o.rows()]){
+                        mLandmarkID2Residualize[tempCounter].second = NotInState_NotTrackedNow;
+                        continue;
+                    }
                 }
-#endif
 
                 // get homogeneous point parameter block ASSUMING it is created during feature tracking,
                 // reset its estimate with inverse depth parameters [\alpha, \beta, 1, \rho]

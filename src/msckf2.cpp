@@ -24,10 +24,10 @@
 #include <okvis/timing/Timer.hpp>
 #include "vio/eigen_utils.h"
 
+DECLARE_bool(use_mahalanobis);
+
 /// \brief okvis Main namespace of this package.
 namespace okvis {
-#undef USE_MAHALANOBIS //use malalanobis gating test in optimize or a simple projection distance threshold in computing jacobians
-// undefine USE_MAHALANOBIS in simulation as it may prune many valid correspondences, otherwise define it
 const double maxProjTolerance = 7; // maximum tolerable discrepancy between predicted and measured point coordinates in image in pixel
 
 #define USE_AIDP//use anchored inverse depth parameterization for a feature point
@@ -1219,11 +1219,9 @@ bool MSCKF2::computeHoi(const uint64_t hpbid, const MapPoint & mp,
             itFrameIds = frameIds.erase(itFrameIds);
             itRoi = vRi.erase(itRoi); itRoi = vRi.erase(itRoi);
             continue;
-        }      
-#ifndef USE_MAHALANOBIS
-//        either filter outliers with this simple heuristic in here or the mahalanobis distance in optimize
-        else
-        {
+        } else if (!FLAGS_use_mahalanobis) {
+            // either filter outliers with this simple heuristic in here or 
+            // the mahalanobis distance in optimize
             Eigen::Vector2d discrep = obsInPixel[kale] - imagePoint;
             if( std::fabs (discrep[0]) > maxProjTolerance || std::fabs (discrep[1]) > maxProjTolerance)
             {
@@ -1232,7 +1230,6 @@ bool MSCKF2::computeHoi(const uint64_t hpbid, const MapPoint & mp,
                 continue;
             }
         }
-#endif
 
         vri.push_back(obsInPixel[kale] - imagePoint);
 
@@ -1454,12 +1451,9 @@ bool MSCKF2::computeHoi(const uint64_t hpbid, const MapPoint & mp,
             itFrameIds = frameIds.erase(itFrameIds);
             itRoi = vRi.erase(itRoi); itRoi = vRi.erase(itRoi);
             continue;
-        }
-
-#ifndef USE_MAHALANOBIS
-        // either filter outliers with this simple heuristic in computeHoi or the mahalanobis distance in optimize
-        else
-        {
+        } else if (!FLAGS_use_mahalanobis) {
+            // either filter outliers with this simple heuristic in computeHoi or
+            // the mahalanobis distance in optimize
             Eigen::Vector2d discrep = obsInPixel[kale] - imagePoint;
             if( std::fabs (discrep[0]) > maxProjTolerance || std::fabs (discrep[1]) > maxProjTolerance)
             {
@@ -1468,7 +1462,6 @@ bool MSCKF2::computeHoi(const uint64_t hpbid, const MapPoint & mp,
                 continue;
             }
         }
-#endif
 
         vri.push_back(obsInPixel[kale] - imagePoint);
 
@@ -1737,14 +1730,14 @@ void MSCKF2::optimize(bool verbose)
             if(!isValidJacobian)
                 continue;
 
-#ifdef USE_MAHALANOBIS
-            // this test looks time consuming as it involves matrix inversion. alternatively,
-            // some heuristics in computeHoi is used, e.g., ignore correspondences of too large discrepancy
-            // remove outliders, cf. Li ijrr2014 visual inertial navigation with rolling shutter cameras
-            double gamma = r_oi.transpose()*(H_oi*variableCov*H_oi.transpose() + R_oi).inverse()* r_oi;
-            if(gamma > chi2_95percentile[r_oi.rows()])
-                continue;
-#endif
+            if (FLAGS_use_mahalanobis) {
+                // this test looks time consuming as it involves matrix inversion. alternatively,
+                // some heuristics in computeHoi is used, e.g., ignore correspondences of too large discrepancy
+                // remove outliders, cf. Li ijrr2014 visual inertial navigation with rolling shutter cameras
+                double gamma = r_oi.transpose()*(H_oi*variableCov*H_oi.transpose() + R_oi).inverse()* r_oi;
+                if(gamma > chi2_95percentile[r_oi.rows()])
+                    continue;
+            }
 
             vr_o.push_back(r_oi);
             vR_o.push_back(R_oi);
@@ -1984,16 +1977,16 @@ void MSCKF2::optimize(bool verbose)
             continue;
         }
 
-#ifdef USE_MAHALANOBIS
-        // this test looks time consuming as it involves matrix inversion. alternatively,
-        // some heuristics in computeHoi is used, e.g., ignore correspondences of too large discrepancy
-        // remove outliders, cf. Li ijrr2014 visual inertial navigation with rolling shutter cameras
-        double gamma = r_oi.transpose()*(H_oi*variableCov*H_oi.transpose() + R_oi).inverse()* r_oi;
-        if(gamma > chi2_95percentile[r_oi.rows()]){
-            ++culledPoints[1];
-            continue;
+        if (FLAGS_use_mahalanobis) {
+            // this test looks time consuming as it involves matrix inversion. alternatively,
+            // some heuristics in computeHoi is used, e.g., ignore correspondences of too large discrepancy
+            // remove outliders, cf. Li ijrr2014 visual inertial navigation with rolling shutter cameras
+            double gamma = r_oi.transpose()*(H_oi*variableCov*H_oi.transpose() + R_oi).inverse()* r_oi;
+            if(gamma > chi2_95percentile[r_oi.rows()]){
+                ++culledPoints[1];
+                continue;
+            }
         }
-#endif
 
         vr_o.push_back(r_oi);
         vR_o.push_back(R_oi);

@@ -2,9 +2,9 @@ cmake_minimum_required(VERSION 2.8.3)
 project(msckf2)
 
 SET(USE_ROS TRUE)
-SET(MSCKF2 true) # build with msck2 or hybridfilter
-SET(FIRST_ESTIMATE true) # use the first estimate technique for propagation matrix and measurement Jacobian?
-SET(KLT_MATCHER false) #use calcOpticalFlowPyrLK to track features instead of brisk feature matching
+SET(MSCKF2 TRUE) # build with msck2 or hybridfilter
+SET(FIRST_ESTIMATE TRUE) # use the first estimate technique for propagation matrix and measurement Jacobian?
+SET(KLT_MATCHER FALSE) #use calcOpticalFlowPyrLK to track features instead of brisk feature matching
 
 IF(NOT CMAKE_BUILD_TYPE)
   SET(CMAKE_BUILD_TYPE Release)
@@ -173,11 +173,16 @@ target_link_libraries(${PROJECT_NAME}
   okvis_multisensor_processing
   pthread
   ${vio_common_LIBRARIES}
+  gflags
 )
 
+# a wrapper to invoke a specific test
+add_executable(invoke_one_test src/invoke_one_test.cpp )
+target_link_libraries(invoke_one_test ${PROJECT_NAME} )
+
 # now the actual applications
-add_executable(msckf2_node src/okvis_node.cpp )
-target_link_libraries(msckf2_node ${PROJECT_NAME} )
+add_executable(msckf2_node src/okvis_node.cpp)
+target_link_libraries(msckf2_node ${PROJECT_NAME})
 
 catkin_add_gtest(allTests test/test_main.cpp)
 target_link_libraries(allTests ${PROJECT_NAME})

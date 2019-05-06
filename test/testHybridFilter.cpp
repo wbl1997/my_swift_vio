@@ -37,6 +37,8 @@
 using namespace boost;
 using namespace boost::accumulators;
 
+DECLARE_bool(use_mahalanobis);
+
 typedef accumulator_set<double, features<tag::density> > MyAccumulator;
 typedef iterator_range<std::vector<std::pair<double, double> >::iterator > histogram_type;
 
@@ -417,11 +419,13 @@ void testHybridFilterCircle(){
     }
 }
 
-/// undef #USE_MAHALANOBIS in test msckf2 or hybridfilter using simulation because many points are pruned as outliers
+
 // TODO: curiously, MSCKF2 or IEKF often diverges after 300 seconds.
 // Note the std for noises used in covariance propagation should be slightly larger than the std used in sampling noises,
 // becuase the process model involves many approximations other than these noise terms.
 void testHybridFilterSinusoid(){
+    FLAGS_use_mahalanobis = false;
+    // set USE_MAHALANOBIS false in test msckf2 or hybridfilter using simulation because many points are pruned as outliers
     const size_t runs= 100; //number of monto carlo runs
     const double DURATION = 300.0;  // length of motion in seconds
     const double IMU_RATE = 100.0;  // Hz
