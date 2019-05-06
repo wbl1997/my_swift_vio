@@ -16,14 +16,12 @@
 #include <okvis/ceres/CameraDistortionParamBlock.hpp>
 #include <okvis/ceres/CameraTimeParamBlock.hpp>
 #include <okvis/ceres/ShapeMatrixParamBlock.hpp>
-
+#include <okvis/timing/Timer.hpp>
 #include <okvis/IMUOdometry.h>
 
 //the following 3 headers are only for testing
 #include "vio/rand_sampler.h"
 #include "vio/IMUErrorModel.h"
-#include <okvis/timing/Timer.hpp>
-
 #include "vio/eigen_utils.h"
 
 DECLARE_bool(use_mahalanobis);
@@ -50,7 +48,8 @@ HybridFilter::HybridFilter(
       updateCovarianceTimer("2.4 updateCovariance", true),
       updateLandmarksTimer("2.5 updateLandmarks", true),
       marginalizeTimer("3. applyMarginalization", true),
-      mM(0), mbUseExternalInitialPose(false)
+      mM(0), mbUseExternalInitialPose(false),
+      mTrackLengthAccumulator(100, 0)
 {
 
 }
@@ -73,7 +72,8 @@ HybridFilter::HybridFilter(const double readoutTime)
       updateCovarianceTimer("2.4 updateCovariance", true),
       updateLandmarksTimer("2.5 updateLandmarks", true),
       marginalizeTimer("3. applyMarginalization", true),
-      mM(0), mbUseExternalInitialPose(false)
+      mM(0), mbUseExternalInitialPose(false),
+      mTrackLengthAccumulator(100, 0)
 {
 
 }
@@ -569,23 +569,6 @@ bool HybridFilter::removeObservation(uint64_t landmarkId, uint64_t poseId,
     return true;
 }
 
-/**
- * @brief Does a vector contain a certain element.
- * @tparam Class of a vector element.
- * @param vector Vector to search element in.
- * @param query Element to search for.
- * @return True if query is an element of vector.
- */
-template<class T>
-bool vectorContains(const std::vector<T> & vector, const T & query){
-    for(size_t i=0; i<vector.size(); ++i){
-        if(vector[i] == query){
-            return true;
-        }
-    }
-    return false;
-}
-
 // Applies the dropping/marginalization strategy, i.e., state management,
 // according to Li and Mourikis RSS 12 optimization based thesis
 bool HybridFilter::applyMarginalizationStrategy()
@@ -657,7 +640,7 @@ bool HybridFilter::applyMarginalizationStrategy()
                     Eigen::Vector3d abrhoi(ab1rho[0],ab1rho[1],ab1rho[3]);
                     Eigen::Vector3d abrhoj;
                     Eigen::Matrix<double, 3, 9> jacobian;
-                    reparameterize_AIDP(T_GA.C(), T_GC.C(), abrhoi, T_GA.r(), T_GC.r(), abrhoj, &jacobian);
+                    vio::reparameterize_AIDP(T_GA.C(), T_GC.C(), abrhoi, T_GA.r(), T_GC.r(), abrhoj, &jacobian);
 
                     reparamJacobian.setZero();
                     size_t startRowC= numNavImuCamStates + 9* mStateID2CovID_[currFrameId];
@@ -746,7 +729,7 @@ bool HybridFilter::applyMarginalizationStrategy()
     {
         vRowStartInterval.push_back(std::make_pair(startKeptRow, covDim_ - startKeptRow));
     }
-    covariance_ = extractBlocks(covariance_, vRowStartInterval, vRowStartInterval);
+    covariance_ = vio::extractBlocks(covariance_, vRowStartInterval, vRowStartInterval);
 
     for(auto it= toRemoveLmIds.begin(), itEnd= toRemoveLmIds.end(); it!=itEnd; ++it){
         std::deque<uint64_t>::iterator idPos = std::find(mInCovLmIds.begin(), mInCovLmIds.end(), *it);
@@ -1414,7 +1397,7 @@ bool HybridFilter::computeHoi(const uint64_t hpbid, const MapPoint & mp,
         *pH_fi = H_fi;
     }
     else{
-        Eigen::MatrixXd nullQ= nullspace(H_fi);// 2nx(2n-3), n==numValidObs
+        Eigen::MatrixXd nullQ = vio::nullspace(H_fi);// 2nx(2n-3), n==numValidObs
         OKVIS_ASSERT_EQ_DBG(Exception, nullQ.cols(), (int)(2*numValidObs-3), "Nullspace of Hfi should have 2n-3 columns");
         //    OKVIS_ASSERT_LT(Exception, (nullQ.transpose()* H_fi).norm(), 1e-6, "nullspace is not correct!");
         r_oi.noalias()= nullQ.transpose()*ri;
@@ -1562,6 +1545,11 @@ void HybridFilter::updateStates(const Eigen::Matrix<double, Eigen::Dynamic, 1> &
     }
     OKVIS_ASSERT_EQ_DBG(Exception, aStart + 3, (size_t)deltaX.rows(), "deltaX size not equal to what's' expected.");
     updateStatesTimer.stop();
+}
+
+void HybridFilter::optimize(size_t /*numIter*/, size_t /*numThreads*/, bool /*verbose*/) {
+    OKVIS_ASSERT_TRUE(Exception, 0, 
+        "This dummy implementation of optimize should never be called!");
 }
 
 // TODO: theoretically the filtering update step can run several times for one set of observations, i.e., iterative EKF
@@ -1847,7 +1835,7 @@ void HybridFilter::optimize(bool verbose)
                     continue;
                 }
 
-                leftNullspaceAndColumnSpace(H_fi, &Q2, &Q1);
+                vio::leftNullspaceAndColumnSpace(H_fi, &Q2, &Q1);
                 z_o = Q2.transpose()*r_i;
                 H_o = Q2.transpose()*H_i;
                 R_o = Q2.transpose()*R_i*Q2;
@@ -2446,7 +2434,7 @@ okvis::Time HybridFilter::firstStateTimestamp()
 void HybridFilter::checkStates(){
 
     const std::string truthFile = "okvis_estimator_output.csv";
-    static CsvReader gg(truthFile); //ground truth file
+    static vio::CsvReader gg(truthFile); //ground truth file
     okvis::Time currentTime = statesMap_.rbegin()->second.timestamp;
     static Eigen::Matrix<double, 18,1> gtCurrState, gtPrevState;
     while(1){
@@ -2712,4 +2700,47 @@ void HybridFilter::printTrackLengthHistogram(std::ostream& mDebug)
         mDebug<<bin<<" "<< *it<< std::endl;
 
 }
+
+uint64_t HybridFilter::getCameraCalibrationEstimate(Eigen::Matrix<double,10,1>& vfckptdr){
+
+    const int camIdx =0;
+    const uint64_t poseId =statesMap_.rbegin()->first;
+    Eigen::Matrix<double, 4/*cameras::PinholeCamera::NumProjectionIntrinsics*/, 1> intrinsic;
+    getSensorStateEstimateAs<ceres::CameraIntrinsicParamBlock>(
+                poseId, camIdx, SensorStates::Camera, CameraSensorStates::Intrinsic,intrinsic);
+    Eigen::Matrix<double,  cameras::RadialTangentialDistortion::NumDistortionIntrinsics, 1> distortionCoeffs;
+    getSensorStateEstimateAs<ceres::CameraDistortionParamBlock>(
+                poseId, camIdx, SensorStates::Camera, CameraSensorStates::Distortion, distortionCoeffs);
+
+    vfckptdr.head<4>()= intrinsic;
+    vfckptdr.segment<cameras::RadialTangentialDistortion::NumDistortionIntrinsics>(4) = distortionCoeffs;
+    double tdEstimate(0), trEstimate(0);
+    getSensorStateEstimateAs<ceres::CameraTimeParamBlock>(
+                poseId, camIdx, SensorStates::Camera, CameraSensorStates::TD, tdEstimate);
+    getSensorStateEstimateAs<ceres::CameraTimeParamBlock>(
+                poseId, camIdx, SensorStates::Camera, CameraSensorStates::TR, trEstimate);
+    vfckptdr.tail<2>() = Eigen::Vector2d(tdEstimate, trEstimate);
+    return poseId;
+}
+
+uint64_t HybridFilter::getTgTsTaEstimate(Eigen::Matrix<double,27,1>& vTGTSTA){
+    const uint64_t poseId =statesMap_.rbegin()->first;
+    Eigen::Matrix<double, 9, 1> vSM;
+    getSensorStateEstimateAs<ceres::ShapeMatrixParamBlock>(
+                poseId, 0, SensorStates::Imu, ImuSensorStates::TG, vSM);
+    vTGTSTA.head<9>() = vSM;
+    getSensorStateEstimateAs<ceres::ShapeMatrixParamBlock>(
+                poseId, 0, SensorStates::Imu, ImuSensorStates::TS, vSM);
+    vTGTSTA.segment<9>(9) = vSM;
+    getSensorStateEstimateAs<ceres::ShapeMatrixParamBlock>(
+                poseId, 0, SensorStates::Imu, ImuSensorStates::TA, vSM);
+    vTGTSTA.tail<9>() = vSM;
+    return poseId;
+}
+
+void HybridFilter::getVariance(Eigen::Matrix<double, 55, 1 >& variances)
+{
+    variances = covariance_.topLeftCorner<55, 55>().diagonal();
+}
+
 }  // namespace okvis

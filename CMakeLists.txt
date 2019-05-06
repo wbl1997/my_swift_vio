@@ -111,6 +111,7 @@ LIST(APPEND SOURCEFILES
     src/HybridFrameNoncentralAbsoluteAdapter.cpp
     src/ImuSimulator.cpp
     src/TrackResultReader.cpp
+    src/HybridFilter.cpp
 
     include/okvis/Subscriber.hpp   
     include/okvis/Player.hpp
@@ -120,17 +121,13 @@ LIST(APPEND SOURCEFILES
     include/okvis/HybridVio.hpp
     include/okvis/odeHybrid.hpp
     include/okvis/ImuSimulator.h
+    include/okvis/HybridFilter.hpp
 )
 
 IF(MSCKF2)
   LIST(APPEND SOURCEFILES
     include/okvis/msckf2.hpp
     src/msckf2.cpp
-  )
-ELSE()
-  LIST(APPEND SOURCEFILES
-    include/okvis/HybridFilter.hpp
-    src/HybridFilter.cpp
   )
 ENDIF()
 

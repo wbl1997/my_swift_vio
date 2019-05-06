@@ -44,7 +44,7 @@ namespace okvis {
  C: Camera
  S: Sensor (IMU)
  */
-class HybridFilter //: public VioBackendInterface
+class HybridFilter : public VioBackendInterface
 {
  public:
   OKVIS_DEFINE_EXCEPTION(Exception, std::runtime_error)
@@ -105,7 +105,7 @@ class HybridFilter //: public VioBackendInterface
    * please make sure the world frame has z axis in negative gravity direction which is assumed in the IMU propagation
    * Only one IMU is supported for now
    */
-  bool addStates(okvis::MultiFramePtr multiFrame,
+  virtual bool addStates(okvis::MultiFramePtr multiFrame,
                  const okvis::ImuMeasurementDeque & imuMeasurements,
                  bool asKeyframe);
 
@@ -153,7 +153,7 @@ class HybridFilter //: public VioBackendInterface
    *        The new number of frames in the window will be numKeyframes+numImuFrames.
    * @return True if successful.
    */
-  bool applyMarginalizationStrategy();
+  virtual bool applyMarginalizationStrategy();
 
   /**
    * @brief Initialise pose from IMU measurements. For convenience as static.
@@ -168,7 +168,9 @@ class HybridFilter //: public VioBackendInterface
   /**
    * @brief Hybrid filtering.
    */
-  void optimize(bool verbose = false);
+  virtual void optimize(bool verbose = false);
+
+  virtual void optimize(size_t numIter, size_t numThreads = 1, bool verbose = false) final;
 
   /**
    * @brief Set a time limit for the optimization process.
@@ -603,7 +605,7 @@ public://huai
 
 public:
   //set intermediate variables which are used for computing Jacobians of feature point observations
-  void retrieveEstimatesOfConstants(const cameras::NCameraSystem& oldCameraSystem);
+  virtual void retrieveEstimatesOfConstants(const cameras::NCameraSystem& oldCameraSystem);
 
   okvis::Time firstStateTimestamp();
 
@@ -621,7 +623,7 @@ public:
    * @param hpbid
    * @return v4Xhomog
    */
-  bool triangulateAMapPoint(const MapPoint & mp, std::vector<Eigen::Vector2d >& obsInPixel,
+  virtual bool triangulateAMapPoint(const MapPoint & mp, std::vector<Eigen::Vector2d >& obsInPixel,
                             std::vector<uint64_t >& frameIds, Eigen::Vector4d& v4Xhomog, std::vector<double>& vR_oi,
                             const okvis::cameras::PinholeCamera<
                                           okvis::cameras::RadialTangentialDistortion >& cameraGeometry,
@@ -658,7 +660,8 @@ public:
   bool computeHoi(const uint64_t hpbid, const MapPoint & mp, Eigen::Matrix<double, Eigen::Dynamic, 1>& r_oi,
                   Eigen::MatrixXd& H_oi, Eigen::MatrixXd& R_oi, Eigen::Vector4d& ab1rho, Eigen::Matrix<double, Eigen::Dynamic, 3>* pH_fi =
           (Eigen::Matrix<double, Eigen::Dynamic, 3>*)(NULL));
-  void updateStates(const Eigen::Matrix<double, Eigen::Dynamic, 1> &deltaX);
+
+  virtual void updateStates(const Eigen::Matrix<double, Eigen::Dynamic, 1> &deltaX);
 
   /// OBSOLETE: check states by comparing current estimates with the ground truth.
   /// To use this function, make sure the ground truth is linked correctly
@@ -678,10 +681,28 @@ public:
       pvstd_ = rhs;
       mbUseExternalInitialPose = bUseExternalPose;
   }
-
+ 
   size_t numObservations(uint64_t landmarkId);
+  /**
+   * @brief getCameraCalibrationEstimate, get the latest estimate of camera calibration parameters
+   * @param vfckptdr
+   * @return the last pose id
+   */
+  uint64_t getCameraCalibrationEstimate(Eigen::Matrix<double,10,1>& vfckptdr);
+  /**
+   * @brief getTgTsTaEstimate, get the lastest estimate of Tg Ts Ta with entries in row major order
+   * @param vTGTSTA
+   * @return the last pose id
+   */
+  uint64_t getTgTsTaEstimate(Eigen::Matrix<double,27,1>& vTGTSTA);
 
-  size_t covDim_; ///< rows(cols) of covariance, dynamically changes, 15+27+13+9m+3s_k, m states in the sliding window, s_k features in states
+  /**
+   * @brief get variance for evolving states(p_GB, q_GB, v_GB, bg, ba), Tg Ts Ta, p_CB, fxy, cxy, k1, k2, p1, p2, td, tr
+   * @param variances
+   */
+  void getVariance(Eigen::Matrix<double, 55, 1 >& variances);
+
+  size_t covDim_; ///< rows(cols) of covariance, dynamically changes
   Eigen::MatrixXd covariance_; ///< covariance of the error vector of all states, error is defined as \tilde{x} = x - \hat{x} except for rotations
   /// the error vector corresponds to states x_B | x_imu | x_c | \pi{B_{N-m}} ... \pi{B_{N-1}} following Li icra 2014
   /// x_B = [^{G}p_B] ^{G}q_B ^{G}v_B b_g b_a]
@@ -692,6 +713,10 @@ public:
 
   // intermediate variables used for computeHoi and computeHxf, refresh them with retrieveEstimatesOfConstants before calling it
   size_t numCamPosePointStates_; //the variables in the states involved in compute Jacobians for a feature, including the camera intrinsics, all cloned states, and all feature states
+
+  // intermediate variables used for computeHoi, refresh them with retrieveEstimatesOfConstants before calling it
+  size_t nVariableDim_; // local dimension of variables used in computing feature Jacobians, including the camera intrinsics, all cloned states except the most recent one
+  
   std::map<uint64_t, int> mStateID2CovID_; //maps state id to the ordered cloned states in the covariance matrix
   kinematics::Transformation T_SC0_;
   uint32_t imageHeight_;
@@ -712,7 +737,7 @@ public:
   // 2 a point not in states is tracked in current frame and to be included in states
   // 3 a point in the states is not tracked in current frame,
   // 4 a points in states is tracked in current frame
-
+  // MSCKF2 only handles the first two cases
 
   uint64_t minValidStateID; //the minimum of the ids of the states that have tracked features
 
@@ -734,7 +759,11 @@ public:
   size_t mM; // number of \delta(pos, \theta, vel) states in the whole state vector
   InitialPVandStd pvstd_;
   bool mbUseExternalInitialPose; // do we use external pose for initialization
-  static const size_t mMaxM = 12; // maximum number of such states, currently set to 15, but can be set dynamically as done in Li, icra14 optimization based ...
+
+  // maximum number of consecutive observations until a landmark is added as a state, 
+  // but can be set dynamically as done in Li, icra14 optimization based ...
+  static const size_t mMaxM = 12; // specific to HybridFilter
+  
   std::vector<size_t> mTrackLengthAccumulator; // histogram of the track lengths, start from 0,1,2, to a fixed number
 };
 
@@ -975,6 +1004,23 @@ const double chi2_95percentile[]={
     233, 269.6076732,
     234, 270.6838679
 };
+
+/**
+ * @brief Does a vector contain a certain element.
+ * @tparam Class of a vector element.
+ * @param vector Vector to search element in.
+ * @param query Element to search for.
+ * @return True if query is an element of vector.
+ */
+template<class T>
+bool vectorContains(const std::vector<T> & vector, const T & query){
+    for(size_t i=0; i<vector.size(); ++i){
+        if(vector[i] == query){
+            return true;
+        }
+    }
+    return false;
+}
 
 }  // namespace okvis
 
