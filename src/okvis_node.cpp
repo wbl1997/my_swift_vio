@@ -70,20 +70,29 @@ DEFINE_int32(load_input_option, 1,
     "0, get input by subscribing to ros topics"
     "1, get input by reading files on a hard drive");
 
+static void displayArgs(const int argc, char **argv) {
+  std::cout << "args\n";
+  for (int i=0; i<argc; ++i) {
+    std::cout << i << " " << argv[i] << std::endl;
+  }
+  std::cout << std::endl;
+}
+
 int main(int argc, char **argv)
 {
-  ros::init(argc, argv, "okvis_node");
-
-  // set up the node
-  ros::NodeHandle nh("okvis_node");
-
-  google::ParseCommandLineFlags(&argc, &argv, false);
+  displayArgs(argc, argv);
+  
+  google::ParseCommandLineFlags(&argc, &argv, true); // true to strip gflags
   google::InitGoogleLogging(argv[0]);
   FLAGS_logtostderr = 1;
   FLAGS_stderrthreshold = 0; // INFO: 0, WARNING: 1, ERROR: 2, FATAL: 3
   FLAGS_colorlogtostderr = 1;
-
+  displayArgs(argc, argv);
+  ros::init(argc, argv, "okvis_node");
+  // set up the node
+  ros::NodeHandle nh("okvis_node");
   okvis::Publisher publisher(nh);
+  displayArgs(argc, argv);
 
   std::string configFilename;
   if (argc >= 2) {
@@ -100,7 +109,7 @@ int main(int argc, char **argv)
       std::cout<<"To visualize it in RVIZ "<<
                  "rosrun rviz rviz -d config/rviz.rviz"<<std::endl;
       std::cout <<"To run msckf2 on image sequences or a video and their associated inertial data, "<< std::endl<<
-                  "enable the corresponding section in this file, then in a terminal, input "<<std::endl<<
+                  "set load_input_option properly as an input argument, then in a terminal, input "<<std::endl<<
                   "msckf2 /path/to/config/file.yaml"<<std::endl;
       std::cout << "Set publishing_options.publishImuPropagatedState to false "
                    "in the settings.yaml to only save optimized states" << std::endl;
@@ -172,20 +181,21 @@ int main(int argc, char **argv)
                 &publisher,std::placeholders::_1,std::placeholders::_2));
   publisher.setParameters(parameters); // pass the specified publishing stuff
 
+  // player to grab messages directly from files on a hard drive
+  std::shared_ptr<okvis::Player> pPlayer;
+  std::shared_ptr<std::thread> ptPlayer;
   if (FLAGS_load_input_option == 0) {
     okvis::Subscriber subscriber(nh, &okvis_estimator, vio_parameters_reader);
   } else {
-    // player to grab messages directly from files on a hard drive
-    std::shared_ptr<okvis::Player> pPlayer;
-    std::shared_ptr<std::thread> ptPlayer;
     if(parameters.input.videoFile.empty()){//image sequence input
       pPlayer.reset(new okvis::Player(&okvis_estimator, parameters, std::string()));
       ptPlayer.reset(new std::thread(&okvis::Player::Run, std::ref(*pPlayer)));
     }
     else//video input
     {
+      std::cout << "working with video file 1" << parameters.input.videoFile << std::endl;
       pPlayer.reset(new okvis::Player(&okvis_estimator, parameters));
-      ptPlayer.reset(new std::thread(&okvis::Player::RunWithSavedTracks, std::ref(*pPlayer)));
+      ptPlayer.reset(new std::thread(&okvis::Player::Run, std::ref(*pPlayer)));
     }
   }
 

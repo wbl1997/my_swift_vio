@@ -162,7 +162,7 @@ bool HybridFrontend::dataAssociationAndInitialization(
   }
   matchToLastFrameTimer.stop();
 
-#elseif USE_BRISK
+#elif defined(USE_BRISK)
 
   int num3dMatches = 0;
 
@@ -540,7 +540,8 @@ int HybridFrontend::matchToLastFrame(
       UpdateEstimatorObservations(estimator, lastFrameId, currentFrameId, im, im);
   }
   ++mFrameCounter;
-#elseif USE_BRISK
+
+#elif defined(USE_BRISK)
   if (estimator.numFrames() < 2) {
     return 0;
   }
@@ -595,7 +596,7 @@ int HybridFrontend::matchToLastFrame(
   if (!isInitialized_)
     inliers2d2d = runRansac2d2d(estimator, params, currentFrameId, lastFrameId, false,
                   removeOutliers, rotationOnly);
-#else
+#else # load saved tracking result by an external module
 
   std::shared_ptr<okvis::MultiFrame> frameB = estimator.multiFrame(currentFrameId);
 

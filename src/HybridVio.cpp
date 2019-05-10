@@ -464,8 +464,14 @@ void HybridVio::matchingLoop() {
     okvis::Time imuDataEndTime = frame->timestamp() + temporal_imu_data_overlap;
     okvis::Time imuDataBeginTime = lastAddedStateTimestamp_
         - temporal_imu_data_overlap;
+    if (imuDataBeginTime.toSec() == 0.0) { // first state not yet added
+        imuDataBeginTime = frame->timestamp() - temporal_imu_data_overlap;
+    }
     if(imuDataEndTime - imuDataBeginTime > Duration(8)) // at maximum Duration(.) sec of data is allowed, 1sec is a conservative number
     {
+        std::cout << imuDataEndTime << " " << imuDataBeginTime << " "
+                  << frame->timestamp() << " " << temporal_imu_data_overlap
+                  << " " << lastAddedStateTimestamp_ << std::endl;
         LOG(WARNING) << "Warn: Too long interval between two frames "<< lastAddedStateTimestamp_.toSec() << " and "<< frame->timestamp().toSec();
         imuDataBeginTime = imuDataEndTime - Duration(8);
     }

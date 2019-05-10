@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 2.8.3)
 project(msckf2)
-
+# uncomment the following if you are using qtcreator to load the cmakelists.txt
+SET(CATKIN_DEVEL_PREFIX /home/jhuai/docker_documents/vins_ws/devel) # this ensures binaries are put into correct location of catkin_ws
 SET(USE_ROS TRUE)
 SET(MSCKF2 TRUE) # build with msck2 or hybridfilter
 SET(FIRST_ESTIMATE TRUE) # use the first estimate technique for propagation matrix and measurement Jacobian?
@@ -27,7 +28,7 @@ ENDIF()
 IF(KLT_MATCHER)
   ADD_DEFINITIONS(-DUSE_KLT)
 ELSEIF(1)
-  #ADD_DEFINITIONS(-DUSE_BRISK)
+  ADD_DEFINITIONS(-DUSE_BRISK)
   #ADD_DEFINITIONS(-DDEACTIVATE_TIMERS)
 ENDIF()
 
