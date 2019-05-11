@@ -67,7 +67,8 @@ void Player::Run()
         }
         okvis::Time t(frameTime);
         t -= okvis::Duration(vioParameters_.sensors_information.imageDelay);
-        std::cout <<"read in frame at "<<std::setprecision(12)<<t.toSec()<<std::endl;
+        std::cout << "read in frame at "<< std::setprecision(12) << t.toSec()
+                  << " id " << mFG.getCurrentId() << std::endl;
         vioInterface_->addImage(t, 0, filtered, NULL, mFG.getCurrentId());
 
         // add corresponding imu data

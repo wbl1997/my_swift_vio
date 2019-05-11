@@ -163,15 +163,8 @@ bool HybridFrontend::dataAssociationAndInitialization(
   matchToLastFrameTimer.stop();
 
 #elif defined(USE_BRISK)
-
-  int num3dMatches = 0;
-
   // first frame? (did do addStates before, so 1 frame minimum in estimator)
   if (estimator.numFrames() > 1) {
-
-    int requiredMatches = 5;
-
-    double uncertainMatchFraction = 0;
     bool rotationOnly = false;
 
 
@@ -595,7 +588,7 @@ int HybridFrontend::matchToLastFrame(
   if (!isInitialized_)
     inliers2d2d = runRansac2d2d(estimator, params, currentFrameId, lastFrameId, false,
                   removeOutliers, rotationOnly);
-#else # load saved tracking result by an external module
+#else // load saved tracking result by an external module
 
   std::shared_ptr<okvis::MultiFrame> frameB = estimator.multiFrame(currentFrameId);
 

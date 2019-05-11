@@ -80,19 +80,15 @@ static void displayArgs(const int argc, char **argv) {
 
 int main(int argc, char **argv)
 {
-  displayArgs(argc, argv);
-  
   google::ParseCommandLineFlags(&argc, &argv, true); // true to strip gflags
   google::InitGoogleLogging(argv[0]);
   FLAGS_logtostderr = 1;
   FLAGS_stderrthreshold = 0; // INFO: 0, WARNING: 1, ERROR: 2, FATAL: 3
   FLAGS_colorlogtostderr = 1;
-  displayArgs(argc, argv);
+
   ros::init(argc, argv, "okvis_node");
-  // set up the node
   ros::NodeHandle nh("okvis_node");
   okvis::Publisher publisher(nh);
-  displayArgs(argc, argv);
 
   std::string configFilename;
   if (argc >= 2) {

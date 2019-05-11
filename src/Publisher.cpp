@@ -49,13 +49,17 @@
 
 #include <okvis/FrameTypedefs.hpp>
 
+DEFINE_string(datafile_separator, ",",
+              "the separator used for a ASCII output file");
+
 /// \brief okvis Main namespace of this package.
 namespace okvis {
 
 // Default constructor.
-Publisher::Publisher()
+Publisher::Publisher(const DUMP_RESULT_OPTION dro)
     : nh_(nullptr),
-      ctr2_(0)
+      ctr2_(0),
+      result_option_(dro)
 {
 }
 
@@ -67,10 +71,14 @@ Publisher::~Publisher()
         if (csvLandmarksFile_->good()) {
             for (size_t l = 0; l < pointsMatched2_.size(); ++l) {
                 Eigen::Vector4d landmark = pointsMatched2_.at(l).pointHomog;
-                *csvLandmarksFile_ << std::setprecision(19) << pointsMatched2_.at(l).id
-                                   << ", " << std::scientific << std::setprecision(18) << landmark[0]
-                                   << ", " << landmark[1] << ", " << landmark[2] << ", " << landmark[3]
-                                   << ", " << pointsMatched2_.at(l).quality << std::endl;
+                *csvLandmarksFile_
+                        << std::setprecision(19) << pointsMatched2_.at(l).id
+                        << FLAGS_datafile_separator << std::scientific
+                        << std::setprecision(18) << landmark[0]
+                        << FLAGS_datafile_separator << landmark[1]
+                        << FLAGS_datafile_separator << landmark[2]
+                        << FLAGS_datafile_separator << landmark[3]
+                        << FLAGS_datafile_separator << pointsMatched2_.at(l).quality << std::endl;
             }
         }
         csvLandmarksFile_->close();
@@ -80,8 +88,8 @@ Publisher::~Publisher()
 }
 
 // Constructor. Calls setNodeHandle().
-Publisher::Publisher(ros::NodeHandle& nh)
-    : Publisher()
+Publisher::Publisher(ros::NodeHandle& nh, const DUMP_RESULT_OPTION dro)
+    : Publisher(dro)
 {
     setNodeHandle(nh);
 }
@@ -153,19 +161,51 @@ bool Publisher::writeCsvDescription()
         return false;
     if (!csvFile_->good())
         return false;
-    //TODO: output different header line based on the output writing function
-    *csvFile_ << "%timestamp" << ", frameIdInSource, " << "p_WS_W_x" << ", " << "p_WS_W_y" << ", "
-              << "p_WS_W_z" << ", " << "q_WS_x" << ", " << "q_WS_y" << ", "
-              << "q_WS_z" << ", " << "q_WS_w" << ", " << "v_WS_W_x" << ", "
-              << "v_WS_W_y" << ", " << "v_WS_W_z" << ", " << "b_g_x[rad/s]" << ", "
-              << "b_g_y" << ", " << "b_g_z" << ", " << "b_a_x[m/s^2]" << ", " << "b_a_y"
-              << ", " << "b_a_z, " << "p_SC_S_x[m]" << ", " << "p_SC_S_y" << ", "
-              << "p_SC_S_z" << ", " << "q_SC_x" << ", " << "q_SC_y" << ", "
-              << "q_SC_z" << ", " << "q_SC_w";
-    *csvFile_<<", Optional Tg_1, Tg_2, Tg_3, Tg_4, Tg_5, Tg_6, Tg_7, Tg_8, Tg_9, "
-               "Ts_1, Ts_2, Ts_3, Ts_4, Ts_5, Ts_6, Ts_7, Ts_8, Ts_9, "
-               "Ta_1, Ta_2, Ta_3, Ta_4, Ta_5, Ta_6, Ta_7, Ta_8, Ta_9, "
-               "fx[pixel], fy, cx, cy, k1, k2, p1, p2, td[s], tr[s]"<<std::endl;
+
+    *csvFile_ << "%timestamp" << FLAGS_datafile_separator << "frameIdInSource"
+              << FLAGS_datafile_separator << "p_WS_W_x" << FLAGS_datafile_separator
+              << "p_WS_W_y" << FLAGS_datafile_separator
+              << "p_WS_W_z" << FLAGS_datafile_separator << "q_WS_x" << FLAGS_datafile_separator
+              << "q_WS_y" << FLAGS_datafile_separator
+              << "q_WS_z" << FLAGS_datafile_separator << "q_WS_w" << FLAGS_datafile_separator
+              << "v_WS_W_x" << FLAGS_datafile_separator
+              << "v_WS_W_y" << FLAGS_datafile_separator << "v_WS_W_z" << FLAGS_datafile_separator
+              << "b_g_x[rad/s]" << FLAGS_datafile_separator
+              << "b_g_y" << FLAGS_datafile_separator << "b_g_z" << FLAGS_datafile_separator
+              << "b_a_x[m/s^2]" << FLAGS_datafile_separator << "b_a_y"
+              << FLAGS_datafile_separator << "b_a_z";
+    if (result_option_ == FULL_STATE_WITH_EXTRINSICS) {
+        *csvFile_
+                << FLAGS_datafile_separator << "Tg_1" << FLAGS_datafile_separator
+                << "Tg_2" << FLAGS_datafile_separator << "Tg_3" << FLAGS_datafile_separator
+                << "Tg_4" << FLAGS_datafile_separator << "Tg_5" << FLAGS_datafile_separator
+                << "Tg_6" << FLAGS_datafile_separator << "Tg_7" << FLAGS_datafile_separator
+                << "Tg_8" << FLAGS_datafile_separator << "Tg_9" << FLAGS_datafile_separator
+                << "Ts_1" << FLAGS_datafile_separator << "Ts_2" << FLAGS_datafile_separator
+                << "Ts_3" << FLAGS_datafile_separator << "Ts_4" << FLAGS_datafile_separator
+                << "Ts_5" << FLAGS_datafile_separator << "Ts_6" << FLAGS_datafile_separator
+                << "Ts_7" << FLAGS_datafile_separator << "Ts_8" << FLAGS_datafile_separator
+                << "Ts_9" << FLAGS_datafile_separator << "Ta_1" << FLAGS_datafile_separator
+                << "Ta_2" << FLAGS_datafile_separator << "Ta_3" << FLAGS_datafile_separator
+                << "Ta_4" << FLAGS_datafile_separator << "Ta_5" << FLAGS_datafile_separator
+                << "Ta_6" << FLAGS_datafile_separator << "Ta_7" << FLAGS_datafile_separator
+                << "Ta_8" << FLAGS_datafile_separator << "Ta_9" << FLAGS_datafile_separator
+                << "p_SC_S_x[m]" << FLAGS_datafile_separator << "p_SC_S_y"
+                << FLAGS_datafile_separator << "p_SC_S_z" << FLAGS_datafile_separator
+                << "fx[pixel]" << FLAGS_datafile_separator << "fy" << FLAGS_datafile_separator
+                << "cx" << FLAGS_datafile_separator << "cy" << FLAGS_datafile_separator
+                << "k1" << FLAGS_datafile_separator << "k2" << FLAGS_datafile_separator
+                << "p1" << FLAGS_datafile_separator << "p2" << FLAGS_datafile_separator
+                << "td[s]" << FLAGS_datafile_separator << "tr[s]";
+    } else if (result_option_ == FULL_STATE_WITH_EXTRINSICS) {
+        *csvFile_
+                << FLAGS_datafile_separator << "p_SC_S_x[m]" << FLAGS_datafile_separator
+                << "p_SC_S_y" << FLAGS_datafile_separator << "p_SC_S_z"
+                << FLAGS_datafile_separator << "q_SC_x" << FLAGS_datafile_separator
+                << "q_SC_y" << FLAGS_datafile_separator << "q_SC_z"
+                << FLAGS_datafile_separator << "q_SC_w";
+    }
+    *csvFile_ << std::endl;
     return true;
 }
 
@@ -176,8 +216,8 @@ bool Publisher::writeLandmarksCsvDescription()
         return false;
     if (!csvLandmarksFile_->good())
         return false;
-    *csvLandmarksFile_ << ", " << "id" << ", " << "l_x" << ", " << "l_y" << ", "
-                       << "l_z" << ", " << "l_w" << ", " << "quality, "
+    *csvLandmarksFile_ << FLAGS_datafile_separator << "id" << FLAGS_datafile_separator << "l_x" << FLAGS_datafile_separator << "l_y" << FLAGS_datafile_separator
+                       << "l_z" << FLAGS_datafile_separator << "l_w" << FLAGS_datafile_separator << "quality, "
                        << "distance" << std::endl;
     return true;
 }
@@ -193,14 +233,7 @@ bool Publisher::setCsvFile(std::fstream& csvFile)
     return csvFile_->good();
 }
 // Set an odometry output CSV file.
-bool Publisher::setCsvFile(std::string& csvFileName)
-{
-    csvFile_.reset(new std::fstream(csvFileName.c_str(), std::ios_base::out));
-    writeCsvDescription();
-    return csvFile_->good();
-}
-// Set an odometry output CSV file.
-bool Publisher::setCsvFile(std::string csvFileName)
+bool Publisher::setCsvFile(const std::string& csvFileName)
 {
     csvFile_.reset(new std::fstream(csvFileName.c_str(), std::ios_base::out));
     writeCsvDescription();
@@ -518,14 +551,16 @@ void Publisher::csvSaveFullStateAsCallback(
             Eigen::Quaterniond q_WS = T_WS.q();
             std::stringstream time;
             time << t.sec << std::setw(9) << std::setfill('0') << t.nsec;
-            *csvFile_ << time.str() <<", "<<frameIdInSource<< ", " << std::scientific
-                      << std::setprecision(8) << p_WS_W[0] << ", " << p_WS_W[1] << ", "
-                      << p_WS_W[2] << ", " << q_WS.x() << ", " << q_WS.y() << ", "
-                      << q_WS.z() << ", " << q_WS.w() << ", " << speedAndBiases[0] << ", "
-                      << speedAndBiases[1] << ", " << speedAndBiases[2] << ", "
-                      << speedAndBiases[3] << ", " << speedAndBiases[4] << ", "
-                      << speedAndBiases[5] << ", " << speedAndBiases[6] << ", "
-                      << speedAndBiases[7] << ", " << speedAndBiases[8] << std::endl;
+            *csvFile_ << time.str() << FLAGS_datafile_separator << frameIdInSource
+                      << FLAGS_datafile_separator << std::scientific << std::setprecision(8)
+                      << p_WS_W[0] << FLAGS_datafile_separator << p_WS_W[1] << FLAGS_datafile_separator
+                      << p_WS_W[2] << FLAGS_datafile_separator << q_WS.x() << FLAGS_datafile_separator
+                      << q_WS.y() << FLAGS_datafile_separator << q_WS.z() << FLAGS_datafile_separator
+                      << q_WS.w() << FLAGS_datafile_separator << speedAndBiases[0] << FLAGS_datafile_separator
+                      << speedAndBiases[1] << FLAGS_datafile_separator << speedAndBiases[2] << FLAGS_datafile_separator
+                      << speedAndBiases[3] << FLAGS_datafile_separator << speedAndBiases[4] << FLAGS_datafile_separator
+                      << speedAndBiases[5] << FLAGS_datafile_separator << speedAndBiases[6] << FLAGS_datafile_separator
+                      << speedAndBiases[7] << FLAGS_datafile_separator << speedAndBiases[8] << std::endl;
         }
     }
 }
@@ -548,20 +583,25 @@ void Publisher::csvSaveFullStateWithExtrinsicsAsCallback(
             Eigen::Quaterniond q_WS = T_WS.q();
             std::stringstream time;
             time << t.sec << std::setw(9) << std::setfill('0') << t.nsec;
-            *csvFile_ << time.str() << ", " <<frameIdInSource<< ", " //<< std::scientific
-                      << std::setprecision(6) << p_WS_W[0] << ", " << p_WS_W[1] << ", "
-                      << p_WS_W[2] << ", " << q_WS.x() << ", " << q_WS.y() << ", "
-                      << q_WS.z() << ", " << q_WS.w() << ", " << speedAndBiases[0] << ", "
-                      << speedAndBiases[1] << ", " << speedAndBiases[2] << ", "
-                      << speedAndBiases[3] << ", " << speedAndBiases[4] << ", "
-                      << speedAndBiases[5] << ", " << speedAndBiases[6] << ", "
-                      << speedAndBiases[7] << ", " << speedAndBiases[8];
+            *csvFile_ << time.str() << FLAGS_datafile_separator <<frameIdInSource<< FLAGS_datafile_separator
+                      << std::setprecision(6) << p_WS_W[0] << FLAGS_datafile_separator << p_WS_W[1]
+                      << FLAGS_datafile_separator << p_WS_W[2] << FLAGS_datafile_separator
+                      << q_WS.x() << FLAGS_datafile_separator << q_WS.y() << FLAGS_datafile_separator
+                      << q_WS.z() << FLAGS_datafile_separator << q_WS.w() << FLAGS_datafile_separator
+                      << speedAndBiases[0] << FLAGS_datafile_separator << speedAndBiases[1]
+                      << FLAGS_datafile_separator << speedAndBiases[2] << FLAGS_datafile_separator
+                      << speedAndBiases[3] << FLAGS_datafile_separator << speedAndBiases[4]
+                      << FLAGS_datafile_separator << speedAndBiases[5] << FLAGS_datafile_separator
+                      << speedAndBiases[6] << FLAGS_datafile_separator << speedAndBiases[7]
+                      << FLAGS_datafile_separator << speedAndBiases[8];
             for (size_t i = 0; i < extrinsics.size(); ++i) {
                 Eigen::Vector3d p_SCi = extrinsics[i].r();
                 Eigen::Quaterniond q_SCi = extrinsics[i].q();
-                *csvFile_ << ", " << p_SCi[0] << ", " << p_SCi[1] << ", " << p_SCi[2]
-                          << ", " << q_SCi.x() << ", " << q_SCi.y() << ", " << q_SCi.z()
-                          << ", " << q_SCi.w();
+                *csvFile_ << FLAGS_datafile_separator << p_SCi[0] << FLAGS_datafile_separator
+                          << p_SCi[1] << FLAGS_datafile_separator << p_SCi[2]
+                          << FLAGS_datafile_separator << q_SCi.x() << FLAGS_datafile_separator
+                          << q_SCi.y() << FLAGS_datafile_separator << q_SCi.z()
+                          << FLAGS_datafile_separator << q_SCi.w();
             }
 
             *csvFile_ << std::endl;
@@ -580,8 +620,7 @@ void Publisher::csvSaveFullStateWithAllCalibrationAsCallback(
         Eigen::aligned_allocator<okvis::kinematics::Transformation> > & extrinsics,
         const Eigen::Matrix<double, 27, 1>& vTgsa,
         const Eigen::Matrix<double, 10, 1>& vfckptdr,
-        const Eigen::Matrix<double, 55, 1>& vVariance)
-{
+        const Eigen::Matrix<double, 55, 1>& vVariance) {
     setTime(t);
     setOdometry(T_WS, speedAndBiases, omega_S);  // TODO: provide setters for this hack
     if (csvFile_) {
@@ -590,29 +629,34 @@ void Publisher::csvSaveFullStateWithAllCalibrationAsCallback(
             Eigen::Quaterniond q_WS = T_WS.q();
             std::stringstream time;
             time << t.sec << std::setw(9) << std::setfill('0') << t.nsec;
-            *csvFile_ << time.str() << ", " <<frameIdInSource<< ", " //<< std::scientific
-                      << std::setprecision(6) << p_WS_W[0] << ", " << p_WS_W[1] << ", "
-                      << p_WS_W[2] << ", " << q_WS.x() << ", " << q_WS.y() << ", "
-                      << q_WS.z() << ", " << q_WS.w() << ", " << speedAndBiases[0] << ", "
-                      << speedAndBiases[1] << ", " << speedAndBiases[2] << ", "
-                      << speedAndBiases[3] << ", " << speedAndBiases[4] << ", "
-                      << speedAndBiases[5] << ", " << speedAndBiases[6] << ", "
-                      << speedAndBiases[7] << ", " << speedAndBiases[8];
+            *csvFile_ << time.str() << FLAGS_datafile_separator <<frameIdInSource
+                      << FLAGS_datafile_separator << std::setprecision(6) << p_WS_W[0]
+                      << FLAGS_datafile_separator << p_WS_W[1] << FLAGS_datafile_separator
+                      << p_WS_W[2] << FLAGS_datafile_separator << q_WS.x()
+                      << FLAGS_datafile_separator << q_WS.y() << FLAGS_datafile_separator
+                      << q_WS.z() << FLAGS_datafile_separator << q_WS.w()
+                      << FLAGS_datafile_separator << speedAndBiases[0] << FLAGS_datafile_separator
+                      << speedAndBiases[1] << FLAGS_datafile_separator << speedAndBiases[2]
+                      << FLAGS_datafile_separator << speedAndBiases[3] << FLAGS_datafile_separator
+                      << speedAndBiases[4] << FLAGS_datafile_separator << speedAndBiases[5]
+                      << FLAGS_datafile_separator << speedAndBiases[6] << FLAGS_datafile_separator
+                      << speedAndBiases[7] << FLAGS_datafile_separator << speedAndBiases[8];
 
             for(size_t jack=0; jack<27; ++jack)
-                *csvFile_ <<", "<<vTgsa[jack];
+                *csvFile_ <<FLAGS_datafile_separator<<vTgsa[jack];
 
             for (size_t i = 0; i < extrinsics.size(); ++i) {
-                Eigen::Vector3d p_CiS = extrinsics[i].inverse().r();
-                *csvFile_ << ", " << p_CiS[0] << ", " << p_CiS[1] << ", " << p_CiS[2];
+                Eigen::Vector3d p_SCi = extrinsics[i].r();
+                *csvFile_ << FLAGS_datafile_separator << p_SCi[0] << FLAGS_datafile_separator
+                          << p_SCi[1] << FLAGS_datafile_separator << p_SCi[2];
             }
 
             for(size_t jack=0; jack<10; ++jack)
-                *csvFile_ <<", "<<vfckptdr[jack];            
+                *csvFile_ <<FLAGS_datafile_separator<<vfckptdr[jack];
 
             //std dev
             for(size_t jack=0; jack<55; ++jack)
-                *csvFile_ <<", "<< std::sqrt(vVariance[jack]);
+                *csvFile_ <<FLAGS_datafile_separator<< std::sqrt(vVariance[jack]);
 
             *csvFile_ << std::endl;
         }
@@ -643,10 +687,10 @@ void Publisher::csvSaveLandmarksAsCallback(
             for (size_t l = 0; l < actualLandmarks.size(); ++l) {
                 Eigen::Vector4d landmark = actualLandmarks.at(l).pointHomog;
                 *csvLandmarksFile_ << std::setprecision(19) << actualLandmarks.at(l).id
-                                   << ", " << std::scientific << std::setprecision(18) << landmark[0]
-                                   << ", " << landmark[1] << ", " << landmark[2] << ", " << landmark[3]
-                                   << ", " << actualLandmarks.at(l).quality
-                                      // << ", " << actualLandmarks.at(l).distance
+                                   << FLAGS_datafile_separator << std::scientific << std::setprecision(18) << landmark[0]
+                                   << FLAGS_datafile_separator << landmark[1] << FLAGS_datafile_separator << landmark[2] << FLAGS_datafile_separator << landmark[3]
+                                   << FLAGS_datafile_separator << actualLandmarks.at(l).quality
+                                      // << FLAGS_datafile_separator << actualLandmarks.at(l).distance
                                    << std::endl;
             }
         }

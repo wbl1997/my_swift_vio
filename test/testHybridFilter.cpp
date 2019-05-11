@@ -423,7 +423,7 @@ void testHybridFilterCircle(){
 // TODO: curiously, MSCKF2 or IEKF often diverges after 300 seconds.
 // Note the std for noises used in covariance propagation should be slightly larger than the std used in sampling noises,
 // becuase the process model involves many approximations other than these noise terms.
-void testHybridFilterSinusoid(const size_t runs=100u) {
+void testHybridFilterSinusoid(const int runs=100) {
     FLAGS_use_mahalanobis = false; // set USE_MAHALANOBIS false in simulation if no outliers are added
     const double DURATION = 300.0;  // length of motion in seconds
     const double IMU_RATE = 100.0;  // Hz
@@ -451,7 +451,7 @@ void testHybridFilterSinusoid(const size_t runs=100u) {
     okvis::timing::Timer filterTimer("msckf2 timer",true);
     bool bVerbose= false; //only output the ground truth and data for the first successful trial
     int successRuns =0;
-    for(size_t run=0; run<runs; ++run){    
+    for(int run=0; run<runs; ++run){
         if(successRuns==0)
             bVerbose = true;
         else
@@ -883,7 +883,6 @@ void testHybridFilterSinusoid(const size_t runs=100u) {
             }
             myAccumulator(trackedFeatures);
 
-            // run the optimization
             estimator.optimize(false);
             estimator.applyMarginalizationStrategy();
 

@@ -2606,7 +2606,10 @@ bool HybridFilter::print(std::ostream& mDebug){
     kinematics::Transformation T_WS = poseParamBlockPtr->estimate();
     okvis::Time currentTime = statesMap_.rbegin()->second.timestamp;
     assert(multiFramePtrMap_.rbegin()->first == poseId);
-    mDebug<<currentTime << " "<<multiFramePtrMap_.rbegin()->second->idInSource <<" "<<std::setfill(' ')<< T_WS.parameters().transpose();
+
+    Eigen::IOFormat SpaceInitFmt(Eigen::StreamPrecision, Eigen::DontAlignCols, " ", " ", "", "", "", "");
+    mDebug<<currentTime << " "<<multiFramePtrMap_.rbegin()->second->idInSource
+         <<" "<< std::setfill(' ')<< T_WS.parameters().transpose().format(SpaceInitFmt);
     // update imu sensor states
     const int imuIdx =0;
     const States stateInQuestion = statesMap_.rbegin()->second;
@@ -2614,25 +2617,25 @@ bool HybridFilter::print(std::ostream& mDebug){
     std::shared_ptr<ceres::SpeedAndBiasParameterBlock> sbParamBlockPtr =std::static_pointer_cast<ceres::SpeedAndBiasParameterBlock>(
                 mapPtr_->parameterBlockPtr(SBId));
     SpeedAndBiases sb = sbParamBlockPtr->estimate();
-    mDebug<<" "<< sb.transpose();
+    mDebug<<" "<< sb.transpose().format(SpaceInitFmt);
 
     uint64_t TGId= stateInQuestion.sensors.at(SensorStates::Imu).at(imuIdx).at(ImuSensorStates::TG).id;
     std::shared_ptr<ceres::ShapeMatrixParamBlock> tgParamBlockPtr =std::static_pointer_cast<ceres::ShapeMatrixParamBlock>(
                 mapPtr_->parameterBlockPtr(TGId));
     Eigen::Matrix<double, 9 ,1> sm = tgParamBlockPtr->estimate();
-    mDebug<<" "<< sm.transpose();
+    mDebug<<" "<< sm.transpose().format(SpaceInitFmt);
 
     uint64_t TSId= stateInQuestion.sensors.at(SensorStates::Imu).at(imuIdx).at(ImuSensorStates::TS).id;
     std::shared_ptr<ceres::ShapeMatrixParamBlock> tsParamBlockPtr =std::static_pointer_cast<ceres::ShapeMatrixParamBlock>(
                 mapPtr_->parameterBlockPtr(TSId));
     sm = tsParamBlockPtr->estimate();
-    mDebug<<" "<< sm.transpose();
+    mDebug<<" "<< sm.transpose().format(SpaceInitFmt);
 
     uint64_t TAId= stateInQuestion.sensors.at(SensorStates::Imu).at(imuIdx).at(ImuSensorStates::TA).id;
     std::shared_ptr<ceres::ShapeMatrixParamBlock> taParamBlockPtr =std::static_pointer_cast<ceres::ShapeMatrixParamBlock>(
                 mapPtr_->parameterBlockPtr(TAId));
     sm = taParamBlockPtr->estimate();
-    mDebug<<" "<< sm.transpose();
+    mDebug<<" "<< sm.transpose().format(SpaceInitFmt);
 
     //update camera sensor states
     const int camIdx =0;
@@ -2640,20 +2643,20 @@ bool HybridFilter::print(std::ostream& mDebug){
     std::shared_ptr<ceres::PoseParameterBlock> extrinsicParamBlockPtr =std::static_pointer_cast<ceres::PoseParameterBlock>(
                 mapPtr_->parameterBlockPtr(extrinsicId));
     kinematics::Transformation T_SC0 = extrinsicParamBlockPtr->estimate();
-    mDebug<<" "<< T_SC0.inverse().r().transpose();
+    mDebug<<" "<< T_SC0.inverse().r().transpose().format(SpaceInitFmt);
 
     uint64_t intrinsicId = stateInQuestion.sensors.at(SensorStates::Camera).at(camIdx).at(CameraSensorStates::Intrinsic).id;
     std::shared_ptr<ceres::CameraIntrinsicParamBlock> intrinsicParamBlockPtr =std::static_pointer_cast<ceres::CameraIntrinsicParamBlock>(
                 mapPtr_->parameterBlockPtr(intrinsicId));
     Eigen::Matrix<double,4,1> cameraIntrinsics = intrinsicParamBlockPtr->estimate();
-    mDebug<<" "<< cameraIntrinsics.transpose();
+    mDebug<<" "<< cameraIntrinsics.transpose().format(SpaceInitFmt);
 
     const int nDistortionCoeffDim = okvis::cameras::RadialTangentialDistortion::NumDistortionIntrinsics;
     uint64_t distortionId = stateInQuestion.sensors.at(SensorStates::Camera).at(camIdx).at(CameraSensorStates::Distortion).id;
     std::shared_ptr<ceres::CameraDistortionParamBlock> distortionParamBlockPtr =std::static_pointer_cast<ceres::CameraDistortionParamBlock>(
                 mapPtr_->parameterBlockPtr(distortionId));
     Eigen::Matrix<double,nDistortionCoeffDim, 1> cameraDistortion = distortionParamBlockPtr->estimate();
-    mDebug<<" "<< cameraDistortion.transpose();
+    mDebug<<" "<< cameraDistortion.transpose().format(SpaceInitFmt);
 
     uint64_t tdId = stateInQuestion.sensors.at(SensorStates::Camera).at(camIdx).at(CameraSensorStates::TD).id;
     std::shared_ptr<ceres::CameraTimeParamBlock> tdParamBlockPtr =std::static_pointer_cast<ceres::CameraTimeParamBlock>(
@@ -2671,7 +2674,7 @@ bool HybridFilter::print(std::ostream& mDebug){
     const int stateDim = 42 + 3 +4 + 4 +2;
     Eigen::Matrix<double, stateDim, 1 > variances = covariance_.topLeftCorner<stateDim, stateDim>().diagonal();
 
-    mDebug <<" "<< variances.cwiseSqrt().transpose()<< std::endl;
+    mDebug <<" "<< variances.cwiseSqrt().transpose().format(SpaceInitFmt)<< std::endl;
     return true;
 }
 

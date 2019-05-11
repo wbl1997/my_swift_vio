@@ -4,6 +4,6 @@
 
 int main(int argc, char **argv)
 {
-  testHybridFilterSinusoid();
+  testHybridFilterSinusoid(std::atoi(argv[1]));
   return 0;
 }
