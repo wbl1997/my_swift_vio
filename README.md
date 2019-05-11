@@ -3,7 +3,7 @@ README                        {#mainpage}
 
 Welcome to MSCKF2/Hybrid Filter. 
 
-This is the Author's implementation of the [1] and [2] with detailed derivation in [3]. It is developed based on the OKVIS library.
+This is the Jianzhu Huai's implementation of the [1] and [2] with detailed derivation in [3]. It is developed based on the OKVIS library.
 
 [1] Li, M., Yu, H., Zheng, X., & Mourikis, A. I. (2014, May). High-fidelity sensor modeling and self-calibration in vision-aided inertial navigation. In 2014 IEEE International Conference on Robotics and Automation (ICRA) (pp. 409-416). IEEE.
 
@@ -63,6 +63,19 @@ catkin_make --pkg vio_common msckf2
 ```
 You will find a demo application in okvis_apps. It can process datasets in the 
 ASL/ETH format.
+
+If you are going to contribute to the project, please configure linter as follows. The below instructions were tested on Ubuntu 16.04.
+```
+sudo pip2 install yapf requests
+sudo apt install clang-format-6.0 pylint
+# the below follows installation guide at https://github.com/ethz-asl/linter/tree/master
+cd workspace/src/msckf2/tools/linter
+echo ". $(realpath setup_linter.sh)" >> ~/.bashrc
+bash
+
+cd ../..
+init_linter_git_hooks
+```
 
 ## Debug the project with QtCreator
 
