@@ -162,7 +162,7 @@ bool HybridFrontend::dataAssociationAndInitialization(
   }
   matchToLastFrameTimer.stop();
 
-#elseif USE_BRISK
+#elif defined(USE_BRISK)
 
   int num3dMatches = 0;
 
@@ -540,7 +540,7 @@ int HybridFrontend::matchToLastFrame(
       UpdateEstimatorObservations(estimator, lastFrameId, currentFrameId, im, im);
   }
   ++mFrameCounter;
-#elseif USE_BRISK
+#elif defined(USE_BRISK)
   if (estimator.numFrames() < 2) {
     return 0;
   }

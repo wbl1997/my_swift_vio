@@ -65,8 +65,7 @@
 
 int main(int argc, char **argv)
 {
-
-//  testHybridFilterSinusoid();
+//  testHybridFilterSinusoid(std::atoi(argv[1]));
 //  return 0;
 
   ros::init(argc, argv, "okvis_node");
@@ -168,7 +167,7 @@ int main(int argc, char **argv)
   else//video input
   {
     pPlayer.reset(new okvis::Player(&okvis_estimator, parameters));
-    ptPlayer.reset(new std::thread(&okvis::Player::RunWithSavedTracks, std::ref(*pPlayer)));
+    ptPlayer.reset(new std::thread(&okvis::Player::Run, std::ref(*pPlayer)));
   }
 
 #endif

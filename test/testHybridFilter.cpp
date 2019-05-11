@@ -421,8 +421,7 @@ void testHybridFilterCircle(){
 // TODO: curiously, MSCKF2 or IEKF often diverges after 300 seconds.
 // Note the std for noises used in covariance propagation should be slightly larger than the std used in sampling noises,
 // becuase the process model involves many approximations other than these noise terms.
-void testHybridFilterSinusoid(){
-    const size_t runs= 100; //number of monto carlo runs
+void testHybridFilterSinusoid(const size_t runs=100u){
     const double DURATION = 300.0;  // length of motion in seconds
     const double IMU_RATE = 100.0;  // Hz
     const double DT = 1.0 / IMU_RATE;  // time increments
@@ -891,11 +890,15 @@ void testHybridFilterSinusoid(){
             if(bVerbose){
                 Eigen::VectorXd allIntrinsics;
                 cameraGeometry0->getIntrinsics(allIntrinsics);
-
-                truthStream <<*iter<<" "<< id<<" "<<std::setfill(' ')<< T_WS.parameters().transpose() <<" "<<
-                              v_WS_true.transpose()<<" 0 0 0 0 0 0 "<< "1 0 0 0 1 0 0 0 1 "<<
-                              "0 0 0 0 0 0 0 0 0 "<< "1 0 0 0 1 0 0 0 1 "<<T_SC_0->inverse().r().transpose()<<" "<<
-                              allIntrinsics.transpose()<<" 0 0"<< std::endl;
+                Eigen::IOFormat SpaceInitFmt(Eigen::StreamPrecision, Eigen::DontAlignCols, " ", " ", "", "", "", "");
+                truthStream <<*iter<<" "<< id<<" "<<std::setfill(' ')
+                           << T_WS.parameters().transpose().format(SpaceInitFmt) <<" "
+                           << v_WS_true.transpose().format(SpaceInitFmt) <<" 0 0 0 0 0 0 "
+                           << "1 0 0 0 1 0 0 0 1 "
+                           << "0 0 0 0 0 0 0 0 0 "<< "1 0 0 0 1 0 0 0 1 "
+                           << T_SC_0->inverse().r().transpose().format(SpaceInitFmt)<<" "
+                           << allIntrinsics.transpose().format(SpaceInitFmt)<<" 0 0"
+                           << std::endl;
             }
             Eigen::Vector3d normalizedError;
             okvis::kinematics::Transformation T_WS_est;
