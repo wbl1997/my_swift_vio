@@ -540,7 +540,6 @@ int HybridFrontend::matchToLastFrame(
       UpdateEstimatorObservations(estimator, lastFrameId, currentFrameId, im, im);
   }
   ++mFrameCounter;
-
 #elif defined(USE_BRISK)
   if (estimator.numFrames() < 2) {
     return 0;

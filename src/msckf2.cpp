@@ -30,7 +30,7 @@ DECLARE_bool(use_mahalanobis);
 namespace okvis {
 const double maxProjTolerance = 7; // maximum tolerable discrepancy between predicted and measured point coordinates in image in pixel
 
-#define USE_AIDP//use anchored inverse depth parameterization for a feature point
+#undef USE_AIDP//use anchored inverse depth parameterization for a feature point
 
 #undef USE_RK4 //use 4th order runge-kutta for integrating IMU data and compute Jacobians,
 
@@ -1316,7 +1316,7 @@ bool MSCKF2::computeHoi(const uint64_t hpbid, const MapPoint & mp,
         Ri(saga2+1, saga2+1)*= (vRi[saga2+1]*vRi[saga2+1]);
     }
 
-    Eigen::MatrixXd nullQ= nullspace(H_fi);// 2nx(2n-3), n==numValidObs
+    Eigen::MatrixXd nullQ= vio::nullspace(H_fi);// 2nx(2n-3), n==numValidObs
     OKVIS_ASSERT_EQ(Exception, nullQ.cols(), (int)(2*numValidObs-3), "Nullspace of Hfi should have 2n-3 columns");
 //    OKVIS_ASSERT_LT(Exception, (nullQ.transpose()* H_fi).norm(), 1e-6, "nullspace is not correct!");
     r_oi.noalias()= nullQ.transpose()*ri;
@@ -1744,8 +1744,7 @@ void MSCKF2::optimize(bool verbose)
             }
         }
         mLandmarkID2Residualize.push_back(std::make_pair(it->second.id, toResidualize));
-//        if(toResidualize!=NotInState_NotTrackedNow || nNumObs<3) //TODO: is 3 too harsh?
-        if(toResidualize!=NotInState_NotTrackedNow) //TODO: is 3 too harsh?
+        if(toResidualize!=NotInState_NotTrackedNow || nNumObs<3) //TODO: is 3 too harsh?
         {
             continue;
         }
