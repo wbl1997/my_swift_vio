@@ -516,12 +516,16 @@ class HybridFrontend {
   uint64_t mPreviousFrameId, mCurrentFrameId;
   size_t mMaxFeaturesInFrame, mMinFeaturesInFrame;
   size_t mFrameCounter; //how many frames have been processed by the frontend
-  cv::Mat mMask; //mask used to protect existing features during initializing features
-//  size_t mTrackedPoints; // number of well tracked points in the current frame
+  cv::Mat mMask; // mask used to protect existing features during initializing
+                 // features
+  //  size_t mTrackedPoints; // number of well tracked points in the current
+  //  frame
   std::vector<cv::KeyPoint> mvKeyPoints; //key points in the current frame
 
   TrackResultReader* pTracker;
-  //create an accumulator for number of features distribution
+  // an accumulator for number of features distribution
+  // TODO(jhuai): for now only implemented for features tracked by an external
+  // module, ORB-VO, for KLT and OKVIS feature tracking to be implemented
   MyAccumulator myAccumulator;
 };
 

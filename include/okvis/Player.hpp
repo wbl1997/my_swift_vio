@@ -7,6 +7,7 @@
 #ifndef INCLUDE_MSCKF2_PLAYER_HPP_
 #define INCLUDE_MSCKF2_PLAYER_HPP_
 
+#include <atomic>
 #include <deque>
 #include <memory>
 
@@ -59,7 +60,9 @@ class Player
 
   void Run();
   void RunWithSavedTracks();
- protected:
+  std::atomic<bool> mbFinished;
+
+protected:
   /// @name ROS callbacks
   /// @{
 
@@ -78,7 +81,6 @@ class Player
   okvis::VioInterface* vioInterface_;   ///< The VioInterface. (E.g. HybridVio)
   okvis::VioParameters vioParameters_;  ///< The parameters and settings. //huai: although cameraGeometry info is included but not used through this member
 
-  bool mbFinished;
   std::string mVideoFile;
   std::string mImageFolder;
   std::string mTimeFile;

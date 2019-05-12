@@ -4,11 +4,13 @@
  * @author Jianzhu Huai
  */
 
+#include <chrono>
 #include <fstream>
 #include <functional>
 #include <iostream>
 #include <memory>
 #include <string>
+#include <thread>
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wnon-virtual-dtor"
@@ -164,6 +166,12 @@ int main(int argc, char **argv) {
   std::shared_ptr<std::thread> ptPlayer;
   if (FLAGS_load_input_option == 0) {
     okvis::Subscriber subscriber(nh, &okvis_estimator, vio_parameters_reader);
+    ros::Rate rate(20);
+    while (ros::ok()) {
+      ros::spinOnce();
+      okvis_estimator.display();
+      rate.sleep();
+    }
   } else {
     if (parameters.input.videoFile.empty()) { // image sequence input
       pPlayer.reset(
@@ -175,13 +183,14 @@ int main(int argc, char **argv) {
       pPlayer.reset(new okvis::Player(&okvis_estimator, parameters));
       ptPlayer.reset(new std::thread(&okvis::Player::Run, std::ref(*pPlayer)));
     }
-  }
-
-  ros::Rate rate(20);
-  while (ros::ok()) {
-    ros::spinOnce();
-    okvis_estimator.display();
-    rate.sleep();
+    ros::Rate rate(20);
+    while (!pPlayer->mbFinished) {
+      okvis_estimator.display();
+      rate.sleep();
+    }
+    ptPlayer->join();
+    std::this_thread::sleep_for(
+        std::chrono::seconds(5)); // in case the optimizer lags
   }
 
   std::string filename = path + "/feature_statistics.txt";

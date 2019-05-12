@@ -15,7 +15,7 @@ hybridFilter assumes that t_d and t_r are constant variables at least in a short
 
 5. make sure the z axis of the world frame is pointing up.
 
-6, how to deal with static motion? limit the number of states, and hence the size of the covariance matrix. Also, what will triangulateAmapPoint return wehn given two identical observations? 
+6, how to deal with static motion, standstill like the beginning of MH_01_easy? limit the number of states, and hence the size of the covariance matrix. Also, what will triangulateAmapPoint return when given two identical observations? 
 Have to add point states into the state vector. Otherwise have to assume that all the frames undergoes motion.
 
 7, make a multiplier to Tg Ts Ta elements, like 1000 as done in Yuksel's matlab code, for numerical consistency
