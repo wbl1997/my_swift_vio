@@ -1,7 +1,20 @@
 cmake_minimum_required(VERSION 2.8.3)
 project(msckf2)
-# uncomment the following if you are using qtcreator to load the cmakelists.txt
-SET(CATKIN_DEVEL_PREFIX /home/jhuai/docker_documents/vins_ws/devel) # this ensures binaries are put into correct location of catkin_ws
+
+# { Begin
+# special handling for debugging with QtCreator
+get_filename_component(SUPER_SOURCE_DIR ${CMAKE_SOURCE_DIR} DIRECTORY)
+get_filename_component(SUPER_BINARY_DIR ${CMAKE_BINARY_DIR} DIRECTORY)
+if(NOT SUPER_SOURCE_DIR MATCHES "src$" OR NOT SUPER_BINARY_DIR MATCHES "build$")
+    message(WARNING "CMAKE_SOURCE_DIR is ${CMAKE_SOURCE_DIR} and"
+        " CMAKE_BINARY_DIR is ${CMAKE_BINARY_DIR}.\n"
+        "They should look like <workspace>/src/${PROJECT_NAME}"
+        " and <workspace>/build/${PROJECT_NAME}")
+endif()
+get_filename_component(WORKSPACE_DIR ${SUPER_SOURCE_DIR} DIRECTORY)
+set(CATKIN_DEVEL_PREFIX ${WORKSPACE_DIR}/devel) # this ensures binaries are put into correct location of catkin_ws
+# } End
+
 SET(USE_ROS TRUE)
 SET(MSCKF2 TRUE) # build with msck2 or hybridfilter
 SET(FIRST_ESTIMATE TRUE) # use the first estimate technique for propagation matrix and measurement Jacobian?
