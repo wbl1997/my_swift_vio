@@ -1,8 +1,13 @@
 cmake_minimum_required(VERSION 2.8.3)
 project(msckf2)
 
-# { Begin
-# special handling for debugging with QtCreator
+# { Begin: special handling for building with QtCreator
+if(NOT CMAKE_SOURCE_DIR MATCHES "src$" AND NOT CMAKE_BINARY_DIR MATCHES "build$")
+# If catkin_make is to be invoked, CMAKE_SOURCE_DIR will be like <workspace>/src
+# and CMAKE_BINARY_DIR will be like <workspace>/build
+# If Build within QtCreator is invoked, CMAKE_SOURCE_DIR will be like <workspace>/src/msckf2
+# and CMAKE_BINARY_DIR will be like <workspace>/build/msckf2
+
 get_filename_component(SUPER_SOURCE_DIR ${CMAKE_SOURCE_DIR} DIRECTORY)
 get_filename_component(SUPER_BINARY_DIR ${CMAKE_BINARY_DIR} DIRECTORY)
 if(NOT SUPER_SOURCE_DIR MATCHES "src$" OR NOT SUPER_BINARY_DIR MATCHES "build$")
@@ -11,9 +16,12 @@ if(NOT SUPER_SOURCE_DIR MATCHES "src$" OR NOT SUPER_BINARY_DIR MATCHES "build$")
         "They should look like <workspace>/src/${PROJECT_NAME}"
         " and <workspace>/build/${PROJECT_NAME}")
 endif()
+
 get_filename_component(WORKSPACE_DIR ${SUPER_SOURCE_DIR} DIRECTORY)
 set(CATKIN_DEVEL_PREFIX ${WORKSPACE_DIR}/devel) # this ensures binaries are put into correct location of catkin_ws
+endif()
 # } End
+message("CATKIN_DEVEL_PREFIX ${CATKIN_DEVEL_PREFIX}")
 
 SET(USE_ROS TRUE)
 SET(MSCKF2 TRUE) # build with msck2 or hybridfilter

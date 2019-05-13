@@ -133,17 +133,22 @@ To start debugging, add commandline arguments in the Run option panel, then pres
 
 Example running cases
 
+Reading measurements from a video and an IMU csv file
 ```
-rosrun msckf2 msckf2_node /home/jhuai/docker_documents/vins_ws/src/msckf2/config/config_parkinglot_jisun_s6.yaml
+vins_ws/devel/lib/msckf2/msckf2_node /home/jhuai/docker_documents/vins_ws/src/msckf2/config/config_parkinglot_jisun_s6.yaml
+```
+The running program will exit once the sequence finishes.
+
+Measurements from rostopics
 ```
 
-```
 rosrun msckf2 msckf2_node /home/jhuai/docker_documents/vins_ws/src/msckf2/config/config_fpga_p2_euroc_dissertation.yaml --load_input_option=0
 # use start to skip the static segment
 rosbag play --pause --start=45.0 --rate=1.0 /media/jhuai/Seagate1/data/euroc/MH_01_easy.bag /cam0/image_raw:=/camera0 /imu0:=/imu
 
 rosrun rviz rviz -d /home/jhuai/docker_documents/vins_ws/src/msckf2/config/rviz.rviz
 ```
+In this case, the program will exit once the Ctrl+C is entered in the terminal that runs the msckf2_node. Note the program will not exit if Ctrl+C is entered in the terminal of roscore.
 
 In order to run a minimal working example, follow the steps below:
 
