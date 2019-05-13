@@ -1,7 +1,10 @@
 README                        {#mainpage}
 ======
 
-Welcome to MSCKF2/Hybrid Filter. 
+Welcome to MSCKF2/Hybrid Filter.
+
+The MSCKF2 has been fully implemented with the so-called first estimate Jacobian technique.
+The Hybrid filter referring to a hybrid of MSCKF and EKF-SLAM is not yet fully implemented.
 
 This is the Jianzhu Huai's implementation of the [1] and [2] with detailed derivation in [3]. It is developed based on the OKVIS library.
 
