@@ -4,8 +4,12 @@
  * @author Stefan Leutenegger
  * @author Andreas Forster
  */
+#include <okvis/HybridVioParametersReader.hpp>
 
 #include <algorithm>
+#include <memory>
+#include <string>
+#include <vector>
 
 #include <glog/logging.h>
 
@@ -17,15 +21,12 @@
 
 #include <opencv2/core/core.hpp>
 
-#include <okvis/HybridVioParametersReader.hpp>
-
 #ifdef HAVE_LIBVISENSOR
   #include <visensor/visensor_api.hpp>
 #endif
 
 /// \brief okvis Main namespace of this package.
 namespace okvis {
-
 // The default constructor.
 HybridVioParametersReader::HybridVioParametersReader()
     : useDriver(false),
@@ -34,8 +35,8 @@ HybridVioParametersReader::HybridVioParametersReader()
 }
 
 // The constructor. This calls readConfigFile().
-HybridVioParametersReader::HybridVioParametersReader(const std::string& filename) {
-  // reads
+HybridVioParametersReader::HybridVioParametersReader(
+    const std::string& filename) {
   readConfigFile(filename);
 }
 
@@ -55,8 +56,8 @@ void HybridVioParametersReader::readConfigFile(const std::string& filename) {
   if (file["numKeyframes"].isInt()) {
     file["numKeyframes"] >> vioParameters_.optimization.numKeyframes;
   } else {
-    LOG(WARNING)
-        << "numKeyframes parameter not provided. Setting to default numKeyframes=5.";
+    LOG(WARNING) << "numKeyframes parameter not provided. "
+                 << "Setting to default numKeyframes=5.";
     vioParameters_.optimization.numKeyframes = 5;
   }
   // number of IMU frames
@@ -64,7 +65,8 @@ void HybridVioParametersReader::readConfigFile(const std::string& filename) {
     file["numImuFrames"] >> vioParameters_.optimization.numImuFrames;
   } else {
     LOG(WARNING)
-        << "numImuFrames parameter not provided. Setting to default numImuFrames=2.";
+        << "numImuFrames parameter not provided. "
+        << "Setting to default numImuFrames=2.";
     vioParameters_.optimization.numImuFrames = 2;
   }
   // minimum ceres iterations
@@ -73,7 +75,8 @@ void HybridVioParametersReader::readConfigFile(const std::string& filename) {
         >> vioParameters_.optimization.min_iterations;
   } else {
     LOG(WARNING)
-        << "ceres_options: minIterations parameter not provided. Setting to default minIterations=1";
+        << "ceres_options: minIterations parameter not provided. "
+        << "Setting to default minIterations=1";
     vioParameters_.optimization.min_iterations = 1;
   }
   // maximum ceres iterations
@@ -82,15 +85,18 @@ void HybridVioParametersReader::readConfigFile(const std::string& filename) {
         >> vioParameters_.optimization.max_iterations;
   } else {
     LOG(WARNING)
-        << "ceres_options: maxIterations parameter not provided. Setting to default maxIterations=10.";
+        << "ceres_options: maxIterations parameter not provided. "
+        << "Setting to default maxIterations=10.";
     vioParameters_.optimization.max_iterations = 10;
   }
   // ceres time limit
   if (file["ceres_options"]["timeLimit"].isReal()) {
-    file["ceres_options"]["timeLimit"] >> vioParameters_.optimization.timeLimitForMatchingAndOptimization;
+    file["ceres_options"]["timeLimit"] >>
+        vioParameters_.optimization.timeLimitForMatchingAndOptimization;
   } else {
     LOG(WARNING)
-        << "ceres_options: timeLimit parameter not provided. Setting no time limit.";
+        << "ceres_options: timeLimit parameter not provided. "
+        << "Setting no time limit.";
     vioParameters_.optimization.timeLimitForMatchingAndOptimization = -1.0;
   }
 
@@ -110,14 +116,16 @@ void HybridVioParametersReader::readConfigFile(const std::string& filename) {
   OKVIS_ASSERT_TRUE(
       Exception, success,
       "'detection threshold' parameter missing in configuration file.");
-  file["detection_options"]["threshold"] >> vioParameters_.optimization.detectionThreshold;
+  file["detection_options"]["threshold"] >>
+      vioParameters_.optimization.detectionThreshold;
 
   // detection octaves
   success = file["detection_options"]["octaves"].isInt();
   OKVIS_ASSERT_TRUE(
       Exception, success,
       "'detection octaves' parameter missing in configuration file.");
-  file["detection_options"]["octaves"] >> vioParameters_.optimization.detectionOctaves;
+  file["detection_options"]["octaves"] >>
+      vioParameters_.optimization.detectionOctaves;
   OKVIS_ASSERT_TRUE(Exception,
                     vioParameters_.optimization.detectionOctaves >= 0,
                     "Invalid parameter value.");
@@ -127,7 +135,8 @@ void HybridVioParametersReader::readConfigFile(const std::string& filename) {
   OKVIS_ASSERT_TRUE(
       Exception, success,
       "'detection maxNoKeypoints' parameter missing in configuration file.");
-  file["detection_options"]["maxNoKeypoints"] >> vioParameters_.optimization.maxNoKeypoints;
+  file["detection_options"]["maxNoKeypoints"] >>
+      vioParameters_.optimization.maxNoKeypoints;
   OKVIS_ASSERT_TRUE(Exception,
                     vioParameters_.optimization.maxNoKeypoints >= 0,
                     "Invalid parameter value.");
@@ -150,7 +159,8 @@ void HybridVioParametersReader::readConfigFile(const std::string& filename) {
   success = file["camera_params"]["image_readout_time"].isReal();
   OKVIS_ASSERT_TRUE(
       Exception, success,
-      "'camera_params: image_readout_time' parameter missing in configuration file.");
+      "'camera_params: image_readout_time' parameter "
+      "missing in configuration file.");
   file["camera_params"]["image_readout_time"]
       >> vioParameters_.sensors_information.imageReadoutTime;
 
@@ -162,7 +172,8 @@ void HybridVioParametersReader::readConfigFile(const std::string& filename) {
         Exception,
         vioParameters_.sensors_information.frameTimestampTolerance
             < 0.5 / vioParameters_.sensors_information.cameraRate,
-        "Timestamp tolerance for stereo frames is larger than half the time between frames.");
+        "Timestamp tolerance for stereo frames is larger than "
+        "half the time between frames.");
     OKVIS_ASSERT_TRUE(
         Exception,
         vioParameters_.sensors_information.frameTimestampTolerance >= 0.0,
@@ -182,7 +193,8 @@ void HybridVioParametersReader::readConfigFile(const std::string& filename) {
   } else {
     vioParameters_.camera_extrinsics.sigma_absolute_translation = 0.0;
     LOG(WARNING)
-        << "camera_params: sigma_absolute_translation parameter not provided. Setting to default 0.0";
+        << "camera_params: sigma_absolute_translation parameter not provided. "
+        << "Setting to default 0.0";
   }
   if (file["camera_params"]["sigma_absolute_orientation"].isReal()) {
     file["camera_params"]["sigma_absolute_orientation"]
@@ -190,7 +202,8 @@ void HybridVioParametersReader::readConfigFile(const std::string& filename) {
   } else {
     vioParameters_.camera_extrinsics.sigma_absolute_orientation = 0.0;
     LOG(WARNING)
-        << "camera_params: sigma_absolute_orientation parameter not provided. Setting to default 0.0";
+        << "camera_params: sigma_absolute_orientation parameter not provided. "
+        << "Setting to default 0.0";
   }
   if (file["camera_params"]["sigma_c_relative_translation"].isReal()) {
     file["camera_params"]["sigma_c_relative_translation"]
@@ -198,7 +211,8 @@ void HybridVioParametersReader::readConfigFile(const std::string& filename) {
   } else {
     vioParameters_.camera_extrinsics.sigma_c_relative_translation = 0.0;
     LOG(WARNING)
-        << "camera_params: sigma_c_relative_translation parameter not provided. Setting to default 0.0";
+        << "camera_params: sigma_c_relative_translation parameter not provided."
+        <<" Setting to default 0.0";
   }
   if (file["camera_params"]["sigma_c_relative_orientation"].isReal()) {
     file["camera_params"]["sigma_c_relative_orientation"]
@@ -206,7 +220,8 @@ void HybridVioParametersReader::readConfigFile(const std::string& filename) {
   } else {
     vioParameters_.camera_extrinsics.sigma_c_relative_orientation = 0.0;
     LOG(WARNING)
-        << "camera_params: sigma_c_relative_orientation parameter not provided. Setting to default 0.0";
+        << "camera_params: sigma_c_relative_orientation parameter not provided."
+        << " Setting to default 0.0";
   }
 
   if (file["camera_params"]["sigma_focal_length"].isReal()) {
@@ -215,7 +230,8 @@ void HybridVioParametersReader::readConfigFile(const std::string& filename) {
   } else {
     vioParameters_.camera_extrinsics.sigma_focal_length = 0.0;
     LOG(WARNING)
-        << "camera_params: sigma_focal_length parameter not provided. Setting to default 0.0";
+        << "camera_params: sigma_focal_length parameter not provided. "
+        << "Setting to default 0.0";
   }
   if (file["camera_params"]["sigma_principal_point"].isReal()) {
     file["camera_params"]["sigma_principal_point"]
@@ -223,16 +239,19 @@ void HybridVioParametersReader::readConfigFile(const std::string& filename) {
   } else {
     vioParameters_.camera_extrinsics.sigma_principal_point = 0.0;
     LOG(WARNING)
-        << "camera_params: sigma_principal_point parameter not provided. Setting to default 0.0";
+        << "camera_params: sigma_principal_point parameter not provided. "
+        << "Setting to default 0.0";
   }
   cv::FileNode a0Node = file["camera_params"]["sigma_distortion"];
   vioParameters_.camera_extrinsics.sigma_distortion.setZero();
   if(a0Node.isSeq()) {
       for(size_t jack=0; jack< a0Node.size(); ++jack)
-        vioParameters_.camera_extrinsics.sigma_distortion[jack] = (double) (a0Node[jack]);
+        vioParameters_.camera_extrinsics.sigma_distortion[jack] =
+            static_cast<double>(a0Node[jack]);
   }else{
       LOG(WARNING)
-          << "camera_params: sigma_distortion parameter not provided. Setting to default 0.0";
+          << "camera_params: sigma_distortion parameter not provided. "
+          << "Setting to default 0.0";
   }
   if (file["camera_params"]["sigma_td"].isReal()) {
     file["camera_params"]["sigma_td"]
@@ -240,7 +259,8 @@ void HybridVioParametersReader::readConfigFile(const std::string& filename) {
   } else {
     vioParameters_.camera_extrinsics.sigma_td = 0.0;
     LOG(WARNING)
-        << "camera_params: sigma_td parameter not provided. Setting to default 0.0";
+        << "camera_params: sigma_td parameter not provided. "
+        << "Setting to default 0.0";
   }
   if (file["camera_params"]["sigma_tr"].isReal()) {
     file["camera_params"]["sigma_tr"]
@@ -248,7 +268,8 @@ void HybridVioParametersReader::readConfigFile(const std::string& filename) {
   } else {
     vioParameters_.camera_extrinsics.sigma_tr= 0.0;
     LOG(WARNING)
-        << "camera_params: sigma_tr parameter not provided. Setting to default 0.0";
+        << "camera_params: sigma_tr parameter not provided. "
+        << "Setting to default 0.0";
   }
 
   if(file["publishing_options"]["publish_rate"].isInt()) {
@@ -285,14 +306,17 @@ void HybridVioParametersReader::readConfigFile(const std::string& filename) {
                 T_Wc_W_[8], T_Wc_W_[9], T_Wc_W_[10], T_Wc_W_[11], 
                 T_Wc_W_[12], T_Wc_W_[13], T_Wc_W_[14], T_Wc_W_[15];
 
-    vioParameters_.publishing.T_Wc_W = okvis::kinematics::Transformation(T_Wc_W_e);
+    vioParameters_.publishing.T_Wc_W =
+        okvis::kinematics::Transformation(T_Wc_W_e);
     std::stringstream s;
     s << vioParameters_.publishing.T_Wc_W.T();
     LOG(INFO) << "Custom World frame provided T_Wc_W=\n" << s.str();
   }
  
   if (file["publishing_options"]["trackedBodyFrame"].isString()) {
-    std::string frame = (std::string)file["publishing_options"]["trackedBodyFrame"];
+    std::string frame =
+        static_cast<std::string>(
+            file["publishing_options"]["trackedBodyFrame"]);
     // cut out first word. str currently contains everything including comments
     frame = frame.substr(0, frame.find(" "));
     if (frame.compare("B") == 0)
@@ -300,13 +324,15 @@ void HybridVioParametersReader::readConfigFile(const std::string& filename) {
     else if (frame.compare("S") == 0)
       vioParameters_.publishing.trackedBodyFrame=FrameName::S;
     else {
-      LOG(WARNING) << frame << " unknown/invalid frame for trackedBodyFrame, setting to B";
+      LOG(WARNING) << frame << " unknown/invalid frame for trackedBodyFrame, "
+                   <<"setting to B";
       vioParameters_.publishing.trackedBodyFrame=FrameName::B;
     }
   }
 
   if (file["publishing_options"]["velocitiesFrame"].isString()) {
-    std::string frame = (std::string)file["publishing_options"]["velocitiesFrame"];
+    std::string frame = static_cast<std::string>(
+        file["publishing_options"]["velocitiesFrame"]);
     // cut out first word. str currently contains everything including comments
     frame = frame.substr(0, frame.find(" "));
     if (frame.compare("B") == 0)
@@ -316,7 +342,8 @@ void HybridVioParametersReader::readConfigFile(const std::string& filename) {
     else if (frame.compare("Wc") == 0)
       vioParameters_.publishing.velocitiesFrame=FrameName::Wc;
     else {
-      LOG(WARNING) << frame << " unknown/invalid frame for velocitiesFrame, setting to Wc";
+      LOG(WARNING) << frame << " unknown/invalid frame for velocitiesFrame,"
+                   << " setting to Wc";
       vioParameters_.publishing.velocitiesFrame=FrameName::Wc;
     }
   }
@@ -389,7 +416,8 @@ void HybridVioParametersReader::readConfigFile(const std::string& filename) {
       vioParameters_.input.voPosesFile = "";
   }
   if (file["input_data"]["vo_feature_tracks_file"].isString()) {
-    std::string path = (std::string)file["input_data"]["vo_feature_tracks_file"];
+    std::string path = static_cast<std::string>(
+        file["input_data"]["vo_feature_tracks_file"]);
     // cut out first word. str currently contains everything including comments
     vioParameters_.input.voFeatureTracksFile = path.substr(0, path.find(" "));
   }
@@ -448,7 +476,8 @@ void HybridVioParametersReader::readConfigFile(const std::string& filename) {
   if (qsNode.isSeq()) {
       Eigen::Vector4d qs;
       qs<< qsNode[0], qsNode[1], qsNode[2], qsNode[3];
-      vioParameters_.initialState.q_WS = Eigen::Quaterniond( qs[3], qs[0], qs[1], qs[2]);
+      vioParameters_.initialState.q_WS =
+          Eigen::Quaterniond(qs[3], qs[0], qs[1], qs[2]);
   }
   else
   {
@@ -468,24 +497,29 @@ void HybridVioParametersReader::readConfigFile(const std::string& filename) {
   }
 
   vioParameters_.initialState.bUseExternalInitState = bUseExternalState;
-  LOG(INFO) << "initial velocity in the global frame z pointing neg gravity " << vioParameters_.initialState.v_WS.transpose() <<std::endl<<
-               " and its std "<< vioParameters_.initialState.std_v_WS.transpose() <<std::endl<<
-               "the std of the initial position in that frame "<< vioParameters_.initialState.std_p_WS.transpose();
-  LOG(INFO) << "initial quaternion from body/IMU frame to the global frame " <<
-               vioParameters_.initialState.q_WS.coeffs().transpose() <<std::endl<<
-               " and its std "<< vioParameters_.initialState.std_q_WS.transpose() <<std::endl;
+  LOG(INFO) << "initial velocity in the global frame z pointing neg gravity "
+            << vioParameters_.initialState.v_WS.transpose() << std::endl
+            << " and its std "
+            << vioParameters_.initialState.std_v_WS.transpose() << std::endl
+            << "the std of the initial position in that frame "
+            << vioParameters_.initialState.std_p_WS.transpose();
+  LOG(INFO) << "initial quaternion from body/IMU frame to the global frame "
+            << vioParameters_.initialState.q_WS.coeffs().transpose()
+            << std::endl << " and its std "
+            << vioParameters_.initialState.std_q_WS.transpose() << std::endl;
 
   // camera calibration
-  std::vector<CameraCalibration,Eigen::aligned_allocator<CameraCalibration>> calibrations;
-  if(!getCameraCalibration(calibrations, file))
+  std::vector<CameraCalibration,
+      Eigen::aligned_allocator<CameraCalibration>> calibrations;
+  if (!getCameraCalibration(calibrations, file))
     LOG(FATAL) << "Did not find any calibration!";
 
   size_t camIdx = 0;
   for (size_t i = 0; i < calibrations.size(); ++i) {
 
     std::shared_ptr<const okvis::kinematics::Transformation> T_SC_okvis_ptr(
-          new okvis::kinematics::Transformation(calibrations[i].T_SC.r(),
-                                                calibrations[i].T_SC.q().normalized()));
+        new okvis::kinematics::Transformation(
+            calibrations[i].T_SC.r(), calibrations[i].T_SC.q().normalized()));
 
     if (strcmp(calibrations[i].distortionType.c_str(), "equidistant") == 0) {
       vioParameters_.nCameraSystem.addCamera(
@@ -509,8 +543,9 @@ void HybridVioParametersReader::readConfigFile(const std::string& filename) {
       s << calibrations[i].T_SC.T();
       LOG(INFO) << "Equidistant pinhole camera " << camIdx
                 << " with T_SC=\n" << s.str();
-    } else if (strcmp(calibrations[i].distortionType.c_str(), "radialtangential") == 0
-               || strcmp(calibrations[i].distortionType.c_str(), "plumb_bob") == 0) {
+    } else if (
+        strcmp(calibrations[i].distortionType.c_str(), "radialtangential") == 0
+        || strcmp(calibrations[i].distortionType.c_str(), "plumb_bob") == 0) {
       vioParameters_.nCameraSystem.addCamera(
           T_SC_okvis_ptr,
           std::shared_ptr<const okvis::cameras::CameraBase>(
@@ -523,17 +558,19 @@ void HybridVioParametersReader::readConfigFile(const std::string& filename) {
                   calibrations[i].principalPoint[0],
                   calibrations[i].principalPoint[1],
                   okvis::cameras::RadialTangentialDistortion(
-                    calibrations[i].distortionCoefficients[0],
-                    calibrations[i].distortionCoefficients[1],
-                    calibrations[i].distortionCoefficients[2],
-                    calibrations[i].distortionCoefficients[3])/*, id ?*/)),
-          okvis::cameras::NCameraSystem::RadialTangential/*, computeOverlaps ?*/);
+                      calibrations[i].distortionCoefficients[0],
+                      calibrations[i].distortionCoefficients[1],
+                      calibrations[i].distortionCoefficients[2],
+                      calibrations[i].distortionCoefficients[3])/*, id ?*/)),
+          okvis::cameras::NCameraSystem::RadialTangential
+          /*, computeOverlaps ?*/);
       std::stringstream s;
       s << calibrations[i].T_SC.T();
       LOG(INFO) << "Radial tangential pinhole camera " << camIdx
                 << " with T_SC=\n" << s.str();
-    } else if (strcmp(calibrations[i].distortionType.c_str(), "radialtangential8") == 0
-               || strcmp(calibrations[i].distortionType.c_str(), "plumb_bob8") == 0) {
+    } else if (
+        strcmp(calibrations[i].distortionType.c_str(), "radialtangential8") == 0
+        || strcmp(calibrations[i].distortionType.c_str(), "plumb_bob8") == 0) {
       vioParameters_.nCameraSystem.addCamera(
           T_SC_okvis_ptr,
           std::shared_ptr<const okvis::cameras::CameraBase>(
@@ -546,21 +583,23 @@ void HybridVioParametersReader::readConfigFile(const std::string& filename) {
                   calibrations[i].principalPoint[0],
                   calibrations[i].principalPoint[1],
                   okvis::cameras::RadialTangentialDistortion8(
-                    calibrations[i].distortionCoefficients[0],
-                    calibrations[i].distortionCoefficients[1],
-                    calibrations[i].distortionCoefficients[2],
-                    calibrations[i].distortionCoefficients[3],
-                    calibrations[i].distortionCoefficients[4],
-                    calibrations[i].distortionCoefficients[5],
-                    calibrations[i].distortionCoefficients[6],
-                    calibrations[i].distortionCoefficients[7])/*, id ?*/)),
-          okvis::cameras::NCameraSystem::RadialTangential8/*, computeOverlaps ?*/);
+                      calibrations[i].distortionCoefficients[0],
+                      calibrations[i].distortionCoefficients[1],
+                      calibrations[i].distortionCoefficients[2],
+                      calibrations[i].distortionCoefficients[3],
+                      calibrations[i].distortionCoefficients[4],
+                      calibrations[i].distortionCoefficients[5],
+                      calibrations[i].distortionCoefficients[6],
+                      calibrations[i].distortionCoefficients[7])/*, id ?*/)),
+          okvis::cameras::NCameraSystem::RadialTangential8
+          /*, computeOverlaps ?*/);
       std::stringstream s;
       s << calibrations[i].T_SC.T();
       LOG(INFO) << "Radial tangential 8 pinhole camera " << camIdx
                 << " with T_SC=\n" << s.str();
     } else {
-      LOG(ERROR) << "unrecognized distortion type " << calibrations[i].distortionType;
+      LOG(ERROR) << "unrecognized distortion type "
+                 << calibrations[i].distortionType;
     }
     ++camIdx;
   }
@@ -571,10 +610,14 @@ void HybridVioParametersReader::readConfigFile(const std::string& filename) {
   OKVIS_ASSERT_TRUE(
       Exception,
       T_BS_.isSeq(),
-      "'T_BS' parameter missing in the configuration file or in the wrong format.")
+      "'T_BS' parameter missing in the configuration file or "
+      "in the wrong format.")
 
   Eigen::Matrix4d T_BS_e;
-  T_BS_e << T_BS_[0], T_BS_[1], T_BS_[2], T_BS_[3], T_BS_[4], T_BS_[5], T_BS_[6], T_BS_[7], T_BS_[8], T_BS_[9], T_BS_[10], T_BS_[11], T_BS_[12], T_BS_[13], T_BS_[14], T_BS_[15];
+  T_BS_e << T_BS_[0], T_BS_[1], T_BS_[2], T_BS_[3],
+            T_BS_[4], T_BS_[5], T_BS_[6], T_BS_[7],
+            T_BS_[8], T_BS_[9], T_BS_[10], T_BS_[11],
+            T_BS_[12], T_BS_[13], T_BS_[14], T_BS_[15];
 
   vioParameters_.imu.T_BS = okvis::kinematics::Transformation(T_BS_e);
   std::stringstream s;
@@ -613,20 +656,24 @@ void HybridVioParametersReader::readConfigFile(const std::string& filename) {
   OKVIS_ASSERT_TRUE(Exception, imu_params["g"].isReal(),
                     "'imu_params: g' parameter missing in configuration file.");
   OKVIS_ASSERT_TRUE(Exception, imu_params["a0"].isSeq(),
-                    "'imu_params: a0' parameter missing in configuration file.");
+                    "'imu_params: a0' parameter missing in "
+                    "configuration file.");
   OKVIS_ASSERT_TRUE(
       Exception, imu_params["imu_rate"].isInt(),
       "'imu_params: imu_rate' parameter missing in configuration file.");
 
   OKVIS_ASSERT_TRUE(
        Exception, imu_params["sigma_TGElement"].isReal(),
-       "'imu_params: sigma_TGElement' parameter missing in configuration file.");
+       "'imu_params: sigma_TGElement' parameter missing in "
+       "configuration file.");
   OKVIS_ASSERT_TRUE(
        Exception, imu_params["sigma_TSElement"].isReal(),
-       "'imu_params: sigma_TSElement' parameter missing in configuration file.");
+       "'imu_params: sigma_TSElement' parameter missing in "
+       "configuration file.");
   OKVIS_ASSERT_TRUE(
        Exception, imu_params["sigma_TAElement"].isReal(),
-       "'imu_params: sigma_TAElement' parameter missing in configuration file.");
+       "'imu_params: sigma_TAElement' parameter missing in "
+       "configuration file.");
 
   imu_params["a_max"] >> vioParameters_.imu.a_max;
   imu_params["g_max"] >> vioParameters_.imu.g_max;
@@ -662,7 +709,8 @@ void HybridVioParametersReader::readConfigFile(const std::string& filename) {
   cv::FileNode initTg = file["imu_params"]["Tg0"];
   if (initTg.isSeq()) {
       Eigen::Matrix<double,9,1> Tg;
-      Tg << initTg[0], initTg[1], initTg[2], initTg[3], initTg[4], initTg[5],initTg[6], initTg[7], initTg[8];
+      Tg << initTg[0], initTg[1], initTg[2], initTg[3], initTg[4],
+            initTg[5],initTg[6], initTg[7], initTg[8];
       vioParameters_.imu.Tg0 = Tg;
   }
   else
@@ -673,7 +721,8 @@ void HybridVioParametersReader::readConfigFile(const std::string& filename) {
   cv::FileNode initTs = file["imu_params"]["Ts0"];
   if (initTs.isSeq()) {
       Eigen::Matrix<double,9,1> Ts;
-      Ts << initTs[0], initTs[1], initTs[2], initTs[3], initTs[4], initTs[5],initTs[6], initTs[7], initTs[8];
+      Ts << initTs[0], initTs[1], initTs[2], initTs[3], initTs[4],
+            initTs[5],initTs[6], initTs[7], initTs[8];
       vioParameters_.imu.Ts0 = Ts;
   }
   else
@@ -684,7 +733,8 @@ void HybridVioParametersReader::readConfigFile(const std::string& filename) {
   cv::FileNode initTa = file["imu_params"]["Ta0"];
   if (initTa.isSeq()) {
       Eigen::Matrix<double,9,1> Ta;
-      Ta << initTa[0], initTa[1], initTa[2], initTa[3], initTa[4], initTa[5],initTa[6], initTa[7], initTa[8];
+      Ta << initTa[0], initTa[1], initTa[2], initTa[3], initTa[4],
+            initTa[5],initTa[6], initTa[7], initTa[8];
       vioParameters_.imu.Ta0 = Ta;
   }
   else
@@ -697,8 +747,10 @@ void HybridVioParametersReader::readConfigFile(const std::string& filename) {
   readConfigFile_ = true;
 }
 
-// Parses booleans from a cv::FileNode. OpenCV sadly has no implementation like this.
-bool HybridVioParametersReader::parseBoolean(cv::FileNode node, bool& val) const {
+// Parses booleans from a cv::FileNode. OpenCV sadly has no implementation
+// like this.
+bool HybridVioParametersReader::parseBoolean(
+    cv::FileNode node, bool& val) const {
   if (node.isInt()) {
     val = (int) (node) != 0;
     return true;
@@ -733,10 +785,11 @@ bool HybridVioParametersReader::parseBoolean(cv::FileNode node, bool& val) const
 }
 
 bool HybridVioParametersReader::getCameraCalibration(
-    std::vector<CameraCalibration,Eigen::aligned_allocator<CameraCalibration>> & calibrations,
+    std::vector<CameraCalibration,
+        Eigen::aligned_allocator<CameraCalibration>> & calibrations,
     cv::FileStorage& configurationFile) {
-
-  bool success = getCalibrationViaConfig(calibrations, configurationFile["cameras"]);
+  bool success = getCalibrationViaConfig(
+      calibrations, configurationFile["cameras"]);
 
 #ifdef HAVE_LIBVISENSOR
   if (useDriver && !success) {
@@ -744,7 +797,7 @@ bool HybridVioParametersReader::getCameraCalibration(
     viSensor = std::shared_ptr<void>(
           new visensor::ViSensorDriver());
     try {
-      // use autodiscovery to find sensor. TODO: specify IP in config?
+      // use autodiscovery to find sensor. TODO(jhuai): specify IP in config?
       std::static_pointer_cast<visensor::ViSensorDriver>(viSensor)->init();
     } catch (Exception const &ex) {
       LOG(ERROR) << ex.what();
@@ -758,19 +811,22 @@ bool HybridVioParametersReader::getCameraCalibration(
   return success;
 }
 
-void HybridVioParametersReader::print(const HybridVioParametersReader::CameraCalibration & cc) const
-{
-     LOG(INFO)<<"T_SC "<<std::endl<< cc.T_SC.T3x4()<<std::endl << "image dimension after downscale "<<
-                cc.imageDimension.transpose()<< " distortion type "<< cc.distortionType.c_str()<<std::endl<< " distortion "<<
-                cc.distortionCoefficients.transpose() <<std::endl<< " focal "<< cc.focalLength.transpose() <<
-                " principalpoint "<<cc.principalPoint.transpose();
+void HybridVioParametersReader::print(
+    const HybridVioParametersReader::CameraCalibration & cc) const {
+     LOG(INFO) << "T_SC " << std::endl << cc.T_SC.T3x4() << std::endl
+               << "image dimension after downscale "
+               << cc.imageDimension.transpose() << " distortion type "
+               << cc.distortionType.c_str() << std::endl << " distortion "
+               << cc.distortionCoefficients.transpose() << std::endl
+               << " focal " << cc.focalLength.transpose()
+               << " principalpoint " << cc.principalPoint.transpose();
 }
 
 // Get the camera calibration via the configuration file.
 bool HybridVioParametersReader::getCalibrationViaConfig(
-    std::vector<CameraCalibration,Eigen::aligned_allocator<CameraCalibration>> & calibrations,
+    std::vector<CameraCalibration,
+        Eigen::aligned_allocator<CameraCalibration>> & calibrations,
     cv::FileNode cameraNode) const {
-
   calibrations.clear();
   bool gotCalibration = false;
   // first check if calibration is available in config file
@@ -790,11 +846,14 @@ bool HybridVioParametersReader::getCalibrationViaConfig(
           && (*it)["focal_length"].size() == 2
           && (*it)["principal_point"].isSeq()
           && (*it)["principal_point"].size() == 2) {
-        LOG(INFO) << "Found calibration in configuration file for camera " << camIdx;
+        LOG(INFO) << "Found calibration in configuration file"
+                  << " for camera " << camIdx;
         gotCalibration = true;
       } else {
-        LOG(WARNING) << "Found incomplete calibration in configuration file for camera " << camIdx
-                     << ". Will not use the calibration from the configuration file.";
+        LOG(WARNING) << "Found incomplete calibration in configuration "
+                     << "file for camera " << camIdx
+                     << ". Will not use the calibration from the "
+                     << "configuration file.";
         return false;
       }
       ++camIdx;
@@ -820,17 +879,25 @@ bool HybridVioParametersReader::getCalibrationViaConfig(
 
       // extrinsics
       Eigen::Matrix4d T_SC;
-      T_SC << T_SC_node[0], T_SC_node[1], T_SC_node[2], T_SC_node[3], T_SC_node[4], T_SC_node[5], T_SC_node[6], T_SC_node[7], T_SC_node[8], T_SC_node[9], T_SC_node[10], T_SC_node[11], T_SC_node[12], T_SC_node[13], T_SC_node[14], T_SC_node[15];
+      T_SC << T_SC_node[0], T_SC_node[1], T_SC_node[2], T_SC_node[3],
+              T_SC_node[4], T_SC_node[5], T_SC_node[6], T_SC_node[7],
+              T_SC_node[8], T_SC_node[9], T_SC_node[10], T_SC_node[11],
+              T_SC_node[12], T_SC_node[13], T_SC_node[14], T_SC_node[15];
       calib.T_SC = okvis::kinematics::Transformation(T_SC);
 
-      calib.imageDimension << (double)imageDimensionNode[0]/downScale, (double)imageDimensionNode[1]/downScale;
+      calib.imageDimension
+          << static_cast<double>(imageDimensionNode[0]/downScale),
+             static_cast<double>(imageDimensionNode[1]/downScale);
       calib.distortionCoefficients.resize(distortionCoefficientNode.size());
       for(size_t i=0; i<distortionCoefficientNode.size(); ++i) {
         calib.distortionCoefficients[i] = distortionCoefficientNode[i];
       }
-      calib.focalLength << (double)focalLengthNode[0]/downScale, (double)focalLengthNode[1]/downScale;
-      calib.principalPoint << (double)principalPointNode[0]/downScale, (double)principalPointNode[1]/downScale;
-      calib.distortionType = (std::string)((*it)["distortion_type"]);
+      calib.focalLength << static_cast<double>(focalLengthNode[0] / downScale),
+                           static_cast<double>(focalLengthNode[1] / downScale);
+      calib.principalPoint <<
+          static_cast<double>(principalPointNode[0] / downScale),
+          static_cast<double>(principalPointNode[1] / downScale);
+      calib.distortionType = static_cast<std::string>((*it)["distortion_type"]);
 
       calibrations.push_back(calib);
       print(calib);
@@ -841,27 +908,32 @@ bool HybridVioParametersReader::getCalibrationViaConfig(
 
 // Get the camera calibrations via the visensor API.
 bool HybridVioParametersReader::getCalibrationViaVisensorAPI(
-    std::vector<CameraCalibration,Eigen::aligned_allocator<CameraCalibration>> & calibrations) const{
+    std::vector<CameraCalibration,
+        Eigen::aligned_allocator<CameraCalibration>> & calibrations) const{
 #ifdef HAVE_LIBVISENSOR
   if (viSensor == nullptr) {
-    LOG(ERROR) << "Tried to get calibration from the sensor. But the sensor is not set up.";
+    LOG(ERROR) << "Tried to get calibration from the sensor. "
+               << "But the sensor is not set up.";
     return false;
   }
 
   calibrations.clear();
 
   std::vector<visensor::SensorId::SensorId> listOfCameraIds =
-      std::static_pointer_cast<visensor::ViSensorDriver>(viSensor)->getListOfCameraIDs();
+      std::static_pointer_cast<visensor::ViSensorDriver>(viSensor)->
+          getListOfCameraIDs();
 
   for (auto it = listOfCameraIds.begin(); it != listOfCameraIds.end(); ++it) {
     visensor::ViCameraCalibration calibrationFromAPI;
     okvis::HybridVioParametersReader::CameraCalibration calibration;
-    if(!std::static_pointer_cast<visensor::ViSensorDriver>(viSensor)->getCameraCalibration(*it,calibrationFromAPI)) {
+    if (!std::static_pointer_cast<visensor::ViSensorDriver>(viSensor)->
+        getCameraCalibration(*it,calibrationFromAPI)) {
       LOG(ERROR) << "Reading the calibration via the sensor API failed.";
       calibrations.clear();
       return false;
     }
-    LOG(INFO) << "Reading the calbration for camera " << size_t(*it) << " via API successful";
+    LOG(INFO) << "Reading the calbration for camera " << size_t(*it)
+              << " via API successful";
     double* R = calibrationFromAPI.R;
     double* t = calibrationFromAPI.t;
     // getCameraCalibration apparently gives T_CI back.
@@ -891,10 +963,9 @@ bool HybridVioParametersReader::getCalibrationViaVisensorAPI(
   return calibrations.empty() == false;
 #else
   static_cast<void>(calibrations); // unused
-  LOG(ERROR) << "Tried to get calibration directly from the sensor. However libvisensor was not found.";
+  LOG(ERROR) << "Tried to get calibration directly from the sensor. "
+             << "However libvisensor was not found.";
   return false;
 #endif
 }
-
-
 }  // namespace okvis
