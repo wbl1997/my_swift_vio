@@ -39,6 +39,8 @@ DEFINE_int32(load_input_option, 1,
     "0, get input by subscribing to ros topics"
     "1, get input by reading files on a hard drive");
 
+DEFINE_string(output_dir, "", "the directory to dump results");
+
 static void displayArgs(const int argc, char **argv) {
   std::cout << "args\n";
   for (int i = 0; i < argc; ++i) {
@@ -104,7 +106,7 @@ int main(int argc, char **argv) {
   vio_parameters_reader.getParameters(parameters);
 
   okvis::HybridVio okvis_estimator(parameters);
-  std::string path = parameters.publishing.outputPath;
+  std::string path = FLAGS_output_dir;
 
   if (FLAGS_dump_output_option == 0) {
     okvis_estimator.setFullStateCallback(

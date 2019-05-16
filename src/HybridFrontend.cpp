@@ -37,22 +37,17 @@ namespace okvis {
 
 // Constructor.
 HybridFrontend::HybridFrontend(size_t numCameras, std::string orbTrackOutput)
-    : isInitialized_(false),
-      numCameras_(numCameras),
-      briskDetectionOctaves_(0),
-      briskDetectionThreshold_(50.0),
-      briskDetectionAbsoluteThreshold_(800.0),
+    : isInitialized_(false), numCameras_(numCameras), briskDetectionOctaves_(0),
+      briskDetectionThreshold_(50.0), briskDetectionAbsoluteThreshold_(800.0),
       briskDetectionMaximumKeypoints_(450),
       briskDescriptionRotationInvariance_(true),
-      briskDescriptionScaleInvariance_(false),
-      briskMatchingThreshold_(60.0),
-      matcher_(std::unique_ptr<okvis::DenseMatcher>(
-                   new okvis::DenseMatcher(4))),
+      briskDescriptionScaleInvariance_(false), briskMatchingThreshold_(60.0),
+      matcher_(
+          std::unique_ptr<okvis::DenseMatcher>(new okvis::DenseMatcher(4))),
       keyframeInsertionOverlapThreshold_(0.6),
       keyframeInsertionMatchingRatioThreshold_(0.2),
       myAccumulator(boost::accumulators::tag::density::num_bins = 20,
-                    boost::accumulators::tag::density::cache_size = 40)
-{
+                    boost::accumulators::tag::density::cache_size = 40) {
   // create mutexes for feature detectors and descriptor extractors
   for (size_t i = 0; i < numCameras_; ++i) {
     featureDetectorMutexes_.push_back(
@@ -93,15 +88,16 @@ bool HybridFrontend::detectAndDescribe(size_t cameraIndex,
 // Matching as well as initialization of landmarks and state.
 bool HybridFrontend::dataAssociationAndInitialization(
 #ifdef USE_MSCKF2
-    okvis::MSCKF2& estimator,
+    okvis::MSCKF2 &estimator,
 #else
-    okvis::HybridFilter& estimator,
+    okvis::HybridFilter &estimator,
 #endif
-    okvis::kinematics::Transformation& /*T_WS_propagated*/, // TODO(sleutenegger): why is this not used here?
+    // TODO(sleutenegger): why is this not used here?
+    okvis::kinematics::Transformation & /*T_WS_propagated*/,
     const okvis::VioParameters &params,
-    const std::shared_ptr<okvis::MapPointVector> /*map*/, // TODO(sleutenegger): why is this not used here?
-    std::shared_ptr<okvis::MultiFrame> framesInOut,
-    bool *asKeyframe) {
+    // TODO(sleutenegger): why is this not used here?
+    const std::shared_ptr<okvis::MapPointVector> /*map*/,
+    std::shared_ptr<okvis::MultiFrame> framesInOut, bool *asKeyframe) {
   // match new keypoints to existing landmarks/keypoints
   // initialise new landmarks (states)
   // outlier rejection by consistency check
@@ -227,9 +223,10 @@ bool HybridFrontend::dataAssociationAndInitialization(
         break;
     }
     matchToLastFrameTimer.stop();
-  } else
+  } else {
     *asKeyframe = true;  // first frame needs to be keyframe
-#else //use ORB_VO
+  }
+#else // use ORB_VO
 
   // first frame? (did do addStates before, so 1 frame minimum in estimator)
 //  if (estimator.numFrames() <= 1)
@@ -298,7 +295,7 @@ bool HybridFrontend::propagation(
         << " to HybridFrontend. Normal when starting up.";
     return 0;
   }
-  //huai: this is not replaced by IMUOdometry function because it performs good
+  // huai: this is not replaced by IMUOdometry function because it performs good
   // for propagating only states,
   // and it does not use imuErrorModel
   int measurements_propagated = okvis::ceres::ImuError::propagation(
@@ -330,7 +327,6 @@ bool HybridFrontend::doWeNeedANewKeyframe(
 
   // go through all the frames and try to match the initialized keypoints
   for (size_t im = 0; im < currentFrame->numFrames(); ++im) {
-
     // get the hull of all keypoints in current frame
     std::vector<cv::Point2f> frameBPoints, frameBHull;
     std::vector<cv::Point2f> frameBMatches, frameBMatchesHull;
@@ -374,8 +370,8 @@ bool HybridFrontend::doWeNeedANewKeyframe(
         }
       }
     }
-    double matchingRatio = double(frameBMatches.size())
-        / double(pointsInFrameBMatchesArea);
+    double matchingRatio = static_cast<double>(frameBMatches.size()) /
+                           static_cast<double>(pointsInFrameBMatchesArea);
 
     // calculate overlap score
     overlap = std::max(overlapArea, overlap);
@@ -430,7 +426,6 @@ int HybridFrontend::matchToKeyframes(
       matcher_->match<MATCHING_ALGORITHM>(matchingAlgorithm);
       retCtr += matchingAlgorithm.numMatches();
       numUncertainMatches += matchingAlgorithm.numUncertainMatches();
-
     }
     kfcounter++;
     if (kfcounter > 2)
@@ -466,7 +461,7 @@ int HybridFrontend::matchToKeyframes(
     // do RANSAC 2D2D for initialization only
     if (!isInitialized_) {
       runRansac2d2d(estimator, params, currentFrameId, olderFrameId, true,
-                    removeOutliers, rotationOnly_tmp);
+                    removeOutliers, &rotationOnly_tmp);
     }
     if (firstFrame) {
       rotationOnly = rotationOnly_tmp;
@@ -480,7 +475,8 @@ int HybridFrontend::matchToKeyframes(
 
   // calculate fraction of safe matches
   if (uncertainMatchFraction) {
-    *uncertainMatchFraction = double(numUncertainMatches) / double(retCtr);
+    *uncertainMatchFraction =
+        static_cast<double>(numUncertainMatches) / static_cast<double>(retCtr);
   }
 
   return retCtr;
@@ -498,35 +494,33 @@ int HybridFrontend::matchToLastFrame(
                                const uint64_t currentFrameId,
                                bool usePoseUncertainty,
                                bool removeOutliers) {
-
   int retCtr = 0;
   int matches3d2d(0), inliers3d2d(0), matches2d2d(0), inliers2d2d(0);
 
 #ifdef USE_KLT
 
-  cv::Size winSize(21,21);
+  cv::Size winSize(21, 21);
   const int LEVELS = 3;
-  bool withDerivatives=true;
+  bool withDerivatives = true;
   cv::Mat currentImage = estimator.multiFrame(currentFrameId)->getFrame(0);
   mPreviousPyramid = mCurrentPyramid;
   mPreviousFrameId = mCurrentFrameId;
-  std::cout <<"current frame id "<< mCurrentFrameId<<std::endl;
+  std::cout << "current frame id " << mCurrentFrameId << std::endl;
   mCurrentFrameId = currentFrameId;
   mCurrentPyramid.clear();
-  //build up the pyramid for KLT tracking
+  // build up the pyramid for KLT tracking
   // the pyramid often involves padding, even though image has no padding
   int maxLevel = cv::buildOpticalFlowPyramid(
       currentImage, mCurrentPyramid, winSize, LEVELS-1, withDerivatives);
-  std::cout <<"number of frames "<< estimator.numFrames()<<std::endl;
-  if (estimator.numFrames() <2) {
+  std::cout << "number of frames " << estimator.numFrames() << std::endl;
+  if (estimator.numFrames() < 2) {
+    TrailTracking_Start();
+    std::shared_ptr<okvis::MultiFrame> frameB =
+        estimator.multiFrame(currentFrameId);
+    const size_t camIdB = 0;
+    frameB->resetKeypoints(camIdB, mvKeyPoints);
 
-      TrailTracking_Start();
-      std::shared_ptr<okvis::MultiFrame> frameB =
-          estimator.multiFrame(currentFrameId);
-      const size_t camIdB=0;
-      frameB->resetKeypoints(camIdB, mvKeyPoints);
-
-      return 0;
+    return 0;
   }
 
   uint64_t lastFrameId = estimator.frameIdByAge(1);
@@ -543,9 +537,8 @@ int HybridFrontend::matchToLastFrame(
       // are added by goodFeaturesToTrack(),
       // and, add this frame as keyframe, updates the tracker's current-frame
       // -KeyFrame struct with any measurements made.
-      if(matches2d2d< 0.5*mMaxFeaturesInFrame ||
-          (mFrameCounter%4==0 && matches2d2d< 0.6*mMaxFeaturesInFrame))
-      {
+      if (matches2d2d < 0.5 * mMaxFeaturesInFrame ||
+          (mFrameCounter % 4 == 0 && matches2d2d < 0.6 * mMaxFeaturesInFrame)) {
         std::vector<cv::KeyPoint> vNewKPs;
         TrailTracking_DetectAndInsert(currentImage, matches2d2d, vNewKPs);
         mvKeyPoints.insert(mvKeyPoints.end(), vNewKPs.begin(), vNewKPs.end());
@@ -588,8 +581,9 @@ int HybridFrontend::matchToLastFrame(
     retCtr += matches3d2d;
   }
 
-  inliers3d2d= runRansac3d2d(estimator, params.nCameraSystem,
-                estimator.multiFrame(currentFrameId), removeOutliers);
+  inliers3d2d =
+      runRansac3d2d(estimator, params.nCameraSystem,
+                    estimator.multiFrame(currentFrameId), removeOutliers);
 #endif
 
   for (size_t im = 0; im < params.nCameraSystem.numCameras(); ++im) {
@@ -600,11 +594,11 @@ int HybridFrontend::matchToLastFrame(
     matchingAlgorithm.setFrames(lastFrameId, currentFrameId, im, im);
 
     // match 2D-2D for initialization of new (mono-)correspondences
-    if(1)
-        matcher_->match<MATCHING_ALGORITHM>(matchingAlgorithm);
-    else{
-        matchingAlgorithm.doSetup();
-        matchingAlgorithm.match();
+    if (1) {
+      matcher_->match<MATCHING_ALGORITHM>(matchingAlgorithm);
+    } else {
+      matchingAlgorithm.doSetup();
+      matchingAlgorithm.match();
     }
     matches2d2d = matchingAlgorithm.numMatches();
 
@@ -614,9 +608,8 @@ int HybridFrontend::matchToLastFrame(
   // remove outliers
   bool rotationOnly = false;
   if (!isInitialized_)
-    inliers2d2d = runRansac2d2d(
-        estimator, params, currentFrameId, lastFrameId,
-        false, removeOutliers, rotationOnly);
+    inliers2d2d = runRansac2d2d(estimator, params, currentFrameId, lastFrameId,
+                                false, removeOutliers, &rotationOnly);
 #else // load saved tracking result by an external module
 
   std::shared_ptr<okvis::MultiFrame> frameB =
@@ -634,47 +627,46 @@ int HybridFrontend::matchToLastFrame(
   std::cout << "number of frames used by estimator "
             << estimator.numFrames() << std::endl;
 
-  std::vector<cv::KeyPoint> keypoints; //keypoints in the current image
-  //map point ids in the current image
+  std::vector<cv::KeyPoint> keypoints; // keypoints in the current image
+  // map point ids in the current image
   // if not empty should of the same length as keypoints
   std::vector<size_t> mapPointIds;
   // map point positions in the current image
   // if not empty should of the same length as keypoints
   std::vector<Eigen::Vector3d> mapPointPositions;
 
-  //if mapPointIds == 0, it means non correspondence
+  // if mapPointIds == 0, it means non correspondence
   pTracker->getNextFrame(
       currentTime.toSec(), keypoints, mapPointIds,
       mapPointPositions, currentFrameId);
   std::cout << "#kp, #mp " << keypoints.size() << " "
             << mapPointIds.size() << std::endl;
-  if(mapPointIds.empty()) {
-      return 0;
+  if (mapPointIds.empty()) {
+    return 0;
   }
-  if(!mapPointIds.empty() && mlTrailers.empty()) {
+  if (!mapPointIds.empty() && mlTrailers.empty()) {
     // should be second keyframe in orb_vo
     // initialize for the first frame
-      size_t nToAdd = 200; //MaxInitialTrails
-      mMaxFeaturesInFrame = nToAdd;
-      size_t nToThrow = 100;//MinInitialTrails
-      mMinFeaturesInFrame = nToThrow;
-      mFrameCounter = 0;
+    size_t nToAdd = 200; // MaxInitialTrails
+    mMaxFeaturesInFrame = nToAdd;
+    size_t nToThrow = 100; // MinInitialTrails
+    mMinFeaturesInFrame = nToThrow;
+    mFrameCounter = 0;
 
-
-      for (size_t i = 0; i < keypoints.size(); i++) {
-          if (mapPointIds[i] != 0) {
-            Trailer t(keypoints[i].pt, keypoints[i].pt, 0, i, mapPointIds[i]);
-            t.p_W = mapPointPositions[i];
-            t.uCurrentFrameId = currentFrameId;
-            mlTrailers.push_back(t);
-          }
+    for (size_t i = 0; i < keypoints.size(); i++) {
+      if (mapPointIds[i] != 0) {
+        Trailer t(keypoints[i].pt, keypoints[i].pt, 0, i, mapPointIds[i]);
+        t.p_W = mapPointPositions[i];
+        t.uCurrentFrameId = currentFrameId;
+        mlTrailers.push_back(t);
       }
-      std::cout << "Initializing at frameid " << currentFrameId
-                << " with new trails " << mlTrailers.size() << std::endl;
+    }
+    std::cout << "Initializing at frameid " << currentFrameId
+              << " with new trails " << mlTrailers.size() << std::endl;
 
-      const size_t camIdB=0;
-      frameB->resetKeypoints(camIdB, keypoints);
-      return 0;
+    const size_t camIdB = 0;
+    frameB->resetKeypoints(camIdB, keypoints);
+    return 0;
   }
 
   uint64_t lastFrameId = estimator.frameIdByAge(1);
@@ -718,7 +710,7 @@ void HybridFrontend::matchStereo(
       // FIXME: implement this in the Multiframe...!!
 
       // check overlap
-      if(!multiFrame->hasOverlap(im0, im1)){
+      if (!multiFrame->hasOverlap(im0, im1)) {
         continue;
       }
 
@@ -808,7 +800,6 @@ int HybridFrontend::runRansac3d2d(
   // assign transformation
   numInliers = ransac.inliers_.size();
   if (numInliers >= 10) {
-
     // kick out outliers:
     std::vector<bool> inliers(numCorrespondences, false);
     for (size_t k = 0; k < ransac.inliers_.size(); ++k) {
@@ -839,18 +830,16 @@ int HybridFrontend::runRansac3d2d(
 // Perform 2D/2D RANSAC.
 int HybridFrontend::runRansac2d2d(
 #ifdef USE_MSCKF2
-    okvis::MSCKF2& estimator,
+    okvis::MSCKF2 &estimator,
 #else
-    okvis::HybridFilter& estimator,
+    okvis::HybridFilter &estimator,
 #endif
 
-                            const okvis::VioParameters& params,
-                            uint64_t currentFrameId, uint64_t olderFrameId,
-                            bool initializePose,
-                            bool removeOutliers,
-                            bool& rotationOnly) {
+    const okvis::VioParameters &params, uint64_t currentFrameId,
+    uint64_t olderFrameId, bool initializePose, bool removeOutliers,
+    bool *rotationOnly) {
   // match 2d2d
-  rotationOnly = false;
+  *rotationOnly = false;
   const size_t numCameras = params.nCameraSystem.numCameras();
 
   size_t totalInlierNumber = 0;
@@ -859,7 +848,6 @@ int HybridFrontend::runRansac2d2d(
 
   // run relative RANSAC
   for (size_t im = 0; im < numCameras; ++im) {
-
     // relative pose adapter for Kneip toolchain
     opengv::relative_pose::HybridFrameRelativeAdapter adapter(estimator,
                                                         params.nCameraSystem,
@@ -890,8 +878,8 @@ int HybridFrontend::runRansac2d2d(
 
     // get quality
     int rotation_only_inliers = rotation_only_ransac.inliers_.size();
-    float rotation_only_ratio = float(rotation_only_inliers)
-        / float(numCorrespondences);
+    float rotation_only_ratio = static_cast<float>(rotation_only_inliers) /
+                                static_cast<float>(numCorrespondences);
 
     // now the rel_pose one:
     typedef opengv::sac_problems::relative_pose::
@@ -901,7 +889,7 @@ int HybridFrontend::runRansac2d2d(
         new HybridFrameRelativePoseSacProblem(
             adapter, HybridFrameRelativePoseSacProblem::STEWENIUS));
     rel_pose_ransac.sac_model_ = rel_pose_problem_ptr;
-    rel_pose_ransac.threshold_ = 9;     //(1.0 - cos(0.5/600));
+    rel_pose_ransac.threshold_ = 9; // (1.0 - cos(0.5/600));
     rel_pose_ransac.max_iterations_ = 50;
 
     // run the ransac
@@ -909,7 +897,8 @@ int HybridFrontend::runRansac2d2d(
 
     // assess success
     int rel_pose_inliers = rel_pose_ransac.inliers_.size();
-    float rel_pose_ratio = float(rel_pose_inliers) / float(numCorrespondences);
+    float rel_pose_ratio = static_cast<float>(rel_pose_inliers) /
+                           static_cast<float>(numCorrespondences);
 
     // decide on success and fill inliers
     std::vector<bool> inliers(numCorrespondences, false);
@@ -917,7 +906,7 @@ int HybridFrontend::runRansac2d2d(
       if (rotation_only_inliers > 10) {
         rotation_only_success = true;
       }
-      rotationOnly = true;
+      *rotationOnly = true;
       totalInlierNumber += rotation_only_inliers;
       for (size_t k = 0; k < rotation_only_ransac.inliers_.size(); ++k) {
         inliers.at(rotation_only_ransac.inliers_.at(k)) = true;
@@ -944,13 +933,12 @@ int HybridFrontend::runRansac2d2d(
     for (size_t k = 0; k < numCorrespondences; ++k) {
       size_t idxB = adapter.getMatchKeypointIdxB(k);
       if (!inliers[k]) {
-
         uint64_t lmId = multiFrame->landmarkId(im, k);
         // reset ID:
         multiFrame->setLandmarkId(im, k, 0);
         // remove observation
         if (removeOutliers) {
-          if (lmId != 0 && estimator.isLandmarkAdded(lmId)){
+          if (lmId != 0 && estimator.isLandmarkAdded(lmId)) {
             estimator.removeObservation(lmId, currentFrameId, im, idxB);
           }
         }
@@ -981,7 +969,7 @@ int HybridFrontend::runRansac2d2d(
         // correct scale. Hopefully.
         T_C1C2_mat.topLeftCorner<3, 4>() = rel_pose_ransac.model_coefficients_;
 
-        //initialize with projected length according to motion prior.
+        // initialize with projected length according to motion prior.
 
         okvis::kinematics::Transformation T_C1C2 = T_SCA.inverse()
             * T_WSA.inverse() * T_WS0 * T_SC0;
@@ -1005,10 +993,10 @@ int HybridFrontend::runRansac2d2d(
     }
   }
 
-  if (rel_pose_success || rotation_only_success)
+  if (rel_pose_success || rotation_only_success) {
     return totalInlierNumber;
-  else {
-    rotationOnly = true;  // hack...
+  } else {
+    *rotationOnly = true; // hack...
     return -1;
   }
 
@@ -1025,17 +1013,17 @@ void HybridFrontend::initialiseBriskFeatureDetectors() {
   featureDetectors_.clear();
   descriptorExtractors_.clear();
   for (size_t i = 0; i < numCameras_; ++i) {
-    featureDetectors_.push_back(
-        std::shared_ptr<cv::FeatureDetector>(
+    featureDetectors_.push_back(std::shared_ptr<cv::FeatureDetector>(
 #ifdef __ARM_NEON__
-            new cv::GridAdaptedFeatureDetector( 
+        new cv::GridAdaptedFeatureDetector(
             new cv::FastFeatureDetector(briskDetectionThreshold_),
-                briskDetectionMaximumKeypoints_, 7, 4 ))); // from config file, except the 7x4...
+            briskDetectionMaximumKeypoints_, 7, 4)));
+    // from config file, except the 7x4...
 #else
-            new brisk::ScaleSpaceFeatureDetector<brisk::HarrisScoreCalculator>(
-                briskDetectionThreshold_, briskDetectionOctaves_, 
-                briskDetectionAbsoluteThreshold_,
-                briskDetectionMaximumKeypoints_)));
+        new brisk::ScaleSpaceFeatureDetector<brisk::HarrisScoreCalculator>(
+            briskDetectionThreshold_, briskDetectionOctaves_,
+            briskDetectionAbsoluteThreshold_,
+            briskDetectionMaximumKeypoints_)));
 #endif
     descriptorExtractors_.push_back(
         std::shared_ptr<cv::DescriptorExtractor>(
@@ -1052,27 +1040,23 @@ void HybridFrontend::initialiseBriskFeatureDetectors() {
 /**
  * The current frame is to be the first frame
  */
-bool HybridFrontend::TrailTracking_Start()
-{
+bool HybridFrontend::TrailTracking_Start() {
   // detect good features
   std::vector<cv::Point2f> vfPoints;
-  size_t nToAdd = 200; //MaxInitialTrails
+  size_t nToAdd = 200; // MaxInitialTrails
   mMaxFeaturesInFrame = nToAdd;
-  size_t nToThrow = 100;//MinInitialTrails
+  size_t nToThrow = 100; // MinInitialTrails
   mMinFeaturesInFrame = nToThrow;
   mFrameCounter = 0;
-  int nSubPixWinWidth= 7; //SubPixWinWidth
-  cv::Size subPixWinSize(nSubPixWinWidth,nSubPixWinWidth);
+  int nSubPixWinWidth = 7; // SubPixWinWidth
+  cv::Size subPixWinSize(nSubPixWinWidth, nSubPixWinWidth);
 
   cv::TermCriteria termcrit(CV_TERMCRIT_ITER|CV_TERMCRIT_EPS, 10, 0.03);
-  cv::goodFeaturesToTrack(
-      mCurrentPyramid[0], vfPoints, nToAdd, 
-      0.01, 10, cv::Mat(), 
-      3, false, 0.04);
-  cv::cornerSubPix(
-      mCurrentPyramid[0], vfPoints, subPixWinSize, cv::Size(-1,-1), termcrit);
-  if(vfPoints.size()<nToThrow)
-  {
+  cv::goodFeaturesToTrack(mCurrentPyramid[0], vfPoints, nToAdd, 0.01, 10,
+                          cv::Mat(), 3, false, 0.04);
+  cv::cornerSubPix(mCurrentPyramid[0], vfPoints, subPixWinSize,
+                   cv::Size(-1, -1), termcrit);
+  if (vfPoints.size() < nToThrow) {
     OKVIS_ASSERT_GT(Exception, vfPoints.size(), nToThrow,
                     "No. features in the first frame is too few");
     return false;
@@ -1080,11 +1064,10 @@ bool HybridFrontend::TrailTracking_Start()
   mvKeyPoints.clear();
   mvKeyPoints.reserve(mMaxFeaturesInFrame+50);
   mlTrailers.clear();
-  for(size_t i = 0; i<vfPoints.size(); i++)
-  {
-      Trailer t(vfPoints[i], vfPoints[i], 0, i);
-      mlTrailers.push_back(t);
-      mvKeyPoints.push_back(cv::KeyPoint(vfPoints[i], 8.f));
+  for (size_t i = 0; i < vfPoints.size(); i++) {
+    Trailer t(vfPoints[i], vfPoints[i], 0, i);
+    mlTrailers.push_back(t);
+    mvKeyPoints.push_back(cv::KeyPoint(vfPoints[i], 8.f));
   }
   std::cout << "create new points " << mvKeyPoints.size()
             << " at the start " << std::endl;
@@ -1102,12 +1085,11 @@ bool HybridFrontend::TrailTracking_Start()
  */
 int HybridFrontend::TrailTracking_Advance(
 #ifdef USE_MSCKF2
-        okvis::MSCKF2& estimator,
+    okvis::MSCKF2 &estimator,
 #else
-        okvis::HybridFilter& estimator,
+    okvis::HybridFilter &estimator,
 #endif
-        uint64_t mfIdA, uint64_t mfIdB, size_t camIdA, size_t camIdB)
-{
+    uint64_t mfIdA, uint64_t mfIdB, size_t camIdA, size_t camIdB) {
     typedef okvis::cameras::PinholeCamera<okvis::cameras::
         RadialTangentialDistortion> CAMERA_GEOMETRY_T;
     int nGoodTrails = 0;
@@ -1124,7 +1106,7 @@ int HybridFrontend::TrailTracking_Advance(
     std::shared_ptr<okvis::MultiFrame> frameB = estimator.multiFrame(mfIdB);
 
     // calculate the relative transformations and uncertainties
-    // TODO donno, if and what we need here - I'll see
+    // TODO(sleuten): donno, if and what we need here - I'll see
 
     okvis::kinematics::Transformation T_CaCb;
     okvis::kinematics::Transformation T_CbCa;
@@ -1161,95 +1143,102 @@ int HybridFrontend::TrailTracking_Advance(
     size_t mMeasAttempted = 0;
     vfPoints[0].reserve(mlTrailers.size());
     vfPoints[1].reserve(mlTrailers.size());
-    for(std::list<Trailer>::const_iterator it = mlTrailers.begin();
-        it!=mlTrailers.end(); ++it) {
-        // TODO(jhuai): predict point position with its world position when
-        // it->mLandmarkId is not 0.
-        // To implement it cf. VioFrameMatchingAlgorithm doSetup
+    for (std::list<Trailer>::const_iterator it = mlTrailers.begin();
+         it != mlTrailers.end(); ++it) {
+      // TODO(jhuai): predict point position with its world position when
+      // it->mLandmarkId is not 0.
+      // To implement it cf. VioFrameMatchingAlgorithm doSetup
 
-            // predict pose in the current pose by rotation compensation,
-            // assume the camera tranlates very small compared to the point depth
-            // if it's not projected successfully, we alias it to prevent it
-            // being tracked
-//            Eigen::Vector2d kptA(it->fCurrPose.x, it->fCurrPose.y);
-//            Eigen::Vector3d dirVecA;
-//            if (!frameA->geometryAs<CAMERA_GEOMETRY_T>(camIdA)->backProject(
-//                kptA, &dirVecA)) {
-//                vfPoints[0].push_back(cv::Point2f(-1,-1)); //pose in last frame
-//                vfPoints[1].push_back(cv::Point2f(-1,-1)); //preventing detect anything
-//                continue;
-//            }
-//            Eigen::Vector3d dirVecB = T_CbCa.C()*dirVecA;
-//            Eigen::Vector2d kptB;
-//            if(frameB->geometryAs<CAMERA_GEOMETRY_T>(camIdB)->project(dirVecB, &kptB)
-//                    != okvis::cameras::CameraBase::ProjectionStatus::Successful) {
-//                vfPoints[0].push_back(cv::Point2f(-1,-1)); //pose in last frame
-//                vfPoints[1].push_back(cv::Point2f(-1,-1)); //preventing detect anything
-//                continue;
-//            }
+      // predict pose in the current pose by rotation compensation,
+      // assume the camera tranlates very small compared to the point depth
+      // if it's not projected successfully, we alias it to prevent it
+      // being tracked
+      //            Eigen::Vector2d kptA(it->fCurrPose.x, it->fCurrPose.y);
+      //            Eigen::Vector3d dirVecA;
+      //            if
+      //            (!frameA->geometryAs<CAMERA_GEOMETRY_T>(camIdA)->backProject(
+      //                kptA, &dirVecA)) {
+      //                // pose in last frame
+      //                vfPoints[0].push_back(cv::Point2f(-1,-1));
+      //                // preventing detect anything
+      //                vfPoints[1].push_back(cv::Point2f(-1,-1));
+      //                continue;
+      //            }
+      //            Eigen::Vector3d dirVecB = T_CbCa.C()*dirVecA;
+      //            Eigen::Vector2d kptB;
+      //            if(frameB->geometryAs<CAMERA_GEOMETRY_T>(camIdB)
+      //                ->project(dirVecB, &kptB) !=
+      //                okvis::cameras::CameraBase::
+      //                ProjectionStatus::Successful) {
+      //                // pose in last frame
+      //                vfPoints[0].push_back(cv::Point2f(-1,-1));
+      //                // preventing detect anything
+      //                vfPoints[1].push_back(cv::Point2f(-1,-1));
+      //                continue;
+      //            }
 
-            vfPoints[0].push_back(it->fCurrPose);//point in previous frame
-//            vfPoints[1].push_back(cv::Point2f((float)kptB[0],(float)kptB[1]));
-            vfPoints[1].push_back(it->fCurrPose);
-            ++mMeasAttempted;
+      vfPoints[0].push_back(it->fCurrPose); // point in previous frame
+      //            vfPoints[1].push_back(cv::Point2f((float)kptB[0],(float)kptB[1]));
+      vfPoints[1].push_back(it->fCurrPose);
+      ++mMeasAttempted;
     }
 
-    int nWinWidth= 15;//WinWidth
-    cv::Size winSize(nWinWidth,nWinWidth);
+    int nWinWidth = 15; // WinWidth
+    cv::Size winSize(nWinWidth, nWinWidth);
     cv::TermCriteria termcrit(CV_TERMCRIT_ITER|CV_TERMCRIT_EPS, 10, 0.03);
     cv::calcOpticalFlowPyrLK(
         mPreviousPyramid, mCurrentPyramid, vfPoints[0], vfPoints[1], status[0],
         err, winSize, 3, termcrit, cv::OPTFLOW_USE_INITIAL_FLOW, 0.001);
-    //what is returned for points failed to track? the initial position
+    // what is returned for points failed to track? the initial position
     // if a point is out of boundary, it will ended up failing to track
-    vfPoints[2]=vfPoints[0];
+    vfPoints[2] = vfPoints[0];
     cv::calcOpticalFlowPyrLK(
         mCurrentPyramid, mPreviousPyramid, vfPoints[1], vfPoints[2], status[1],
         err, winSize, 3, termcrit, cv::OPTFLOW_USE_INITIAL_FLOW, 0.001);
 
     mvKeyPoints.clear();
-    mvKeyPoints.reserve(mMaxFeaturesInFrame+100); //keypoints in frame B
+    mvKeyPoints.reserve(mMaxFeaturesInFrame + 100); // keypoints in frame B
     std::list<Trailer>::iterator it = mlTrailers.begin();
     // note status[0].size() is constant, but not mlTrailers.size()
-    for(size_t which=0; which<status[0].size(); ++which) {
-        if(status[0][which]){
-            cv::Point2f delta=vfPoints[2][which] - vfPoints[0][which];
-            bool bInImage=
-                (vfPoints[0][which].x >= 0.f) &&
-                (vfPoints[0][which].y >= 0.f) &&
-                (vfPoints[1][which].x >= 0.f) &&
-                (vfPoints[1][which].y >= 0.f) &&
-                (vfPoints[0][which].x <= (imageW-1.f)) &&
-                (vfPoints[0][which].y <= (imageH-1.f)) &&
-                (vfPoints[1][which].x <= (imageW-1.f)) &&
-                (vfPoints[1][which].y <= (imageH-1.f));
-            if (!status[1][which] || !bInImage || (delta.dot(delta)) > 2)
-                status[0][which] = 0;
+    for (size_t which = 0; which < status[0].size(); ++which) {
+      if (status[0][which]) {
+        cv::Point2f delta = vfPoints[2][which] - vfPoints[0][which];
+        bool bInImage =
+            (vfPoints[0][which].x >= 0.f) && (vfPoints[0][which].y >= 0.f) &&
+            (vfPoints[1][which].x >= 0.f) && (vfPoints[1][which].y >= 0.f) &&
+            (vfPoints[0][which].x <= (imageW - 1.f)) &&
+            (vfPoints[0][which].y <= (imageH - 1.f)) &&
+            (vfPoints[1][which].x <= (imageW - 1.f)) &&
+            (vfPoints[1][which].y <= (imageH - 1.f));
+        if (!status[1][which] || !bInImage || (delta.dot(delta)) > 2)
+          status[0][which] = 0;
 
-//           if(!bInImage){
-//               std::cout << "vPoint[0][which] "<< vfPoints[0][which].x <<" "
-//                         << vfPoints[0][which].y << " "
-//                         << vfPoints[1][which].x << " "
-//                         << vfPoints[1][which].y <<" "<<std::endl;
-//           }
+        //           if(!bInImage){
+        //               std::cout << "vPoint[0][which] "<< vfPoints[0][which].x
+        //               <<" "
+        //                         << vfPoints[0][which].y << " "
+        //                         << vfPoints[1][which].x << " "
+        //                         << vfPoints[1][which].y <<" "<<std::endl;
+        //           }
 
-            it->fCurrPose=vfPoints[1][which];
-        }
-        // Erase from list of trails if not found this frame.
-        if(!status[0][which])
-            it=mlTrailers.erase(it);
-        else{
-            it->uOldKeyPointIdx = it->uKeyPointIdx;
-            it->uKeyPointIdx = nGoodTrails;
-            ++it->uTrackLength;
+        it->fCurrPose = vfPoints[1][which];
+      }
+      // Erase from list of trails if not found this frame.
+      if (!status[0][which]) {
+        it = mlTrailers.erase(it);
+      } else {
+        it->uOldKeyPointIdx = it->uKeyPointIdx;
+        it->uKeyPointIdx = nGoodTrails;
+        ++it->uTrackLength;
 
-            mvKeyPoints.push_back(cv::KeyPoint(it->fCurrPose, 8.f));
-            ++it;
-            ++nGoodTrails;
-        }
+        mvKeyPoints.push_back(cv::KeyPoint(it->fCurrPose, 8.f));
+        ++it;
+        ++nGoodTrails;
+      }
     }
 
-    assert(mlTrailers.end()==it && (int)mvKeyPoints.size()== nGoodTrails);
+    assert(mlTrailers.end() == it &&
+           static_cast<int>(mvKeyPoints.size()) == nGoodTrails);
 
     /*//added by huai for debug
     cv::namedWindow( "Display window", cv::WINDOW_AUTOSIZE );
@@ -1274,63 +1263,64 @@ int HybridFrontend::TrailTracking_Advance2(
     const std::vector<Eigen::Vector3d>& mapPointPositions,
     uint64_t mfIdB,
     const cv::Mat currentImage) {
-    int nGoodTrails =0;
-    int nTrackedFeatures = 0;
-    //build a map of mappoint ids for accelerating searching
-    std::map<size_t, std::list<Trailer>::iterator> mpId2Trailer;
+  int nGoodTrails = 0;
+  int nTrackedFeatures = 0;
+  // build a map of mappoint ids for accelerating searching
+  std::map<size_t, std::list<Trailer>::iterator> mpId2Trailer;
 
-    for (std::list<Trailer>::iterator iter = mlTrailers.begin(),
-        itEnd = mlTrailers.end(); iter!= itEnd; ++iter) {
-        mpId2Trailer[iter->uExternalLmId] = iter;
+  for (std::list<Trailer>::iterator iter = mlTrailers.begin(),
+                                    itEnd = mlTrailers.end();
+       iter != itEnd; ++iter) {
+    mpId2Trailer[iter->uExternalLmId] = iter;
     }
 
     std::list<Trailer> tempTrailers;
     auto it = mapPointIds.begin();
-    size_t counter =0;
-    while(it!= mapPointIds.end()){
-        if(*it ==0){
-            ++it;
-            ++counter;
-            continue;
-        }
-        auto iterMap = mpId2Trailer.find(*it);
-        if(iterMap!= mpId2Trailer.end()){
-            std::list<Trailer>::iterator tp = iterMap->second;
-            tp->uOldKeyPointIdx = tp->uKeyPointIdx;
-            tp->uKeyPointIdx = counter;
-            tp->fCurrPose= keypoints[counter].pt;
-            tp->p_W = mapPointPositions[counter];
-            tp->uCurrentFrameId = mfIdB;
-            ++(tp->uTrackLength);
-            ++nGoodTrails;
-        }else{ // a new trail
-            Trailer t(keypoints[counter].pt, keypoints[counter].pt,
-                0, counter, *it);
-            t.p_W = mapPointPositions[counter];
-            t.uCurrentFrameId = mfIdB;
-            tempTrailers.push_back(t);
-        }
-        ++nTrackedFeatures;
+    size_t counter = 0;
+    while (it != mapPointIds.end()) {
+      if (*it == 0) {
         ++it;
         ++counter;
+        continue;
+      }
+      auto iterMap = mpId2Trailer.find(*it);
+      if (iterMap != mpId2Trailer.end()) {
+        std::list<Trailer>::iterator tp = iterMap->second;
+        tp->uOldKeyPointIdx = tp->uKeyPointIdx;
+        tp->uKeyPointIdx = counter;
+        tp->fCurrPose = keypoints[counter].pt;
+        tp->p_W = mapPointPositions[counter];
+        tp->uCurrentFrameId = mfIdB;
+        ++(tp->uTrackLength);
+        ++nGoodTrails;
+      } else { // a new trail
+        Trailer t(keypoints[counter].pt, keypoints[counter].pt, 0, counter,
+                  *it);
+        t.p_W = mapPointPositions[counter];
+        t.uCurrentFrameId = mfIdB;
+        tempTrailers.push_back(t);
+      }
+      ++nTrackedFeatures;
+      ++it;
+      ++counter;
     }
 
     assert(counter == mapPointIds.size());
     mlTrailers.insert(mlTrailers.end(), tempTrailers.begin(),
         tempTrailers.end());
 
-    //added by huai for debug
-//    cv::namedWindow( "Display window", cv::WINDOW_AUTOSIZE );
-// CAUTION: do not draw on pyramid[0], ruining the data
-//    cv::Mat image= currentImage.clone();
-//    for (std::list<Trailer>::const_iterator it = mlTrailers.begin();
-//        it!=mlTrailers.end();++it){
-//        cv::line(image, it->fInitPose, it->fCurrPose, CV_RGB(0,0,0));
-//        cv::circle( image, it->fCurrPose, 3, cv::Scalar(255,0,0), -1, 8);
-//    }
-//    //CVDRGB2OpenCVRGB(mimFrameRGB, image);
-//    cv::imshow( "Display window", image );
-//    cv::waitKey(30);
+    // added by huai for debug
+    //    cv::namedWindow( "Display window", cv::WINDOW_AUTOSIZE );
+    // CAUTION: do not draw on pyramid[0], ruining the data
+    //    cv::Mat image= currentImage.clone();
+    //    for (std::list<Trailer>::const_iterator it = mlTrailers.begin();
+    //        it!=mlTrailers.end();++it){
+    //        cv::line(image, it->fInitPose, it->fCurrPose, CV_RGB(0,0,0));
+    //        cv::circle( image, it->fCurrPose, 3, cv::Scalar(255,0,0), -1, 8);
+    //    }
+    //    //CVDRGB2OpenCVRGB(mimFrameRGB, image);
+    //    cv::imshow( "Display window", image );
+    //    cv::waitKey(30);
 
     myAccumulator(nTrackedFeatures);
     return nGoodTrails;
@@ -1347,25 +1337,23 @@ int HybridFrontend::TrailTracking_DetectAndInsert(
     const size_t startIndex = mvKeyPoints.size();
     // detect good features
     std::vector<cv::Point2f> vfPoints;
-    int nToAdd=mMaxFeaturesInFrame-nInliers+50;
-    int nSubPixWinWidth=7; //SubPixWinWidth
-    cv::Size subPixWinSize(nSubPixWinWidth,nSubPixWinWidth);
+    int nToAdd = mMaxFeaturesInFrame - nInliers + 50;
+    int nSubPixWinWidth = 7; // SubPixWinWidth
+    cv::Size subPixWinSize(nSubPixWinWidth, nSubPixWinWidth);
     cv::TermCriteria termcrit(CV_TERMCRIT_ITER|CV_TERMCRIT_EPS, 10, 0.03);
-    //create mask
-    if(mMask.empty())
-        mMask.create(currentFrame.size(), CV_8UC1);
-    mMask= cv::Scalar(255);
-    for (std::list<Trailer>::const_iterator lTcIt=mlTrailers.begin();
-        lTcIt!=mlTrailers.end(); ++lTcIt) {
-        cv::circle(mMask, lTcIt->fCurrPose, 11, cv::Scalar(0), CV_FILLED);
+    // create mask
+    if (mMask.empty())
+      mMask.create(currentFrame.size(), CV_8UC1);
+    mMask = cv::Scalar(255);
+    for (std::list<Trailer>::const_iterator lTcIt = mlTrailers.begin();
+         lTcIt != mlTrailers.end(); ++lTcIt) {
+      cv::circle(mMask, lTcIt->fCurrPose, 11, cv::Scalar(0), CV_FILLED);
     }
-    double minDist=std::min(currentFrame.size().width/100+1.0, 15.0);
-    cv::goodFeaturesToTrack(
-        currentFrame, vfPoints, nToAdd, 
-        0.01, minDist, mMask,
-        3, false, 0.04);
-    cornerSubPix(currentFrame, vfPoints, subPixWinSize,
-        cv::Size(-1,-1), termcrit);
+    double minDist = std::min(currentFrame.size().width / 100 + 1.0, 15.0);
+    cv::goodFeaturesToTrack(currentFrame, vfPoints, nToAdd, 0.01, minDist,
+                            mMask, 3, false, 0.04);
+    cornerSubPix(currentFrame, vfPoints, subPixWinSize, cv::Size(-1, -1),
+                 termcrit);
 
     std::cout << "Detected additional " << vfPoints.size()
               << " points" << std::endl;
@@ -1383,19 +1371,18 @@ int HybridFrontend::TrailTracking_DetectAndInsert(
     // feature bucketing: keeps only max_features per bucket, where the domain
     // is split into buckets of size (bucket_width,bucket_height)
     */
-    size_t jack=0;
-    for(size_t i = 0; i<vfPoints.size(); i++)
-    {
-        /*if (grid.at<unsigned char>((int)(vfPoints[i].x/bucket_width),
-            (int)(vfPoints[i].y/bucket_height))>=max_features_bin)
-            continue;
-        else
-            ++grid.at<unsigned char>((int)(vfPoints[i].x/bucket_width),
-                (int)(vfPoints[i].y/bucket_height));*/
-        Trailer t(vfPoints[i], vfPoints[i], 0, startIndex + jack);
-        mlTrailers.push_back(t);
-        vNewKPs.push_back(cv::KeyPoint(vfPoints[i], 8.f));
-        ++jack;
+    size_t jack = 0u;
+    for (size_t i = 0; i < vfPoints.size(); i++) {
+      /*if (grid.at<unsigned char>((int)(vfPoints[i].x/bucket_width),
+          (int)(vfPoints[i].y/bucket_height))>=max_features_bin)
+          continue;
+      else
+          ++grid.at<unsigned char>((int)(vfPoints[i].x/bucket_width),
+              (int)(vfPoints[i].y/bucket_height));*/
+      Trailer t(vfPoints[i], vfPoints[i], 0, startIndex + jack);
+      mlTrailers.push_back(t);
+      vNewKPs.push_back(cv::KeyPoint(vfPoints[i], 8.f));
+      ++jack;
     }
 
     /*//added by huai for debug
@@ -1416,72 +1403,70 @@ int HybridFrontend::TrailTracking_DetectAndInsert(
 
 void HybridFrontend::UpdateEstimatorObservations(
 #ifdef USE_MSCKF2
-        okvis::MSCKF2& estimator,
+    okvis::MSCKF2 &estimator,
 #else
-        okvis::HybridFilter& estimator,
+    okvis::HybridFilter &estimator,
 #endif
-        uint64_t mfIdA, uint64_t mfIdB, size_t camIdA, size_t camIdB)
-{
+    uint64_t mfIdA, uint64_t mfIdB, size_t camIdA, size_t camIdB) {
     // update estimator's observations and keypoints
     typedef okvis::cameras::PinholeCamera<
         okvis::cameras::RadialTangentialDistortion> camera_geometry_t;
     std::shared_ptr<okvis::MultiFrame> frameA = estimator.multiFrame(mfIdA);
     std::shared_ptr<okvis::MultiFrame> frameB = estimator.multiFrame(mfIdB);
-    for(auto it= mlTrailers.begin(); it!= mlTrailers.end(); ++it)
-    {
-        if (it->uLandmarkId!=0) {
-            estimator.addObservation<camera_geometry_t>(
-                it->uLandmarkId, mfIdB, camIdB, it->uKeyPointIdx);
-        }
-        else if(it->uTrackLength==2) {
-            // two observations, we skip those for new features of an obs
-            uint64_t lmId = okvis::IdProvider::instance().newId();
-            // TODO(jhuai): do triangulation
-//            double sigmaR = 1e-3;
-//            Eigen::Vector3d e1 =
-//                backProject(Eigen::Vector3d(
-//                    it->fInitPose.x, it->fInitPose.y, 1)).normalized();
-//            Eigen::Vector3d e2 =
-//                  (T_AW.C()*T_BW.C().transpose()*
-//                   obsDirections.back()).normalized();
-//            okvis::kinematics::Transformation T_MW = T_BW;
-//            Eigen::Vector3d p2 = T_AW.r() -
-//                (T_AW.q() * T_BW.q().conjugate())._transformVector(T_BW.r());
-//            Eigen::Matrix<double,4,1> hP_A =
-//                triangulateFastLocal(
-//                    Eigen::Vector3d(0,0,0), // center of A in A coordinates
-//                    e1, p2, // center of B in A coordinates
-//                    e2, sigmaR, isValid, isParallel);
+    for (auto it = mlTrailers.begin(); it != mlTrailers.end(); ++it) {
+      if (it->uLandmarkId != 0) {
+        estimator.addObservation<camera_geometry_t>(it->uLandmarkId, mfIdB,
+                                                    camIdB, it->uKeyPointIdx);
+      } else if (it->uTrackLength == 2) {
+        // two observations, we skip those for new features of an obs
+        uint64_t lmId = okvis::IdProvider::instance().newId();
+        // TODO(jhuai): do triangulation
+        //            double sigmaR = 1e-3;
+        //            Eigen::Vector3d e1 =
+        //                backProject(Eigen::Vector3d(
+        //                    it->fInitPose.x, it->fInitPose.y,
+        //                    1)).normalized();
+        //            Eigen::Vector3d e2 =
+        //                  (T_AW.C()*T_BW.C().transpose()*
+        //                   obsDirections.back()).normalized();
+        //            okvis::kinematics::Transformation T_MW = T_BW;
+        //            Eigen::Vector3d p2 = T_AW.r() -
+        //                (T_AW.q() *
+        //                T_BW.q().conjugate())._transformVector(T_BW.r());
+        //            Eigen::Matrix<double,4,1> hP_A =
+        //                triangulateFastLocal(
+        //                    Eigen::Vector3d(0,0,0), // center of A in A
+        //                    coordinates e1, p2, // center of B in A
+        //                    coordinates e2, sigmaR, isValid, isParallel);
 
-            Eigen::Matrix<double,4,1> hP_W;
-            hP_W.setOnes(); //random initialization
-            bool canBeInitialized=true;
-            estimator.addLandmark(lmId, hP_W);
-            OKVIS_ASSERT_TRUE(Exception, estimator.isLandmarkAdded(lmId),
-                              lmId<<" not added, bug");
-            estimator.setLandmarkInitialized(lmId, canBeInitialized);
+        Eigen::Matrix<double, 4, 1> hP_W;
+        hP_W.setOnes(); // random initialization
+        bool canBeInitialized = true;
+        estimator.addLandmark(lmId, hP_W);
+        OKVIS_ASSERT_TRUE(Exception, estimator.isLandmarkAdded(lmId),
+                          lmId << " not added, bug");
+        estimator.setLandmarkInitialized(lmId, canBeInitialized);
 
-            frameA->setLandmarkId(camIdA, it->uOldKeyPointIdx, lmId);
-            estimator.addObservation<camera_geometry_t>(
-                lmId, mfIdA, camIdA, it->uOldKeyPointIdx);
+        frameA->setLandmarkId(camIdA, it->uOldKeyPointIdx, lmId);
+        estimator.addObservation<camera_geometry_t>(lmId, mfIdA, camIdA,
+                                                    it->uOldKeyPointIdx);
 
-            it->uLandmarkId = lmId;
-            frameB->setLandmarkId(camIdB, it->uKeyPointIdx, lmId);
+        it->uLandmarkId = lmId;
+        frameB->setLandmarkId(camIdB, it->uKeyPointIdx, lmId);
 
-            estimator.addObservation<camera_geometry_t>(
-                lmId, mfIdB, camIdB, it->uKeyPointIdx);
-        }
+        estimator.addObservation<camera_geometry_t>(lmId, mfIdB, camIdB,
+                                                    it->uKeyPointIdx);
+      }
     }
 }
 
 void HybridFrontend::UpdateEstimatorObservations2(
 #ifdef USE_MSCKF2
-        okvis::MSCKF2& estimator,
+    okvis::MSCKF2 &estimator,
 #else
-        okvis::HybridFilter& estimator,
+    okvis::HybridFilter &estimator,
 #endif
-        uint64_t mfIdA, uint64_t mfIdB, size_t camIdA, size_t camIdB)
-{
+    uint64_t mfIdA, uint64_t mfIdB, size_t camIdA, size_t camIdB) {
     const size_t maxTrackLength = 15;  // break the track once it hits this val
     // update estimator's observations and keypoints
     typedef okvis::cameras::PinholeCamera<okvis::cameras::
@@ -1489,64 +1474,66 @@ void HybridFrontend::UpdateEstimatorObservations2(
     std::shared_ptr<okvis::MultiFrame> frameA = estimator.multiFrame(mfIdA);
     std::shared_ptr<okvis::MultiFrame> frameB = estimator.multiFrame(mfIdB);
     int deletedTrails = 0;
-    for(auto it= mlTrailers.begin(); it!= mlTrailers.end();)
-    {
-        if(it->uCurrentFrameId< mfIdB)
-        {
-            if(it->uTrackLength>1)
-                ++deletedTrails;
+    for (auto it = mlTrailers.begin(); it != mlTrailers.end();) {
+      if (it->uCurrentFrameId < mfIdB) {
+        if (it->uTrackLength > 1)
+          ++deletedTrails;
+        it = mlTrailers.erase(it);
+        continue;
+      } else {
+        assert(it->uCurrentFrameId == mfIdB);
+      }
 
-            it= mlTrailers.erase(it);
-            continue;
+      if (it->uLandmarkId != 0) {
+        if (it->uTrackLength < maxTrackLength) {
+          estimator.addObservation<camera_geometry_t>(it->uLandmarkId, mfIdB,
+                                                      camIdB, it->uKeyPointIdx);
+        } else { // break up the trail
+          it->fInitPose = it->fCurrPose;
+          it->uLandmarkId = 0;
+          it->uTrackLength = 1;
         }
-        else
-            assert(it->uCurrentFrameId == mfIdB);
+      } else if (it->uTrackLength == 2) {
+        // two observations, we skip those for new features of an observation
+        uint64_t lmId = okvis::IdProvider::instance().newId();
 
-        if (it->uLandmarkId != 0) {
-            if(it->uTrackLength<maxTrackLength)
-                estimator.addObservation<camera_geometry_t>(
-                    it->uLandmarkId, mfIdB, camIdB, it->uKeyPointIdx);
-            else//break up the trail
-            {
-                it->fInitPose =it->fCurrPose;
-                it->uLandmarkId =0;
-                it->uTrackLength =1;
-            }
-        } else if (it->uTrackLength == 2) {
-            //two observations, we skip those for new features of an observation
-            uint64_t lmId = okvis::IdProvider::instance().newId();
+        Eigen::Matrix<double, 4, 1> hP_W;
+        hP_W.head<3>() = it->p_W; // up to a scale factor
+        hP_W[3] = 1;
+        bool canBeInitialized = true;
+        estimator.addLandmark(lmId, hP_W);
+        OKVIS_ASSERT_TRUE(Exception, estimator.isLandmarkAdded(lmId),
+                          lmId << " not added, bug");
+        estimator.setLandmarkInitialized(lmId, canBeInitialized);
 
-            Eigen::Matrix<double,4,1> hP_W;
-            hP_W.head<3>() = it->p_W; //up to a scale factor
-            hP_W[3] =1;
-            bool canBeInitialized=true;
-            estimator.addLandmark(lmId, hP_W);
-            OKVIS_ASSERT_TRUE(Exception, estimator.isLandmarkAdded(lmId),
-                              lmId<<" not added, bug");
-            estimator.setLandmarkInitialized(lmId, canBeInitialized);
+        frameA->setLandmarkId(camIdA, it->uOldKeyPointIdx, lmId);
+        estimator.addObservation<camera_geometry_t>(lmId, mfIdA, camIdA,
+                                                    it->uOldKeyPointIdx);
 
-            frameA->setLandmarkId(camIdA, it->uOldKeyPointIdx, lmId);
-            estimator.addObservation<camera_geometry_t>(
-                lmId, mfIdA, camIdA, it->uOldKeyPointIdx);
-
-            it->uLandmarkId = lmId;
-            frameB->setLandmarkId(camIdB, it->uKeyPointIdx, lmId);
-            estimator.addObservation<camera_geometry_t>(
-                lmId, mfIdB, camIdB, it->uKeyPointIdx);
-        }
-        else
-            assert(it->uTrackLength==1);
-        ++it;
+        it->uLandmarkId = lmId;
+        frameB->setLandmarkId(camIdB, it->uKeyPointIdx, lmId);
+        estimator.addObservation<camera_geometry_t>(lmId, mfIdB, camIdB,
+                                                    it->uKeyPointIdx);
+      } else {
+        assert(it->uTrackLength == 1);
+      }
+      ++it;
     }
     std::cout << "Trails after deleted " << deletedTrails << " "
               << mlTrailers.size() << std::endl;
 }
 
 void HybridFrontend::printNumFeatureDistribution(std::ofstream & stream) {
-
     if (!stream.is_open()) {
         std::cerr << "cannot write feature distribution without proper stream "
                   << std::endl;
+    }
+    std::size_t num_samples = boost::accumulators::count(myAccumulator);
+    if (num_samples == 0) {
+      stream << "Skip computing the histogram of number of features in "
+                "images as no sample is stored!"
+             << std::endl;
+      return;
     }
     histogram_type hist = boost::accumulators::density(myAccumulator);
 

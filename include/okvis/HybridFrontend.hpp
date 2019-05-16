@@ -21,7 +21,10 @@
 /// \brief okvis Main namespace of this package.
 namespace okvis {
 
-typedef boost::accumulators::accumulator_set<double, boost::accumulators::features<boost::accumulators::tag::density> > MyAccumulator;
+typedef boost::accumulators::accumulator_set<
+    double, boost::accumulators::features<boost::accumulators::tag::count,
+                                          boost::accumulators::tag::density>>
+    MyAccumulator;
 typedef boost::iterator_range<std::vector<std::pair<double, double> >::iterator > histogram_type;
 
 struct Trailer{
@@ -459,13 +462,13 @@ class HybridFrontend {
    */
   int runRansac2d2d(
 #ifdef USE_MSCKF2
-    okvis::MSCKF2& estimator,
+      okvis::MSCKF2 &estimator,
 #else
-    okvis::HybridFilter& estimator,
+      okvis::HybridFilter &estimator,
 #endif
-                    const okvis::VioParameters& params, uint64_t currentFrameId,
-                    uint64_t olderFrameId, bool initializePose,
-                    bool removeOutliers, bool &rotationOnly);
+      const okvis::VioParameters &params, uint64_t currentFrameId,
+      uint64_t olderFrameId, bool initializePose, bool removeOutliers,
+      bool *rotationOnly);
 
   /// (re)instantiates feature detectors and descriptor extractors. Used after settings changed or at startup.
   void initialiseBriskFeatureDetectors();
