@@ -812,6 +812,7 @@ void HybridVio::optimizationLoop() {
         int frameIdInSource = -1;
         bool isKF = false;
         estimator_.getFrameId(frame_pairs->id(), frameIdInSource, isKF);
+        std::cout << "optimized at frame id " << frameIdInSource << std::endl;
         // if we publish the state after each IMU propagation we do not need
         // to publish it here.
         if (!parameters_.publishing.publishImuPropagatedState) {

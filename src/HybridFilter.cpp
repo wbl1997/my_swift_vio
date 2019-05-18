@@ -1591,38 +1591,35 @@ void HybridFilter::optimize(bool verbose)
     for(auto it = landmarksMap_.begin(); it!=landmarksMap_.end(); ++it, ++tempCounter){
         ResidualizeCase toResidualize = NotInState_NotTrackedNow;
         const size_t nNumObs = it->second.observations.size();
-        if(it->second.anchorStateId==0)// this point is not in the states
-        {
-            for(auto itObs= it->second.observations.rbegin(), iteObs= it->second.observations.rend();
-                itObs!=iteObs; ++itObs)
-            {
-                if(itObs->first.frameId == currFrameId)
-                {
-                    if(nNumObs == mMaxM){ // this point is to be included in the states
-                        toResidualize = ToAdd_TrackedNow;
-                        ++nToAddFeatures;
-                    }
-                    else{
-                        OKVIS_ASSERT_LT_DBG(Exception, nNumObs, mMaxM,
-                                            "A point not in state should not have consecutive features more than mMaxM.");
-                        toResidualize = NotToAdd_TrackedNow;
-                    }
-                    break;
-                }
+        if (it->second.anchorStateId == 0) { // this point is not in the states
+          for (auto itObs = it->second.observations.rbegin(),
+                    iteObs = it->second.observations.rend();
+               itObs != iteObs; ++itObs) {
+            if (itObs->first.frameId == currFrameId) {
+              if (nNumObs ==
+                  mMaxM) { // this point is to be included in the states
+                toResidualize = ToAdd_TrackedNow;
+                ++nToAddFeatures;
+              } else {
+                OKVIS_ASSERT_LT_DBG(Exception, nNumObs, mMaxM,
+                                    "A point not in state should not have "
+                                    "consecutive features more than mMaxM.");
+                toResidualize = NotToAdd_TrackedNow;
+              }
+              break;
             }
-        }
-        else
-        {
-            toResidualize = InState_NotTrackedNow;
-            for(auto itObs= it->second.observations.rbegin(), iteObs= it->second.observations.rend();
-                itObs!=iteObs; ++itObs)
-            {
-                if(itObs->first.frameId == currFrameId)// point in states are still tracked so far
-                {
-                    toResidualize = InState_TrackedNow;
-                    break;
-                }
+          }
+        } else {
+          toResidualize = InState_NotTrackedNow;
+          for (auto itObs = it->second.observations.rbegin(),
+                    iteObs = it->second.observations.rend();
+               itObs != iteObs; ++itObs) {
+            if (itObs->first.frameId ==
+                currFrameId) { // point in states are still tracked so far
+              toResidualize = InState_TrackedNow;
+              break;
             }
+          }
         }
 
         mLandmarkID2Residualize[tempCounter].first = it->second.id;
@@ -2261,169 +2258,246 @@ bool HybridFilter::getSensorStateParameterBlockPtr(
     return true;
 }
 
-//TODO: mapPtr_ and hpbid is only used for debug
-bool HybridFilter::triangulateAMapPoint(const MapPoint & mp,  std::vector<Eigen::Vector2d >& obsInPixel,
-                                        std::vector<uint64_t >& frameIds, Eigen::Vector4d& v4Xhomog, std::vector<double>& vR_oi,
-                                        const cameras::PinholeCamera< cameras::RadialTangentialDistortion >& cameraGeometry,
-                                        const kinematics::Transformation & T_SC0,
-                                        const uint64_t& hpbid)
-{
-    triangulateTimer.start();
-    std::vector<Eigen::Vector3d > obsDirections;// each entry is undistorted coordinates in image plane at z=1 in the specific camera frame, [\bar{x},\bar{y},1]
-    std::vector<Sophus::SE3d> T_CWs; //the SE3 transform from world to camera frame
+// TODO(jhuai): mapPtr_ and hpbid is only used for debug
+void HybridFilter::gatherPoseObservForTriang(
+    const MapPoint &mp,
+    const cameras::PinholeCamera<cameras::RadialTangentialDistortion>
+        &cameraGeometry,
+    std::vector<uint64_t> *frameIds,
+    std::vector<okvis::kinematics::Transformation> *T_WSs,
+    std::vector<Eigen::Vector3d> *obsDirections,
+    std::vector<Eigen::Vector2d> *obsInPixel, std::vector<double> *vR_oi,
+    const uint64_t &hpbid) const {
+  for (auto itObs = mp.observations.begin(), iteObs = mp.observations.end();
+       itObs != iteObs; ++itObs) {
+    uint64_t poseId = itObs->first.frameId;
+    Eigen::Vector2d measurement;
+    okvis::MultiFramePtr multiFramePtr =
+        multiFramePtrMap_.at(itObs->first.frameId);
+    multiFramePtr->getKeypoint(itObs->first.cameraIndex,
+                               itObs->first.keypointIndex, measurement);
 
-    for(auto itObs= mp.observations.begin(), iteObs= mp.observations.end(); itObs!=iteObs; ++itObs )
-    {
-        uint64_t poseId = itObs->first.frameId;
-        Eigen::Vector2d measurement;
-        okvis::MultiFramePtr multiFramePtr = multiFramePtrMap_.at(itObs->first.frameId);
-        multiFramePtr->getKeypoint(itObs->first.cameraIndex, itObs->first.keypointIndex, measurement);
+#if 0 // debugging
+       std::shared_ptr <const ceres::ReprojectionError
+               < okvis::cameras::PinholeCamera<
+               okvis::cameras::RadialTangentialDistortion> > > reprojectionErrorPtr=
+               std::dynamic_pointer_cast< const
+               okvis::ceres::ReprojectionError< okvis::cameras::PinholeCamera<
+               okvis::cameras::RadialTangentialDistortion> > >(
+                   mapPtr_->errorInterfacePtr(reinterpret_cast< ::ceres::ResidualBlockId>(itObs->second)));
 
-#if 0
-        std::shared_ptr <const ceres::ReprojectionError
-                < okvis::cameras::PinholeCamera<
-                okvis::cameras::RadialTangentialDistortion> > > reprojectionErrorPtr=
-                std::dynamic_pointer_cast< const
-                okvis::ceres::ReprojectionError< okvis::cameras::PinholeCamera<
-                okvis::cameras::RadialTangentialDistortion> > >(
-                    mapPtr_->errorInterfacePtr(reinterpret_cast< ::ceres::ResidualBlockId>(itObs->second)));
-
-        Eigen::Vector2d measurement1 = reprojectionErrorPtr->measurement();
-        OKVIS_ASSERT_LT(Exception, (measurement - measurement1).norm(), 1e-8,
-                        "wrong keypoint correspondence in map and frame!");
+       Eigen::Vector2d measurement1 = reprojectionErrorPtr->measurement();
+       OKVIS_ASSERT_LT(Exception, (measurement - measurement1).norm(), 1e-8,
+                       "wrong keypoint correspondence in map and frame!");
 #endif
 
-        obsInPixel.push_back(measurement);
+    obsInPixel->push_back(measurement);
 
-        double kpSize = 1.0;
-        multiFramePtr->getKeypointSize(itObs->first.cameraIndex, itObs->first.keypointIndex, kpSize);
-        vR_oi.push_back(kpSize/8); vR_oi.push_back(kpSize/8); // image pixel noise follows that in addObservation function
+    double kpSize = 1.0;
+    multiFramePtr->getKeypointSize(itObs->first.cameraIndex,
+                                   itObs->first.keypointIndex, kpSize);
+    vR_oi->push_back(kpSize / 8);
+    vR_oi->push_back(
+        kpSize /
+        8); // image pixel noise follows that in addObservation function
 
-        //use the latest estimates for camera intrinsic parameters
-        Eigen::Vector3d backProjectionDirection;
-        cameraGeometry.backProject( measurement, &backProjectionDirection);
-        obsDirections.push_back(backProjectionDirection); // each observation is in image plane z=1, (\bar{x}, \bar{y}, 1)
+    // use the latest estimates for camera intrinsic parameters
+    Eigen::Vector3d backProjectionDirection;
+    cameraGeometry.backProject(measurement, &backProjectionDirection);
+    obsDirections->push_back(
+        backProjectionDirection); // each observation is in image plane z=1,
+                                  // (\bar{x}, \bar{y}, 1)
 
-        okvis::kinematics::Transformation T_WS, T_WC0;
-        get_T_WS(poseId, T_WS);
-        T_WC0= T_WS * T_SC0;
-        Sophus::SE3d Tc2w(T_WC0.q(), T_WC0.r());
-        T_CWs.push_back(Tc2w.inverse());
-        frameIds.push_back(poseId);
-    }
-#if 0
-    // point's world position estimated in the feature tracking, for debugging
-    std::shared_ptr<okvis::ceres::HomogeneousPointParameterBlock> pointPBPtr =
-            std::static_pointer_cast<okvis::ceres::HomogeneousPointParameterBlock>( mapPtr_->parameterBlockPtr(hpbid));
-    Eigen::Vector4d homoPoint = pointPBPtr->estimate();
-    std::cout<< "okvis point estimate :"<< (homoPoint.head<3>().transpose()/homoPoint[3])<<std::endl;
+    okvis::kinematics::Transformation T_WS;
+    get_T_WS(poseId, T_WS);
+    T_WSs->push_back(T_WS);
+    frameIds->push_back(poseId);
+  }
+
+#if 0 /// point's world position estimated during the feature tracking, for
+     /// debugging
+   std::shared_ptr<okvis::ceres::HomogeneousPointParameterBlock> pointPBPtr =
+           std::static_pointer_cast<okvis::ceres::HomogeneousPointParameterBlock>( mapPtr_->parameterBlockPtr(hpbid));
+   Eigen::Vector4d homoPoint = pointPBPtr->estimate();
+   std::cout<< "okvis point estimate :"<< (homoPoint.head<3>().transpose()/homoPoint[3])<<std::endl;
 #endif
+}
 
-    bool isValid(false); //is triangulation valid, i.e., not too large uncertainty
-    bool isParallel(false); //is a ray
+bool HybridFilter::triangulateAMapPoint(
+    const MapPoint &mp, std::vector<Eigen::Vector2d> &obsInPixel,
+    std::vector<uint64_t> &frameIds, Eigen::Vector4d &v4Xhomog,
+    std::vector<double> &vR_oi,
+    const cameras::PinholeCamera<cameras::RadialTangentialDistortion>
+        &cameraGeometry,
+    const kinematics::Transformation &T_SC0, const uint64_t &hpbid,
+    bool use_AIDP) {
+  triangulateTimer.start();
 
-    //test parallel following okvis::triangulateFast using only the first, last, and middle observations
-    okvis::kinematics::Transformation T_AW(T_CWs.front().translation(), T_CWs.front().unit_quaternion());
-    okvis::kinematics::Transformation T_BW(T_CWs.back().translation(), T_CWs.back().unit_quaternion());
-    double keypointAStdDev = vR_oi.front()*8;
-    keypointAStdDev = 0.8 * keypointAStdDev / 12.0;
-    double raySigmasA = sqrt(sqrt(2)) * keypointAStdDev / cameraGeometry.focalLengthU();
+  // each entry is undistorted coordinates in image plane at
+  // z=1 in the specific camera frame, [\bar{x},\bar{y},1]
+  std::vector<Eigen::Vector3d> obsDirections;
+  // the SE3 transform from world to camera frame
+  std::vector<Sophus::SE3d> T_CWs;
 
-    keypointAStdDev = vR_oi.back()*8;
-    keypointAStdDev = 0.8 * keypointAStdDev / 12.0;
-    double raySigmasB = sqrt(sqrt(2)) * keypointAStdDev / cameraGeometry.focalLengthU();
-    double sigmaR = std::max(raySigmasA, raySigmasB);
-
-    Eigen::Vector3d e1 = (obsDirections.front()).normalized();
-    Eigen::Vector3d e2 = (T_AW.C()*T_BW.C().transpose()*obsDirections.back()).normalized();
-    Eigen::Vector3d e3 = e2; // we also check the middle point for safety
-    okvis::kinematics::Transformation T_MW = T_BW;
-    if(obsDirections.size()>2)
-    {
-        auto iter= T_CWs.begin() + obsDirections.size()/2;
-        T_MW = okvis::kinematics::Transformation(iter->translation(), iter->unit_quaternion());
-        auto itObs = obsDirections.begin() + obsDirections.size()/2;
-        e3 = (T_AW.C()*T_MW.C().transpose()*(*itObs)).normalized();
-    }else
-    {
-        std::cout << obsDirections.size()<< std::endl;
-        OKVIS_ASSERT_GT(Exception, obsDirections.size(), 2, "for triangulation obs should be greater than 2");
+  std::vector<okvis::kinematics::Transformation> T_WSs;
+  gatherPoseObservForTriang(mp, cameraGeometry, &frameIds, &T_WSs,
+                            &obsDirections, &obsInPixel, &vR_oi, hpbid);
+  if (use_AIDP) { // Ca will play the role of W in T_CWs
+    Sophus::SE3d T_WCa;
+    for (std::vector<okvis::kinematics::Transformation>::const_reverse_iterator
+             riter = T_WSs.rbegin();
+         riter != T_WSs.rend(); ++riter) {
+      okvis::kinematics::Transformation T_WCi = *riter * T_SC0;
+      if (riter == T_WSs.rbegin()) {
+        T_CWs.push_back(Sophus::SE3d());
+        T_WCa = Sophus::SE3d(T_WCi.q(), T_WCi.r());
+      } else {
+        T_CWs.push_back(Sophus::SE3d(T_WCi.q(), T_WCi.r()).inverse() * T_WCa);
+      }
     }
-
-    double e1e2 = e1.dot(e2);
-    double e1e3=  e1.dot(e3);
-    double e1e22 = e1e2*e1e2;
-    double e1e32 = e1e3*e1e3;
-    // ray parallax test
-    const double parallaxThreshold = 1.0 - 5e-5; // the value is chosen to be comparable with okvis::triangulateFast, yet a little easier to declare parallel
-    if( e1e22 > parallaxThreshold && e1e32 > parallaxThreshold)
-    {
-        isParallel = true;
-        if ((e1.cross(e2)).norm() < 6 * sigmaR && (e1.cross(e3)).norm() < 6 * sigmaR){
-            isValid = true;
-        }
-        OKVIS_ASSERT_TRUE(Exception, isValid, "isValid supposed to be true");
-        v4Xhomog.head<3>() = (e1+e2+e3)/3.0;
-        v4Xhomog[3] = 0;
-        v4Xhomog = T_AW.inverse()* v4Xhomog;
-        triangulateTimer.stop();
-        return true;
+  } else {
+    for (std::vector<okvis::kinematics::Transformation>::const_iterator iter =
+             T_WSs.begin();
+         iter != T_WSs.end(); ++iter) {
+      okvis::kinematics::Transformation T_WCi = *iter * T_SC0;
+      T_CWs.push_back(Sophus::SE3d(T_WCi.q(), T_WCi.r()).inverse());
     }
+  }
 
-//debugging, compare result of triangulateFast and get_x_from
-//    Eigen::Vector4d v4Xhomog2 =Get_X_from_xP_lin(obsDirections, T_CWs, isValid, isParallel);
+#if 1
+  // Method 1 estimate point's world position with DLT + gauss newton,
+  // for simulations with ideal conditions, this method may perform better
+  //   than method 2
+  bool isValid;
+  bool isParallel;
+  v4Xhomog = Get_X_from_xP_lin(obsDirections, T_CWs, isValid, isParallel);
+  if (isValid && !isParallel) {
+    Eigen::Vector3d res = v4Xhomog.head<3>() / v4Xhomog[3];
+    //        std::cout<<"before Gauss Optimization:"<<
+    //        res.transpose()<<std::endl;
+    triangulate_refine_GN(obsDirections, T_CWs, res, 5);
+    v4Xhomog[3] = 1;
+    v4Xhomog.head<3>() = res;
+    //        std::cout<<"after Gauss Optimization:"<<
+    //        res.transpose()<<std::endl;
+    triangulateTimer.stop();
+    return true;
+  } else {
+    std::cout << " cannot triangulate pure rotation or infinity points "
+              << v4Xhomog.transpose() << std::endl;
+    triangulateTimer.stop();
+    return false;
+  }
+#else  // method 2 Median point method and/or gauss newton
+  bool isValid(false); // is triangulation valid, i.e., not too large
+                       // uncertainty
+  bool isParallel(false); // is a ray
 
-    if(e1e22< e1e32){
-        Eigen::Vector3d p2 = T_AW.r() - (T_AW.q()*T_BW.q().conjugate())._transformVector(T_BW.r());
+  // test parallel following okvis::triangulateFast using only the first, last,
+  // and middle observations
+  okvis::kinematics::Transformation T_AW(T_CWs.front().translation(),
+                                         T_CWs.front().unit_quaternion());
+  okvis::kinematics::Transformation T_BW(T_CWs.back().translation(),
+                                         T_CWs.back().unit_quaternion());
+  double keypointAStdDev = vR_oi.front() * 8;
+  keypointAStdDev = 0.8 * keypointAStdDev / 12.0;
+  double raySigmasA =
+      sqrt(sqrt(2)) * keypointAStdDev / cameraGeometry.focalLengthU();
 
-        v4Xhomog = triangulateFastLocal(Eigen::Vector3d(0,0,0),  // center of A in A coordinates
-                         e1, p2, // center of B in A coordinates
-                         e2, sigmaR, isValid, isParallel);
+  keypointAStdDev = vR_oi.back() * 8;
+  keypointAStdDev = 0.8 * keypointAStdDev / 12.0;
+  double raySigmasB =
+      sqrt(sqrt(2)) * keypointAStdDev / cameraGeometry.focalLengthU();
+  double sigmaR = std::max(raySigmasA, raySigmasB);
 
-    }else{
-        Eigen::Vector3d p3 = T_AW.r() - (T_AW.q()*T_MW.q().conjugate())._transformVector(T_MW.r());
+  Eigen::Vector3d e1 = (obsDirections.front()).normalized();
+  Eigen::Vector3d e2 =
+      (T_AW.C() * T_BW.C().transpose() * obsDirections.back()).normalized();
+  Eigen::Vector3d e3 = e2; // we also check the middle point for safety
+  okvis::kinematics::Transformation T_MW = T_BW;
+  if (obsDirections.size() > 2) {
+    auto iter = T_CWs.begin() + obsDirections.size() / 2;
+    T_MW = okvis::kinematics::Transformation(iter->translation(),
+                                             iter->unit_quaternion());
+    auto itObs = obsDirections.begin() + obsDirections.size() / 2;
+    e3 = (T_AW.C() * T_MW.C().transpose() * (*itObs)).normalized();
+  } else if (obsDirections.size() < 2) {
+    // number of observations<=2, happens with triangulating points
+    // for visualization
+    return false;
+  } // else do nothing
 
-        v4Xhomog = triangulateFastLocal(Eigen::Vector3d(0,0,0),  // center of A in A coordinates
-                         e1, p3, // center of M in A coordinates
-                         e3, sigmaR, isValid, isParallel);
+  double e1e2 = e1.dot(e2);
+  double e1e3 = e1.dot(e3);
+  double e1e22 = e1e2 * e1e2;
+  double e1e32 = e1e3 * e1e3;
+  // ray parallax test
+  const double parallaxThreshold =
+      1.0 -
+      5e-5; // the value is chosen to be comparable with okvis::triangulateFast,
+            // yet a little easier to declare parallel
+  if (e1e22 > parallaxThreshold && e1e32 > parallaxThreshold) {
+    isParallel = true;
+    if ((e1.cross(e2)).norm() < 6 * sigmaR &&
+        (e1.cross(e3)).norm() < 6 * sigmaR) {
+      isValid = true;
+    } else {
+      OKVIS_ASSERT_TRUE(Exception, isValid, "Why isValid false?");
+      triangulateTimer.stop();
+      return false;
     }
+    v4Xhomog.head<3>() = (e1 + e2 + e3) / 3.0;
+    v4Xhomog[3] = 0;
+    v4Xhomog = T_AW.inverse() * v4Xhomog;
+    triangulateTimer.stop();
+    // TODO(jhuai): return true for AIDP?
+    return false; // because Euclidean representation does not support rays
+  }
 
-    OKVIS_ASSERT_FALSE(Exception, isParallel, "a infinity point infiltrate ");
+  if (e1e22 < e1e32) {
+    Eigen::Vector3d p2 =
+        T_AW.r() - (T_AW.q() * T_BW.q().conjugate())._transformVector(T_BW.r());
 
-    if(isValid)
-    {
-        //debugging
-//        if(isParallel)
-//        {
-//            std::cout <<"a point parallel detect only in Get_X_from_xP_lin "<< v4Xhomog.transpose()<<std::endl;
-//            triangulateTimer.stop();
-//            return true;
-//        }
+    v4Xhomog = triangulateFastLocal(
+        Eigen::Vector3d(0, 0, 0), // center of A in A coordinates
+        e1, p2,                   // center of B in A coordinates
+        e2, sigmaR, isValid, isParallel);
 
-        v4Xhomog/=v4Xhomog[3];
-        v4Xhomog = T_AW.inverse()* v4Xhomog;
-        Eigen::Vector3d res= v4Xhomog.head<3>();
+  } else {
+    Eigen::Vector3d p3 =
+        T_AW.r() - (T_AW.q() * T_MW.q().conjugate())._transformVector(T_MW.r());
 
-        triangulate_refine_GN( obsDirections, T_CWs, res, 7);
-        v4Xhomog[3]=1;
-        v4Xhomog.head<3>() = res;
+    v4Xhomog = triangulateFastLocal(
+        Eigen::Vector3d(0, 0, 0), // center of A in A coordinates
+        e1, p3,                   // center of M in A coordinates
+        e3, sigmaR, isValid, isParallel);
+  }
 
-        //debugging, compare result of triangulateFast and get_x_from
-//        v4Xhomog2/= v4Xhomog2[3];
-//        std::cout << "v4Xhomog by DLT "<< v4Xhomog2.transpose() <<" by midpoint+GN "<< v4Xhomog.transpose()<< std::endl;
+  OKVIS_ASSERT_FALSE(Exception, isParallel, "a infinity point infiltrate ");
 
-        triangulateTimer.stop();
-        return true;
-    }
-    else
-    {
-        //        std::cout<<" invalid triangulation with input to triangulateFast "<< obsDirections.front().transpose()<<std::endl<<
-        //                   (T_AW*T_BW.inverse()).r().transpose()<<std::endl<<
-        //                   (T_AW.C()*T_BW.C().transpose()*obsDirections.back()).transpose() <<std::endl<< sigmaR<<std::endl;
-        //        std::cout <<"my dlt and okvis dlt estiamtes are "<< v4Xhomog.transpose() <<" "<< v4Xhomog2.transpose()<< std::endl;
-        triangulateTimer.stop();
-        return false;
-    }
+  if (isValid) {
+    v4Xhomog /= v4Xhomog[3];
+    v4Xhomog = T_AW.inverse() * v4Xhomog;
+    Eigen::Vector3d res = v4Xhomog.head<3>();
+
+    triangulate_refine_GN(obsDirections, T_CWs, res, 7);
+    v4Xhomog[3] = 1;
+    v4Xhomog.head<3>() = res;
+
+    triangulateTimer.stop();
+    return true;
+  } else {
+    //        std::cout<<" invalid triangulation with input to triangulateFast
+    //        "<< obsDirections.front().transpose()<<std::endl<<
+    //                   (T_AW*T_BW.inverse()).r().transpose()<<std::endl<<
+    //                   (T_AW.C()*T_BW.C().transpose()*obsDirections.back()).transpose()
+    //                   <<std::endl<< sigmaR<<std::endl;
+    //        std::cout <<"my dlt and okvis dlt estiamtes are "<<
+    //        v4Xhomog.transpose() <<" "<< v4Xhomog2.transpose()<< std::endl;
+    triangulateTimer.stop();
+    return false;
+  }
+#endif // METHOD 2
 }
 
 okvis::Time HybridFilter::firstStateTimestamp()

@@ -96,30 +96,13 @@ public:
   virtual void retrieveEstimatesOfConstants(const cameras::NCameraSystem& oldCameraSystem) final;
 
   /**
-   * @brief triangulateAMapPoint, does not support rays which arise from static mode, pure rotation, or points at infinity
-   * @param mp
-   * @param obsInPixel
-   * @param frameIds
-   * @param v4Xhomog, stores [X,Y,Z,1] in the global frame
-   * @param vR_oi, the diagonal elements of the observation noise matrix, in pixels, size 2Nx1
-   * @param cameraGeometry, used for point projection
-   * @param T_SC0
-   * @param hpbid
-   * @return v4Xhomog
-   */
-  virtual bool triangulateAMapPoint(const MapPoint & mp, std::vector<Eigen::Vector2d >& obsInPixel,
-                            std::vector<uint64_t >& frameIds, Eigen::Vector4d& v4Xhomog, std::vector<double>& vR_oi,
-                            const okvis::cameras::PinholeCamera<
-                                          okvis::cameras::RadialTangentialDistortion >& cameraGeometry,
-                            const okvis::kinematics::Transformation & T_SC0,
-                                          const uint64_t& hpbid) final;
-
-  /**
-   * @brief computeHoi, compute the marginalized Jacobian for a feature i's track
+   * @brief computeHoi, compute the marginalized Jacobian for a feature i's
+   * track assume the number of observations of the map points is at least two
    * @param hpbid homogeneous point parameter block id of the map point
    * @param mp mappoint
    * @param r_oi residuals
-   * @param H_oi Jacobians of feature observations w.r.t variables related to camera intrinsics, camera poses (13+9(m-1))
+   * @param H_oi Jacobians of feature observations w.r.t variables related to
+   * camera intrinsics, camera poses (13+9(m-1))
    * @param R_oi covariance matrix of these observations
    * r_oi H_oi and R_oi are values after marginalizing H_fi
    * @return true if succeeded in computing the residual and Jacobians

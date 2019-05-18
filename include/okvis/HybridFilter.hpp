@@ -609,26 +609,40 @@ public:
 
   okvis::Time firstStateTimestamp();
 
+  void gatherPoseObservForTriang(
+      const MapPoint &mp,
+      const cameras::PinholeCamera<cameras::RadialTangentialDistortion>
+          &cameraGeometry,
+      std::vector<uint64_t> *frameIds,
+      std::vector<okvis::kinematics::Transformation> *T_WSs,
+      std::vector<Eigen::Vector3d> *obsDirections,
+      std::vector<Eigen::Vector2d> *obsInPixel, std::vector<double> *vR_oi,
+      const uint64_t &hpbid) const;
+
   /**
-   * @brief triangulateAMapPoint, supports ordinary points and rays which arise from static mode, pure rotation,
-   * or points at infinity. Assume the same camera model for all observations, and rolling shutter effect is not accounted for
+   * @brief triangulateAMapPoint, does not support rays which arise from static
+   * mode, pure rotation, or points at infinity. Assume the same camera model
+   * for all observations, and rolling shutter effect is not accounted for
    * @param mp
    * @param obsInPixel
-   * @param frameIds, id of frames observing this feature in the ascending order because the MapPoint.observations is
-   *  an ordinary ordered map
-   * @param v4Xhomog, stores either [X,Y,Z,1] in the global frame, or [X,Y,Z,W] in the global frame
-   * @param vR_oi, the diagonal elements of the observation noise matrix, in pixels, size 2Nx1
+   * @param frameIds, id of frames observing this feature in the ascending order
+   * because the MapPoint.observations is an ordinary ordered map
+   * @param v4Xhomog, stores either [X,Y,Z,1] in the global frame
+   * @param vR_oi, the diagonal elements of the observation noise matrix, in
+   * pixels, size 2Nx1
    * @param cameraGeometry, used for point projection
    * @param T_SC0
    * @param hpbid
    * @return v4Xhomog
    */
-  virtual bool triangulateAMapPoint(const MapPoint & mp, std::vector<Eigen::Vector2d >& obsInPixel,
-                            std::vector<uint64_t >& frameIds, Eigen::Vector4d& v4Xhomog, std::vector<double>& vR_oi,
-                            const okvis::cameras::PinholeCamera<
-                                          okvis::cameras::RadialTangentialDistortion >& cameraGeometry,
-                            const okvis::kinematics::Transformation & T_SC0,
-                                          const uint64_t& hpbid);
+  virtual bool triangulateAMapPoint(
+      const MapPoint &mp, std::vector<Eigen::Vector2d> &obsInPixel,
+      std::vector<uint64_t> &frameIds, Eigen::Vector4d &v4Xhomog,
+      std::vector<double> &vR_oi,
+      const okvis::cameras::PinholeCamera<
+          okvis::cameras::RadialTangentialDistortion> &cameraGeometry,
+      const okvis::kinematics::Transformation &T_SC0, const uint64_t &hpbid,
+      bool use_AIDP = false) final;
   /**
    * @brief computeHxf, compute the residual and Jacobians for a SLAM feature i observed in current frame
    * @param hpbid homogeneous point parameter block id of the map point
@@ -644,15 +658,21 @@ public:
                   Eigen::Matrix<double, 2, Eigen::Dynamic>& H_f, Eigen::Matrix2d & R_i);
 
   /**
-   * @brief computeHoi, compute the marginalized Jacobian for a feature i's track
+   * @brief computeHoi, compute the marginalized Jacobian for a feature i's
+   track
+   * assume the number of observations of the map points is at least two
    * @param hpbid homogeneous point parameter block id of the map point
    * @param mp mappoint
    * @param r_oi residuals
-   * @param H_oi Jacobians of feature observations w.r.t variables related to camera intrinsics, camera poses (13+9(m-1)-3)
+   * @param H_oi Jacobians of feature observations w.r.t variables related to
+   camera intrinsics, camera poses (13+9(m-1)-3)
    * @param R_oi covariance matrix of these observations
-   * @param ab1rho [\alpha, \beta, 1, \rho] of the point in the anchor frame, representing either an ordinary point or a ray
-   * @param pH_fi pointer to the Jacobian of feature observations w.r.t the feature parameterization,[\alpha, \beta, \rho]
-   * if pH_fi is NULL, r_oi H_oi and R_oi are values after marginalizing H_fi, H_oi is of size (2n-3)x(13+9(m-1)-3);
+   * @param ab1rho [\alpha, \beta, 1, \rho] of the point in the anchor frame,
+   representing either an ordinary point or a ray
+   * @param pH_fi pointer to the Jacobian of feature observations w.r.t the
+   feature parameterization,[\alpha, \beta, \rho]
+   * if pH_fi is NULL, r_oi H_oi and R_oi are values after marginalizing H_fi,
+   H_oi is of size (2n-3)x(13+9(m-1)-3);
    * otherwise, H_oi is of size 2nx(13+9(m-1)-3)
 
    * @return true if succeeded in computing the residual and Jacobians

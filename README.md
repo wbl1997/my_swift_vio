@@ -136,7 +136,7 @@ Example running cases
 Reading measurements from a video and an IMU csv file
 ```
 vins_ws/devel/lib/msckf2/msckf2_node /home/jhuai/docker_documents/vins_ws/src/msckf2/config/config_parkinglot_jisun_s6.yaml \
-  --output_dir=/home/<USER>/Desktop/temp
+  --output_dir=/media/jhuai/Seagate/temp/parkinglot/
 ```
 The running program will exit once the sequence finishes.
 

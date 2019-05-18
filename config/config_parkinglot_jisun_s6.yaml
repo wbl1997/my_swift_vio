@@ -1,9 +1,9 @@
 %YAML:1.0
 cameras:
      - {T_SC:
-        [ 0, -1, 0, 0,
-          -1, 0, 0, 0,
-           0, 0, -1,0,
+        [  0.000341425919084, -0.999979770238, 0.00635157806524, 0,
+           -0.999250868111, -0.000586960849829, -0.0386957110793, 0,
+           0.0386986564019, -0.00633360817684, -0.999230853907, 0,
            0.0, 0.0, 0.0, 1.0],
         down_scale: 2,
         image_dimension: [1920, 1080],
@@ -13,7 +13,7 @@ cameras:
         principal_point: [957.048, 545.8245]}
 
 camera_params:
-    camera_rate: 15 # just to manage the expectations of when there should be frames arriving
+    camera_rate: 30 # just to manage the expectations of when there should be frames arriving
     image_readout_time: 0.033 # how long does it take to read out one image? in secs
     sigma_absolute_translation: 2e-2 # The standard deviation of the camera extrinsics translation, e.g. 1.0e-10 for online-calib [m].
     sigma_absolute_orientation: 0.0 # The standard deviation of the camera extrinsics orientation, e.g. 1.0e-3 for online-calib [rad].
@@ -29,8 +29,8 @@ camera_params:
 imu_params:
     a_max: 176.0 # acceleration saturation [m/s^2]
     g_max: 7.8 # gyro saturation [rad/s]
-    sigma_g_c: 12.0e-4 # gyro noise density [rad/s/sqrt(Hz)]
-    sigma_a_c: 8.0e-3 # accelerometer noise density [m/s^2/sqrt(Hz)]
+    sigma_g_c: 24.0e-4 # gyro noise density [rad/s/sqrt(Hz)]
+    sigma_a_c: 16.0e-3 # accelerometer noise density [m/s^2/sqrt(Hz)]
     sigma_bg: 0.03 # gyro bias prior [rad/s]
     sigma_ba: 0.1 # accelerometer bias prior [m/s^2]
     sigma_gw_c: 2.0e-5 # gyro drift noise density [rad/s^s/sqrt(Hz)]
@@ -92,7 +92,7 @@ publishing_options:
     velocitiesFrame: Wc                # Wc, B or S,  the frames in which the velocities of the selected trackedBodyFrame will be expressed in
 
 input_data:
-    video_file: "/media/jhuai/Seagate1/data/west_campus_parking_lot/Jisun/20151111_120342.mp4"
-    imu_file: "/media/jhuai/Seagate1/data/west_campus_parking_lot/Jisun/mystream_11_11_12_3_13.csv"
-    startIndex: 16500
-    finishIndex: 22500
+    video_file: "/media/jhuai/Seagate/data/west_campus_parking_lot/Jisun/20151111_120342.mp4"
+    imu_file: "/media/jhuai/Seagate/data/west_campus_parking_lot/Jisun/mystream_11_11_12_3_13.csv"
+    startIndex: 18800 # 16500
+    finishIndex: 28900 # 22500
