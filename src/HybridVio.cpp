@@ -783,6 +783,14 @@ void HybridVio::optimizationLoop() {
     {
       std::lock_guard<std::mutex> l(estimator_mutex_);
       optimizationTimer.start();
+
+      okvis::Time opt_frame_time = frame_pairs->timestamp();
+      int frameIdInSource = -1;
+      bool isKF = false;
+      estimator_.getFrameId(frame_pairs->id(), frameIdInSource, isKF);
+      printf("Optimizing at frame id %d at %d.%d\n", frameIdInSource,
+             opt_frame_time.sec, opt_frame_time.nsec);
+
       estimator_.optimize(false);
 
       optimizationTimer.stop();
@@ -805,17 +813,10 @@ void HybridVio::optimizationLoop() {
         estimator_.getSpeedAndBias(frame_pairs->id(), 0,
                                    lastOptimizedSpeedAndBiases_);
         lastOptimizedStateTimestamp_ = frame_pairs->timestamp();
-        //        printf("lastOptimizedStateTimestamp_ %lu and "
-        //               "deleteImuMeasurementsUntil %lu\n",
-        //               lastOptimizedStateTimestamp_.toNSec(),
-        //               deleteImuMeasurementsUntil.toNSec());
+
         int frameIdInSource = -1;
         bool isKF = false;
         estimator_.getFrameId(frame_pairs->id(), frameIdInSource, isKF);
-
-        std::cout << "optimized at frame id " << frameIdInSource << " at "
-                  << lastOptimizedStateTimestamp_.sec << "."
-                  << lastOptimizedStateTimestamp_.nsec << std::endl;
         // if we publish the state after each IMU propagation we do not need
         // to publish it here.
         if (!parameters_.publishing.publishImuPropagatedState) {
