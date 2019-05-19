@@ -1,4 +1,4 @@
-function figNumber = intermediatePlotter(figNumber, data, gt, outputPath,
+function figNumber = intermediatePlotter(... figNumber, data, gt, outputPath,
                                          fontSize) if (nargin <= 3) outputPath =
     "" end if (nargin <= 4) fontSize = 18;
 end

@@ -7,12 +7,13 @@ addpath('/media/jhuai/Seagate/jhuai/huai_work/ekfmonoslam/voicebox');
 
 filename = input('msckf2_csv:', 's');
 output_dir = input('output_dir:', 's');
-% filename =
-    'F:\jhuai\huai work\dissertation\figure_data\msckf2_estimator_output_noniter_float.csv';
-% filename =
-    'F:\west_campus_parking_lot\calibration\Greg\output\msckf2_estimator_output_greg_fixedTgTsTa.csv';
+% filename = 'F:\jhuai\huai work\dissertation\figure_data\... %
+             msckf2_estimator_output_noniter_float.csv'; %
+             filename ='F:\west_campus_parking_lot\calibration\Greg\... %
+                       output\msckf2_estimator_output_greg_fixedTgTsTa.csv';
 
-nominal_intrinsics =[1554.622, 1554.622, 960, 540]/2;
+                       nominal_intrinsics =
+    [ 1554.622, 1554.622, 960, 540 ] / 2;
 % nominal_intrinsics = [ 458.65, 457.30, 367.22, 248.38 ];
 
 % p_bc = R_bc * -t_cb;
@@ -51,7 +52,9 @@ fprintf('%.6f\n', estimate_average(55:56));
 fprintf('tr [ms]\n');
 fprintf('%.3f\n', estimate_average(58)*1e3);
 
-% ground truth file must have the same number of rows as output data gt = [];
+% ground truth file must have the same number of rows as output data
+
+        gt = [];
 if(~isempty(gt))
     gt = csvread('G:\state_groundtruth_estimate0\data_copy.csv');
     index= find(abs(gt(:,1) - startTime)<10000);
@@ -106,16 +109,23 @@ figNumber = 0;
 figNumber = figNumber +1;
 figure(figNumber);
 plot3(data(:,3), data(:,4), data(:,5), '-b'); hold on;
-if(~isempty(gt))
-    plot3(gt(:,2), gt(:,3), gt(:,4), '-r');
-end
 plot3(data(1,3),data(1,4),data(1,5), '-sr');
 plot3(data(end,3),data(end,4),data(end,5), '-sb');
+legend_list = {'msckf2', 'start', 'finish'};
+
 if(~isempty(gt))
-    legend('msckf2','gt','start','finish');
-else
-    legend('msckf2','start','finish');
+    plot3(gt(:,2), gt(:,3), gt(:,4), '-r');
+    legend_list{end+1} = 'gt';
 end
+
+% eg., 'Seagate/temp/parkinglot/opt_states.txt';
+cmp_data_file = input('okvis_classic:', 's'); 
+if (cmp_data_file)
+    cmp_data = dlmread(cmp_data_file, ' ', 3, 0);
+    plot3(cmp_data(:, 4), cmp_data(:, 5), cmp_data(:, 6), '-g');
+    legend_list{end+1} = 'okvis';
+end
+legend(legend_list);
 title ('p_b^g', 'FontSize', fontsize);
 xlabel ('x [m]', 'FontSize', fontsize);
 ylabel ('y [m]', 'FontSize', fontsize);
@@ -352,5 +362,5 @@ grid on;
 xlabel('time [sec]');
 set(gca,'FontSize',fontsize);
 
-figNumber = intermediatePlotter( ...
-    figNumber, data,  nominal_intrinsics'*2, output_dir, fontsize);
+figNumber = intermediatePlotter(figNumber, data, ...
+   nominal_intrinsics'*2, output_dir, fontsize);
