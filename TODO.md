@@ -74,3 +74,8 @@ For MSCKF2, pointHomog and parameter block stores position in the global frame, 
 
 28. Implement another two versions of MSCKF, (1) Fix Tg Ts Ta p_b^c, fx fy cx cy k1 k2 p1 p2 td tr, only estimate p_b^g, v_b^g, R_b^g, b_g, b_a
 
+use some bool flags to tell if some parameters are fixed, or some parameters are equal, like fx = fy
+
+29. implement observability constrained EKF for calibration
+
+30. add the calibration parameters to the original OKVIS estimator, use bool flags to indicate if some parameters are fixed

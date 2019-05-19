@@ -140,7 +140,8 @@ vins_ws/devel/lib/msckf2/msckf2_node $HOME/docker_documents/vins_ws/src/msckf2/c
   --video_file="/media/$USER/Seagate/data/west_campus_parking_lot/Jisun/20151111_120342.mp4" \
   --imu_file="/media/$USER/Seagate/data/west_campus_parking_lot/Jisun/mystream_11_11_12_3_13.csv" \
   --start_index=18800 \
-  --finish_index=28900
+  --finish_index=28900 \
+  --max_inc_tol=10.0
 # 16500, 22500
 ```
 The running program will exit once the sequence finishes.
