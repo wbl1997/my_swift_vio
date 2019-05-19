@@ -1697,28 +1697,27 @@ void HybridFilter::optimize(bool verbose)
 
         Eigen::MatrixXd r_q, T_H, R_q; //residual, Jacobian, and noise covariance after projecting to the column space of H_o
         if (r_o.rows() <= static_cast<int>(dimH_o[1])) {
-            // no need to reduce rows of H_o
-            r_q= r_o;
-            T_H= H_o;
-            R_q= R_o;
-        } else {   // project into the column space of H_o, reduce the residual dimension
-            Eigen::HouseholderQR<Eigen::MatrixXd> qr(H_o);
-            Eigen::MatrixXd Q = qr.householderQ();
-            Eigen::MatrixXd thinQ = Q.topLeftCorner(dimH_o[0], dimH_o[1]);
+          // no need to reduce rows of H_o
+          r_q = r_o;
+          T_H = H_o;
+          R_q = R_o;
+        } else { // project into the column space of H_o, reduce the residual
+                 // dimension
+          Eigen::HouseholderQR<Eigen::MatrixXd> qr(H_o);
+          Eigen::MatrixXd Q = qr.householderQ();
+          Eigen::MatrixXd thinQ = Q.topLeftCorner(dimH_o[0], dimH_o[1]);
 
-            r_q = thinQ.transpose()*r_o;
-            R_q = thinQ.transpose()*R_o* thinQ;
+          r_q = thinQ.transpose() * r_o;
+          R_q = thinQ.transpose() * R_o * thinQ;
 
-            Eigen::MatrixXd R=qr.matrixQR().triangularView<Eigen::Upper>();
-            for(size_t row=0; row< dimH_o[1]; ++row)
-            {
-                for(size_t col=0; col< dimH_o[1]; ++col)
-                {
-                    if(std::fabs(R(row, col))< 1e-10)
-                        R(row,col)=0;
-                }
+          Eigen::MatrixXd R = qr.matrixQR().triangularView<Eigen::Upper>();
+          for (size_t row = 0; row < dimH_o[1]; ++row) {
+            for (size_t col = 0; col < dimH_o[1]; ++col) {
+              if (std::fabs(R(row, col)) < 1e-10)
+                R(row, col) = 0;
             }
-            T_H = R.topLeftCorner(dimH_o[1], dimH_o[1]);
+          }
+          T_H = R.topLeftCorner(dimH_o[1], dimH_o[1]);
         }
 
         // stack Jacobians and residuals for features in state, i.e., SLAM features
@@ -2347,7 +2346,8 @@ bool HybridFilter::triangulateAMapPoint(
     std::vector<okvis::kinematics::Transformation> reversed_T_CWs;
     okvis::kinematics::Transformation T_WCa;
     for (std::vector<okvis::kinematics::Transformation>::const_reverse_iterator
-             riter = T_WSs.rbegin(); riter != T_WSs.rend(); ++riter) {
+             riter = T_WSs.rbegin();
+         riter != T_WSs.rend(); ++riter) {
       okvis::kinematics::Transformation T_WCi = (*riter) * T_SC0;
       if (riter == T_WSs.rbegin()) {
         reversed_T_CWs.emplace_back(okvis::kinematics::Transformation());
@@ -2358,12 +2358,14 @@ bool HybridFilter::triangulateAMapPoint(
       }
     }
     for (std::vector<okvis::kinematics::Transformation>::const_reverse_iterator
-         riter = reversed_T_CWs.rbegin(); riter != reversed_T_CWs.rend(); ++riter) {
+             riter = reversed_T_CWs.rbegin();
+         riter != reversed_T_CWs.rend(); ++riter) {
       T_CWs.emplace_back(Sophus::SE3d(riter->q(), riter->r()));
     }
   } else {
     for (std::vector<okvis::kinematics::Transformation>::const_iterator iter =
-             T_WSs.begin(); iter != T_WSs.end(); ++iter) {
+             T_WSs.begin();
+         iter != T_WSs.end(); ++iter) {
       okvis::kinematics::Transformation T_WCi = *iter * T_SC0;
       okvis::kinematics::Transformation T_CiW = T_WCi.inverse();
       T_CWs.emplace_back(Sophus::SE3d(T_CiW.q(), T_CiW.r()));
