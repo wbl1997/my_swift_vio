@@ -74,5 +74,3 @@ For MSCKF2, pointHomog and parameter block stores position in the global frame, 
 
 28. Implement another two versions of MSCKF, (1) Fix Tg Ts Ta p_b^c, fx fy cx cy k1 k2 p1 p2 td tr, only estimate p_b^g, v_b^g, R_b^g, b_g, b_a
 
-29. if USE_AIDP is defined, testHybridFilter() crashes in triangulateAMapPoint of computeHoi
-

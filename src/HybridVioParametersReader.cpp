@@ -86,63 +86,6 @@ static void parseExpandedCameraParamSigmas(
   }
 }
 
-void parseInputData(cv::FileNode inputDataNode, InputData *input) {
-  if (inputDataNode["video_file"].isString()) {
-    std::string path = (std::string)inputDataNode["video_file"];
-    // cut out first word. str currently contains everything including comments
-    input->videoFile = path.substr(0, path.find(" "));
-  } else {
-    input->videoFile = "";
-  }
-  if (inputDataNode["image_folder"].isString()) {
-    std::string path = (std::string)inputDataNode["image_folder"];
-    // cut out first word. str currently contains everything including comments
-    input->imageFolder = path.substr(0, path.find(" "));
-  } else {
-    input->imageFolder = "";
-  }
-  if (inputDataNode["imu_file"].isString()) {
-    std::string path = (std::string)inputDataNode["imu_file"];
-    // cut out first word. str currently contains everything including comments
-    input->imuFile = path.substr(0, path.find(" "));
-  } else {
-    input->imuFile = "";
-  }
-  if (inputDataNode["time_file"].isString()) {
-    std::string path = (std::string)inputDataNode["time_file"];
-    // cut out first word. str currently contains everything including comments
-    input->timeFile = path.substr(0, path.find(" "));
-  } else {
-    input->timeFile = "";
-  }
-  if (inputDataNode["startIndex"].isInt()) {
-    input->startIndex = inputDataNode["startIndex"];
-  } else {
-    input->startIndex = 0;
-  }
-  if (inputDataNode["finishIndex"].isInt()) {
-    input->finishIndex = inputDataNode["finishIndex"];
-  } else {
-    input->finishIndex = 0;
-  }
-
-  if (inputDataNode["vo_poses_file"].isString()) {
-    std::string path = (std::string)inputDataNode["vo_poses_file"];
-    // cut out first word. str currently contains everything including comments
-    input->voPosesFile = path.substr(0, path.find(" "));
-  } else {
-    input->voPosesFile = "";
-  }
-  if (inputDataNode["vo_feature_tracks_file"].isString()) {
-    std::string path =
-        static_cast<std::string>(inputDataNode["vo_feature_tracks_file"]);
-    // cut out first word. str currently contains everything including comments
-    input->voFeatureTracksFile = path.substr(0, path.find(" "));
-  } else {
-    input->voFeatureTracksFile = "";
-  }
-}
-
 void parseInitialState(cv::FileNode initialStateNode,
                        InitialState *initialState) {
   bool bUseExternalState = true;
@@ -475,7 +418,6 @@ void HybridVioParametersReader::readConfigFile(const std::string& filename) {
     }
   }
 
-  parseInputData(file["input_data"], &vioParameters_.input);
   parseInitialState(file["initial_state"], &vioParameters_.initialState);
 
   // camera calibration

@@ -41,12 +41,42 @@ DEFINE_int32(load_input_option, 1,
 
 DEFINE_string(output_dir, "", "the directory to dump results");
 
+DEFINE_string(image_folder, "", "folder of an input image sequence");
+
+DEFINE_string(video_file, "", "full name of an input video file");
+
+DEFINE_string(time_file, "",
+              "full name of an input time file containing"
+              " timestamps for each image seq. frame");
+
+DEFINE_string(imu_file, "", "full name of an input IMU file");
+
+DEFINE_string(vo_poses_file, "", "full name of external VO poses");
+
+DEFINE_string(vo_feature_tracks_file, "",
+              "full name of external VO output feature tracks");
+
+DEFINE_int32(start_index, 0, "index of the first frame to be processed");
+
+DEFINE_int32(finish_index, 0, "index of the last frame to be processed");
+
 static void displayArgs(const int argc, char **argv) {
   std::cout << "args\n";
   for (int i = 0; i < argc; ++i) {
     std::cout << i << " " << argv[i] << std::endl;
   }
   std::cout << std::endl;
+}
+
+bool setInputParameters(okvis::InputData *input) {
+  input->videoFile = FLAGS_video_file;
+  input->imageFolder = FLAGS_image_folder;
+  input->imuFile = FLAGS_imu_file;
+  input->timeFile = FLAGS_time_file;
+  input->voPosesFile = FLAGS_vo_poses_file;
+  input->voFeatureTracksFile = FLAGS_vo_feature_tracks_file;
+  input->startIndex = FLAGS_start_index;
+  input->finishIndex = FLAGS_finish_index;
 }
 
 int main(int argc, char **argv) {
@@ -104,7 +134,7 @@ int main(int argc, char **argv) {
   okvis::RosParametersReader vio_parameters_reader(configFilename);
   okvis::VioParameters parameters;
   vio_parameters_reader.getParameters(parameters);
-
+  setInputParameters(&parameters.input);
   okvis::HybridVio okvis_estimator(parameters);
   std::string path = FLAGS_output_dir;
 

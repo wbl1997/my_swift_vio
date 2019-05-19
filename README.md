@@ -135,24 +135,17 @@ Example running cases
 
 Reading measurements from a video and an IMU csv file
 ```
-vins_ws/devel/lib/msckf2/msckf2_node /home/jhuai/docker_documents/vins_ws/src/msckf2/config/config_parkinglot_jisun_s6.yaml \
-  --output_dir=/media/jhuai/Seagate/temp/parkinglot/
+vins_ws/devel/lib/msckf2/msckf2_node $HOME/docker_documents/vins_ws/src/msckf2/config/config_parkinglot_jisun_s6.yaml \
+  --output_dir=/media/$USER/Seagate/temp/parkinglot/ --use_AIDP=true \
+  --video_file="/media/$USER/Seagate/data/west_campus_parking_lot/Jisun/20151111_120342.mp4" \
+  --imu_file="/media/$USER/Seagate/data/west_campus_parking_lot/Jisun/mystream_11_11_12_3_13.csv" \
+  --start_index=18800 \
+  --finish_index=28900
+# 16500, 22500
 ```
 The running program will exit once the sequence finishes.
 
 Measurements from rostopics
-```
-
-rosrun msckf2 msckf2_node /home/jhuai/docker_documents/vins_ws/src/msckf2/config/config_fpga_p2_euroc_dissertation.yaml --load_input_option=0 \
-  --output_dir=/home/<USER>/Desktop/temp  --use_AIDP=true
-# use start to skip the static segment
-rosbag play --pause --start=45.0 --rate=1.0 /media/jhuai/Seagate/data/euroc/MH_01_easy.bag /cam0/image_raw:=/camera0 /imu0:=/imu
-
-rosrun rviz rviz -d /home/jhuai/docker_documents/vins_ws/src/msckf2/config/rviz.rviz
-```
-In this case, the program will exit once the Ctrl+C is entered in the terminal that runs the msckf2_node. Note the program will not exit if Ctrl+C is entered in the terminal of roscore.
-
-In order to run a minimal working example, follow the steps below:
 
 1. Download a dataset of your choice from 
    http://projects.asl.ethz.ch/datasets/doku.php?id=kmavvisualinertialdatasets. 
@@ -160,19 +153,20 @@ In order to run a minimal working example, follow the steps below:
    You will find a corresponding calibration / estimator configuration in the 
    okvis/config folder.
 
-2. Run the app as
+2. Run the node
 
-        ./okvis_apps path/to/okvis_ros/okvis/config/config_fpga_p2_euroc.yaml path/to/MH_01_easy/
-				
-You can also run a dataset processing ros node that will publish topics that can be visualized with rviz
+```
+rosrun msckf2 msckf2_node $HOME/docker_documents/vins_ws/src/msckf2/config/config_fpga_p2_euroc_dissertation.yaml --load_input_option=0 \
+  --output_dir=/home/<USER>/Desktop/temp  --use_AIDP=true
+# use start to skip the static segment
+rosbag play --pause --start=45.0 --rate=1.0 /media/jhuai/Seagate/data/euroc/MH_01_easy.bag /cam0/image_raw:=/camera0 /imu0:=/imu
 
-    rosrun okvis_ros okvis_node_synchronous path/to/okvis_ros/okvis/config/config_fpga_p2_euroc.yaml path/to/MH_01_easy/
+rosrun rviz rviz -d $HOME/docker_documents/vins_ws/src/msckf2/config/rviz.rviz
+```
+In this case, the program will exit once the Ctrl+C is entered in the terminal that runs the msckf2_node. Note the program will not exit if Ctrl+C is entered in the terminal of roscore.
 
 Use the rviz.rviz configuration in the okvis_ros/config/ directory to get the pose / 
 landmark display.
-
-If you want to run the live application connecting to a sensor, use the okvis_node 
-application (modify the launch file launch/okvis_node.launch).
 
 ## Outputs and frames
 
