@@ -30,6 +30,9 @@ DEFINE_bool(use_AIDP, false,
             "use anchored inverse depth parameterization for a feature point?"
             " Preliminary result shows AIDP worsen the result slightly");
 
+DEFINE_double(max_inc_tol, 2,
+              "the tolerance of the lpNorm of an EKF state update");
+
 DECLARE_bool(use_mahalanobis);
 
 /// \brief okvis Main namespace of this package.
@@ -1657,14 +1660,15 @@ void MSCKF2::optimize(bool verbose)
             if(tempDeltaX.lpNorm<Eigen::Infinity>()<epsilon)
                 break;
         }
-        //for debugging
+        // for debugging
         double tempNorm = tempDeltaX.head<15>().lpNorm<Eigen::Infinity>();
-        if(tempNorm>2)
-        {
-            std::cout<< tempDeltaX.transpose()<< std::endl;
-            OKVIS_ASSERT_LT(Exception, tempNorm, 2, "Warn too large increment>2 may imply wrong association ");
+        if (tempNorm > FLAGS_max_inc_tol) {
+          std::cout << tempDeltaX.transpose() << std::endl;
+          OKVIS_ASSERT_LT(
+              Exception, tempNorm, FLAGS_max_inc_tol,
+              "Warn too large increment>2 may imply wrong association");
         }
-        //end debugging
+        // end debugging
         deltaX=tempDeltaX;
         ++numIteration;
 
@@ -1895,14 +1899,15 @@ void MSCKF2::optimize(bool verbose)
     {
         OKVIS_ASSERT_TRUE(Exception, false, "nan in kalman filter");
     }
-    //for debugging
+    // for debugging
     double tempNorm = deltaX.head<15>().lpNorm<Eigen::Infinity>();
-    if(tempNorm>2)
-    {
-        std::cout<< deltaX.transpose()<< std::endl;
-        OKVIS_ASSERT_LT(Exception, tempNorm, 2, "Warn too large increment>2 may imply wrong association ");
+    if (tempNorm > FLAGS_max_inc_tol) {
+      std::cout << deltaX.transpose() << std::endl;
+      OKVIS_ASSERT_LT(
+          Exception, tempNorm, FLAGS_max_inc_tol,
+          "Warn too large increment>2 may imply wrong association ");
     }
-    //end debugging
+    // end debugging
     computeKalmanGainTimer.stop();
 
     updateStates(deltaX);
