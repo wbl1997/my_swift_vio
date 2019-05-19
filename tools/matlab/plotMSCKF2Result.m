@@ -1,22 +1,26 @@
 %usage: matlab
 close all;
 
-addpath('F:\jhuai\huai work\dissertation\matlab_scripts\cgraumann-umeyama')
-addpath('F:\jhuai\JianzhuHuai\GPS_IMU\programs\matlab_ws\instk');
-addpath('F:\jhuai\JianzhuHuai\GPS_IMU\programs\matlab_ws\voicebox');
+addpath('cgraumann-umeyama')
+    addpath('/media/jhuai/Seagate/jhuai/huai_work/ekfmonoslam/instk');
+addpath('/media/jhuai/Seagate/jhuai/huai_work/ekfmonoslam/voicebox');
 
-% this experiment shows that iekf has no benefit compared to non iterative approach
-filename= 'F:\jhuai\huai work\dissertation\figure_data\msckf2_estimator_output_noniter_float.csv';
-%filename= 'F:\west_campus_parking_lot\calibration\Greg\output\msckf2_estimator_output_greg_fixedTgTsTa.csv';
+filename = input('msckf2_csv:', 's');
+output_dir = input('output_dir:', 's');
+% filename =
+    'F:\jhuai\huai work\dissertation\figure_data\msckf2_estimator_output_noniter_float.csv';
+% filename =
+    'F:\west_campus_parking_lot\calibration\Greg\output\msckf2_estimator_output_greg_fixedTgTsTa.csv';
 
 nominal_intrinsics =[1554.622, 1554.622, 960, 540]/2;
-nominal_intrinsics =[458.65, 457.30, 367.22, 248.38];
+% nominal_intrinsics = [ 458.65, 457.30, 367.22, 248.38 ];
 
-p_cb = [0.0652, -0.0207, -0.0081];
-xlimits = [0, 160];
+% p_bc = R_bc * -t_cb;
+p_bc = -[ 0, -1, 0; - 1, 0, 0; 0, 0, -1 ] * [0.0652; - 0.0207; - 0.0081];
 
 fontsize= 18;
-data= csvread(filename);
+
+data = dlmread(filename, ',', 1, 0);
 startTime = data(1,1);
 endTime = data(end,1); %2.188e13-4.5e9;
 index= find(abs(endTime - data(:,1))<2.5e7, 1);
@@ -47,8 +51,7 @@ fprintf('%.6f\n', estimate_average(55:56));
 fprintf('tr [ms]\n');
 fprintf('%.3f\n', estimate_average(58)*1e3);
 
-% ground truth file must have the same number of rows as output data
-gt=[1];
+% ground truth file must have the same number of rows as output data gt = [];
 if(~isempty(gt))
     gt = csvread('G:\state_groundtruth_estimate0\data_copy.csv');
     index= find(abs(gt(:,1) - startTime)<10000);
@@ -209,7 +212,7 @@ end
 plot(data(:,1), (-3*data(:,68)+ data(:, 13))*pid180, '--r');
 plot(data(:,1), (-3*data(:,69)+ data(:, 14))*pid180, '--g');
 plot(data(:,1), (-3*data(:,70)+ data(:, 15))*pid180, '--b');
-xlim (xlimits);
+
 xlabel('time [sec]', 'FontSize', fontsize);
 s = sprintf('%c/sec', char(176));
 ylabel(s, 'FontSize', fontsize);
@@ -235,7 +238,7 @@ end
 plot(data(:,1), -3*data(:,71)+ data(:, 16), '--r');
 plot(data(:,1), -3*data(:,72)+ data(:, 17), '--g');
 plot(data(:,1), -3*data(:,73)+ data(:, 18), '--b');
-xlim (xlimits);
+
 xlabel('time [sec]', 'FontSize', fontsize);
 ylabel('m/sec^2', 'FontSize', fontsize);
 title('b_a', 'FontSize', fontsize);
@@ -254,21 +257,23 @@ plot(data(:,1), (3*data(:,101)+ data(:, 46))*ruler, '--r');
 plot(data(:,1), (3*data(:,102)+ data(:, 47))*ruler, '--g');
 plot(data(:,1), (3*data(:,103)+ data(:, 48))*ruler, '--b');
 
-if(~isempty(gt) && ~isempty(p_cb))
-    plot(gt(:,1), ones(size(gt,1),1)*p_cb(1)*ruler, '-k'); hold on;
-    plot(gt(:,1), ones(size(gt,1),1)*p_cb(2)*ruler, '-c');
-    plot(gt(:,1), ones(size(gt,1),1)*p_cb(3)*ruler, '-m');
+if(~isempty(gt) && ~isempty(p_bc))
+    plot(gt(:,1), ones(size(gt,1),1)*p_bc(1)*ruler, '-k'); hold on;
+    plot(gt(:,1), ones(size(gt,1),1)*p_bc(2)*ruler, '-c');
+    plot(gt(:,1), ones(size(gt,1),1)*p_bc(3)*ruler, '-m');
 end
 plot(data(:,1), (-3*data(:,101)+ data(:, 46))*ruler, '--r');
 plot(data(:,1), (-3*data(:,102)+ data(:, 47))*ruler, '--g');
 plot(data(:,1), (-3*data(:,103)+ data(:, 48))*ruler, '--b');
-xlim (xlimits);
+
 xlabel('time [sec]', 'FontSize', fontsize);
 ylabel('cm', 'FontSize', fontsize);
-title('p_b^c', 'FontSize', fontsize);
+title('p_c^b', 'FontSize', fontsize);
 legend('x', 'y', 'z','3\sigma_x','3\sigma_y','3\sigma_z', 'gt x','gt y','gt z');
 set(gca,'FontSize',fontsize);
 grid on;
+saveas(gcf,[output_dir, '\Error p_CB'],'epsc');
+
 
 figNumber = figNumber +1;
 figure(figNumber);
@@ -307,7 +312,7 @@ set(gca,'FontSize',fontsize);
 figNumber = figNumber +1;
 figure(figNumber);
 p1p2Scale= 1e2;
-showP1P2= false;
+showP1P2= true;
 plot(data(:,1), data(:, 53), '-r'); hold on;
 plot(data(:,1), data(:, 54), '-g');
 if(showP1P2)
@@ -319,8 +324,8 @@ end
 % plot(data(:,1), tile_data(:,1), '.r'); hold on;
 % plot(data(:,1), tile_data(:,2), '.g');
 if(showP1P2)
-    plot(data(:,1), tile_data(:,3)*p1p2Scale, '.b');
-    plot(data(:,1), tile_data(:,4)*p1p2Scale, '.k');
+%     plot(data(:,1), tile_data(:,3)*p1p2Scale, '.b');
+%     plot(data(:,1), tile_data(:,4)*p1p2Scale, '.k');
 end
 plot(data(:,1), data(:, 53)+3*data(:, 108), '--r');
 plot(data(:,1), data(:, 54)+3*data(:, 109), '--g');
@@ -347,20 +352,5 @@ grid on;
 xlabel('time [sec]');
 set(gca,'FontSize',fontsize);
 
-figNumber = figNumber +1;
-figure(figNumber);
-clock= 1000;
-plot(data(:,1), data(:, 57)*clock, '-r'); hold on;
-plot(data(:,1), data(:, 58)*clock, '-g');
-plot(data(:,1), data(:, 57)*clock+3*data(:, 112)*clock, '--r');
-plot(data(:,1), data(:, 58)*clock+3*data(:, 113)*clock, '--g');
-plot(data(:,1), data(:, 57)*clock-3*data(:, 112)*clock, '--r');
-plot(data(:,1), data(:, 58)*clock-3*data(:, 113)*clock, '--g');
-legend('t_d','t_r', '3\sigma_t_d','3\sigma_t_r');
-xlim (xlimits);
-grid on;
-xlabel('time [sec]','FontSize',fontsize);
-title('$t_d$, $t_r$', 'Interpreter', 'Latex','FontSize',fontsize);
-ylabel('msec','FontSize',fontsize);
-set(gca,'FontSize',fontsize);
-figNumber = intermediatePlotter(figNumber, data,  nominal_intrinsics'*2, 'G:\temp');
+figNumber = intermediatePlotter( ...
+    figNumber, data,  nominal_intrinsics'*2, output_dir, fontsize);

@@ -1,6 +1,6 @@
-function figNumber = intermediatePlotter(figNumber, data, gt, outputPath)
-if(nargin==3)
-outputPath= 'G:\temp';
+function figNumber = intermediatePlotter(figNumber, data, gt, outputPath,
+                                         fontSize) if (nargin <= 3) outputPath =
+    "" end if (nargin <= 4) fontSize = 18;
 end
 figNumber = figNumber +1;
 figure(figNumber);
@@ -123,101 +123,20 @@ set(gca,'FontSize',18);
 
 figNumber = figNumber +1;
 figure(figNumber);
-ruler = 100;
-plot(data(:,1), data(:, 46)*ruler, '-r'); hold on;
-plot(data(:,1), data(:, 47)*ruler, '-g');
-plot(data(:,1), data(:, 48)*ruler, '-b');
-
-plot(data(:,1), 3*data(:, 101)*ruler, '--r');
-plot(data(:,1), 3*data(:, 102)*ruler, '--g');
-plot(data(:,1), 3*data(:, 103)*ruler, '--b');
-
-plot(data(:,1), -3*data(:, 101)*ruler, '--r');
-plot(data(:,1), -3*data(:, 102)*ruler, '--g');
-plot(data(:,1), -3*data(:, 103)*ruler, '--b');
-h_legend=legend('x','y','z', '3\sigma_x','3\sigma_y','3\sigma_z');
-set(h_legend,'FontSize',18);
-grid on;
-xlabel('time [sec]', 'FontSize', 18);
-title('$\mathbf{p}_b^c$', 'Interpreter', 'Latex');
-set(gca,'FontSize',18);
-ylabel('cm', 'FontSize', 18);
-saveas(gcf,[outputPath, '\Error p_CB'],'epsc');
-
-figNumber = figNumber +1;
-figure(figNumber);
-if(size(gt,1) == size(data,1))
-    plot(data(:,1), data(:, 49)-gt(:,49), '-r'); hold on;
-    plot(data(:,1), data(:, 50)-gt(:,50), '-g');
-    plot(data(:,1), data(:, 51)-gt(:,51), '-b');
-    plot(data(:,1), data(:, 52)-gt(:,52), '-k');
-else if(size(gt,1)==4)
-        plot(data(:,1), data(:, 49)-gt(1), '-r'); hold on;
-        plot(data(:,1), data(:, 50)-gt(2), '-g');
-        plot(data(:,1), data(:, 51)-gt(3), '-b');
-        plot(data(:,1), data(:, 52)-gt(4), '-k');
-    end
-end
-
-plot(data(:,1), 3*data(:, 104), '--r'); hold on;
-plot(data(:,1), 3*data(:, 105), '--g');
-plot(data(:,1), 3*data(:, 106), '--b');
-plot(data(:,1), 3*data(:, 107), '--k');
-
-plot(data(:,1), -3*data(:, 104), '--r'); hold on;
-plot(data(:,1), -3*data(:, 105), '--g');
-plot(data(:,1), -3*data(:, 106), '--b');
-plot(data(:,1), -3*data(:, 107), '--k');
-
-h_legend= legend('f_x','f_y','c_x','c_y', '3\sigma_f_x', '3\sigma_f_y','3\sigma_c_x','3\sigma_c_y');
-set(h_legend,'FontSize',18);
-grid on;
-xlabel('time [sec]', 'FontSize', 18);
-title('($f_x$, $f_y$), ($c_x$, $c_y$)', 'Interpreter', 'Latex');
-set(gca,'FontSize',18);
-ylabel('pixel', 'FontSize', 18);
-
-figNumber = figNumber +1;
-figure(figNumber);
-plot(data(:,1), data(:, 53), '-r'); hold on;
-plot(data(:,1), data(:, 54), '-g');
-plot(data(:,1), data(:, 55), '-b');
-plot(data(:,1), data(:, 56), '-k');
-
-plot(data(:,1), 3*data(:, 108), '--r');
-plot(data(:,1), 3*data(:, 109), '--g');
-plot(data(:,1), 3*data(:, 110), '--b');
-plot(data(:,1), 3*data(:, 111), '--k');
-
-plot(data(:,1), -3*data(:, 108), '--r');
-plot(data(:,1), -3*data(:, 109), '--g');
-plot(data(:,1), -3*data(:, 110), '--b');
-plot(data(:,1), -3*data(:, 111), '--k');
-
-h_legend=legend('k_1','k_2','p_1','p_2', '3\sigma_{k_1}', '3\sigma_{k_2}', '3\sigma_{p_1}', '3\sigma_{p_2}');
-set(h_legend,'FontSize',18);
-grid on;
-xlabel('time [sec]', 'FontSize', 18);
-title('($k_1$, $k_2$, $p_1$, $p_2$)', 'Interpreter', 'Latex');
-set(gca,'FontSize',18);
-
-
-figNumber = figNumber +1;
-figure(figNumber);
 clock= 1000;
 plot(data(:,1), data(:, 57)*clock, '-r'); hold on;
 plot(data(:,1), data(:, 58)*clock, '-g');
-plot(data(:,1), 3*data(:, 112)*clock, '--r');
-plot(data(:,1), 3*data(:, 113)*clock, '--g');
-plot(data(:,1), -3*data(:, 112)*clock, '--r');
-plot(data(:,1), -3*data(:, 113)*clock, '--g');
+plot(data( :, 1), data( :, 57) * clock + 3 * data( :, 112) * clock, '--r');
+plot(data( :, 1), data( :, 58) * clock + 3 * data( :, 113) * clock, '--g');
+plot(data( :, 1), data( :, 57) * clock - 3 * data( :, 112) * clock, '--r');
+plot(data( :, 1), data( :, 58) * clock - 3 * data( :, 113) * clock, '--g');
 h_legend=legend('t_d','t_r', '3\sigma_t_d','3\sigma_t_r');
-set(h_legend,'FontSize',18);
+set(h_legend, 'FontSize', fontSize);
 grid on;
-xlabel('time [sec]', 'FontSize', 18);
+xlabel('time [sec]', 'FontSize', fontSize);
 title('$t_d$, $t_r$', 'Interpreter', 'Latex');
-set(gca,'FontSize',18);
-ylabel('msec', 'FontSize', 18);
+set(gca, 'FontSize', fontSize);
+ylabel('msec', 'FontSize', fontSize);
 
 saveas(gcf,[outputPath, '\Error td tr'],'epsc');
 
