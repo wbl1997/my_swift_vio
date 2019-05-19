@@ -642,8 +642,8 @@ void compute_errors(
 // involves many approximations other than these noise terms.
 void testHybridFilterSinusoid(const std::string &outputPath,
                               const int runs = 100) {
-  FLAGS_use_mahalanobis =
-      false; // set USE_MAHALANOBIS false in simulation if no outliers are added
+  // set USE_MAHALANOBIS false in simulation if no outliers are added
+  FLAGS_use_mahalanobis = false;
   const double DURATION = 300.0;    // length of motion in seconds
   const double IMU_RATE = 100.0;    // Hz
   const double DT = 1.0 / IMU_RATE; // time increments

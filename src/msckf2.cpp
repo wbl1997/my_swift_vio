@@ -906,7 +906,7 @@ bool MSCKF2::computeHoi(const uint64_t hpbid, const MapPoint &mp,
         triangulateAMapPoint(mp, obsInPixel, frameIds, v4Xhomog, vRi,
                              tempCameraGeometry_, T_SC0_, hpbid, true);
 
-    if(!bSucceeded){
+    if (!bSucceeded) {
         computeHTimer.stop();
         return false;
     }
@@ -924,17 +924,16 @@ bool MSCKF2::computeHoi(const uint64_t hpbid, const MapPoint &mp,
     get_T_WS(anchorId, T_WBa);
     okvis::kinematics::Transformation T_GA = T_WBa*T_SC0_; // anchor frame to global frame
 
-    Eigen::Vector4d ab1rho = T_GA.inverse()*v4Xhomog;
+    Eigen::Vector4d ab1rho = v4Xhomog;
 
-    if(ab1rho[2]<=0) //negative depth
-    {
+    if (ab1rho[2] <= 0) { //negative depth
 //        std::cout <<"negative depth in ab1rho "<< ab1rho.transpose()<<std::endl;
 //        std::cout << "original v4xhomog "<< v4Xhomog.transpose()<< std::endl;
         computeHTimer.stop();
         return false;
     }
 
-    ab1rho/= ab1rho[2]; //[\alpha = X/Z, \beta= Y/Z, 1, \rho=1/Z] in the anchor frame
+    ab1rho /= ab1rho[2]; //[\alpha = X/Z, \beta= Y/Z, 1, \rho=1/Z] in the anchor frame
 
     Eigen::Vector2d imagePoint; // projected pixel coordinates of the point ${z_u, z_v}$ in pixel units
     Eigen::Matrix2Xd intrinsicsJacobian; //$\frac{\partial [z_u, z_v]^T}{\partial( f_x, f_v, c_x, c_y, k_1, k_2, p_1, p_2, [k_3])}$
@@ -1149,9 +1148,8 @@ bool MSCKF2::computeHoi(const uint64_t hpbid, const MapPoint &mp,
     frameIds.clear();
     computeHTimer.stop();
     return true;
-
-  } else { // The landmark is expressed with Euclidean coordinates in the global
-           // frame
+  } else {
+    // The landmark is expressed with Euclidean coordinates in the global frame
     computeHTimer.start();
 
     //gather all observations for this feature point

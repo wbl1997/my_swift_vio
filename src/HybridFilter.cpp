@@ -1696,14 +1696,12 @@ void HybridFilter::optimize(bool verbose)
         }
 
         Eigen::MatrixXd r_q, T_H, R_q; //residual, Jacobian, and noise covariance after projecting to the column space of H_o
-        if(r_o.rows() <= dimH_o[1]) // no need to reduce rows of H_o,
-        {
+        if (r_o.rows() <= static_cast<int>(dimH_o[1])) {
+            // no need to reduce rows of H_o
             r_q= r_o;
             T_H= H_o;
             R_q= R_o;
-        }
-        else
-        {   // project into the column space of H_o, reduce the residual dimension
+        } else {   // project into the column space of H_o, reduce the residual dimension
             Eigen::HouseholderQR<Eigen::MatrixXd> qr(H_o);
             Eigen::MatrixXd Q = qr.householderQ();
             Eigen::MatrixXd thinQ = Q.topLeftCorner(dimH_o[0], dimH_o[1]);
@@ -2268,6 +2266,11 @@ void HybridFilter::gatherPoseObservForTriang(
     std::vector<Eigen::Vector3d> *obsDirections,
     std::vector<Eigen::Vector2d> *obsInPixel, std::vector<double> *vR_oi,
     const uint64_t &hpbid) const {
+  frameIds->clear();
+  T_WSs->clear();
+  obsDirections->clear();
+  obsInPixel->clear();
+  vR_oi->clear();
   for (auto itObs = mp.observations.begin(), iteObs = mp.observations.end();
        itObs != iteObs; ++itObs) {
     uint64_t poseId = itObs->first.frameId;
@@ -2296,17 +2299,15 @@ void HybridFilter::gatherPoseObservForTriang(
     double kpSize = 1.0;
     multiFramePtr->getKeypointSize(itObs->first.cameraIndex,
                                    itObs->first.keypointIndex, kpSize);
+    // image pixel noise follows that in addObservation function
     vR_oi->push_back(kpSize / 8);
-    vR_oi->push_back(
-        kpSize /
-        8); // image pixel noise follows that in addObservation function
+    vR_oi->push_back(kpSize / 8);
 
     // use the latest estimates for camera intrinsic parameters
     Eigen::Vector3d backProjectionDirection;
     cameraGeometry.backProject(measurement, &backProjectionDirection);
-    obsDirections->push_back(
-        backProjectionDirection); // each observation is in image plane z=1,
-                                  // (\bar{x}, \bar{y}, 1)
+    // each observation is in image plane z=1, (\bar{x}, \bar{y}, 1)
+    obsDirections->push_back(backProjectionDirection);
 
     okvis::kinematics::Transformation T_WS;
     get_T_WS(poseId, T_WS);
@@ -2343,24 +2344,29 @@ bool HybridFilter::triangulateAMapPoint(
   gatherPoseObservForTriang(mp, cameraGeometry, &frameIds, &T_WSs,
                             &obsDirections, &obsInPixel, &vR_oi, hpbid);
   if (use_AIDP) { // Ca will play the role of W in T_CWs
-    Sophus::SE3d T_WCa;
+    std::vector<okvis::kinematics::Transformation> reversed_T_CWs;
+    okvis::kinematics::Transformation T_WCa;
     for (std::vector<okvis::kinematics::Transformation>::const_reverse_iterator
-             riter = T_WSs.rbegin();
-         riter != T_WSs.rend(); ++riter) {
-      okvis::kinematics::Transformation T_WCi = *riter * T_SC0;
+             riter = T_WSs.rbegin(); riter != T_WSs.rend(); ++riter) {
+      okvis::kinematics::Transformation T_WCi = (*riter) * T_SC0;
       if (riter == T_WSs.rbegin()) {
-        T_CWs.push_back(Sophus::SE3d());
-        T_WCa = Sophus::SE3d(T_WCi.q(), T_WCi.r());
+        reversed_T_CWs.emplace_back(okvis::kinematics::Transformation());
+        T_WCa = T_WCi;
       } else {
-        T_CWs.push_back(Sophus::SE3d(T_WCi.q(), T_WCi.r()).inverse() * T_WCa);
+        okvis::kinematics::Transformation T_CiW = T_WCi.inverse() * T_WCa;
+        reversed_T_CWs.emplace_back(T_CiW);
       }
+    }
+    for (std::vector<okvis::kinematics::Transformation>::const_reverse_iterator
+         riter = reversed_T_CWs.rbegin(); riter != reversed_T_CWs.rend(); ++riter) {
+      T_CWs.emplace_back(Sophus::SE3d(riter->q(), riter->r()));
     }
   } else {
     for (std::vector<okvis::kinematics::Transformation>::const_iterator iter =
-             T_WSs.begin();
-         iter != T_WSs.end(); ++iter) {
+             T_WSs.begin(); iter != T_WSs.end(); ++iter) {
       okvis::kinematics::Transformation T_WCi = *iter * T_SC0;
-      T_CWs.push_back(Sophus::SE3d(T_WCi.q(), T_WCi.r()).inverse());
+      okvis::kinematics::Transformation T_CiW = T_WCi.inverse();
+      T_CWs.emplace_back(Sophus::SE3d(T_CiW.q(), T_CiW.r()));
     }
   }
 
@@ -2389,8 +2395,8 @@ bool HybridFilter::triangulateAMapPoint(
     return false;
   }
 #else  // method 2 Median point method and/or gauss newton
-  bool isValid(false); // is triangulation valid, i.e., not too large
-                       // uncertainty
+  bool isValid(false);    // is triangulation valid, i.e., not too large
+                          // uncertainty
   bool isParallel(false); // is a ray
 
   // test parallel following okvis::triangulateFast using only the first, last,
