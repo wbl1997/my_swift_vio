@@ -1,6 +1,10 @@
-function figNumber = intermediatePlotter(... figNumber, data, gt, outputPath,
-                                         fontSize) if (nargin <= 3) outputPath =
-    "" end if (nargin <= 4) fontSize = 18;
+function figNumber = intermediatePlotter(...
+    figNumber, data, gt, outputPath, fontSize)
+if (nargin <= 3) 
+    outputPath = ""
+end
+if (nargin <= 4)
+    fontSize = 18;
 end
 figNumber = figNumber +1;
 figure(figNumber);

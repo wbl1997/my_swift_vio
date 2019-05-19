@@ -7,13 +7,11 @@ addpath('/media/jhuai/Seagate/jhuai/huai_work/ekfmonoslam/voicebox');
 
 filename = input('msckf2_csv:', 's');
 output_dir = input('output_dir:', 's');
-% filename = 'F:\jhuai\huai work\dissertation\figure_data\... %
-             msckf2_estimator_output_noniter_float.csv'; %
-             filename ='F:\west_campus_parking_lot\calibration\Greg\... %
-                       output\msckf2_estimator_output_greg_fixedTgTsTa.csv';
-
-                       nominal_intrinsics =
-    [ 1554.622, 1554.622, 960, 540 ] / 2;
+% filename = 'F:\jhuai\huai work\dissertation\figure_data\...
+% msckf2_estimator_output_noniter_float.csv'; 
+% filename ='F:\west_campus_parking_lot\calibration\Greg\... 
+% output\msckf2_estimator_output_greg_fixedTgTsTa.csv';
+nominal_intrinsics = [ 1554.622, 1554.622, 960, 540 ] / 2;
 % nominal_intrinsics = [ 458.65, 457.30, 367.22, 248.38 ];
 
 % p_bc = R_bc * -t_cb;
