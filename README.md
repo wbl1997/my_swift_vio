@@ -159,7 +159,7 @@ Measurements from rostopics
 rosrun msckf2 msckf2_node $HOME/docker_documents/vins_ws/src/msckf2/config/config_fpga_p2_euroc_dissertation.yaml --load_input_option=0 \
   --output_dir=/home/<USER>/Desktop/temp  --use_AIDP=true
 # use start to skip the static segment
-rosbag play --pause --start=45.0 --rate=1.0 /media/jhuai/Seagate/data/euroc/MH_01_easy.bag /cam0/image_raw:=/camera0 /imu0:=/imu
+rosbag play --pause --start=45.0 --rate=1.0 /media/$USER/Seagate/data/euroc/MH_01_easy.bag /cam0/image_raw:=/camera0 /imu0:=/imu
 
 rosrun rviz rviz -d $HOME/docker_documents/vins_ws/src/msckf2/config/rviz.rviz
 ```

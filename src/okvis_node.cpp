@@ -77,6 +77,7 @@ bool setInputParameters(okvis::InputData *input) {
   input->voFeatureTracksFile = FLAGS_vo_feature_tracks_file;
   input->startIndex = FLAGS_start_index;
   input->finishIndex = FLAGS_finish_index;
+  return true;
 }
 
 int main(int argc, char **argv) {
