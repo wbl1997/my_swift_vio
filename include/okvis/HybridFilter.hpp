@@ -648,8 +648,7 @@ class HybridFilter : public VioBackendInterface {
  public:
   // set intermediate variables which are used for computing Jacobians of
   // feature point observations
-  virtual void retrieveEstimatesOfConstants(
-      const cameras::NCameraSystem &oldCameraSystem);
+  virtual void retrieveEstimatesOfConstants();
 
   okvis::Time firstStateTimestamp();
 
@@ -814,8 +813,6 @@ class HybridFilter : public VioBackendInterface {
       double, 4 + cameras::RadialTangentialDistortion::NumDistortionIntrinsics,
       1>
       intrinsicParameters_;
-  okvis::cameras::PinholeCamera<okvis::cameras::RadialTangentialDistortion>
-      tempCameraGeometry_;
   double tdLatestEstimate;
   double trLatestEstimate;
 

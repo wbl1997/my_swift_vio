@@ -348,7 +348,6 @@ bool HybridFilter::addStates(okvis::MultiFramePtr multiFrame,
       camera_rig_.addCamera(multiFrame->T_SC(i),
                             multiFrame->GetCameraSystem().cameraGeometry(i),
                             imageReadoutTime, 0, std::vector<bool>());
-
       const okvis::kinematics::Transformation T_SC =
           camera_rig_.getCameraExtrinsic(i);
       uint64_t id = IdProvider::instance().newId();
@@ -673,7 +672,7 @@ bool HybridFilter::removeObservation(uint64_t landmarkId, uint64_t poseId,
 
   // remove residual block
   mapPtr_->removeResidualBlock(
-      reinterpret_cast< ::ceres::ResidualBlockId>(it->second));
+      reinterpret_cast<::ceres::ResidualBlockId>(it->second));
 
   // remove also in local map
   mapPoint.observations.erase(it);
@@ -693,7 +692,7 @@ bool HybridFilter::applyMarginalizationStrategy() {
   Eigen::Matrix<double, 3, Eigen::Dynamic> reparamJacobian(
       3,
       covDim_);  // Jacobians of feature reparameterization due to anchor change
-  std::vector<Eigen::Matrix<double, 3, Eigen::Dynamic> >
+  std::vector<Eigen::Matrix<double, 3, Eigen::Dynamic>>
       vJacobian;  // container of these reparameterizing Jacobians
   std::vector<size_t> vCovPtId;  // id in covariance of point features to be
                                  // reparameterized, 0 based
@@ -860,7 +859,7 @@ bool HybridFilter::applyMarginalizationStrategy() {
     toRemoveIndices.push_back(startIndex);
   }
   std::sort(toRemoveIndices.begin(), toRemoveIndices.end());
-  std::vector<std::pair<size_t, size_t> > vRowStartInterval;
+  std::vector<std::pair<size_t, size_t>> vRowStartInterval;
   vRowStartInterval.reserve(toRemoveLmIds.size() + 1);
   size_t startKeptRow =
       0;  // start id(based on the old matrix) of the kept rows
@@ -1030,8 +1029,7 @@ bool HybridFilter::initPoseFromImu(
 
 // set latest estimates for the assumed constant states which are commonly used
 // in computing Jacobians of all feature observations
-void HybridFilter::retrieveEstimatesOfConstants(
-    const cameras::NCameraSystem& oldCameraSystem) {
+void HybridFilter::retrieveEstimatesOfConstants() {
   // X_c and all the augmented states including the last inserted one in which a
   // marginalized point has no observation in it
   // p_B^C, f_x, f_y, c_x, c_y, k_1, k_2, p_1, p_2, [k_3], t_d, t_r,
@@ -1069,8 +1067,7 @@ void HybridFilter::retrieveEstimatesOfConstants(
   getSensorStateEstimateAs<ceres::CameraDistortionParamBlock>(
       currFrameId, camIdx, SensorStates::Camera, CameraSensorStates::Distortion,
       distortionCoeffs);
-  uint32_t imageHeight = camera_rig_.getCameraGeometry(camIdx)->imageHeight();
-  uint32_t imageWidth = camera_rig_.getCameraGeometry(camIdx)->imageWidth();
+
   okvis::cameras::RadialTangentialDistortion distortion(
       distortionCoeffs[0], distortionCoeffs[1], distortionCoeffs[2],
       distortionCoeffs[3]);
@@ -1078,10 +1075,8 @@ void HybridFilter::retrieveEstimatesOfConstants(
   intrinsicParameters_ << intrinsic[0], intrinsic[1], intrinsic[2],
       intrinsic[3], distortionCoeffs[0], distortionCoeffs[1],
       distortionCoeffs[2], distortionCoeffs[3];
-  tempCameraGeometry_ =
-      okvis::cameras::PinholeCamera<okvis::cameras::RadialTangentialDistortion>(
-          imageWidth, imageHeight, intrinsic[0], intrinsic[1], intrinsic[2],
-          intrinsic[3], distortion);
+
+  camera_rig_.setCameraIntrinsics(camIdx, intrinsicParameters_);
 
   getSensorStateEstimateAs<ceres::CameraTimeParamBlock>(
       currFrameId, camIdx, SensorStates::Camera, CameraSensorStates::TD,
@@ -1244,9 +1239,10 @@ bool HybridFilter::computeHxf(const uint64_t hpbid, const MapPoint& mp,
   okvis::kinematics::Transformation T_CA =
       (T_WB * T_SC0_).inverse() * T_GA;  // anchor frame to current camera frame
   Eigen::Vector3d pfiinC = (T_CA * ab1rho).head<3>();
-
+  std::shared_ptr<okvis::cameras::CameraBase> tempCameraGeometry =
+      camera_rig_.getCameraGeometry(camIdx);
   cameras::CameraBase::ProjectionStatus status =
-      tempCameraGeometry_.projectWithExternalParameters(
+      tempCameraGeometry->projectWithExternalParameters(
           pfiinC, intrinsicParameters_, &imagePoint, &pointJacobian3,
           &intrinsicsJacobian);
   if (status != cameras::CameraBase::ProjectionStatus::Successful) {
@@ -1370,10 +1366,15 @@ bool HybridFilter::computeHoi(const uint64_t hpbid, const MapPoint& mp,
   Eigen::Vector4d v4Xhomog;  // triangulated point position in the global frame
                              // expressed in [X,Y,Z,W],
   // representing either an ordinary point or a ray, e.g., a point at infinity
-
+  const int camIdx = 0;
+  std::shared_ptr<okvis::cameras::CameraBase> tempCameraGeometry =
+      camera_rig_.getCameraGeometry(camIdx);
   bool bSucceeded =
       triangulateAMapPoint(mp, obsInPixel, frameIds, v4Xhomog, vRi,
-                           tempCameraGeometry_, T_SC0_, hpbid);
+                           *dynamic_cast<okvis::cameras::PinholeCamera<
+                               okvis::cameras::RadialTangentialDistortion>*>(
+                               tempCameraGeometry.get()),
+                           T_SC0_, hpbid);
 
   if (!bSucceeded) {
     computeHTimer.stop();
@@ -1392,10 +1393,11 @@ bool HybridFilter::computeHoi(const uint64_t hpbid, const MapPoint& mp,
     OKVIS_ASSERT_EQ_DBG(Exception, anchorId, (++statesMap_.rbegin())->first,
                         "anchor frame of marginalized point should be the "
                         "frame preceding current frame");
-  } else
+  } else {
     OKVIS_ASSERT_EQ_DBG(
         Exception, anchorId, (statesMap_.rbegin())->first,
         "anchor frame of to be included points should be the current frame");
+  }
 
   // compute Jacobians for a measurement in image j of the current feature i
   // C_j is the current frame, Bj refers to the body frame associated with the
@@ -1454,9 +1456,9 @@ bool HybridFilter::computeHoi(const uint64_t hpbid, const MapPoint& mp,
   ImuMeasurement interpolatedInertialData;
 
   // containers of the above Jacobians for all observations of a mappoint
-  std::vector<Eigen::Matrix<double, 2, Eigen::Dynamic> > vJ_X;
-  std::vector<Eigen::Matrix<double, 2, 3> > vJ_pfi;
-  std::vector<Eigen::Matrix<double, 2, 1> > vri;  // residuals for feature i
+  std::vector<Eigen::Matrix<double, 2, Eigen::Dynamic>> vJ_X;
+  std::vector<Eigen::Matrix<double, 2, 3>> vJ_pfi;
+  std::vector<Eigen::Matrix<double, 2, 1>> vri;  // residuals for feature i
 
   size_t numPoses = frameIds.size();
   size_t numValidObs = 0;
@@ -1523,7 +1525,7 @@ bool HybridFilter::computeHoi(const uint64_t hpbid, const MapPoint& mp,
     Eigen::Vector3d pfiinC = (T_CA * ab1rho).head<3>();
 
     cameras::CameraBase::ProjectionStatus status =
-        tempCameraGeometry_.projectWithExternalParameters(
+        tempCameraGeometry->projectWithExternalParameters(
             pfiinC, intrinsicParameters_, &imagePoint, &pointJacobian3,
             &intrinsicsJacobian);
     if (status != cameras::CameraBase::ProjectionStatus::Successful) {
@@ -1894,23 +1896,20 @@ void HybridFilter::optimize(size_t /*numIter*/, size_t /*numThreads*/,
 void HybridFilter::optimize(bool verbose) {
   optimizeTimer.start();
   // containers of Jacobians of measurements of marginalized features
-  std::vector<Eigen::Matrix<double, Eigen::Dynamic, 1> > vr_o;
+  std::vector<Eigen::Matrix<double, Eigen::Dynamic, 1>> vr_o;
   std::vector<Eigen::MatrixXd>
       vH_o;  // each entry (2n-3)x(13+9m), n, number of observations, m, states
              // in the sliding window
   std::vector<Eigen::MatrixXd> vR_o;  // each entry (2n-3)x(2n-3)
   // containers of Jacobians of measurements of points in the states
   std::vector<Eigen::Vector2d> vr_i;
-  std::vector<Eigen::Matrix<double, 2, Eigen::Dynamic> >
+  std::vector<Eigen::Matrix<double, 2, Eigen::Dynamic>>
       vH_x;  // each entry 2x(42+13+ 9m)
-  std::vector<Eigen::Matrix<double, 2, Eigen::Dynamic> >
+  std::vector<Eigen::Matrix<double, 2, Eigen::Dynamic>>
       vH_f;  // each entry 2x(3s_k)
   std::vector<Eigen::Matrix2d> vR_i;
 
   const uint64_t currFrameId = currentFrameId();
-  const cameras::NCameraSystem oldCameraSystem =
-      multiFramePtrMap_.at(currFrameId)
-          ->GetCameraSystem();  // only used to get image width and height
 
   OKVIS_ASSERT_EQ_DBG(
       Exception, covDim_,
@@ -1919,7 +1918,7 @@ void HybridFilter::optimize(bool verbose) {
       "Inconsistent covDim and number of states");
   // prepare intermediate variables for computing Jacobians
 
-  retrieveEstimatesOfConstants(oldCameraSystem);
+  retrieveEstimatesOfConstants();
 
   size_t dimH_o[2] = {0, numCamPosePointStates_ - 3 * mInCovLmIds.size() - 9};
   size_t nMarginalizedFeatures =
@@ -2179,16 +2178,15 @@ void HybridFilter::optimize(bool verbose) {
     Eigen::MatrixXd H_o;
     Eigen::MatrixXd R_o;
 
-    std::vector<Eigen::Matrix<double, Eigen::Dynamic, 1> > vz_1;
-    std::vector<Eigen::Matrix<double, Eigen::Dynamic, 1> > vz_o;
-    std::vector<Eigen::Matrix<double, 3, Eigen::Dynamic> > vH_1;
-    std::vector<Eigen::Matrix<double, 3, 3> > vH_2;
-    std::vector<Eigen::Matrix<double, 3, 3> > vR_1;
+    std::vector<Eigen::Matrix<double, Eigen::Dynamic, 1>> vz_1;
+    std::vector<Eigen::Matrix<double, Eigen::Dynamic, 1>> vz_o;
+    std::vector<Eigen::Matrix<double, 3, Eigen::Dynamic>> vH_1;
+    std::vector<Eigen::Matrix<double, 3, 3>> vH_2;
+    std::vector<Eigen::Matrix<double, 3, 3>> vR_1;
     vH_o.clear();
     vR_o.clear();
 
-    retrieveEstimatesOfConstants(
-        oldCameraSystem);  // do this because states are just updated
+    retrieveEstimatesOfConstants();  // do this because states are just updated
 
     tempCounter = 0;
     size_t totalObsDim = 0;  // total dimensions of all features' observations
@@ -2424,7 +2422,9 @@ void HybridFilter::optimize(bool verbose) {
             std::vector<double> vRi; //std noise in pixels
             Eigen::Vector4d v4Xhomog;
             bool bSucceeded= triangulateAMapPoint(it->second, obsInPixel,
-                                                  frameIds, v4Xhomog, vRi, tempCameraGeometry_,T_SC0_, it->first);
+                                                  frameIds, v4Xhomog, vRi, *dynamic_cast<okvis::cameras::PinholeCamera<
+                                                  okvis::cameras::RadialTangentialDistortion>*>(
+                                                  tempCameraGeometry.get()), T_SC0_, it->first);
             if(bSucceeded){
                 it->second.quality = 1.0;
                 it->second.pointHomog = v4Xhomog; //this is position in the global frame

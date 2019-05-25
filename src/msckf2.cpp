@@ -298,7 +298,12 @@ bool MSCKF2::addStates(okvis::MultiFramePtr multiFrame,
               .id;
 
     } else {
-      const okvis::kinematics::Transformation T_SC = *multiFrame->T_SC(i);
+      camera_rig_.addCamera(
+          multiFrame->T_SC(i), multiFrame->GetCameraSystem().cameraGeometry(i),
+          imageReadoutTime, tdEstimate.toSec(), std::vector<bool>());
+      const okvis::kinematics::Transformation T_SC =
+          camera_rig_.getCameraExtrinsic(i);
+
       uint64_t id = IdProvider::instance().newId();
       std::shared_ptr<okvis::ceres::PoseParameterBlock>
           extrinsicsParameterBlockPtr(new okvis::ceres::PoseParameterBlock(
@@ -308,8 +313,7 @@ bool MSCKF2::addStates(okvis::MultiFramePtr multiFrame,
       cameraInfos.at(CameraSensorStates::T_SCi).id = id;
 
       Eigen::VectorXd allIntrinsics;
-      multiFrame->GetCameraSystem().cameraGeometry(i)->getIntrinsics(
-          allIntrinsics);
+      camera_rig_.getCameraGeometry(i)->getIntrinsics(allIntrinsics);
       id = IdProvider::instance().newId();
       std::shared_ptr<okvis::ceres::CameraIntrinsicParamBlock>
           intrinsicParamBlockPtr(new okvis::ceres::CameraIntrinsicParamBlock(
@@ -329,16 +333,16 @@ bool MSCKF2::addStates(okvis::MultiFramePtr multiFrame,
 
       id = IdProvider::instance().newId();
       std::shared_ptr<okvis::ceres::CameraTimeParamBlock> tdParamBlockPtr(
-          new okvis::ceres::CameraTimeParamBlock(tdEstimate.toSec(), id,
-                                                 correctedStateTime));
+          new okvis::ceres::CameraTimeParamBlock(camera_rig_.getTimeDelay(i),
+                                                 id, correctedStateTime));
       mapPtr_->addParameterBlock(tdParamBlockPtr,
                                  ceres::Map::Parameterization::Trivial);
       cameraInfos.at(CameraSensorStates::TD).id = id;
 
       id = IdProvider::instance().newId();
       std::shared_ptr<okvis::ceres::CameraTimeParamBlock> trParamBlockPtr(
-          new okvis::ceres::CameraTimeParamBlock(imageReadoutTime, id,
-                                                 correctedStateTime));
+          new okvis::ceres::CameraTimeParamBlock(camera_rig_.getReadoutTime(i),
+                                                 id, correctedStateTime));
       mapPtr_->addParameterBlock(trParamBlockPtr,
                                  ceres::Map::Parameterization::Trivial);
       cameraInfos.at(CameraSensorStates::TR).id = id;
@@ -962,8 +966,7 @@ bool MSCKF2::applyMarginalizationStrategy() {
 // set latest estimates for the assumed constant states commonly used in
 // computing Jacobians of all feature observations
 // TODO(jhuai): merge with the super class implementation
-void MSCKF2::retrieveEstimatesOfConstants(
-    const cameras::NCameraSystem &oldCameraSystem) {
+void MSCKF2::retrieveEstimatesOfConstants() {
   // X_c and all the augmented states except for the last one because the point
   // has no observation in that frame
   // p_B^C, f_x, f_y, c_x, c_y, k_1, k_2, p_1, p_2, [k_3], t_d, t_r,
@@ -1004,9 +1007,6 @@ void MSCKF2::retrieveEstimatesOfConstants(
   // TODO(jhuai): create cameraGeometry from the intrinsicParameterBlock and
   // distortionParameterBlock, input specified model id, oldCameraGeometry
   // imageHeight Width
-
-  uint32_t imageHeight = camera_rig_.getCameraGeometry(camIdx)->imageHeight();
-  uint32_t imageWidth = camera_rig_.getCameraGeometry(camIdx)->imageWidth();
   okvis::cameras::RadialTangentialDistortion distortion(
       distortionCoeffs[0], distortionCoeffs[1], distortionCoeffs[2],
       distortionCoeffs[3]);
@@ -1014,10 +1014,8 @@ void MSCKF2::retrieveEstimatesOfConstants(
   intrinsicParameters_ << intrinsic[0], intrinsic[1], intrinsic[2],
       intrinsic[3], distortionCoeffs[0], distortionCoeffs[1],
       distortionCoeffs[2], distortionCoeffs[3];
-  tempCameraGeometry_ =
-      okvis::cameras::PinholeCamera<okvis::cameras::RadialTangentialDistortion>(
-          imageWidth, imageHeight, intrinsic[0], intrinsic[1], intrinsic[2],
-          intrinsic[3], distortion);
+
+  camera_rig_.setCameraIntrinsics(camIdx, intrinsicParameters_);
 
   getSensorStateEstimateAs<ceres::CameraTimeParamBlock>(
       statesMap_.rbegin()->first, camIdx, SensorStates::Camera,
@@ -1051,6 +1049,11 @@ void MSCKF2::retrieveEstimatesOfConstants(
 bool MSCKF2::computeHoi(const uint64_t hpbid, const MapPoint &mp,
                         Eigen::Matrix<double, Eigen::Dynamic, 1> &r_oi,
                         Eigen::MatrixXd &H_oi, Eigen::MatrixXd &R_oi) {
+  const int camIdx = 0;
+  okvis::cameras::PinholeCamera<okvis::cameras::RadialTangentialDistortion>
+      *tempCameraGeometry = dynamic_cast<okvis::cameras::PinholeCamera<
+          okvis::cameras::RadialTangentialDistortion> *>(
+          camera_rig_.getCameraGeometry(camIdx).get());
   if (FLAGS_use_AIDP) {  // The landmark is expressed with AIDP in the anchor
                          // frame
     computeHTimer.start();
@@ -1068,7 +1071,7 @@ bool MSCKF2::computeHoi(const uint64_t hpbid, const MapPoint &mp,
 
     bool bSucceeded =
         triangulateAMapPoint(mp, obsInPixel, frameIds, v4Xhomog, vRi,
-                             tempCameraGeometry_, T_SC0_, hpbid, true);
+                             *tempCameraGeometry, T_SC0_, hpbid, true);
 
     if (!bSucceeded) {
       computeHTimer.stop();
@@ -1218,7 +1221,7 @@ bool MSCKF2::computeHoi(const uint64_t hpbid, const MapPoint &mp,
       Eigen::Vector3d pfiinC = (T_CA * ab1rho).head<3>();
 
       cameras::CameraBase::ProjectionStatus status =
-          tempCameraGeometry_.projectWithExternalParameters(
+          tempCameraGeometry->projectWithExternalParameters(
               pfiinC, intrinsicParameters_, &imagePoint, &pointJacobian3,
               &intrinsicsJacobian);
       if (status != cameras::CameraBase::ProjectionStatus::Successful) {
@@ -1377,7 +1380,7 @@ bool MSCKF2::computeHoi(const uint64_t hpbid, const MapPoint &mp,
     Eigen::Vector4d v4Xhomog;
     bool bSucceeded =
         triangulateAMapPoint(mp, obsInPixel, frameIds, v4Xhomog, vRi,
-                             tempCameraGeometry_, T_SC0_, hpbid, false);
+                             *tempCameraGeometry, T_SC0_, hpbid, false);
     if (!bSucceeded) {
       computeHTimer.stop();
       return false;
@@ -1483,7 +1486,7 @@ bool MSCKF2::computeHoi(const uint64_t hpbid, const MapPoint &mp,
 
       Eigen::Vector3d pfiinC = ((T_WB * T_SC0_).inverse() * v4Xhomog).head<3>();
       cameras::CameraBase::ProjectionStatus status =
-          tempCameraGeometry_.projectWithExternalParameters(
+          tempCameraGeometry->projectWithExternalParameters(
               pfiinC, intrinsicParameters_, &imagePoint, &pointJacobian3,
               &intrinsicsJacobian);
       if (status != cameras::CameraBase::ProjectionStatus::Successful) {
@@ -1791,9 +1794,6 @@ void MSCKF2::optimize(bool verbose) {
   std::vector<Eigen::MatrixXd> vR_o;
   // gather tracks of features that are not tracked in current frame
   uint64_t currFrameId = currentFrameId();
-  const cameras::NCameraSystem oldCameraSystem =
-      multiFramePtrMap_.at(currFrameId)
-          ->GetCameraSystem();  // only used to get image width and height
 
   OKVIS_ASSERT_EQ(
       Exception,
@@ -1801,7 +1801,7 @@ void MSCKF2::optimize(bool verbose) {
           cameras::RadialTangentialDistortion::NumDistortionIntrinsics,
       9 * statesMap_.size(), "Inconsistent covDim and number of states");
 
-  retrieveEstimatesOfConstants(oldCameraSystem);
+  retrieveEstimatesOfConstants();
   size_t dimH_o[2] = {0, nVariableDim_};
 
   mLandmarkID2Residualize.clear();
@@ -2024,8 +2024,7 @@ void MSCKF2::optimize(bool verbose) {
   // state)
   {
     updateLandmarksTimer.start();
-    retrieveEstimatesOfConstants(
-        oldCameraSystem);  // do this because states are just updated
+    retrieveEstimatesOfConstants();  // do this because states are just updated
     size_t tempCounter = 0;
     minValidStateID = statesMap_.rbegin()->first;
     for (auto it = landmarksMap_.begin(); it != landmarksMap_.end();
@@ -2049,9 +2048,14 @@ void MSCKF2::optimize(bool verbose) {
       std::vector<uint64_t> frameIds;
       std::vector<double> vRi;  // std noise in pixels
       Eigen::Vector4d v4Xhomog;
+      const int camIdx = 0;
+      okvis::cameras::PinholeCamera<okvis::cameras::RadialTangentialDistortion>
+          *tempCameraGeometry = dynamic_cast<okvis::cameras::PinholeCamera<
+              okvis::cameras::RadialTangentialDistortion> *>(
+              camera_rig_.getCameraGeometry(camIdx).get());
       bool bSucceeded =
           triangulateAMapPoint(it->second, obsInPixel, frameIds, v4Xhomog, vRi,
-                               tempCameraGeometry_, T_SC0_, it->first, false);
+                               *tempCameraGeometry, T_SC0_, it->first, false);
       if (bSucceeded) {
         it->second.quality = 1.0;
         it->second.pointHomog = v4Xhomog;
@@ -2079,9 +2083,6 @@ void MSCKF2::optimize(bool verbose) {
   std::vector<Eigen::MatrixXd> vR_o;
   // gather tracks of features that are not tracked in current frame
   uint64_t currFrameId = currentFrameId();
-  const cameras::NCameraSystem oldCameraSystem =
-      multiFramePtrMap_.at(currFrameId)
-          ->GetCameraSystem();  // only used to get image width and height
 
   OKVIS_ASSERT_EQ(
       Exception,
@@ -2089,7 +2090,7 @@ void MSCKF2::optimize(bool verbose) {
           cameras::RadialTangentialDistortion::NumDistortionIntrinsics,
       9 * statesMap_.size(), "Inconsistent covDim and number of states");
 
-  retrieveEstimatesOfConstants(oldCameraSystem);
+  retrieveEstimatesOfConstants();
   size_t dimH_o[2] = {0, nVariableDim_};
   size_t nMarginalizedFeatures = 0;
   mLandmarkID2Residualize.clear();
@@ -2271,8 +2272,7 @@ void MSCKF2::optimize(bool verbose) {
   // state)
   {
     updateLandmarksTimer.start();
-    retrieveEstimatesOfConstants(
-        oldCameraSystem);  // do this because states are just updated
+    retrieveEstimatesOfConstants();  // do this because states are just updated
     size_t tempCounter = 0;
     minValidStateID = statesMap_.rbegin()->first;
     for (auto it = landmarksMap_.begin(); it != landmarksMap_.end();
@@ -2296,9 +2296,14 @@ void MSCKF2::optimize(bool verbose) {
       std::vector<uint64_t> frameIds;
       std::vector<double> vRi;  // std noise in pixels
       Eigen::Vector4d v4Xhomog;
+      const int camIdx = 0;
+      okvis::cameras::PinholeCamera<okvis::cameras::RadialTangentialDistortion>
+          *tempCameraGeometry = dynamic_cast<okvis::cameras::PinholeCamera<
+              okvis::cameras::RadialTangentialDistortion> *>(
+              camera_rig_.getCameraGeometry(camIdx).get());
       bool bSucceeded =
           triangulateAMapPoint(it->second, obsInPixel, frameIds, v4Xhomog, vRi,
-                               tempCameraGeometry_, T_SC0_, it->first, false);
+                               *tempCameraGeometry, T_SC0_, it->first, false);
       if (bSucceeded) {
         it->second.quality = 1.0;
         it->second.pointHomog = v4Xhomog;

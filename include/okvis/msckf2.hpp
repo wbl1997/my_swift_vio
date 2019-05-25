@@ -1,35 +1,35 @@
 #ifndef INCLUDE_OKVIS_MSCKF2_HPP_
 #define INCLUDE_OKVIS_MSCKF2_HPP_
 
+#include <array>
 #include <memory>
 #include <mutex>
-#include <array>
 
 #include <ceres/ceres.h>
 #include <okvis/kinematics/Transformation.hpp>
 
-#include <okvis/assert_macros.hpp>
-#include <okvis/HybridFilter.hpp>
-#include <okvis/MultiFrame.hpp>
 #include <okvis/FrameTypedefs.hpp>
+#include <okvis/HybridFilter.hpp>
 #include <okvis/Measurements.hpp>
+#include <okvis/MultiFrame.hpp>
 #include <okvis/Variables.hpp>
-#include <okvis/ceres/PoseParameterBlock.hpp>
-#include <okvis/ceres/SpeedAndBiasParameterBlock.hpp>
+#include <okvis/assert_macros.hpp>
+#include <okvis/ceres/CeresIterationCallback.hpp>
 #include <okvis/ceres/HomogeneousPointParameterBlock.hpp>
 #include <okvis/ceres/Map.hpp>
 #include <okvis/ceres/MarginalizationError.hpp>
+#include <okvis/ceres/PoseParameterBlock.hpp>
 #include <okvis/ceres/ReprojectionError.hpp>
-#include <okvis/ceres/CeresIterationCallback.hpp>
+#include <okvis/ceres/SpeedAndBiasParameterBlock.hpp>
 
 //#include <okvis/ceres/ImuError.hpp>
 #include <okvis/cameras/PinholeCamera.hpp>
 #include <okvis/cameras/RadialTangentialDistortion.hpp>
 
-#include "vio/CsvReader.h"
-#include <okvis/timing/Timer.hpp>
-#include "vio/IMUErrorModel.h"
 #include <okvis/initialpvandstd.hpp>
+#include <okvis/timing/Timer.hpp>
+#include "vio/CsvReader.h"
+#include "vio/IMUErrorModel.h"
 
 /// \brief okvis Main namespace of this package.
 namespace okvis {
@@ -43,8 +43,7 @@ namespace okvis {
  C: Camera
  S: Sensor (IMU)
  */
-class MSCKF2 : public HybridFilter
-{
+class MSCKF2 : public HybridFilter {
   // landmarks are not in the EKF states in contrast to HybridFilter
  public:
   OKVIS_DEFINE_EXCEPTION(Exception, std::runtime_error)
@@ -60,40 +59,45 @@ class MSCKF2 : public HybridFilter
    * @param mapPtr Shared pointer to ceres map.
    */
   MSCKF2(std::shared_ptr<okvis::ceres::Map> mapPtr,
-               const double readoutTime =0.0);
+         const double readoutTime = 0.0);
 
   virtual ~MSCKF2();
 
   /**
    * @brief add a state to the state map
    * @param multiFrame Matched multiFrame.
-   * @param imuMeasurements IMU measurements from last state to new one. imuMeasurements covers
-   * at least the current state and the last state in time, with an extension on both sides.
+   * @param imuMeasurements IMU measurements from last state to new one.
+   * imuMeasurements covers at least the current state and the last state in
+   * time, with an extension on both sides.
    * @param asKeyframe Is this new frame a keyframe?
    * @return True if successful.
-   * If it is the first state, initialize it and the covariance matrix. In initialization,
-   * please make sure the world frame has z axis in negative gravity direction which is assumed in the IMU propagation
-   * Only one IMU is supported for now
+   * If it is the first state, initialize it and the covariance matrix. In
+   * initialization, please make sure the world frame has z axis in negative
+   * gravity direction which is assumed in the IMU propagation Only one IMU is
+   * supported for now
    */
   virtual bool addStates(okvis::MultiFramePtr multiFrame,
-                 const okvis::ImuMeasurementDeque & imuMeasurements,
-                 bool asKeyframe) final;
+                         const okvis::ImuMeasurementDeque& imuMeasurements,
+                         bool asKeyframe) final;
 
   /**
-   * @brief Applies the dropping/marginalization strategy according to the RSS'13/IJRR'14 paper.
-   *        The new number of frames in the window will be numKeyframes+numImuFrames.
+   * @brief Applies the dropping/marginalization strategy according to the
+   * RSS'13/IJRR'14 paper. The new number of frames in the window will be
+   * numKeyframes+numImuFrames.
    * @return True if successful.
    */
   virtual bool applyMarginalizationStrategy() final;
 
   /**
-   * @brief MSCKF2 with iterated EKF. c.f., Faraz Mirzaei, a Kalman filter based algorithm for IMU-Camera calibration
+   * @brief MSCKF2 with iterated EKF. c.f., Faraz Mirzaei, a Kalman filter based
+   * algorithm for IMU-Camera calibration
    */
   virtual void optimize(bool verbose = false) final;
 
-public:
-  //set intermediate variables which are used for computing Jacobians of feature point observations
-  virtual void retrieveEstimatesOfConstants(const cameras::NCameraSystem& oldCameraSystem) final;
+ public:
+  // set intermediate variables which are used for computing Jacobians of
+  // feature point observations
+  virtual void retrieveEstimatesOfConstants() final;
 
   /**
    * @brief computeHoi, compute the marginalized Jacobian for a feature i's
@@ -107,11 +111,12 @@ public:
    * r_oi H_oi and R_oi are values after marginalizing H_fi
    * @return true if succeeded in computing the residual and Jacobians
    */
-  bool computeHoi(const uint64_t hpbid, const MapPoint & mp, Eigen::Matrix<double, Eigen::Dynamic, 1>& r_oi,
+  bool computeHoi(const uint64_t hpbid, const MapPoint& mp,
+                  Eigen::Matrix<double, Eigen::Dynamic, 1>& r_oi,
                   Eigen::MatrixXd& H_oi, Eigen::MatrixXd& R_oi);
 
-  virtual void updateStates(const Eigen::Matrix<double, Eigen::Dynamic, 1> &deltaX) final;
-
+  virtual void updateStates(
+      const Eigen::Matrix<double, Eigen::Dynamic, 1>& deltaX) final;
 };
 
 }  // namespace okvis

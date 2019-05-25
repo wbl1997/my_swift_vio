@@ -53,6 +53,11 @@ class CameraRig {
     *(T_SC_[camera_id]) = T_SC;
   }
 
+  inline void setCameraIntrinsics(int camera_id,
+                                  const Eigen::VectorXd& intrinsic_vec) {
+    camera_geometries_[camera_id]->setIntrinsics(intrinsic_vec);
+  }
+
   inline int addCamera(
       std::shared_ptr<const okvis::kinematics::Transformation> T_SC,
       std::shared_ptr<const cameras::CameraBase> cameraGeometry, double tr,

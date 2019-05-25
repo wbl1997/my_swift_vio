@@ -1,5 +1,5 @@
 # Turn the components of the linter individualy on / off.
-clangformat: on
+clangformat: off
 cpplint: on
 yapf: on
 pylint: on
