@@ -74,8 +74,10 @@ For MSCKF2, pointHomog and parameter block stores position in the global frame, 
 
 28. Implement another two versions of MSCKF, (1) Fix Tg Ts Ta p_b^c, fx fy cx cy k1 k2 p1 p2 td tr, only estimate p_b^g, v_b^g, R_b^g, b_g, b_a
 
-use some bool flags to tell if some parameters are fixed, or some parameters are equal, like fx = fy
+use some bool flags to tell if some parameters are fixed, or some parameters are equal, like fx = fy. Need to synthesize the patterns to organize related parameters, eg, use a model to interface with the camera intrinsics, and another to deal with the IMU intrinsics, and yet another for camera-IMU extrinsics. Refer to colmap for an implementation example where template are used to handle different camera models.
 
 29. implement observability constrained EKF for calibration
 
-30. add the calibration parameters to the original OKVIS estimator, use bool flags to indicate if some parameters are fixed
+30. add the calibration parameters to the original OKVIS estimator, use bool flags to indicate if some parameters are fixed. Take a look at OKVIS camera IMU extrinsics for how to fix parameters.
+
+
