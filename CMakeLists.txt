@@ -128,6 +128,7 @@ LIST(APPEND SOURCEFILES
     src/ImuSimulator.cpp
     src/TrackResultReader.cpp
     src/HybridFilter.cpp
+    src/camerarig.cpp
 
     include/okvis/Subscriber.hpp   
     include/okvis/Player.hpp

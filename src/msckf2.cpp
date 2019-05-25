@@ -1005,8 +1005,8 @@ void MSCKF2::retrieveEstimatesOfConstants(
   // distortionParameterBlock, input specified model id, oldCameraGeometry
   // imageHeight Width
 
-  imageHeight_ = oldCameraSystem.cameraGeometry(camIdx)->imageHeight();
-  imageWidth_ = oldCameraSystem.cameraGeometry(camIdx)->imageWidth();
+  uint32_t imageHeight = camera_rig_.getCameraGeometry(camIdx)->imageHeight();
+  uint32_t imageWidth = camera_rig_.getCameraGeometry(camIdx)->imageWidth();
   okvis::cameras::RadialTangentialDistortion distortion(
       distortionCoeffs[0], distortionCoeffs[1], distortionCoeffs[2],
       distortionCoeffs[3]);
@@ -1016,7 +1016,7 @@ void MSCKF2::retrieveEstimatesOfConstants(
       distortionCoeffs[2], distortionCoeffs[3];
   tempCameraGeometry_ =
       okvis::cameras::PinholeCamera<okvis::cameras::RadialTangentialDistortion>(
-          imageWidth_, imageHeight_, intrinsic[0], intrinsic[1], intrinsic[2],
+          imageWidth, imageHeight, intrinsic[0], intrinsic[1], intrinsic[2],
           intrinsic[3], distortion);
 
   getSensorStateEstimateAs<ceres::CameraTimeParamBlock>(
@@ -1106,13 +1106,13 @@ bool MSCKF2::computeHoi(const uint64_t hpbid, const MapPoint &mp,
     }
 
     ab1rho /= ab1rho[2];  //[\alpha = X/Z, \beta= Y/Z, 1, \rho=1/Z] in the
-                          //anchor frame
+                          // anchor frame
 
     Eigen::Vector2d imagePoint;  // projected pixel coordinates of the point
                                  // ${z_u, z_v}$ in pixel units
     Eigen::Matrix2Xd
         intrinsicsJacobian;  //$\frac{\partial [z_u, z_v]^T}{\partial( f_x, f_v,
-                             //c_x, c_y, k_1, k_2, p_1, p_2, [k_3])}$
+                             // c_x, c_y, k_1, k_2, p_1, p_2, [k_3])}$
     Eigen::Matrix<double, 2, 3>
         pointJacobian3;  // $\frac{\partial [z_u, z_v]^T}{\partial
                          // p_{f_i}^{C_j}}$
@@ -1169,7 +1169,10 @@ bool MSCKF2::computeHoi(const uint64_t hpbid, const MapPoint &mp,
       const ImuMeasurementDeque &imuMeas = imuMeasPtr->second;
 
       Time stateEpoch = statesMap_.at(poseId).timestamp;
-      double kpN = obsInPixel[kale][1] / imageHeight_ - 0.5;  // k per N
+      const int camIdx = 0;
+      uint32_t imageHeight =
+          camera_rig_.getCameraGeometry(camIdx)->imageHeight();
+      double kpN = obsInPixel[kale][1] / imageHeight - 0.5;  // k per N
       const Duration featureTime =
           Duration(tdLatestEstimate + trLatestEstimate * kpN) -
           statesMap_.at(poseId).tdAtCreation;
@@ -1386,7 +1389,7 @@ bool MSCKF2::computeHoi(const uint64_t hpbid, const MapPoint &mp,
                                  // ${z_u, z_v}$ in pixel units
     Eigen::Matrix2Xd
         intrinsicsJacobian;  //$\frac{\partial [z_u, z_v]^T}{\partial( f_x, f_v,
-                             //c_x, c_y, k_1, k_2, p_1, p_2, [k_3])}$
+                             // c_x, c_y, k_1, k_2, p_1, p_2, [k_3])}$
     Eigen::Matrix<double, 2, 3>
         pointJacobian3;  // $\frac{\partial [z_u, z_v]^T}{\partial
                          // p_{f_i}^{C_j}}$
@@ -1435,7 +1438,10 @@ bool MSCKF2::computeHoi(const uint64_t hpbid, const MapPoint &mp,
       const ImuMeasurementDeque &imuMeas = imuMeasPtr->second;
 
       Time stateEpoch = statesMap_.at(poseId).timestamp;
-      double kpN = obsInPixel[kale][1] / imageHeight_ - 0.5;  // k per N
+      const int camIdx = 0;
+      uint32_t imageHeight =
+          camera_rig_.getCameraGeometry(camIdx)->imageHeight();
+      double kpN = obsInPixel[kale][1] / imageHeight - 0.5;  // k per N
       Duration featureTime =
           Duration(tdLatestEstimate + trLatestEstimate * kpN) -
           statesMap_.at(poseId).tdAtCreation;

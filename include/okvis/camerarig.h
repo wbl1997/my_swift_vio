@@ -15,7 +15,10 @@ class CameraRig {
   ///< Mounting transformations from IMU
   std::vector<std::shared_ptr<okvis::kinematics::Transformation>> T_SC_;
   ///< Camera geometries
-  std::vector<std::shared_ptr<cameras::CameraBase>> cameraGeometries_;
+  std::vector<std::shared_ptr<cameras::CameraBase>> camera_geometries_;
+  // for each intrinsic parameter of a camera, if 1 fixed, if 0 float to be
+  // optimized. If empty, all to be optimized
+  std::vector<std::vector<bool>> fixed_intrinsic_mask_;
   ///< time in secs to read out a frame, applies to rolling shutter cameras
   std::vector<double> frame_readout_time_;
   ///< at the same epoch, timestamp by camera_clock + time_delay =
@@ -28,15 +31,17 @@ class CameraRig {
     return frame_readout_time_[camera_id];
   }
   inline uint32_t getImageWidth(int camera_id) {
-    return cameraGeometries_[camera_id]->imageWidth();
+    return camera_geometries_[camera_id]->imageWidth();
   }
   inline uint32_t getImageHeight(int camera_id) {
-    return cameraGeometries_[camera_id]->imageHeight();
+    return camera_geometries_[camera_id]->imageHeight();
   }
   inline okvis::kinematics::Transformation getCameraExtrinsic(int camera_id) {
     return *(T_SC_[camera_id]);
   }
-
+  inline std::shared_ptr<cameras::CameraBase> getCameraGeometry(int camera_id) {
+    return camera_geometries_[camera_id];
+  }
   inline void setTimeDelay(int camera_id, double td) {
     time_delay_[camera_id] = td;
   }
@@ -51,12 +56,14 @@ class CameraRig {
   inline int addCamera(
       std::shared_ptr<const okvis::kinematics::Transformation> T_SC,
       std::shared_ptr<const cameras::CameraBase> cameraGeometry, double tr,
-      double td) {
+      double td,
+      const std::vector<bool>& fixedIntrinsicMask = std::vector<bool>()) {
     T_SC_.emplace_back(
         std::make_shared<okvis::kinematics::Transformation>(*T_SC));
-    cameraGeometries_.emplace_back(cloneCameraGeometry(cameraGeometry));
-    frame_readout_time_.push_back(tr);
-    time_delay_.push_back(td);
+    camera_geometries_.emplace_back(cloneCameraGeometry(cameraGeometry));
+    frame_readout_time_.emplace_back(tr);
+    time_delay_.emplace_back(td);
+    fixed_intrinsic_mask_.emplace_back(fixedIntrinsicMask);
     return static_cast<int>(T_SC_.size()) - 1;
   }
 };

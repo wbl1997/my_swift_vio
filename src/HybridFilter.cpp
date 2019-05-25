@@ -309,6 +309,7 @@ bool HybridFilter::addStates(okvis::MultiFramePtr multiFrame,
   OKVIS_ASSERT_EQ_DBG(Exception, imuParametersVec_.size(), 1,
                       "Only one IMU is supported.");
   // initialize new sensor states
+
   // cameras:
   for (size_t i = 0; i < extrinsicsEstimationParametersVec_.size(); ++i) {
     SpecificSensorStatesContainer cameraInfos(5);
@@ -347,7 +348,13 @@ bool HybridFilter::addStates(okvis::MultiFramePtr multiFrame,
               .at(CameraSensorStates::TR)
               .id;
     } else {
-      const okvis::kinematics::Transformation T_SC = *multiFrame->T_SC(i);
+      // initialize the evolving camera geometry
+      camera_rig_.addCamera(multiFrame->T_SC(i),
+                            multiFrame->GetCameraSystem().cameraGeometry(i),
+                            imageReadoutTime, 0, std::vector<bool>());
+
+      const okvis::kinematics::Transformation T_SC =
+          camera_rig_.getCameraExtrinsic(i);
       uint64_t id = IdProvider::instance().newId();
       std::shared_ptr<okvis::ceres::PoseParameterBlock>
           extrinsicsParameterBlockPtr(new okvis::ceres::PoseParameterBlock(
@@ -357,8 +364,7 @@ bool HybridFilter::addStates(okvis::MultiFramePtr multiFrame,
       cameraInfos.at(CameraSensorStates::T_SCi).id = id;
 
       Eigen::VectorXd allIntrinsics;
-      multiFrame->GetCameraSystem().cameraGeometry(i)->getIntrinsics(
-          allIntrinsics);
+      camera_rig_.getCameraGeometry(i)->getIntrinsics(allIntrinsics);
       id = IdProvider::instance().newId();
       std::shared_ptr<okvis::ceres::CameraIntrinsicParamBlock>
           intrinsicParamBlockPtr(new okvis::ceres::CameraIntrinsicParamBlock(
@@ -378,15 +384,16 @@ bool HybridFilter::addStates(okvis::MultiFramePtr multiFrame,
 
       id = IdProvider::instance().newId();
       std::shared_ptr<okvis::ceres::CameraTimeParamBlock> tdParamBlockPtr(
-          new okvis::ceres::CameraTimeParamBlock(0, id, correctedStateTime));
+          new okvis::ceres::CameraTimeParamBlock(camera_rig_.getTimeDelay(i),
+                                                 id, correctedStateTime));
       mapPtr_->addParameterBlock(tdParamBlockPtr,
                                  ceres::Map::Parameterization::Trivial);
       cameraInfos.at(CameraSensorStates::TD).id = id;
 
       id = IdProvider::instance().newId();
       std::shared_ptr<okvis::ceres::CameraTimeParamBlock> trParamBlockPtr(
-          new okvis::ceres::CameraTimeParamBlock(imageReadoutTime, id,
-                                                 correctedStateTime));
+          new okvis::ceres::CameraTimeParamBlock(camera_rig_.getReadoutTime(i),
+                                                 id, correctedStateTime));
       mapPtr_->addParameterBlock(trParamBlockPtr,
                                  ceres::Map::Parameterization::Trivial);
       cameraInfos.at(CameraSensorStates::TR).id = id;
@@ -1066,8 +1073,8 @@ void HybridFilter::retrieveEstimatesOfConstants(
   getSensorStateEstimateAs<ceres::CameraDistortionParamBlock>(
       currFrameId, camIdx, SensorStates::Camera, CameraSensorStates::Distortion,
       distortionCoeffs);
-  imageHeight_ = oldCameraSystem.cameraGeometry(camIdx)->imageHeight();
-  imageWidth_ = oldCameraSystem.cameraGeometry(camIdx)->imageWidth();
+  uint32_t imageHeight = camera_rig_.getCameraGeometry(camIdx)->imageHeight();
+  uint32_t imageWidth = camera_rig_.getCameraGeometry(camIdx)->imageWidth();
   okvis::cameras::RadialTangentialDistortion distortion(
       distortionCoeffs[0], distortionCoeffs[1], distortionCoeffs[2],
       distortionCoeffs[3]);
@@ -1077,7 +1084,7 @@ void HybridFilter::retrieveEstimatesOfConstants(
       distortionCoeffs[2], distortionCoeffs[3];
   tempCameraGeometry_ =
       okvis::cameras::PinholeCamera<okvis::cameras::RadialTangentialDistortion>(
-          imageWidth_, imageHeight_, intrinsic[0], intrinsic[1], intrinsic[2],
+          imageWidth, imageHeight, intrinsic[0], intrinsic[1], intrinsic[2],
           intrinsic[3], distortion);
 
   getSensorStateEstimateAs<ceres::CameraTimeParamBlock>(
@@ -1194,7 +1201,9 @@ bool HybridFilter::computeHxf(const uint64_t hpbid, const MapPoint& mp,
   const ImuMeasurementDeque& imuMeas = imuMeasPtr->second;
 
   Time stateEpoch = statesMap_.at(currFrameId).timestamp;
-  double kpN = obsInPixel[1] / imageHeight_ - 0.5;  // k per N
+  const int camIdx = 0;
+  uint32_t imageHeight = camera_rig_.getCameraGeometry(camIdx)->imageHeight();
+  double kpN = obsInPixel[1] / imageHeight - 0.5;  // k per N
   Duration featureTime = Duration(tdLatestEstimate + trLatestEstimate * kpN) -
                          statesMap_.at(currFrameId).tdAtCreation;
 
@@ -1471,7 +1480,9 @@ bool HybridFilter::computeHoi(const uint64_t hpbid, const MapPoint& mp,
     const ImuMeasurementDeque& imuMeas = imuMeasPtr->second;
 
     Time stateEpoch = statesMap_.at(poseId).timestamp;
-    double kpN = obsInPixel[kale][1] / imageHeight_ - 0.5;  // k per N
+    const int camIdx = 0;
+    uint32_t imageHeight = camera_rig_.getCameraGeometry(camIdx)->imageHeight();
+    double kpN = obsInPixel[kale][1] / imageHeight - 0.5;  // k per N
     Duration featureTime = Duration(tdLatestEstimate + trLatestEstimate * kpN) -
                            statesMap_.at(poseId).tdAtCreation;
 

@@ -1,4 +1,7 @@
 #include <okvis/camerarig.h>
+
+#include <glog/logging.h>
+
 #include <okvis/cameras/EquidistantDistortion.hpp>
 #include <okvis/cameras/NoDistortion.hpp>
 #include <okvis/cameras/PinholeCamera.hpp>
@@ -48,7 +51,7 @@ std::shared_ptr<cameras::CameraBase> cloneCameraGeometry(
 
     } else if (strcmp(distortionType.c_str(), "RadialTangentialDistortion8") ==
                0) {
-      return std::shared_ptr<const okvis::cameras::CameraBase>(
+      return std::shared_ptr<okvis::cameras::CameraBase>(
           new okvis::cameras::PinholeCamera<
               okvis::cameras::RadialTangentialDistortion8>(
               cameraGeometry->imageWidth(), cameraGeometry->imageHeight(),
@@ -65,7 +68,7 @@ std::shared_ptr<cameras::CameraBase> cloneCameraGeometry(
                   intrinsic_vec[distortion_start_index + 7]),
               id));
     } else if (strcmp(distortionType.c_str(), "NoDistortion") == 0) {
-      return std::shared_ptr<const okvis::cameras::CameraBase>(
+      return std::shared_ptr<okvis::cameras::CameraBase>(
           new okvis::cameras::PinholeCamera<okvis::cameras::NoDistortion>(
               cameraGeometry->imageWidth(), cameraGeometry->imageHeight(),
               intrinsic_vec[0], intrinsic_vec[1], intrinsic_vec[2],
@@ -77,6 +80,7 @@ std::shared_ptr<cameras::CameraBase> cloneCameraGeometry(
     LOG(ERROR) << "unrecognized camera geometry type "
                << cameraGeometry->type();
   }
+  return std::shared_ptr<cameras::CameraBase>();
 }
 
 }  // namespace cameras

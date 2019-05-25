@@ -810,8 +810,6 @@ class HybridFilter : public VioBackendInterface {
                         // covariance matrix
 
   kinematics::Transformation T_SC0_;
-  uint32_t imageHeight_;
-  uint32_t imageWidth_;
   Eigen::Matrix<
       double, 4 + cameras::RadialTangentialDistortion::NumDistortionIntrinsics,
       1>
