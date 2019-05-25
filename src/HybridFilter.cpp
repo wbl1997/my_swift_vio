@@ -1066,7 +1066,6 @@ void HybridFilter::retrieveEstimatesOfConstants(
   getSensorStateEstimateAs<ceres::CameraDistortionParamBlock>(
       currFrameId, camIdx, SensorStates::Camera, CameraSensorStates::Distortion,
       distortionCoeffs);
-
   imageHeight_ = oldCameraSystem.cameraGeometry(camIdx)->imageHeight();
   imageWidth_ = oldCameraSystem.cameraGeometry(camIdx)->imageWidth();
   okvis::cameras::RadialTangentialDistortion distortion(
@@ -1155,7 +1154,7 @@ bool HybridFilter::computeHxf(const uint64_t hpbid, const MapPoint& mp,
                                // current frame ${z_u, z_v}$ in pixel units
   Eigen::Matrix2Xd
       intrinsicsJacobian;  //$\frac{\partial [z_u, z_v]^T}{\partial( f_x, f_v,
-                           //c_x, c_y, k_1, k_2, p_1, p_2, [k_3])}$
+                           // c_x, c_y, k_1, k_2, p_1, p_2, [k_3])}$
   Eigen::Matrix<double, 2, 3>
       pointJacobian3;  // $\frac{\partial [z_u, z_v]^T}{\partial p_{f_i}^{C_j}}$
 
@@ -1418,7 +1417,7 @@ bool HybridFilter::computeHoi(const uint64_t hpbid, const MapPoint& mp,
                                // ${z_u, z_v}$ in pixel units
   Eigen::Matrix2Xd
       intrinsicsJacobian;  //$\frac{\partial [z_u, z_v]^T}{\partial( f_x, f_v,
-                           //c_x, c_y, k_1, k_2, p_1, p_2, [k_3])}$
+                           // c_x, c_y, k_1, k_2, p_1, p_2, [k_3])}$
   Eigen::Matrix<double, 2, 3>
       pointJacobian3;  // $\frac{\partial [z_u, z_v]^T}{\partial p_{f_i}^{C_j}}$
 
@@ -2199,7 +2198,7 @@ void HybridFilter::optimize(bool verbose) {
       if (mLandmarkID2Residualize[tempCounter].second == ToAdd_TrackedNow) {
         Eigen::Vector4d
             ab1rho;  //[\alpha, \beta, 1, \rho] of the point in the anchor
-                     //frame, representing either an ordinary point or a ray
+                     // frame, representing either an ordinary point or a ray
         bool isValidJacobian =
             computeHoi(pit->first, pit->second, r_i, H_i, R_i, ab1rho, &H_fi);
 

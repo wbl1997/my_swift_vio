@@ -3,16 +3,16 @@
 #include <memory>
 #include <vector>
 
-#include <glog/logging.h>
 #include <gflags/gflags.h>
+#include <glog/logging.h>
 
 #include <okvis/HybridVio.hpp>
 #include <okvis/assert_macros.hpp>
 #include <okvis/ceres/ImuError.hpp>
 
 // the following four are used only for debugging with ground truth
-#include <okvis/ceres/CameraIntrinsicParamBlock.hpp>
 #include <okvis/ceres/CameraDistortionParamBlock.hpp>
+#include <okvis/ceres/CameraIntrinsicParamBlock.hpp>
 #include <okvis/ceres/CameraTimeParamBlock.hpp>
 #include <okvis/ceres/ShapeMatrixParamBlock.hpp>
 
@@ -21,6 +21,8 @@ DEFINE_bool(
     "use malalanobis gating test in optimize or a simple projection distance"
     " threshold in computing jacobians. true by default, set false"
     " in simulation as it may prune many valid correspondences");
+
+DECLARE_int32(feature_tracking_method);
 
 /// \brief okvis Main namespace of this package.
 namespace okvis {
@@ -36,10 +38,14 @@ HybridVio::HybridVio(okvis::VioParameters &parameters,
                      okvis::MockVioBackendInterface &estimator,
                      okvis::MockVioFrontendInterface &frontend)
     : speedAndBiases_propagated_(okvis::SpeedAndBiases::Zero()),
-      imu_params_(parameters.imu), repropagationNeeded_(false),
+      imu_params_(parameters.imu),
+      repropagationNeeded_(false),
       frameSynchronizer_(okvis::FrameSynchronizer(parameters)),
-      lastAddedImageTimestamp_(okvis::Time(0, 0)), optimizationDone_(true),
-      estimator_(estimator), frontend_(frontend), parameters_(parameters),
+      lastAddedImageTimestamp_(okvis::Time(0, 0)),
+      optimizationDone_(true),
+      estimator_(estimator),
+      frontend_(frontend),
+      parameters_(parameters),
       maxImuInputQueueSize_(60) {
   init();
 }
@@ -47,9 +53,11 @@ HybridVio::HybridVio(okvis::VioParameters &parameters,
 // Constructor.
 HybridVio::HybridVio(okvis::VioParameters &parameters)
     : speedAndBiases_propagated_(okvis::SpeedAndBiases::Zero()),
-      imu_params_(parameters.imu), repropagationNeeded_(false),
+      imu_params_(parameters.imu),
+      repropagationNeeded_(false),
       frameSynchronizer_(okvis::FrameSynchronizer(parameters)),
-      lastAddedImageTimestamp_(okvis::Time(0, 0)), optimizationDone_(true),
+      lastAddedImageTimestamp_(okvis::Time(0, 0)),
+      optimizationDone_(true),
       estimator_(parameters.sensors_information.imageReadoutTime),
       frontend_(parameters.nCameraSystem.numCameras(),
                 parameters.input.voFeatureTracksFile),
@@ -115,13 +123,12 @@ void HybridVio::startThreads() {
     keypointConsumerThreads_.emplace_back(&HybridVio::matchingLoop, this);
   }
   imuConsumerThread_ = std::thread(&HybridVio::imuConsumerLoop, this);
-  positionConsumerThread_ = std::thread(&HybridVio::positionConsumerLoop,
-                                        this);
+  positionConsumerThread_ = std::thread(&HybridVio::positionConsumerLoop, this);
   gpsConsumerThread_ = std::thread(&HybridVio::gpsConsumerLoop, this);
-  magnetometerConsumerThread_ = std::thread(
-      &HybridVio::magnetometerConsumerLoop, this);
-  differentialConsumerThread_ = std::thread(
-      &HybridVio::differentialConsumerLoop, this);
+  magnetometerConsumerThread_ =
+      std::thread(&HybridVio::magnetometerConsumerLoop, this);
+  differentialConsumerThread_ =
+      std::thread(&HybridVio::differentialConsumerLoop, this);
 
   // algorithm threads
   visualizationThread_ = std::thread(&HybridVio::visualizationLoop, this);
@@ -177,22 +184,20 @@ bool HybridVio::addImage(const okvis::Time &stamp, size_t cameraIndex,
                          int frameIdInSource, bool * /*asKeyframe*/) {
   assert(cameraIndex < numCameras_);
 
-  if (lastAddedImageTimestamp_ > stamp
-      && fabs((lastAddedImageTimestamp_ - stamp).toSec())
-          > parameters_.sensors_information.frameTimestampTolerance) {
-    LOG(ERROR)
-        << "Received image from the past. Dropping the image.";
+  if (lastAddedImageTimestamp_ > stamp &&
+      fabs((lastAddedImageTimestamp_ - stamp).toSec()) >
+          parameters_.sensors_information.frameTimestampTolerance) {
+    LOG(ERROR) << "Received image from the past. Dropping the image.";
     return false;
   }
   lastAddedImageTimestamp_ = stamp;
 
-  std::shared_ptr<okvis::CameraMeasurement> frame = std::make_shared<
-      okvis::CameraMeasurement>();
+  std::shared_ptr<okvis::CameraMeasurement> frame =
+      std::make_shared<okvis::CameraMeasurement>();
   frame->measurement.image = image;
   frame->measurement.idInSource = frameIdInSource;
   frame->timeStamp = stamp;
   frame->sensorId = cameraIndex;
-
 
   if (keypoints != nullptr) {
     frame->measurement.deliversKeypoints = true;
@@ -216,21 +221,22 @@ bool HybridVio::addImage(const okvis::Time &stamp, size_t cameraIndex,
 }
 
 // Add an abstracted image observation.
-bool HybridVio::addKeypoints(
-    const okvis::Time & /*stamp*/, size_t /*cameraIndex*/,
-    const std::vector<cv::KeyPoint> & /*keypoints*/,
-    const std::vector<uint64_t> & /*landmarkIds*/,
-    const cv::Mat & /*descriptors*/,
-    bool* /*asKeyframe*/) {
-  OKVIS_THROW(Exception, "HybridVio::addKeypoints() not implemented anymore "
-                         "since changes to _keypointMeasurements queue.");
+bool HybridVio::addKeypoints(const okvis::Time & /*stamp*/,
+                             size_t /*cameraIndex*/,
+                             const std::vector<cv::KeyPoint> & /*keypoints*/,
+                             const std::vector<uint64_t> & /*landmarkIds*/,
+                             const cv::Mat & /*descriptors*/,
+                             bool * /*asKeyframe*/) {
+  OKVIS_THROW(Exception,
+              "HybridVio::addKeypoints() not implemented anymore "
+              "since changes to _keypointMeasurements queue.");
   return false;
 }
 
 // Add an IMU measurement.
-bool HybridVio::addImuMeasurement(const okvis::Time & stamp,
-                                      const Eigen::Vector3d & alpha,
-                                      const Eigen::Vector3d & omega) {
+bool HybridVio::addImuMeasurement(const okvis::Time &stamp,
+                                  const Eigen::Vector3d &alpha,
+                                  const Eigen::Vector3d &omega) {
   okvis::ImuMeasurement imu_measurement;
   imu_measurement.measurement.accelerometers = alpha;
   imu_measurement.measurement.gyroscopes = omega;
@@ -270,9 +276,9 @@ void HybridVio::addPositionMeasurement(
 }
 
 // Add a GPS measurement.
-void HybridVio::addGpsMeasurement(const okvis::Time &, double, double,
-                                      double, const Eigen::Vector3d &,
-                                      const Eigen::Matrix3d &) {
+void HybridVio::addGpsMeasurement(const okvis::Time &, double, double, double,
+                                  const Eigen::Vector3d &,
+                                  const Eigen::Matrix3d &) {
   OKVIS_THROW(Exception, "GPS measurements not supported")
 }
 
@@ -288,8 +294,8 @@ void HybridVio::addBarometerMeasurement(const okvis::Time &, double, double) {
 }
 
 // Add a differential pressure measurement.
-void HybridVio::addDifferentialPressureMeasurement(const okvis::Time &,
-                                                       double, double) {
+void HybridVio::addDifferentialPressureMeasurement(const okvis::Time &, double,
+                                                   double) {
   OKVIS_THROW(Exception, "Differential pressure measurements not supported")
 }
 
@@ -346,7 +352,7 @@ void HybridVio::frameConsumerLoop(size_t cameraIndex) {
       addNewFrameToSynchronizerTimer.start();
       multiFrame = frameSynchronizer_.addNewFrame(frame);
       addNewFrameToSynchronizerTimer.stop();
-    } // unlock frameSynchronizer only now as we can be sure that not
+    }  // unlock frameSynchronizer only now as we can be sure that not
     // two states are added for the same timestamp
     okvis::kinematics::Transformation T_WS;
     okvis::Time lastTimestamp;
@@ -362,8 +368,8 @@ void HybridVio::frameConsumerLoop(size_t cameraIndex) {
     }
 
     // -- get relevant imu messages for new state
-    okvis::Time imuDataEndTime = multiFrame->timestamp()
-        + temporal_imu_data_overlap;
+    okvis::Time imuDataEndTime =
+        multiFrame->timestamp() + temporal_imu_data_overlap;
     okvis::Time imuDataBeginTime = lastTimestamp - temporal_imu_data_overlap;
 
     OKVIS_ASSERT_TRUE_DBG(Exception, imuDataBeginTime < imuDataEndTime,
@@ -372,15 +378,15 @@ void HybridVio::frameConsumerLoop(size_t cameraIndex) {
     // wait until all relevant imu messages have arrived and check for
     // termination request
     if (imuFrameSynchronizer_.waitForUpToDateImuData(
-      okvis::Time(imuDataEndTime)) == false)  {
+            okvis::Time(imuDataEndTime)) == false) {
       return;
     }
     OKVIS_ASSERT_TRUE_DBG(
         Exception, imuDataEndTime < imuMeasurements_.back().timeStamp,
         "Waiting for up to date imu data seems to have failed!");
 
-    okvis::ImuMeasurementDeque imuData = getImuMeasurments(imuDataBeginTime,
-                                                           imuDataEndTime);
+    okvis::ImuMeasurementDeque imuData =
+        getImuMeasurments(imuDataBeginTime, imuDataEndTime);
 
     // if imu_data is empty, either end_time > begin_time or
     // no measurements in timeframe, should not happen, as we waited
@@ -418,7 +424,8 @@ void HybridVio::frameConsumerLoop(size_t cameraIndex) {
         //        printf("lastOptimizedStateTimestamp_ set to %ld "
         //               "for the first time\n", lastOptimizedStateTimestamp_);
       }
-      OKVIS_ASSERT_TRUE_DBG(Exception, success,
+      OKVIS_ASSERT_TRUE_DBG(
+          Exception, success,
           "pose could not be initialized from imu measurements.");
       if (!success) {
         beforeDetectTimer.stop();
@@ -432,20 +439,20 @@ void HybridVio::frameConsumerLoop(size_t cameraIndex) {
                                           multiFrame->timestamp());
       propagationTimer.stop();
     }
-    okvis::kinematics::Transformation T_WC = T_WS
-        * (*parameters_.nCameraSystem.T_SC(frame->sensorId));
+    okvis::kinematics::Transformation T_WC =
+        T_WS * (*parameters_.nCameraSystem.T_SC(frame->sensorId));
     beforeDetectTimer.stop();
 
-#ifdef USE_BRISK
-    detectTimer.start();
-    frontend_.detectAndDescribe(frame->sensorId, multiFrame, T_WC, nullptr);
-    detectTimer.stop();
-#endif
+    if (FLAGS_feature_tracking_method == 0) {
+      detectTimer.start();
+      frontend_.detectAndDescribe(frame->sensorId, multiFrame, T_WC, nullptr);
+      detectTimer.stop();
+    }
 
     afterDetectTimer.start();
 
     bool push = false;
-    { // we now tell frame synchronizer that detectAndDescribe is done for
+    {  // we now tell frame synchronizer that detectAndDescribe is done for
       // MF with our timestamp
       waitForFrameSynchronizerMutexTimer2.start();
       std::lock_guard<std::mutex> lock(frameSynchronizer_mutex_);
@@ -453,7 +460,7 @@ void HybridVio::frameConsumerLoop(size_t cameraIndex) {
       frameSynchronizer_.detectionEndedForMultiFrame(multiFrame->id());
 
       if (frameSynchronizer_.detectionCompletedForAllCameras(
-          multiFrame->id())) {
+              multiFrame->id())) {
         //        LOG(INFO) << "detection completed for multiframe with id "
         // << multi_frame->id();
         push = true;
@@ -484,16 +491,15 @@ void HybridVio::matchingLoop() {
     std::shared_ptr<okvis::MultiFrame> frame;
 
     // get data and check for termination request
-    if (keypointMeasurements_.PopBlocking(&frame) == false)
-      return;
+    if (keypointMeasurements_.PopBlocking(&frame) == false) return;
 
     prepareToAddStateTimer.start();
     // -- get relevant imu messages for new state
     okvis::Time imuDataEndTime = frame->timestamp() + temporal_imu_data_overlap;
-    okvis::Time imuDataBeginTime = lastAddedStateTimestamp_
-        - temporal_imu_data_overlap;
-    if (imuDataBeginTime.toSec() == 0.0) { // first state not yet added
-        imuDataBeginTime = frame->timestamp() - temporal_imu_data_overlap;
+    okvis::Time imuDataBeginTime =
+        lastAddedStateTimestamp_ - temporal_imu_data_overlap;
+    if (imuDataBeginTime.toSec() == 0.0) {  // first state not yet added
+      imuDataBeginTime = frame->timestamp() - temporal_imu_data_overlap;
     }
     // at maximum Duration(.) sec of data is allowed, 1sec is
     // a conservative number
@@ -523,16 +529,15 @@ void HybridVio::matchingLoop() {
           "Waiting for up to date imu data seems to have failed!");
     }
 
-    okvis::ImuMeasurementDeque imuData = getImuMeasurments(imuDataBeginTime,
-                                                           imuDataEndTime);
+    okvis::ImuMeasurementDeque imuData =
+        getImuMeasurments(imuDataBeginTime, imuDataEndTime);
 
     prepareToAddStateTimer.stop();
     // if imu_data is empty, either end_time > begin_time or
     // no measurements in timeframe, should not happen, as we waited
     // for measurements
     // this should only happen at the beginning of a test
-    if (imuData.size() == 0)
-      continue;
+    if (imuData.size() == 0) continue;
 
     // make sure that optimization of last frame is over.
     // TODO(sleuten): If we didn't actually 'pop' the _matchedFrames queue
@@ -540,12 +545,11 @@ void HybridVio::matchingLoop() {
     {
       waitForOptimizationTimer.start();
       std::unique_lock<std::mutex> l(estimator_mutex_);
-      while (!optimizationDone_)
-        optimizationNotification_.wait(l);
+      while (!optimizationDone_) optimizationNotification_.wait(l);
       waitForOptimizationTimer.stop();
       addStateTimer.start();
       okvis::Time t0Matching = okvis::Time::now();
-      bool asKeyframe = true; // for msckf2 always set a frame as keyframe
+      bool asKeyframe = true;  // for msckf2 always set a frame as keyframe
       if (estimator_.addStates(frame, imuData, asKeyframe)) {
         lastAddedStateTimestamp_ = frame->timestamp();
         addStateTimer.stop();
@@ -578,8 +582,7 @@ void HybridVio::matchingLoop() {
     }  // unlock estimator_mutex_
 
     // use queue size 1 to propagate a congestion to the _matchedFrames queue
-    if (matchedFrames_.PushBlockingIfFull(frame, 1) == false)
-      return;
+    if (matchedFrames_.PushBlockingIfFull(frame, 1) == false) return;
   }
 }
 
@@ -589,18 +592,17 @@ void HybridVio::imuConsumerLoop() {
   TimerSwitchable processImuTimer("0 processImuMeasurements", true);
   for (;;) {
     // get data and check for termination request
-    if (imuMeasurementsReceived_.PopBlocking(&data) == false)
-      return;
+    if (imuMeasurementsReceived_.PopBlocking(&data) == false) return;
     processImuTimer.start();
     okvis::Time start;
-    const okvis::Time* end;  // do not need to copy end timestamp
+    const okvis::Time *end;  // do not need to copy end timestamp
     {
       std::lock_guard<std::mutex> imuLock(imuMeasurements_mutex_);
       OKVIS_ASSERT_TRUE(Exception,
-                        imuMeasurements_.empty()
-                        || imuMeasurements_.back().timeStamp < data.timeStamp,
+                        imuMeasurements_.empty() ||
+                            imuMeasurements_.back().timeStamp < data.timeStamp,
                         "IMU measurement from the past received");
-//      imuMeasurements_.push_back(data);
+      //      imuMeasurements_.push_back(data);
 
       if (parameters_.publishing.publishImuPropagatedState) {
         if (!repropagationNeeded_ && imuMeasurements_.size() > 0) {
@@ -634,12 +636,11 @@ void HybridVio::imuConsumerLoop() {
       result.stamp = *end;
       result.T_WS = T_WS_propagated_;
       result.speedAndBiases = speedAndBiases_propagated_;
-      result.omega_S = imuMeasurements_.back().measurement.gyroscopes
-          - speedAndBiases_propagated_.segment<3>(3);
+      result.omega_S = imuMeasurements_.back().measurement.gyroscopes -
+                       speedAndBiases_propagated_.segment<3>(3);
       for (size_t i = 0; i < parameters_.nCameraSystem.numCameras(); ++i) {
-        result.vector_of_T_SCi.push_back(
-            okvis::kinematics::Transformation(
-                *parameters_.nCameraSystem.T_SC(i)));
+        result.vector_of_T_SCi.push_back(okvis::kinematics::Transformation(
+            *parameters_.nCameraSystem.T_SC(i)));
       }
       result.onlyPublishLandmarks = false;
       optimizationResults_.PushNonBlockingDroppingIfFull(result, 1);
@@ -653,8 +654,7 @@ void HybridVio::positionConsumerLoop() {
   okvis::PositionMeasurement data;
   for (;;) {
     // get data and check for termination request
-    if (positionMeasurementsReceived_.PopBlocking(&data) == false)
-      return;
+    if (positionMeasurementsReceived_.PopBlocking(&data) == false) return;
     // collect
     {
       std::lock_guard<std::mutex> positionLock(positionMeasurements_mutex_);
@@ -664,24 +664,20 @@ void HybridVio::positionConsumerLoop() {
 }
 
 // Loop to process GPS measurements.
-void HybridVio::gpsConsumerLoop() {
-}
+void HybridVio::gpsConsumerLoop() {}
 
 // Loop to process magnetometer measurements.
-void HybridVio::magnetometerConsumerLoop() {
-}
+void HybridVio::magnetometerConsumerLoop() {}
 
 // Loop to process differential pressure measurements.
-void HybridVio::differentialConsumerLoop() {
-}
+void HybridVio::differentialConsumerLoop() {}
 
 // Loop that visualizes completed frames.
 void HybridVio::visualizationLoop() {
   okvis::VioVisualizer visualizer_(parameters_);
   for (;;) {
     VioVisualizer::VisualizationData::Ptr new_data;
-    if (visualizationData_.PopBlocking(&new_data) == false)
-      return;
+    if (visualizationData_.PopBlocking(&new_data) == false) return;
     // visualizer_.showDebugImages(new_data);
     std::vector<cv::Mat> out_images(parameters_.nCameraSystem.numCameras());
     for (size_t i = 0; i < parameters_.nCameraSystem.numCameras(); ++i) {
@@ -694,10 +690,8 @@ void HybridVio::visualizationLoop() {
 // trigger display (needed because OSX won't allow threaded display)
 void HybridVio::display() {
   std::vector<cv::Mat> out_images;
-  if (displayImages_.Size() == 0)
-    return;
-  if (displayImages_.PopBlocking(&out_images) == false)
-    return;
+  if (displayImages_.Size() == 0) return;
+  if (displayImages_.PopBlocking(&out_images) == false) return;
   // draw
   for (size_t im = 0; im < parameters_.nCameraSystem.numCameras(); im++) {
     std::stringstream windowname;
@@ -709,27 +703,26 @@ void HybridVio::display() {
 
 // Get a subset of the recorded IMU measurements.
 okvis::ImuMeasurementDeque HybridVio::getImuMeasurments(
-    okvis::Time& imuDataBeginTime, okvis::Time& imuDataEndTime) {
+    okvis::Time &imuDataBeginTime, okvis::Time &imuDataEndTime) {
   // sanity checks:
   // if end time is smaller than begin time, return empty queue.
   // if begin time is larger than newest imu time, return empty queue.
-  if (imuDataEndTime < imuDataBeginTime
-      || imuDataBeginTime > imuMeasurements_.back().timeStamp)
+  if (imuDataEndTime < imuDataBeginTime ||
+      imuDataBeginTime > imuMeasurements_.back().timeStamp)
     return okvis::ImuMeasurementDeque();
 
   std::lock_guard<std::mutex> lock(imuMeasurements_mutex_);
   // get iterator to imu data before previous frame
-  okvis::ImuMeasurementDeque::iterator first_imu_package = imuMeasurements_
-      .begin();
+  okvis::ImuMeasurementDeque::iterator first_imu_package =
+      imuMeasurements_.begin();
   okvis::ImuMeasurementDeque::iterator last_imu_package =
       imuMeasurements_.end();
   // TODO(jhuai): go backwards through queue. Is probably faster.
   for (auto iter = imuMeasurements_.begin(); iter != imuMeasurements_.end();
-      ++iter) {
+       ++iter) {
     // move first_imu_package iterator back until iter->timeStamp is higher
     // than requested begintime
-    if (iter->timeStamp <= imuDataBeginTime)
-      first_imu_package = iter;
+    if (iter->timeStamp <= imuDataBeginTime) first_imu_package = iter;
 
     // set last_imu_package iterator as soon as we hit first timeStamp higher
     // than requested endtime & break
@@ -747,17 +740,15 @@ okvis::ImuMeasurementDeque HybridVio::getImuMeasurments(
 }
 
 // Remove IMU measurements from the internal buffer.
-int HybridVio::deleteImuMeasurements(const okvis::Time& eraseUntil) {
+int HybridVio::deleteImuMeasurements(const okvis::Time &eraseUntil) {
   std::lock_guard<std::mutex> lock(imuMeasurements_mutex_);
-  if (imuMeasurements_.front().timeStamp > eraseUntil)
-    return 0;
+  if (imuMeasurements_.front().timeStamp > eraseUntil) return 0;
 
   okvis::ImuMeasurementDeque::iterator eraseEnd;
   int removed = 0;
   for (auto it = imuMeasurements_.begin(); it != imuMeasurements_.end(); ++it) {
     eraseEnd = it;
-    if (it->timeStamp >= eraseUntil)
-      break;
+    if (it->timeStamp >= eraseUntil) break;
     ++removed;
   }
 
@@ -776,8 +767,7 @@ void HybridVio::optimizationLoop() {
     std::shared_ptr<okvis::MultiFrame> frame_pairs;
     VioVisualizer::VisualizationData::Ptr visualizationDataPtr;
     okvis::Time deleteImuMeasurementsUntil(0, 0);
-    if (matchedFrames_.PopBlocking(&frame_pairs) == false)
-      return;
+    if (matchedFrames_.PopBlocking(&frame_pairs) == false) return;
 
     OptimizationResults result;
     {
@@ -845,10 +835,10 @@ void HybridVio::optimizationLoop() {
             new VioVisualizer::VisualizationData());
         visualizationDataPtr->observations.resize(frame_pairs->numKeypoints());
         okvis::MapPoint landmark;
-        okvis::ObservationVector::iterator it = visualizationDataPtr
-            ->observations.begin();
+        okvis::ObservationVector::iterator it =
+            visualizationDataPtr->observations.begin();
         for (size_t camIndex = 0; camIndex < frame_pairs->numFrames();
-            ++camIndex) {
+             ++camIndex) {
           for (size_t k = 0; k < frame_pairs->numKeypoints(camIndex); ++k) {
             OKVIS_ASSERT_TRUE_DBG(
                 Exception, it != visualizationDataPtr->observations.end(),
@@ -873,8 +863,8 @@ void HybridVio::optimizationLoop() {
             ++it;
           }
         }
-        visualizationDataPtr->keyFrames = estimator_.multiFrame(
-            estimator_.currentKeyframeId());
+        visualizationDataPtr->keyFrames =
+            estimator_.multiFrame(estimator_.currentKeyframeId());
         estimator_.get_T_WS(estimator_.currentKeyframeId(),
                             visualizationDataPtr->T_WS_keyFrame);
       }
@@ -886,9 +876,9 @@ void HybridVio::optimizationLoop() {
     if (!parameters_.publishing.publishImuPropagatedState) {
       // adding further elements to result that do not access estimator.
       for (size_t i = 0; i < parameters_.nCameraSystem.numCameras(); ++i) {
-          okvis::kinematics::Transformation T_SCA;
-          estimator_.getCameraSensorStates(frame_pairs->id(), i, T_SCA);
-          result.vector_of_T_SCi.push_back(T_SCA);
+        okvis::kinematics::Transformation T_SCA;
+        estimator_.getCameraSensorStates(frame_pairs->id(), i, T_SCA);
+        result.vector_of_T_SCi.push_back(T_SCA);
       }
     }
     optimizationResults_.Push(result);
@@ -908,8 +898,7 @@ void HybridVio::publisherLoop() {
   for (;;) {
     // get the result data
     OptimizationResults result;
-    if (optimizationResults_.PopBlocking(&result) == false)
-      return;
+    if (optimizationResults_.PopBlocking(&result) == false) return;
 
     // call all user callbacks
     if (stateCallback_ && !result.onlyPublishLandmarks)

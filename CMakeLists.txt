@@ -26,7 +26,6 @@ message("CATKIN_DEVEL_PREFIX ${CATKIN_DEVEL_PREFIX}")
 SET(USE_ROS TRUE)
 SET(MSCKF2 TRUE) # build with msck2 or hybridfilter
 SET(FIRST_ESTIMATE TRUE) # use the first estimate technique for propagation matrix and measurement Jacobian?
-SET(KLT_MATCHER FALSE) #use calcOpticalFlowPyrLK to track features instead of brisk feature matching
 
 IF(NOT CMAKE_BUILD_TYPE)
   SET(CMAKE_BUILD_TYPE Release)
@@ -46,12 +45,7 @@ IF(FIRST_ESTIMATE)
   ADD_DEFINITIONS(-DUSE_FIRST_ESTIMATE)
 ENDIF()
 
-IF(KLT_MATCHER)
-  ADD_DEFINITIONS(-DUSE_KLT)
-ELSEIF(1)
-  ADD_DEFINITIONS(-DUSE_BRISK)
-  #ADD_DEFINITIONS(-DDEACTIVATE_TIMERS)
-ENDIF()
+#ADD_DEFINITIONS(-DDEACTIVATE_TIMERS)
 
 message(STATUS "Building MSCKF2 with ${CMAKE_BUILD_TYPE}")
 
