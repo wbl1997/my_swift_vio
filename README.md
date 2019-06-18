@@ -80,6 +80,31 @@ cd ../..
 init_linter_git_hooks
 ```
 
+Run gtests. Both gtest and gmock are required.
+```
+sudo apt-get install libgtest-dev google-mock
+cd /usr/src/gtest
+sudo cmake CMakeLists.txt
+sudo make
+# copy or symlink libgtest.a and libgtest_main.a to your /usr/lib folder
+sudo cp *.a /usr/lib
+
+cd /usr/src/gmock
+sudo cmake CMakeLists.txt
+sudo make
+# copy or symlink libgmock.a and libgmock_main.a to your /usr/lib folder
+sudo cp *.a /usr/lib
+```
+Ref: https://www.eriksmistad.no/getting-started-with-google-test-on-ubuntu/
+
+
+```
+catkin_make run_tests
+# To run single tests
+devel/lib/msckf2/allTests --gtest_filter="*Eigen*"
+
+```
+
 ## Debug the project with QtCreator
 
 Follow the below steps exactly, otherwise mysterious errors like missing generate_config file.
@@ -126,8 +151,6 @@ QtCreator may not find cmake files for libraries like roscpp,
 set the path like /opt/ros/kinetic/share/roscpp/cmake. Doing similar changes for other not found ros libraries.
 
 To enable debug mode, in the Build option panel, set CMake Build Type to Debug
-
-Build msckf2 in QtCreator
 
 To start debugging, add commandline arguments in the Run option panel, then press the Run icon
 

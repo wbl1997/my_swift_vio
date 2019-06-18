@@ -12,7 +12,7 @@
 #include <glog/logging.h>
 #include <okvis/Player.hpp>
 
-#define THRESHOLD_DATA_DELAY_WARNING 0.1 // in seconds
+#define THRESHOLD_DATA_DELAY_WARNING 0.1  // in seconds
 
 /// \brief okvis Main namespace of this package.
 namespace okvis {
@@ -21,20 +21,27 @@ Player::~Player() {}
 
 Player::Player(okvis::VioInterface *vioInterfacePtr,
                const okvis::VioParameters &params)
-    : mbFinished(false), vioInterface_(vioInterfacePtr), vioParameters_(params),
-      mVideoFile(params.input.videoFile), mImuFile(params.input.imuFile),
-      mIG(mImuFile, vio::SensorStreamCSV, 0.005),
-      mFG(mVideoFile, params.input.startIndex, params.input.finishIndex),
-      mSG(NULL) {}
-
-Player::Player(okvis::VioInterface *vioInterfacePtr,
-               const okvis::VioParameters &params, std::string imageFolder)
-    : mbFinished(false), vioInterface_(vioInterfacePtr), vioParameters_(params),
-      mImageFolder(params.input.imageFolder), mTimeFile(params.input.timeFile),
-      mImuFile(params.input.imuFile), mIG(mImuFile, vio::PlainText, 0.01),
-      mFG(mImageFolder, mTimeFile, params.input.startIndex,
-          params.input.finishIndex),
-      mSG(NULL) {}
+    : mbFinished(false),
+      vioInterface_(vioInterfacePtr),
+      vioParameters_(params),
+      mVideoFile(params.input.videoFile),
+      mImageFolder(params.input.imageFolder),
+      mTimeFile(params.input.timeFile),
+      mImuFile(params.input.imuFile) {
+  if (mVideoFile.empty()) {  // image sequence input
+    mIG = std::make_shared<vio::IMUGrabber>(mImuFile, vio::PlainText);
+    mFG = std::make_shared<vio::FrameGrabber>(mImageFolder, mTimeFile,
+                                              params.input.startIndex,
+                                              params.input.finishIndex);
+  } else {
+    //    mIG = std::make_shared<vio::IMUGrabber>(mImuFile,
+    //    vio::SensorStreamCSV);
+    mIG = std::make_shared<vio::IMUGrabber>(mImuFile, vio::KalibrCsv);
+    mFG = std::make_shared<vio::FrameGrabber>(mVideoFile, mTimeFile,
+                                              params.input.startIndex,
+                                              params.input.finishIndex);
+  }
+}
 
 void Player::Run() {
   ros::Rate rate(vioParameters_.sensors_information.cameraRate);
@@ -47,7 +54,7 @@ void Player::Run() {
   double frameTime;
   int frameCounter(0);
 
-  while (mFG.grabFrame(frame, frameTime)) {
+  while (mFG->grabFrame(frame, frameTime)) {
     cv::Mat filtered;
     if (vioParameters_.optimization.useMedianFilter) {
       cv::medianBlur(frame, filtered, 3);
@@ -57,17 +64,17 @@ void Player::Run() {
     okvis::Time t(frameTime);
     t -= okvis::Duration(vioParameters_.sensors_information.imageDelay);
     std::cout << "read in frame at " << std::setprecision(12) << t.toSec()
-              << " id " << mFG.getCurrentId() << std::endl;
-    vioInterface_->addImage(t, 0, filtered, NULL, mFG.getCurrentId());
+              << " id " << mFG->getCurrentId() << std::endl;
+    vioInterface_->addImage(t, 0, filtered, NULL, mFG->getCurrentId());
 
     // add corresponding imu data
     if (frameCounter == 0) {
-      mIG.getObservation(t.toSec() -
-                         0.1); // 0.1 to avoid reading the first entry that may
-                               // be useful for later processing
+      mIG->getObservation(t.toSec() -
+                          0.1);  // 0.1 to avoid reading the first entry that
+                                 // may be useful for later processing
     }
 
-    bool isMeasGood = mIG.getObservation(t.toSec() + advance);
+    bool isMeasGood = mIG->getObservation(t.toSec() + advance);
     if (!isMeasGood) {
       // the measurements can be bad when appraoching the end of a file
       ++frameCounter;
@@ -76,10 +83,10 @@ void Player::Run() {
     }
     std::vector<Eigen::Matrix<double, 7, 1>,
                 Eigen::aligned_allocator<Eigen::Matrix<double, 7, 1>>>
-        imuObservations = mIG.measurement;
+        imuObservations = mIG->getMeasurement();
 
-    imuObservations.pop_back(); // remove the first entry which was the last in
-                                // the previous observations
+    imuObservations.pop_back();  // remove the first entry which was the last in
+                                 // the previous observations
 
     //        std::cout <<" start and finish timestamp "
     //        <<std::setprecision(12)<< imuObservations.front()[0] <<" "<<
@@ -120,9 +127,9 @@ void Player::RunWithSavedTracks() {
   std::cout << "camera frame rate "
             << vioParameters_.sensors_information.cameraRate << std::endl;
   const double advance =
-      0.5; //+ advance to retrieve a little more imu data, thus,
-           // avoid waiting in processing frames which causes false warning of
-           // delayed frames
+      0.5;  //+ advance to retrieve a little more imu data, thus,
+            // avoid waiting in processing frames which causes false warning of
+            // delayed frames
   cv::Mat frame;
   double frameTime;
   int frameCounter(0);
@@ -132,9 +139,9 @@ void Player::RunWithSavedTracks() {
   VIOStage stage(NotInitialized);
   okvis::Time initStateTime = vioParameters_.initialState.stateTime;
 
-  mSG = new vio::StatesGrabber(orbvo_output, 17);
+  mSG = std::make_shared<vio::StatesGrabber>(orbvo_output, 17);
 
-  while (mFG.grabFrame(frame, frameTime)) {
+  while (mFG->grabFrame(frame, frameTime)) {
     cv::Mat filtered;
     if (vioParameters_.optimization.useMedianFilter) {
       cv::medianBlur(frame, filtered, 3);
@@ -170,13 +177,13 @@ void Player::RunWithSavedTracks() {
 
     // add corresponding imu data
     if (frameCounter == 0) {
-      mIG.getObservation(t.toSec() -
-                         0.1); // 0.1 to avoid reading the first entry that may
-                               // be useful for later processing
+      mIG->getObservation(t.toSec() -
+                          0.1);  // 0.1 to avoid reading the first entry that
+                                 // may be useful for later processing
     }
     ++frameCounter;
 
-    bool isMeasGood = mIG.getObservation(t.toSec() + advance);
+    bool isMeasGood = mIG->getObservation(t.toSec() + advance);
     if (!isMeasGood) {
       // the measurements can be bad when appraoching the end of a file
       std::cerr << "Warn: failed to get inertial observation up to "
@@ -187,9 +194,9 @@ void Player::RunWithSavedTracks() {
 
     std::vector<Eigen::Matrix<double, 7, 1>,
                 Eigen::aligned_allocator<Eigen::Matrix<double, 7, 1>>>
-        imuObservations = mIG.measurement;
-    imuObservations.pop_back(); // remove the first entry which was the last in
-                                // the previous observations
+        imuObservations = mIG->getMeasurement();
+    imuObservations.pop_back();  // remove the first entry which was the last in
+                                 // the previous observations
 
     std::cout << " start and finish timestamp " << std::setprecision(12)
               << imuObservations.front()[0] << " " << imuObservations.back()[0]
@@ -198,7 +205,7 @@ void Player::RunWithSavedTracks() {
       vioInterface_->addImuMeasurement(okvis::Time(obs[0]), obs.segment<3>(1),
                                        obs.segment<3>(4));
     }
-    vioInterface_->addImage(t, 0, filtered, NULL, mFG.getCurrentId());
+    vioInterface_->addImage(t, 0, filtered, NULL, mFG->getCurrentId());
 
     rate.sleep();
   }
@@ -206,4 +213,4 @@ void Player::RunWithSavedTracks() {
   mbFinished.store(true);
 }
 
-} // namespace okvis
+}  // namespace okvis

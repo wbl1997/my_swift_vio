@@ -173,21 +173,25 @@ add_dependencies(${PROJECT_NAME} okvis_multisensor_processing)
 # make sure configure headers are built before any node using them
 add_dependencies(${PROJECT_NAME} ${PROJECT_NAME}_gencfg)
 
+list(APPEND LINK_LIBRARIES
+    ${catkin_LIBRARIES}
+    okvis_util
+    okvis_kinematics
+    okvis_time
+    okvis_cv
+    okvis_common
+    okvis_ceres
+    okvis_timing
+    okvis_matcher
+    okvis_frontend
+    okvis_multisensor_processing
+    ${vio_common_LIBRARIES}
+    gflags
+    pthread
+)
+
 target_link_libraries(${PROJECT_NAME}  
-  ${catkin_LIBRARIES}  
-  okvis_util
-  okvis_kinematics
-  okvis_time
-  okvis_cv 
-  okvis_common
-  okvis_ceres
-  okvis_timing
-  okvis_matcher
-  okvis_frontend 
-  okvis_multisensor_processing
-  pthread
-  ${vio_common_LIBRARIES}
-  gflags
+  ${LINK_LIBRARIES}
 )
 
 # a wrapper to invoke a specific test
@@ -199,4 +203,4 @@ add_executable(msckf2_node src/okvis_node.cpp)
 target_link_libraries(msckf2_node ${PROJECT_NAME})
 
 catkin_add_gtest(allTests test/test_main.cpp)
-target_link_libraries(allTests ${PROJECT_NAME})
+target_link_libraries(allTests ${PROJECT_NAME} gtest gmock pthread)

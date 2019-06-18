@@ -2,7 +2,7 @@
 close all;
 
 addpath('cgraumann-umeyama')
-    addpath('/media/jhuai/Seagate/jhuai/huai_work/ekfmonoslam/instk');
+addpath('/media/jhuai/Seagate/jhuai/huai_work/ekfmonoslam/instk');
 addpath('/media/jhuai/Seagate/jhuai/huai_work/ekfmonoslam/voicebox');
 
 filename = input('msckf2_csv:', 's');
@@ -12,7 +12,7 @@ output_dir = input('output_dir:', 's');
 % filename ='F:\west_campus_parking_lot\calibration\Greg\... 
 % output\msckf2_estimator_output_greg_fixedTgTsTa.csv';
 nominal_intrinsics = [ 1554.622, 1554.622, 960, 540 ] / 2;
-% nominal_intrinsics = [ 458.65, 457.30, 367.22, 248.38 ];
+nominal_intrinsics = [ 1000, 1000, 640, 360] / 2;
 
 % p_bc = R_bc * -t_cb;
 p_bc = -[ 0, -1, 0; - 1, 0, 0; 0, 0, -1 ] * [0.0652; - 0.0207; - 0.0081];
@@ -51,8 +51,7 @@ fprintf('tr [ms]\n');
 fprintf('%.3f\n', estimate_average(58)*1e3);
 
 % ground truth file must have the same number of rows as output data
-
-        gt = [];
+gt = [];
 if(~isempty(gt))
     gt = csvread('G:\state_groundtruth_estimate0\data_copy.csv');
     index= find(abs(gt(:,1) - startTime)<10000);

@@ -19,25 +19,26 @@
 #include <image_transport/image_transport.h>
 #include "sensor_msgs/Imu.h"
 
-#include <glog/logging.h>
 #include <gflags/gflags.h>
+#include <glog/logging.h>
 
-#include <okvis/Subscriber.hpp>
+#include <okvis/HybridVio.hpp>
 #include <okvis/Publisher.hpp>
 #include <okvis/RosParametersReader.hpp>
-#include <okvis/HybridVio.hpp>
+#include <okvis/Subscriber.hpp>
 
 #include <okvis/Player.hpp>
 
-DEFINE_int32(dump_output_option, 3,
+DEFINE_int32(
+    dump_output_option, 3,
     "0, direct results to ROS publishers, other options save results to csvs"
     "1, save states, 2, save states and camera extrinsics, "
     "3, save states, and all calibration parameters, 4, save states,"
     "all calibration parameters, feature tracks, and landmarks");
 
 DEFINE_int32(load_input_option, 1,
-    "0, get input by subscribing to ros topics"
-    "1, get input by reading files on a hard drive");
+             "0, get input by subscribing to ros topics"
+             "1, get input by reading files on a hard drive");
 
 DEFINE_string(output_dir, "", "the directory to dump results");
 
@@ -81,10 +82,10 @@ bool setInputParameters(okvis::InputData *input) {
 }
 
 int main(int argc, char **argv) {
-  google::ParseCommandLineFlags(&argc, &argv, true); // true to strip gflags
+  google::ParseCommandLineFlags(&argc, &argv, true);  // true to strip gflags
   google::InitGoogleLogging(argv[0]);
   FLAGS_logtostderr = 1;
-  FLAGS_stderrthreshold = 0; // INFO: 0, WARNING: 1, ERROR: 2, FATAL: 3
+  FLAGS_stderrthreshold = 0;  // INFO: 0, WARNING: 1, ERROR: 2, FATAL: 3
   FLAGS_colorlogtostderr = 1;
 
   ros::init(argc, argv, "okvis_node");
@@ -95,7 +96,7 @@ int main(int argc, char **argv) {
 
   std::string configFilename;
   if (argc >= 2) {
-      configFilename = argv[1];
+    configFilename = argv[1];
   } else {
     std::cout << "You can either invoke okvis_node through a ros launch file,"
                  " or through Qt debug. "
@@ -177,8 +178,8 @@ int main(int argc, char **argv) {
         for (size_t i = 0; i < numCameras; ++i) {
           std::stringstream num;
           num << i;
-          okvis_estimator.setTracksCsvFile(i, path + "/cam" + num.str() +
-                                                  "_tracks.csv");
+          okvis_estimator.setTracksCsvFile(
+              i, path + "/cam" + num.str() + "_tracks.csv");
         }
         publisher.setLandmarksCsvFile(path + "/okvis_estimator_landmarks.csv");
         okvis_estimator.setLandmarksCallback(
@@ -192,7 +193,7 @@ int main(int argc, char **argv) {
   okvis_estimator.setStateCallback(
       std::bind(&okvis::Publisher::publishStateAsCallback, &publisher,
                 std::placeholders::_1, std::placeholders::_2));
-  publisher.setParameters(parameters); // pass the specified publishing stuff
+  publisher.setParameters(parameters);  // pass the specified publishing stuff
 
   // player to grab messages directly from files on a hard drive
   std::shared_ptr<okvis::Player> pPlayer;
@@ -206,16 +207,9 @@ int main(int argc, char **argv) {
       rate.sleep();
     }
   } else {
-    if (parameters.input.videoFile.empty()) { // image sequence input
-      pPlayer.reset(
-          new okvis::Player(&okvis_estimator, parameters, std::string()));
-      ptPlayer.reset(new std::thread(&okvis::Player::Run, std::ref(*pPlayer)));
-    } else { // video input
-      std::cout << "working with video file " << parameters.input.videoFile
-                << std::endl;
-      pPlayer.reset(new okvis::Player(&okvis_estimator, parameters));
-      ptPlayer.reset(new std::thread(&okvis::Player::Run, std::ref(*pPlayer)));
-    }
+    pPlayer.reset(new okvis::Player(&okvis_estimator, parameters));
+    ptPlayer.reset(new std::thread(&okvis::Player::Run, std::ref(*pPlayer)));
+
     ros::Rate rate(20);
     while (!pPlayer->mbFinished) {
       okvis_estimator.display();
@@ -223,7 +217,7 @@ int main(int argc, char **argv) {
     }
     ptPlayer->join();
     std::this_thread::sleep_for(
-        std::chrono::seconds(5)); // in case the optimizer lags
+        std::chrono::seconds(5));  // in case the optimizer lags
   }
 
   std::string filename = path + "/feature_statistics.txt";

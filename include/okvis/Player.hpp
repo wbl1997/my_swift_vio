@@ -14,9 +14,9 @@
 //#include <boost/shared_ptr.hpp>
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wnon-virtual-dtor"
-#include <ros/ros.h>
-#include <image_geometry/pinhole_camera_model.h>
 #include <dynamic_reconfigure/server.h>
+#include <image_geometry/pinhole_camera_model.h>
+#include <ros/ros.h>
 // #include <okvis_ros/CameraConfig.h> // generated
 #pragma GCC diagnostic pop
 #include <image_transport/image_transport.h>
@@ -28,41 +28,37 @@
 #include <Eigen/Core>
 
 #include <okvis/Time.hpp>
-#include <okvis/cameras/NCameraSystem.hpp>
 #include <okvis/VioInterface.hpp>
+#include <okvis/cameras/NCameraSystem.hpp>
 //#include <okvis/HybridVio.hpp>
-#include <okvis/assert_macros.hpp>
 #include <okvis/Publisher.hpp>
 #include <okvis/VioParametersReader.hpp>
+#include <okvis/assert_macros.hpp>
 #include <okvis/kinematics/Transformation.hpp>
 
-#include "vio/ImuGrabber.h" //for reading IMU data
-#include "vio/FrameGrabber.h" //for reading images
+#include "vio/FrameGrabber.h"  //for reading images
+#include "vio/ImuGrabber.h"    //for reading IMU data
 /// \brief okvis Main namespace of this package.
 namespace okvis {
 
 /**
  * @brief This class handles all the buffering of incoming data.
  */
-class Player
-{
+class Player {
  public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
   OKVIS_DEFINE_EXCEPTION(Exception, std::runtime_error)
 
   ~Player();
-  //constructor for videos
+
   Player(okvis::VioInterface* vioInterfacePtr,
-             const okvis::VioParameters& param_reader);
-  // constructor for image sequences, the last parameter is only a place holder
-  Player(okvis::VioInterface* vioInterfacePtr,
-               const okvis::VioParameters & params, std::string imageFolder);
+         const okvis::VioParameters& param_reader);
 
   void Run();
   void RunWithSavedTracks();
   std::atomic<bool> mbFinished;
 
-protected:
+ protected:
   /// @name ROS callbacks
   /// @{
 
@@ -74,25 +70,28 @@ protected:
   /// @name Node and subscriber related
   /// @{
 
-
   /// @}
 
-
-  okvis::VioInterface* vioInterface_;   ///< The VioInterface. (E.g. HybridVio)
-  okvis::VioParameters vioParameters_;  ///< The parameters and settings. //huai: although cameraGeometry info is included but not used through this member
+  okvis::VioInterface* vioInterface_;  ///< The VioInterface. (E.g. HybridVio)
+  okvis::VioParameters
+      vioParameters_;  ///< The parameters and settings. //huai: although
+                       ///< cameraGeometry info is included but not used through
+                       ///< this member
 
   std::string mVideoFile;
   std::string mImageFolder;
   std::string mTimeFile;
   std::string mImuFile;
 
-  vio::IMUGrabber mIG;
-  vio::FrameGrabber mFG;
-  vio::StatesGrabber* mSG;
-private:
-  Player(const Player & rhs);
-  Player & operator=(const Player &)=delete;
+  std::shared_ptr<vio::IMUGrabber> mIG;
+  std::shared_ptr<vio::FrameGrabber> mFG;
+  std::shared_ptr<vio::StatesGrabber> mSG;
+
+ private:
+  Player(const Player& rhs);
+  Player& operator=(const Player&) = delete;
 };
-}
+
+}  // namespace okvis
 
 #endif /* INCLUDE_MSCKF2_PLAYER_HPP_ */
