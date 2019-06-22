@@ -25,7 +25,6 @@ message("CATKIN_DEVEL_PREFIX ${CATKIN_DEVEL_PREFIX}")
 
 SET(USE_ROS TRUE)
 SET(MSCKF2 TRUE) # build with msck2 or hybridfilter
-SET(FIRST_ESTIMATE TRUE) # use the first estimate technique for propagation matrix and measurement Jacobian?
 
 IF(NOT CMAKE_BUILD_TYPE)
   SET(CMAKE_BUILD_TYPE Release)
@@ -39,10 +38,6 @@ IF(MSCKF2)
 ENDIF()
 IF(USE_ROS)
   add_definitions(-DSLAM_USE_ROS)
-ENDIF()
-
-IF(FIRST_ESTIMATE)
-  ADD_DEFINITIONS(-DUSE_FIRST_ESTIMATE)
 ENDIF()
 
 #ADD_DEFINITIONS(-DDEACTIVATE_TIMERS)
@@ -202,5 +197,17 @@ target_link_libraries(invoke_one_test ${PROJECT_NAME} )
 add_executable(msckf2_node src/okvis_node.cpp)
 target_link_libraries(msckf2_node ${PROJECT_NAME})
 
-catkin_add_gtest(allTests test/test_main.cpp)
+catkin_add_gtest(allTests test/test_main.cpp
+    test/BinaryOperators.cpp
+    test/BoostAccumulators.cpp
+    test/EigenMatrixInitialization.cpp
+    test/MapKeyOrder.cpp
+    test/Sizeof.cpp
+    test/StdAccumulate.cpp
+    test/testHybridFilter.cpp
+    test/testEigenQR.cpp
+    test/testIMUOdometry.cpp
+    test/testTriangulate.cpp
+    test/testVioDatasetPlayer.cpp)
+
 target_link_libraries(allTests ${PROJECT_NAME} gtest gmock pthread)

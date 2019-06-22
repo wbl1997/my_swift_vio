@@ -171,8 +171,9 @@ TEST(Eigen, QRvsSVD) {
     EXPECT_LT((allScales0 - allScales).norm(), 1E-10);
     EXPECT_LT((allScales1 - allScales).norm(), 1E-4);
   }
-  cout << "time difference svd - float (qr+svd) for each run :"
-       << (elapsedTime[0] - elapsedTime[2]) / runs << endl;
-  cout << "cummulated time svd vs qr+svd vs float qr+svd " << elapsedTime[0]
-       << " " << elapsedTime[1] << " " << elapsedTime[2] << endl;
+  std::cout << "time difference svd - float (qr+svd) for each run :"
+            << (elapsedTime[0] - elapsedTime[2]) / runs << std::endl;
+  std::cout << "cummulated time svd vs qr+svd vs float qr+svd "
+            << elapsedTime[0] << " " << elapsedTime[1] << " " << elapsedTime[2]
+            << std::endl;
 }

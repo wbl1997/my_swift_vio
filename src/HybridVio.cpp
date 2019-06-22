@@ -408,11 +408,7 @@ void HybridVio::frameConsumerLoop(size_t cameraIndex) {
               << std::endl;
     if (estimator_.numFrames() == 0) {
       // first frame ever
-#ifdef USE_MSCKF2
-      bool success = okvis::MSCKF2::initPoseFromImu(imuData, T_WS);
-#else
       bool success = okvis::HybridFilter::initPoseFromImu(imuData, T_WS);
-#endif
       std::cout << "estimator initialized using inertial data " << std::endl;
       {
         std::lock_guard<std::mutex> lock(lastState_mutex_);

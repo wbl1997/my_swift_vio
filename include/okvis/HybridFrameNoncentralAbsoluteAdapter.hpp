@@ -3,19 +3,15 @@
 #define INCLUDE_OKVIS_OPENGV_HYBRIDFRAMENONCENTRALABSOLUTEADAPTER_HPP_
 
 #include <stdlib.h>
-#include <vector>
 #include <memory>
-#include <opengv/types.hpp>
-#include <opengv/absolute_pose/NoncentralAbsoluteAdapter.hpp>
-#include <okvis/kinematics/Transformation.hpp>
 #include <okvis/FrameTypedefs.hpp>
 #include <okvis/cameras/NCameraSystem.hpp>
+#include <okvis/kinematics/Transformation.hpp>
+#include <opengv/absolute_pose/NoncentralAbsoluteAdapter.hpp>
+#include <opengv/types.hpp>
+#include <vector>
 
-#ifdef USE_MSCKF2
 #include <okvis/msckf2.hpp>
-#else
-#include <okvis/HybridFilter.hpp>
-#endif
 
 /**
  * \brief Namespace for classes extending the OpenGV library.
@@ -30,12 +26,12 @@ namespace absolute_pose {
 ///        i.e. could be a multi-camera-setup.
 class HybridFrameNoncentralAbsoluteAdapter : public AbsoluteAdapterBase {
  private:
-  using AbsoluteAdapterBase::_t;
   using AbsoluteAdapterBase::_R;
+  using AbsoluteAdapterBase::_t;
 
  public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
-  OKVIS_DEFINE_EXCEPTION(Exception,std::runtime_error)
+  OKVIS_DEFINE_EXCEPTION(Exception, std::runtime_error)
 
   /// \brief type for describing matches.
   typedef std::vector<int> matches_t;
@@ -48,15 +44,14 @@ class HybridFrameNoncentralAbsoluteAdapter : public AbsoluteAdapterBase {
    */
   HybridFrameNoncentralAbsoluteAdapter(
 #ifdef USE_MSCKF2
-      const okvis::MSCKF2 & estimator,
+      const okvis::MSCKF2& estimator,
 #else
-      const okvis::HybridFilter & estimator,
+      const okvis::HybridFilter& estimator,
 #endif
-      const okvis::cameras::NCameraSystem & nCameraSystem,
+      const okvis::cameras::NCameraSystem& nCameraSystem,
       std::shared_ptr<okvis::MultiFrame> frame);
 
-  virtual ~HybridFrameNoncentralAbsoluteAdapter() {
-  }
+  virtual ~HybridFrameNoncentralAbsoluteAdapter() {}
 
   /// @name Algorithm input
   /// @{
@@ -109,14 +104,14 @@ class HybridFrameNoncentralAbsoluteAdapter : public AbsoluteAdapterBase {
    * @param index The serialized index of the correspondence.
    * @return Camera index of the correspondence.
    */
-  int camIndex(size_t index) const {return camIndices_.at(index);}
+  int camIndex(size_t index) const { return camIndices_.at(index); }
 
   /**
    * @brief Get the keypoint index for a specific correspondence
    * @param index The serialized index of the correspondence.
    * @return Keypoint index belonging to the correspondence.
    */
-  int keypointIndex(size_t index) const {return keypointIndices_.at(index);}
+  int keypointIndex(size_t index) const { return keypointIndices_.at(index); }
 
   /**
    * \brief Retrieve the weight of a correspondence. The weight is supposed to
@@ -157,10 +152,9 @@ class HybridFrameNoncentralAbsoluteAdapter : public AbsoluteAdapterBase {
 
   /// The standard deviations of the bearing vectors in [rad].
   std::vector<double> sigmaAngles_;
-
 };
 
-}
-}
+}  // namespace absolute_pose
+}  // namespace opengv
 
 #endif /* INCLUDE_OKVIS_OPENGV_FRAMENONCENTRALABSOLUTEADAPTER_HPP_ */

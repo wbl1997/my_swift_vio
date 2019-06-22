@@ -62,7 +62,7 @@ If you have installed okvis_ros in the catkin workspace, then you may need to di
 From the catkin workspace root, type 
 ```
 cd workspace/
-catkin_make --pkg vio_common msckf2
+catkin_make -DUSE_ROS=ON --pkg vio_common msckf2
 ```
 You will find a demo application in devel/lib/msckf2/msckf2_node. It can process datasets in the ASL/ETH format.
 

@@ -34,6 +34,7 @@ DEFINE_double(max_inc_tol, 2,
               "the tolerance of the lpNorm of an EKF state update");
 
 DECLARE_bool(use_mahalanobis);
+DECLARE_bool(use_first_estimate);
 
 /// \brief okvis Main namespace of this package.
 namespace okvis {
@@ -163,37 +164,37 @@ bool MSCKF2::addStates(okvis::MultiFramePtr multiFrame,
                   ceres::ode::OdoErrorStateDim>
         F_tot;
 
-#ifdef USE_FIRST_ESTIMATE
-    /// use latest estimate to propagate pose, speed and bias, and first
-    /// estimate to propagate covariance and Jacobian
-    Eigen::Matrix<double, 6, 1> lP =
-        statesMap_.rbegin()->second.linearizationPoint;
-    Eigen::Vector3d tempV_WS = speedAndBias.head<3>();
-    IMUErrorModel<double> tempIEM(speedAndBias.tail<6>(), vTgTsTa);
-    int numUsedImuMeasurements = IMUOdometry::propagation(
-        imuMeasurements, imuParametersVec_.at(0), T_WS, tempV_WS, tempIEM,
-        startTime, correctedStateTime, &Pkm1, &F_tot, &lP);
-    speedAndBias.head<3>() = tempV_WS;
-#else
-    /// use latest estimate to propagate pose, speed and bias, and covariance
+    int numUsedImuMeasurements = -1;
+    if (FLAGS_use_first_estimate) {
+      /// use latest estimate to propagate pose, speed and bias, and first
+      /// estimate to propagate covariance and Jacobian
+      Eigen::Matrix<double, 6, 1> lP =
+          statesMap_.rbegin()->second.linearizationPoint;
+      Eigen::Vector3d tempV_WS = speedAndBias.head<3>();
+      IMUErrorModel<double> tempIEM(speedAndBias.tail<6>(), vTgTsTa);
+      numUsedImuMeasurements = IMUOdometry::propagation(
+          imuMeasurements, imuParametersVec_.at(0), T_WS, tempV_WS, tempIEM,
+          startTime, correctedStateTime, &Pkm1, &F_tot, &lP);
+      speedAndBias.head<3>() = tempV_WS;
+    } else {
+      /// use latest estimate to propagate pose, speed and bias, and covariance
 #ifdef USE_RK4
-    // method 1 RK4 a little bit more accurate but 4 times slower
-    F_tot.setIdentity();
-    int numUsedImuMeasurements = IMUOdometry::propagation_RungeKutta(
-        imuMeasurements, imuParametersVec_.at(0), T_WS, speedAndBias, vTgTsTa,
-        startTime, correctedStateTime, &Pkm1, &F_tot);
+      // method 1 RK4 a little bit more accurate but 4 times slower
+      F_tot.setIdentity();
+      int numUsedImuMeasurements = IMUOdometry::propagation_RungeKutta(
+          imuMeasurements, imuParametersVec_.at(0), T_WS, speedAndBias, vTgTsTa,
+          startTime, correctedStateTime, &Pkm1, &F_tot);
 #else
-    // method 2, i.e., adapt the imuError::propagation function of okvis by the
-    // msckf2 derivation in Michael Andrew Shelley
-    Eigen::Vector3d tempV_WS = speedAndBias.head<3>();
-    IMUErrorModel<double> tempIEM(speedAndBias.tail<6>(), vTgTsTa);
-    int numUsedImuMeasurements = IMUOdometry::propagation(
-        imuMeasurements, imuParametersVec_.at(0), T_WS, tempV_WS, tempIEM,
-        startTime, correctedStateTime, &Pkm1, &F_tot);
-    speedAndBias.head<3>() = tempV_WS;
+      // method 2, i.e., adapt the imuError::propagation function of okvis by
+      // the msckf2 derivation in Michael Andrew Shelley
+      Eigen::Vector3d tempV_WS = speedAndBias.head<3>();
+      IMUErrorModel<double> tempIEM(speedAndBias.tail<6>(), vTgTsTa);
+      numUsedImuMeasurements = IMUOdometry::propagation(
+          imuMeasurements, imuParametersVec_.at(0), T_WS, tempV_WS, tempIEM,
+          startTime, correctedStateTime, &Pkm1, &F_tot);
+      speedAndBias.head<3>() = tempV_WS;
 #endif
-
-#endif
+    }
 
     covariance_.topLeftCorner(ceres::ode::OdoErrorStateDim,
                               ceres::ode::OdoErrorStateDim) = Pkm1;
@@ -1252,28 +1253,28 @@ bool MSCKF2::computeHoi(const uint64_t hpbid, const MapPoint &mp,
       kinematics::Transformation lP_T_WB = T_WB;
       SpeedAndBiases lP_sb = sb;
 
-#ifdef USE_FIRST_ESTIMATE
-      // compute p_WB, v_WB at (t_{f_i,j}) that use FIRST ESTIMATES of position
-      // and velocity, i.e., their linearization point
-      Eigen::Matrix<double, 6, 1> posVelFirstEstimate =
-          statesMap_.at(poseId).linearizationPoint;
-      lP_T_WB =
-          kinematics::Transformation(posVelFirstEstimate.head<3>(), T_WBj.q());
-      lP_sb = sbj;
-      lP_sb.head<3>() = posVelFirstEstimate.tail<3>();
-      tempV_WS = posVelFirstEstimate.tail<3>();
-      numUsedImuMeasurements = -1;
-      if (featureTime >= Duration()) {
-        numUsedImuMeasurements = IMUOdometry::propagation(
-            imuMeas, imuParametersVec_.at(0), lP_T_WB, tempV_WS, iem_,
-            stateEpoch, stateEpoch + featureTime);
-      } else {
-        numUsedImuMeasurements = IMUOdometry::propagationBackward(
-            imuMeas, imuParametersVec_.at(0), lP_T_WB, tempV_WS, iem_,
-            stateEpoch, stateEpoch + featureTime);
+      if (FLAGS_use_first_estimate) {
+        // compute p_WB, v_WB at (t_{f_i,j}) that use FIRST ESTIMATES of
+        // position and velocity, i.e., their linearization point
+        Eigen::Matrix<double, 6, 1> posVelFirstEstimate =
+            statesMap_.at(poseId).linearizationPoint;
+        lP_T_WB = kinematics::Transformation(posVelFirstEstimate.head<3>(),
+                                             T_WBj.q());
+        lP_sb = sbj;
+        lP_sb.head<3>() = posVelFirstEstimate.tail<3>();
+        tempV_WS = posVelFirstEstimate.tail<3>();
+        numUsedImuMeasurements = -1;
+        if (featureTime >= Duration()) {
+          numUsedImuMeasurements = IMUOdometry::propagation(
+              imuMeas, imuParametersVec_.at(0), lP_T_WB, tempV_WS, iem_,
+              stateEpoch, stateEpoch + featureTime);
+        } else {
+          numUsedImuMeasurements = IMUOdometry::propagationBackward(
+              imuMeas, imuParametersVec_.at(0), lP_T_WB, tempV_WS, iem_,
+              stateEpoch, stateEpoch + featureTime);
+        }
+        lP_sb.head<3>() = tempV_WS;
       }
-      lP_sb.head<3>() = tempV_WS;
-#endif
 
       double rho = ab1rho[3];
       okvis::kinematics::Transformation T_BcA = lP_T_WB.inverse() * T_GA;
@@ -1517,28 +1518,28 @@ bool MSCKF2::computeHoi(const uint64_t hpbid, const MapPoint &mp,
 
       kinematics::Transformation lP_T_WB = T_WB;
       SpeedAndBiases lP_sb = sb;
-#ifdef USE_FIRST_ESTIMATE
-      lP_T_WB = T_WBj;
-      lP_sb = sbj;
-      Eigen::Matrix<double, 6, 1> posVelFirstEstimate =
-          statesMap_.at(poseId).linearizationPoint;
-      lP_T_WB = kinematics::Transformation(posVelFirstEstimate.head<3>(),
-                                           lP_T_WB.q());
-      lP_sb.head<3>() = posVelFirstEstimate.tail<3>();
+      if (FLAGS_use_first_estimate) {
+        lP_T_WB = T_WBj;
+        lP_sb = sbj;
+        Eigen::Matrix<double, 6, 1> posVelFirstEstimate =
+            statesMap_.at(poseId).linearizationPoint;
+        lP_T_WB = kinematics::Transformation(posVelFirstEstimate.head<3>(),
+                                             lP_T_WB.q());
+        lP_sb.head<3>() = posVelFirstEstimate.tail<3>();
 
-      tempV_WS = lP_sb.head<3>();
-      numUsedImuMeasurements = -1;
-      if (featureTime >= Duration()) {
-        numUsedImuMeasurements = IMUOdometry::propagation(
-            imuMeas, imuParametersVec_.at(0), lP_T_WB, tempV_WS, iem_,
-            stateEpoch, stateEpoch + featureTime);
-      } else {
-        numUsedImuMeasurements = IMUOdometry::propagationBackward(
-            imuMeas, imuParametersVec_.at(0), lP_T_WB, tempV_WS, iem_,
-            stateEpoch, stateEpoch + featureTime);
+        tempV_WS = lP_sb.head<3>();
+        numUsedImuMeasurements = -1;
+        if (featureTime >= Duration()) {
+          numUsedImuMeasurements = IMUOdometry::propagation(
+              imuMeas, imuParametersVec_.at(0), lP_T_WB, tempV_WS, iem_,
+              stateEpoch, stateEpoch + featureTime);
+        } else {
+          numUsedImuMeasurements = IMUOdometry::propagationBackward(
+              imuMeas, imuParametersVec_.at(0), lP_T_WB, tempV_WS, iem_,
+              stateEpoch, stateEpoch + featureTime);
+        }
+        lP_sb.head<3>() = tempV_WS;
       }
-      lP_sb.head<3>() = tempV_WS;
-#endif
 
       J_td = pointJacobian3 * T_SC0_.C().transpose() *
              (okvis::kinematics::crossMx(
