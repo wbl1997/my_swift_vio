@@ -53,7 +53,12 @@ void Player::Run() {
   cv::Mat frame;
   double frameTime;
   int frameCounter(0);
-
+  if (!mFG->is_open()) {
+    std::cout << "Frame grabber is not opened properly. "
+                 "Make sure its input files are OK"
+              << std::endl;
+    return;
+  }
   while (mFG->grabFrame(frame, frameTime)) {
     cv::Mat filtered;
     if (vioParameters_.optimization.useMedianFilter) {

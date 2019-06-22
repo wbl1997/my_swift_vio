@@ -1,6 +1,6 @@
 #include "../test/OpenCVDistortion.cpp"
 #include "../test/testDequeIterator.cpp"
-#include "../test/testHybridFilter.cpp" // only for testing
+#include "../test/testHybridFilter.cpp"  // only for testing
 
 DECLARE_bool(use_AIDP);
 

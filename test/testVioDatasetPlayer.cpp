@@ -22,6 +22,11 @@ TEST(VioCommon, VioDatasetPlayer) {
   input.imageFolder = "";
   input.imuFile = "";
 
+  optimization.useMedianFilter = false;
+
+  sensors_information.cameraRate = 20;
+  sensors_information.imageDelay = 10;
+
   parameters.input = input;
   parameters.initialState = initialState;
   parameters.optimization = optimization;
