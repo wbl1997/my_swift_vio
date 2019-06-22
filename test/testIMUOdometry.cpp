@@ -159,9 +159,17 @@ struct CovPropConfig {
   }
 };
 
+static void print_p_q_sb(const Eigen::Vector3d& p_WS_W,
+                         const Eigen::Quaterniond& q_WS,
+                         const Eigen::Matrix<double, 9, 1>& sb) {
+  std::cout << "p:" << p_WS_W.transpose() << std::endl;
+  std::cout << "q:" << q_WS.x() << " " << q_WS.y() << " " << q_WS.z() << " "
+            << q_WS.w() << std::endl;
+  std::cout << "v:" << sb.head<3>().transpose() << std::endl;
+  std::cout << "bg ba:" << sb.tail<6>().transpose() << std::endl;
+}
+
 // compare RungeKutta and Euler forward and backward integration
-// It is observed that RungeKutta may perform worse than Euler's implementation
-// for forward + backward propagation
 TEST(IMUOdometry, BackwardIntegration) {
   using namespace Eigen;
   using namespace okvis;
@@ -194,9 +202,12 @@ TEST(IMUOdometry, BackwardIntegration) {
   okvis::SpeedAndBiases sb1 = sb;
 
   // DETAILED INTEGRATION
+
   p_WS_W = cpc.get_p_WS_W0();
   q_WS = cpc.get_q_WS0();
   sb = cpc.get_sb0();
+  std::cout << "States before forward RK integration:" << std::endl;
+  print_p_q_sb(p_WS_W, q_WS, sb);
 
   okvis::ImuMeasurementDeque imuMeasurements = cpc.get_imu_measurements();
   auto iterLast = imuMeasurements.begin();
@@ -212,10 +223,8 @@ TEST(IMUOdometry, BackwardIntegration) {
     iterLast = iter;
   }
 
-  //    std::cout <<"states after forward integration: q_WS, p_WS_W, speed and
-  //    bias"<<std::endl; std::cout<< q_WS.w()<<" "<<q_WS.x()<<" "<<q_WS.y()<<"
-  //    "<<q_WS.z()<<std::endl; std::cout<< p_WS_W.transpose() << std::endl;
-  //    std::cout<< sb.transpose()<< std::endl;
+  std::cout << "States after forward RK integration:" << std::endl;
+  print_p_q_sb(p_WS_W, q_WS, sb);
 
   // backward
   auto iterRLast = imuMeasurements.rbegin();
@@ -231,11 +240,17 @@ TEST(IMUOdometry, BackwardIntegration) {
     iterRLast = iterR;
   }
 
+  std::cout << "States after backward RK integration:" << std::endl;
+  print_p_q_sb(p_WS_W, q_WS, sb);
+
   Eigen::Vector3d p_WS_W2 = p_WS_W;
   Eigen::Quaterniond q_WS2 = q_WS;
   okvis::SpeedAndBiases sb2 = sb;
 
   // NUMERICAL_INTEGRATION EULER
+  std::cout << "States before forward Euler integration:" << std::endl;
+  print_p_q_sb(cpc.get_p_WS_W0(), cpc.get_q_WS0(), cpc.get_sb0());
+
   sb = cpc.get_sb0();
   T_WB = kinematics::Transformation(cpc.get_p_WS_W0(), cpc.get_q_WS0());
   Eigen::Vector3d tempV_WS = sb.head<3>();
@@ -244,12 +259,18 @@ TEST(IMUOdometry, BackwardIntegration) {
                            T_WB, tempV_WS, iem, cpc.get_meas_begin_time(),
                            cpc.get_meas_end_time());
 
+  std::cout << "States after forward Euler integration:" << std::endl;
+  sb.head<3>() = tempV_WS;
+  print_p_q_sb(T_WB.r(), T_WB.q(), sb);
+
   IMUOdometry::propagationBackward(
       cpc.get_imu_measurements(), cpc.get_imu_params(), T_WB, tempV_WS, iem,
       cpc.get_meas_end_time(), cpc.get_meas_begin_time());
   p_WS_W = T_WB.r();
   q_WS = T_WB.q();
   sb.head<3>() = tempV_WS;
+  std::cout << "States after backward Euler integration:" << std::endl;
+  print_p_q_sb(T_WB.r(), T_WB.q(), sb);
 
   Eigen::Vector3d p_WS_W3 = p_WS_W;
   Eigen::Quaterniond q_WS3 = q_WS;
@@ -258,7 +279,6 @@ TEST(IMUOdometry, BackwardIntegration) {
   // two methods results the same?
   check_q_near(q_WS1, q_WS2, 1e-8);
   check_p_near(p_WS_W1, p_WS_W2, 1e-8);
-
   check_sb_near(sb1, sb2, 1e-8);
 
   // Runge Kutta return to the starting position ?
