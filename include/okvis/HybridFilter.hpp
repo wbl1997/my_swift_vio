@@ -847,16 +847,13 @@ class HybridFilter : public VioBackendInterface {
   uint64_t minValidStateID;  // the minimum of the ids of the states that have
                              // tracked features
 
-  okvis::timing::Timer addStatesTimer;
-  okvis::timing::Timer optimizeTimer;
-
   okvis::timing::Timer triangulateTimer;
   okvis::timing::Timer computeHTimer;
   okvis::timing::Timer computeKalmanGainTimer;
   okvis::timing::Timer updateStatesTimer;
   okvis::timing::Timer updateCovarianceTimer;
   okvis::timing::Timer updateLandmarksTimer;
-  okvis::timing::Timer marginalizeTimer;
+
   bool getFrameId(uint64_t poseId, int &frameIdInSource, bool &isKF) const;
 
   std::deque<uint64_t>

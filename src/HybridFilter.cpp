@@ -42,15 +42,12 @@ HybridFilter::HybridFilter(std::shared_ptr<okvis::ceres::Map> mapPtr,
       marginalizationResidualId_(0),
       imageReadoutTime(readoutTime),
       minValidStateID(0),
-      addStatesTimer("1. addStates ", true),
-      optimizeTimer("2. optimize", true),
-      triangulateTimer("2.1.1 triangulateAMapPoint", true),
-      computeHTimer("2.1 computeHoi", true),
-      computeKalmanGainTimer("2.2 computeKalmanGain", true),
-      updateStatesTimer("2.3 updateStates", true),
-      updateCovarianceTimer("2.4 updateCovariance", true),
-      updateLandmarksTimer("2.5 updateLandmarks", true),
-      marginalizeTimer("3. applyMarginalization", true),
+      triangulateTimer("3.1.1.1 triangulateAMapPoint", true),
+      computeHTimer("3.1.1 computeHoi", true),
+      computeKalmanGainTimer("3.1.2 computeKalmanGain", true),
+      updateStatesTimer("3.1.3 updateStates", true),
+      updateCovarianceTimer("3.1.4 updateCovariance", true),
+      updateLandmarksTimer("3.1.5 updateLandmarks", true),
       mM(0),
       mbUseExternalInitialPose(false),
       mTrackLengthAccumulator(100, 0) {}
@@ -64,15 +61,12 @@ HybridFilter::HybridFilter(const double readoutTime)
       marginalizationResidualId_(0),
       imageReadoutTime(readoutTime),
       minValidStateID(0),
-      addStatesTimer("1. addStates ", true),
-      optimizeTimer("2. optimize", true),
-      triangulateTimer("2.1.1 triangulateAMapPoint", true),
-      computeHTimer("2.1 computeHoi", true),
-      computeKalmanGainTimer("2.2 computeKalmanGain", true),
-      updateStatesTimer("2.3 updateStates", true),
-      updateCovarianceTimer("2.4 updateCovariance", true),
-      updateLandmarksTimer("2.5 updateLandmarks", true),
-      marginalizeTimer("3. applyMarginalization", true),
+      triangulateTimer("3.1.1.1 triangulateAMapPoint", true),
+      computeHTimer("3.1.1 computeHoi", true),
+      computeKalmanGainTimer("3.1.2 computeKalmanGain", true),
+      updateStatesTimer("3.1.3 updateStates", true),
+      updateCovarianceTimer("3.1.4 updateCovariance", true),
+      updateLandmarksTimer("3.1.5 updateLandmarks", true),
       mM(0),
       mbUseExternalInitialPose(false),
       mTrackLengthAccumulator(100, 0) {}
@@ -115,7 +109,6 @@ bool HybridFilter::addStates(okvis::MultiFramePtr multiFrame,
                                    // current td estimate
 
   Eigen::Matrix<double, 27, 1> vTgTsTa;
-  addStatesTimer.start();
   if (statesMap_.empty()) {
     correctedStateTime = multiFrame->timestamp() + tdEstimate;
     // in case this is the first frame ever, let's initialize the pose:
@@ -600,8 +593,6 @@ bool HybridFilter::addStates(okvis::MultiFramePtr multiFrame,
 
   covDim_ = covDimAugmented;
   covariance_ = covarianceAugmented;
-
-  addStatesTimer.stop();
   return true;
 }
 
@@ -685,9 +676,6 @@ bool HybridFilter::removeObservation(uint64_t landmarkId, uint64_t poseId,
 // Applies the dropping/marginalization strategy, i.e., state management,
 // according to Li and Mourikis RSS 12 optimization based thesis
 bool HybridFilter::applyMarginalizationStrategy() {
-  std::cout << "in applyMarginalizationStrategy" << std::endl;
-  marginalizeTimer.start();
-
   /// remove features tracked no more, the feature can be in state or not
   size_t tempCounter = 0;
 
@@ -943,7 +931,6 @@ bool HybridFilter::applyMarginalizationStrategy() {
   // update covariance matrix
   size_t numRemovedStates = removeFrames.size();
   if (numRemovedStates == 0) {
-    marginalizeTimer.stop();
     return true;
   }
 
@@ -962,7 +949,6 @@ bool HybridFilter::applyMarginalizationStrategy() {
   covariance_ = slimCovariance;
   covDim_ -= numRemovedStates * 9;
   mM -= numRemovedStates;
-  marginalizeTimer.stop();
   return true;
 }
 
@@ -1905,7 +1891,6 @@ void HybridFilter::optimize(size_t /*numIter*/, size_t /*numThreads*/,
 // set of observations, i.e., iterative EKF but the current implementation does
 // not account for that.
 void HybridFilter::optimize(bool verbose) {
-  optimizeTimer.start();
   // containers of Jacobians of measurements of marginalized features
   std::vector<
       Eigen::Matrix<double, Eigen::Dynamic, 1>,
@@ -2487,7 +2472,6 @@ void HybridFilter::optimize(bool verbose) {
   if (verbose) {
     LOG(INFO) << mapPtr_->summary.FullReport();
   }
-  optimizeTimer.stop();
 }
 
 // Set a time limit for the optimization process.

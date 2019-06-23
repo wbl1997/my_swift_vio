@@ -70,7 +70,6 @@ bool MSCKF2::addStates(okvis::MultiFramePtr multiFrame,
                                    // current td estimate
 
   Eigen::Matrix<double, 27, 1> vTgTsTa;
-  addStatesTimer.start();
   if (statesMap_.empty()) {
     // in case this is the first frame ever, let's initialize the pose:
     tdEstimate.fromSec(imuParametersVec_.at(0).td0);
@@ -519,7 +518,6 @@ bool MSCKF2::addStates(okvis::MultiFramePtr multiFrame,
       covariance_.topLeftCorner(9, covDim_), covariance_.topLeftCorner<9, 9>();
   covDim_ = covDimAugmented;
   covariance_ = covarianceAugmented;
-  addStatesTimer.stop();
   return true;
 }
 
@@ -527,8 +525,6 @@ bool MSCKF2::addStates(okvis::MultiFramePtr multiFrame,
 // Shelley's MS thesis
 
 bool MSCKF2::applyMarginalizationStrategy() {
-  marginalizeTimer.start();
-
   // these will keep track of what we want to marginalize out.
   std::vector<uint64_t> paremeterBlocksToBeMarginalized;
 
@@ -936,7 +932,6 @@ bool MSCKF2::applyMarginalizationStrategy() {
   // update covariance matrix
   size_t numRemovedStates = removeFrames.size();
   if (numRemovedStates == 0) {
-    marginalizeTimer.stop();
     return true;
   }
 
@@ -960,7 +955,6 @@ bool MSCKF2::applyMarginalizationStrategy() {
 
   covariance_ = slimCovariance;
   covDim_ = covDim_ - numRemovedStates * 9;
-  marginalizeTimer.stop();
   return true;
 }
 
@@ -1807,7 +1801,6 @@ void MSCKF2::updateStates(
 #ifdef USE_IEKF
 // iterated extended Kalman filter
 void MSCKF2::optimize(bool verbose) {
-  optimizeTimer.start();
   // containers of Jacobians of measurements
   std::vector<Eigen::MatrixXd, Eigen::aligned_allocator<Eigen::MatrixXd>> vr_o;
   std::vector<Eigen::MatrixXd, Eigen::aligned_allocator<Eigen::MatrixXd>> vH_o;
@@ -1919,8 +1912,6 @@ void MSCKF2::optimize(bool verbose) {
                               // ordered map
           minValidStateID = itObs->first.frameId;
       }
-
-      optimizeTimer.stop();
       return;
     }
 
@@ -2091,13 +2082,11 @@ void MSCKF2::optimize(bool verbose) {
   if (verbose) {
     LOG(INFO) << mapPtr_->summary.FullReport();
   }
-  optimizeTimer.stop();
 }
 #else
 // extended kalman filter
 // Start msckf2 optimization.
 void MSCKF2::optimize(bool verbose) {
-  optimizeTimer.start();
   // containers of Jacobians of measurements
   std::vector<Eigen::MatrixXd, Eigen::aligned_allocator<Eigen::MatrixXd>> vr_o;
   std::vector<Eigen::MatrixXd, Eigen::aligned_allocator<Eigen::MatrixXd>> vH_o;
@@ -2190,8 +2179,6 @@ void MSCKF2::optimize(bool verbose) {
                             // ordered map
         minValidStateID = itObs->first.frameId;
     }
-
-    optimizeTimer.stop();
     return;
   }
 
@@ -2340,7 +2327,6 @@ void MSCKF2::optimize(bool verbose) {
   if (verbose) {
     LOG(INFO) << mapPtr_->summary.FullReport();
   }
-  optimizeTimer.stop();
 }
 #endif
 
