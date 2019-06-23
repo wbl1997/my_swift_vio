@@ -34,9 +34,7 @@ Player::Player(okvis::VioInterface *vioInterfacePtr,
                                               params.input.startIndex,
                                               params.input.finishIndex);
   } else {
-    //    mIG = std::make_shared<vio::IMUGrabber>(mImuFile,
-    //    vio::SensorStreamCSV);
-    mIG = std::make_shared<vio::IMUGrabber>(mImuFile, vio::KalibrCsv);
+    mIG = std::make_shared<vio::IMUGrabber>(mImuFile);
     mFG = std::make_shared<vio::FrameGrabber>(mVideoFile, mTimeFile,
                                               params.input.startIndex,
                                               params.input.finishIndex);

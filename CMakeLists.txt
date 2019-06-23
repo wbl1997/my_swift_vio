@@ -124,6 +124,7 @@ LIST(APPEND SOURCEFILES
     src/TrackResultReader.cpp
     src/HybridFilter.cpp
     src/camerarig.cpp
+    src/PoseViewer.cpp
 
     include/okvis/Subscriber.hpp   
     include/okvis/Player.hpp

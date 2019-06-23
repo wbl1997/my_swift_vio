@@ -61,14 +61,6 @@ DEFINE_int32(start_index, 0, "index of the first frame to be processed");
 
 DEFINE_int32(finish_index, 0, "index of the last frame to be processed");
 
-static void displayArgs(const int argc, char **argv) {
-  std::cout << "args\n";
-  for (int i = 0; i < argc; ++i) {
-    std::cout << i << " " << argv[i] << std::endl;
-  }
-  std::cout << std::endl;
-}
-
 bool setInputParameters(okvis::InputData *input) {
   input->videoFile = FLAGS_video_file;
   input->imageFolder = FLAGS_image_folder;
