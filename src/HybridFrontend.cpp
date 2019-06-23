@@ -122,55 +122,8 @@ bool HybridFrontend::dataAssociationAndInitialization(
                       "mixed frame types are not supported yet");
   }
 
-  if (FLAGS_feature_tracking_method == 1) {
-    // first frame? (did do addStates before, so 1 frame minimum in estimator)
-    if (estimator.numFrames() <= 1)
-      *asKeyframe = true;  // first frame needs to be keyframe
-
-    bool rotationOnly = false;
-
-    if (!isInitialized_) {
-      if (!rotationOnly) {
-        isInitialized_ = true;
-        LOG(INFO) << "Initialized!";
-      }
-    }
-
-    // keyframe decision, at the moment only landmarks that match with keyframe
-    // are initialised
-    *asKeyframe = *asKeyframe || doWeNeedANewKeyframe(estimator, framesInOut);
-
-    // match to last frame
-    TimerSwitchable matchToLastFrameTimer("2.4.2 matchToLastFrame");
-    switch (distortionType) {
-      case okvis::cameras::NCameraSystem::RadialTangential: {
-        matchToLastFrame<
-            VioFrameMatchingAlgorithm<okvis::cameras::PinholeCamera<
-                okvis::cameras::RadialTangentialDistortion> > >(
-            estimator, params, framesInOut->id(), false);
-        break;
-      }
-      case okvis::cameras::NCameraSystem::Equidistant: {
-        matchToLastFrame<
-            VioFrameMatchingAlgorithm<okvis::cameras::PinholeCamera<
-                okvis::cameras::EquidistantDistortion> > >(
-            estimator, params, framesInOut->id(), false);
-        break;
-      }
-      case okvis::cameras::NCameraSystem::RadialTangential8: {
-        matchToLastFrame<
-            VioFrameMatchingAlgorithm<okvis::cameras::PinholeCamera<
-                okvis::cameras::RadialTangentialDistortion8> > >(
-            estimator, params, framesInOut->id(), false);
-
-        break;
-      }
-      default:
-        OKVIS_THROW(Exception, "Unsupported distortion type.")
-        break;
-    }
-    matchToLastFrameTimer.stop();
-  } else if (FLAGS_feature_tracking_method == 0) {
+  if (FLAGS_feature_tracking_method == 0 ||
+      FLAGS_feature_tracking_method == 1) {
     // first frame? (did do addStates before, so 1 frame minimum in estimator)
     if (estimator.numFrames() > 1) {
       bool rotationOnly = false;
@@ -220,7 +173,6 @@ bool HybridFrontend::dataAssociationAndInitialization(
       *asKeyframe = true;  // first frame needs to be keyframe
     }
   } else {  // use ORB_VO
-
     // first frame? (did do addStates before, so 1 frame minimum in estimator)
     //  if (estimator.numFrames() <= 1)
     assert(*asKeyframe == true);  // first frame needs to be keyframe
@@ -472,30 +424,30 @@ int HybridFrontend::matchToLastFrame(
     cv::Size winSize(21, 21);
     const int LEVELS = 3;
     bool withDerivatives = true;
+
+    std::cout << "number of frames " << estimator.numFrames() << std::endl;
+    uint64_t lastFrameId = estimator.frameIdByAge(1);
+
+    if (estimator.numFrames() == 2) {
+      // build the previous pyramid
+      cv::Mat currentImage = estimator.multiFrame(lastFrameId)->getFrame(0);
+      cv::buildOpticalFlowPyramid(currentImage, mCurrentPyramid, winSize,
+                                  LEVELS - 1, withDerivatives);
+      TrailTracking_Start();
+      std::shared_ptr<okvis::MultiFrame> frameB =
+          estimator.multiFrame(lastFrameId);
+      const size_t camIdB = 0;
+      frameB->resetKeypoints(camIdB, mvKeyPoints);
+    }
+
     cv::Mat currentImage = estimator.multiFrame(currentFrameId)->getFrame(0);
     mPreviousPyramid = mCurrentPyramid;
-    mPreviousFrameId = mCurrentFrameId;
-    std::cout << "current frame id " << mCurrentFrameId << std::endl;
-    mCurrentFrameId = currentFrameId;
     mCurrentPyramid.clear();
     // build up the pyramid for KLT tracking
     // the pyramid often involves padding, even though image has no padding
-    int maxLevel = cv::buildOpticalFlowPyramid(
-        currentImage, mCurrentPyramid, winSize, LEVELS - 1, withDerivatives);
-    std::cout << "number of frames " << estimator.numFrames() << std::endl;
-    if (estimator.numFrames() < 2) {
-      TrailTracking_Start();
-      std::shared_ptr<okvis::MultiFrame> frameB =
-          estimator.multiFrame(currentFrameId);
-      const size_t camIdB = 0;
-      frameB->resetKeypoints(camIdB, mvKeyPoints);
+    cv::buildOpticalFlowPyramid(currentImage, mCurrentPyramid, winSize,
+                                LEVELS - 1, withDerivatives);
 
-      return 0;
-    }
-
-    uint64_t lastFrameId = estimator.frameIdByAge(1);
-    OKVIS_ASSERT_EQ(Exception, lastFrameId, mPreviousFrameId,
-                    "lastFrameId should equal to recorded in Frontend");
     for (size_t im = 0; im < params.nCameraSystem.numCameras(); ++im) {
       // match 2D-2D for initialization of new (mono-)correspondences
       matches2d2d =
@@ -519,6 +471,17 @@ int HybridFrontend::matchToLastFrame(
       std::shared_ptr<okvis::MultiFrame> frameB =
           estimator.multiFrame(currentFrameId);
       frameB->resetKeypoints(im, mvKeyPoints);
+
+      // TODO(jhuai):
+      // use a matching algorithm's triangulation engine and its interface to
+      // estimator and multiframes to add the landmark, the mappoint and its
+      // observations see the setBestMatch method of the
+      // VioFrameMatchingAlgorithm class matchingAlgorithm.doSetup(); for
+      // (size_t i = 0; i < vpairs.size(); ++i) {
+      //   matchingAlgorithm.setBestMatch(vpairs[i].indexA, i,
+      //   vpairs[i].distance);
+      // }
+
       UpdateEstimatorObservations(estimator, lastFrameId, currentFrameId, im,
                                   im);
     }
@@ -562,12 +525,7 @@ int HybridFrontend::matchToLastFrame(
       matchingAlgorithm.setFrames(lastFrameId, currentFrameId, im, im);
 
       // match 2D-2D for initialization of new (mono-)correspondences
-      if (1) {
-        matcher_->match<MATCHING_ALGORITHM>(matchingAlgorithm);
-      } else {
-        matchingAlgorithm.doSetup();
-        matchingAlgorithm.match();
-      }
+      matcher_->match<MATCHING_ALGORITHM>(matchingAlgorithm);
       matches2d2d = matchingAlgorithm.numMatches();
 
       retCtr += matches2d2d;
@@ -580,18 +538,15 @@ int HybridFrontend::matchToLastFrame(
           runRansac2d2d(estimator, params, currentFrameId, lastFrameId, false,
                         removeOutliers, &rotationOnly);
   } else {  // load saved tracking result by an external module
-
     std::shared_ptr<okvis::MultiFrame> frameB =
         estimator.multiFrame(currentFrameId);
 
     cv::Mat currentImage = frameB->getFrame(0);
     okvis::Time currentTime = frameB->timestamp();
 
-    mPreviousFrameId = mCurrentFrameId;
-    std::cout << "current frame id in frontend " << mCurrentFrameId
+    std::cout << "current frame id in frontend " << currentFrameId
               << " timestamp " << std::setprecision(12) << currentTime.toSec()
               << std::endl;
-    mCurrentFrameId = currentFrameId;
 
     std::cout << "number of frames used by estimator " << estimator.numFrames()
               << std::endl;
@@ -638,8 +593,6 @@ int HybridFrontend::matchToLastFrame(
     }
 
     uint64_t lastFrameId = estimator.frameIdByAge(1);
-    OKVIS_ASSERT_EQ(Exception, lastFrameId, mPreviousFrameId,
-                    "lastFrameId should equal to recorded in Frontend");
     for (size_t im = 0; im < params.nCameraSystem.numCameras(); ++im) {
       // match 2D-2D for initialization of new (mono-)correspondences
       matches2d2d = TrailTracking_Advance2(
@@ -1370,30 +1323,11 @@ void HybridFrontend::UpdateEstimatorObservations(
   std::shared_ptr<okvis::MultiFrame> frameB = estimator.multiFrame(mfIdB);
   for (auto it = mlTrailers.begin(); it != mlTrailers.end(); ++it) {
     if (it->uLandmarkId != 0) {
+      frameB->setLandmarkId(camIdB, it->uKeyPointIdx, it->uLandmarkId);
       estimator.addObservation<camera_geometry_t>(it->uLandmarkId, mfIdB,
                                                   camIdB, it->uKeyPointIdx);
     } else if (it->uTrackLength == 2) {
-      // two observations, we skip those for new features of an obs
       uint64_t lmId = okvis::IdProvider::instance().newId();
-      // TODO(jhuai): do triangulation
-      //            double sigmaR = 1e-3;
-      //            Eigen::Vector3d e1 =
-      //                backProject(Eigen::Vector3d(
-      //                    it->fInitPose.x, it->fInitPose.y,
-      //                    1)).normalized();
-      //            Eigen::Vector3d e2 =
-      //                  (T_AW.C()*T_BW.C().transpose()*
-      //                   obsDirections.back()).normalized();
-      //            okvis::kinematics::Transformation T_MW = T_BW;
-      //            Eigen::Vector3d p2 = T_AW.r() -
-      //                (T_AW.q() *
-      //                T_BW.q().conjugate())._transformVector(T_BW.r());
-      //            Eigen::Matrix<double,4,1> hP_A =
-      //                triangulateFastLocal(
-      //                    Eigen::Vector3d(0,0,0), // center of A in A
-      //                    coordinates e1, p2, // center of B in A
-      //                    coordinates e2, sigmaR, isValid, isParallel);
-
       Eigen::Matrix<double, 4, 1> hP_W;
       hP_W.setOnes();  // random initialization
       bool canBeInitialized = true;

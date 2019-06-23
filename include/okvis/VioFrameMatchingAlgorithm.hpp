@@ -226,11 +226,7 @@ class VioFrameMatchingAlgorithm : public okvis::MatchingAlgorithm {
     return brisk::Hamming::PopcntofXORed(descriptorA, descriptorB,
                                          3 /*48 / 16*/);
   }
-
- public:
-  virtual void match();
 };
-
 }  // namespace okvis
 
 #endif /* INCLUDE_OKVIS_VIOFRAMEMATCHINGALGORITHM_HPP_ */

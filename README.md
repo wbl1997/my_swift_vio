@@ -118,7 +118,7 @@ To prepare the workspace file structure,
 clean build and devel dirs under the workspace, 
 then build the project
 ```
-cd vins_ws/devel
+cd msckf2_ws/devel
 rm -rf ./*
 cd ../build
 rm -rf ./*
@@ -127,10 +127,10 @@ catkin_make --pkg vio_common msckf2
 
 ### Build msckf2 with QtCreator
 
-To begin with, open qtcreator, suppose vins_ws is the workspace dir,
+To begin with, open qtcreator, suppose msckf2_ws is the workspace dir,
 
 ```
-source vins_ws/devel/setup.zsh
+source msckf2_ws/devel/setup.zsh
 /opt/Qt/Tools/QtCreator/bin/qtcreator
 ```
 
@@ -143,10 +143,10 @@ source /opt/ros/kinetic/setup.zsh
 /opt/Qt/Tools/QtCreator/bin/qtcreator
 ```
 
-Then, open vins_ws/src/msckf2/CMakeLists.txt in QtCreator,
-uncomment SET(CATKIN_DEVEL_PREFIX /persist/vins_ws/devel) in CMakeLists.txt
+Then, open msckf2_ws/src/msckf2/CMakeLists.txt in QtCreator,
+uncomment SET(CATKIN_DEVEL_PREFIX /persist/msckf2_ws/devel) in CMakeLists.txt
 
-For the first time, configure the DEFAULT output path for the project in QtCreator as vins_ws/build/msckf2. 
+For the first time, configure the DEFAULT output path for the project in QtCreator as msckf2_ws/build/msckf2. 
 QtCreator may not find cmake files for libraries like roscpp, 
 set the path like /opt/ros/kinetic/share/roscpp/cmake. Doing similar changes for other not found ros libraries.
 
@@ -156,20 +156,23 @@ To start debugging, add commandline arguments in the Run option panel, then pres
 
 Example running cases
 
-Reading measurements from a video and an IMU csv file
+#### Reading measurements from a video and an IMU csv file
 ```
-vins_ws/devel/lib/msckf2/msckf2_node $HOME/docker_documents/vins_ws/src/msckf2/config/config_parkinglot_jisun_s6.yaml \
+msckf2_ws/devel/lib/msckf2/msckf2_node $HOME/docker_documents/msckf2_ws/src/msckf2/config/config_parkinglot_jisun_s6.yaml \
   --output_dir=/media/$USER/Seagate/temp/parkinglot/ --use_AIDP=true \
   --video_file="/media/$USER/Seagate/data/west_campus_parking_lot/Jisun/20151111_120342.mp4" \
   --imu_file="/media/$USER/Seagate/data/west_campus_parking_lot/Jisun/mystream_11_11_12_3_13.csv" \
   --start_index=18800 \
   --finish_index=28900 \
-  --max_inc_tol=10.0
+  --max_inc_tol=10.0 \
+  --dump_output_option=0 \ 
+  --feature_tracking_method=1
+
 # 16500, 22500
 ```
 The running program will exit once the sequence finishes.
 
-Measurements from rostopics
+#### Measurements from rostopics
 
 1. Download a dataset of your choice from 
    http://projects.asl.ethz.ch/datasets/doku.php?id=kmavvisualinertialdatasets. 
@@ -180,12 +183,12 @@ Measurements from rostopics
 2. Run the node
 
 ```
-rosrun msckf2 msckf2_node $HOME/docker_documents/vins_ws/src/msckf2/config/config_fpga_p2_euroc_dissertation.yaml --load_input_option=0 \
+rosrun msckf2 msckf2_node $HOME/docker_documents/msckf2_ws/src/msckf2/config/config_fpga_p2_euroc_dissertation.yaml --load_input_option=0 \
   --output_dir=$HOME/Desktop/temp  --use_AIDP=true
 # use start to skip the static segment
 rosbag play --pause --start=45.0 --rate=1.0 /media/$USER/Seagate/data/euroc/MH_01_easy.bag /cam0/image_raw:=/camera0 /imu0:=/imu
 
-rosrun rviz rviz -d $HOME/docker_documents/vins_ws/src/msckf2/config/rviz.rviz
+rosrun rviz rviz -d $HOME/docker_documents/msckf2_ws/src/msckf2/config/rviz.rviz
 ```
 In this case, the program will exit once the Ctrl+C is entered in the terminal that runs the msckf2_node. Note the program will not exit if Ctrl+C is entered in the terminal of roscore.
 

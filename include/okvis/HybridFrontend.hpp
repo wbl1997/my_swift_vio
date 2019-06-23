@@ -531,8 +531,16 @@ class HybridFrontend {
 #endif
       uint64_t mfIdA, uint64_t mfIdB, size_t camIdA, size_t camIdB);
 
+  void UpdateEstimatorObservations(
+#ifdef USE_MSCKF2
+      okvis::MSCKF2& estimator,
+#else
+      okvis::HybridFilter& estimator,
+#endif
+      uint64_t mfIdA, uint64_t mfIdB, size_t camIdA, size_t camIdB);
+
   /**
-   * @brief TrailTracking_Advance2
+   * @brief TrailTracking_Advance2 works with external feature associations
    * @param keypoints
    * @param mapPointIds
    * @param mapPointPositions
@@ -545,15 +553,15 @@ class HybridFrontend {
       const std::vector<Eigen::Vector3d>& mapPointPositions, uint64_t mfIdB,
       const cv::Mat currentImage);
 
-  void UpdateEstimatorObservations(
-#ifdef USE_MSCKF2
-      okvis::MSCKF2& estimator,
-#else
-      okvis::HybridFilter& estimator,
-#endif
-      uint64_t mfIdA, uint64_t mfIdB, size_t camIdA, size_t camIdB);
-
-  // works for orb_vo
+  /**
+   * @brief UpdateEstimatorObservations2 works with external feature
+   * associations
+   * @param estimator
+   * @param mfIdA
+   * @param mfIdB
+   * @param camIdA
+   * @param camIdB
+   */
   void UpdateEstimatorObservations2(
 #ifdef USE_MSCKF2
       okvis::MSCKF2& estimator,
@@ -564,7 +572,6 @@ class HybridFrontend {
 
   std::list<Trailer> mlTrailers;  // reference to lTrailers in map
   std::vector<cv::Mat> mCurrentPyramid, mPreviousPyramid;
-  uint64_t mPreviousFrameId, mCurrentFrameId;
   size_t mMaxFeaturesInFrame, mMinFeaturesInFrame;
   size_t mFrameCounter;  // how many frames have been processed by the frontend
   cv::Mat mMask;  // mask used to protect existing features during initializing
@@ -576,7 +583,8 @@ class HybridFrontend {
   TrackResultReader* pTracker;
   // an accumulator for number of features distribution
   // TODO(jhuai): for now only implemented for features tracked by an external
-  // module, ORB-VO, for KLT and OKVIS feature tracking to be implemented
+  // module, ORB-VO. The accumulator for KLT and OKVIS feature tracking  is to
+  // be implemented
   MyAccumulator myAccumulator;
 };
 
