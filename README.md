@@ -183,7 +183,7 @@ The running program will exit once the sequence finishes.
 2. Run the node
 
 ```
-rosrun msckf2 msckf2_node $HOME/docker_documents/msckf2_ws/src/msckf2/config/config_fpga_p2_euroc_dissertation.yaml --load_input_option=0 \
+rosrun msckf2 msckf2_node $HOME/docker_documents/msckf2_ws/src/msckf2/config/config_fpga_p2_euroc_dissertation.yaml --dump_output_option=0 --load_input_option=0 \
   --output_dir=$HOME/Desktop/temp  --use_AIDP=true
 # use start to skip the static segment
 rosbag play --pause --start=45.0 --rate=1.0 /media/$USER/Seagate/data/euroc/MH_01_easy.bag /cam0/image_raw:=/camera0 /imu0:=/imu

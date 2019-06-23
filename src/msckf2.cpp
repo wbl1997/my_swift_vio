@@ -1060,7 +1060,8 @@ bool MSCKF2::computeHoi(const uint64_t hpbid, const MapPoint &mp,
     computeHTimer.start();
 
     // all observations for this feature point
-    std::vector<Eigen::Vector2d> obsInPixel;
+    std::vector<Eigen::Vector2d, Eigen::aligned_allocator<Eigen::Vector2d>>
+        obsInPixel;
     // id of frames observing this feature point
     std::vector<uint64_t> frameIds;
     // std noise in pixels
@@ -1151,9 +1152,16 @@ bool MSCKF2::computeHoi(const uint64_t hpbid, const MapPoint &mp,
     ImuMeasurement interpolatedInertialData;
 
     // containers of the above Jacobians for all observations of a mappoint
-    std::vector<Eigen::Matrix<double, 2, Eigen::Dynamic> > vJ_X;
-    std::vector<Eigen::Matrix<double, 2, 3> > vJ_pfi;
-    std::vector<Eigen::Matrix<double, 2, 1> > vri;  // residuals for feature i
+    std::vector<
+        Eigen::Matrix<double, 2, Eigen::Dynamic>,
+        Eigen::aligned_allocator<Eigen::Matrix<double, 2, Eigen::Dynamic>>>
+        vJ_X;
+    std::vector<Eigen::Matrix<double, 2, 3>,
+                Eigen::aligned_allocator<Eigen::Matrix<double, 2, 3>>>
+        vJ_pfi;
+    std::vector<Eigen::Matrix<double, 2, 1>,
+                Eigen::aligned_allocator<Eigen::Matrix<double, 2, 1>>>
+        vri;  // residuals for feature i
 
     size_t numPoses = frameIds.size();
     size_t numValidObs = 0;
@@ -1375,7 +1383,8 @@ bool MSCKF2::computeHoi(const uint64_t hpbid, const MapPoint &mp,
     computeHTimer.start();
 
     // gather all observations for this feature point
-    std::vector<Eigen::Vector2d> obsInPixel;
+    std::vector<Eigen::Vector2d, Eigen::aligned_allocator<Eigen::Vector2d>>
+        obsInPixel;
     std::vector<uint64_t> frameIds;
     std::vector<double> vRi;  // std noise in pixels
     Eigen::Vector4d v4Xhomog;
@@ -1416,13 +1425,23 @@ bool MSCKF2::computeHoi(const uint64_t hpbid, const MapPoint &mp,
     ImuMeasurement interpolatedInertialData;
 
     // containers of the above Jacobians for all observations of a mappoint
-    std::vector<Eigen::Matrix<
-        double, 2,
-        9 + cameras::RadialTangentialDistortion::NumDistortionIntrinsics> >
+    std::vector<
+        Eigen::Matrix<
+            double, 2,
+            9 + cameras::RadialTangentialDistortion::NumDistortionIntrinsics>,
+        Eigen::aligned_allocator<Eigen::Matrix<
+            double, 2,
+            9 + cameras::RadialTangentialDistortion::NumDistortionIntrinsics>>>
         vJ_Xc;
-    std::vector<Eigen::Matrix<double, 2, 9> > vJ_XBj;
-    std::vector<Eigen::Matrix<double, 2, 3> > vJ_pfi;
-    std::vector<Eigen::Matrix<double, 2, 1> > vri;  // residuals for feature i
+    std::vector<Eigen::Matrix<double, 2, 9>,
+                Eigen::aligned_allocator<Eigen::Matrix<double, 2, 9>>>
+        vJ_XBj;
+    std::vector<Eigen::Matrix<double, 2, 3>,
+                Eigen::aligned_allocator<Eigen::Matrix<double, 2, 3>>>
+        vJ_pfi;
+    std::vector<Eigen::Matrix<double, 2, 1>,
+                Eigen::aligned_allocator<Eigen::Matrix<double, 2, 1>>>
+        vri;  // residuals for feature i
 
     size_t numPoses = frameIds.size();
     size_t numValidObs = 0;
@@ -1790,9 +1809,9 @@ void MSCKF2::updateStates(
 void MSCKF2::optimize(bool verbose) {
   optimizeTimer.start();
   // containers of Jacobians of measurements
-  std::vector<Eigen::MatrixXd> vr_o;
-  std::vector<Eigen::MatrixXd> vH_o;
-  std::vector<Eigen::MatrixXd> vR_o;
+  std::vector<Eigen::MatrixXd, Eigen::aligned_allocator<Eigen::MatrixXd>> vr_o;
+  std::vector<Eigen::MatrixXd, Eigen::aligned_allocator<Eigen::MatrixXd>> vH_o;
+  std::vector<Eigen::MatrixXd, Eigen::aligned_allocator<Eigen::MatrixXd>> vR_o;
   // gather tracks of features that are not tracked in current frame
   uint64_t currFrameId = currentFrameId();
 
@@ -2045,7 +2064,8 @@ void MSCKF2::optimize(bool verbose) {
       // update coordinates of map points, this is only necessary when
       // (1) they are used to predict the points projection in new frames OR
       // (2) to visualize the point quality
-      std::vector<Eigen::Vector2d> obsInPixel;
+      std::vector<Eigen::Vector2d, Eigen::aligned_allocator<Eigen::Vector2d>>
+          obsInPixel;
       std::vector<uint64_t> frameIds;
       std::vector<double> vRi;  // std noise in pixels
       Eigen::Vector4d v4Xhomog;
@@ -2079,9 +2099,9 @@ void MSCKF2::optimize(bool verbose) {
 void MSCKF2::optimize(bool verbose) {
   optimizeTimer.start();
   // containers of Jacobians of measurements
-  std::vector<Eigen::MatrixXd> vr_o;
-  std::vector<Eigen::MatrixXd> vH_o;
-  std::vector<Eigen::MatrixXd> vR_o;
+  std::vector<Eigen::MatrixXd, Eigen::aligned_allocator<Eigen::MatrixXd>> vr_o;
+  std::vector<Eigen::MatrixXd, Eigen::aligned_allocator<Eigen::MatrixXd>> vH_o;
+  std::vector<Eigen::MatrixXd, Eigen::aligned_allocator<Eigen::MatrixXd>> vR_o;
   // gather tracks of features that are not tracked in current frame
   uint64_t currFrameId = currentFrameId();
 
@@ -2293,7 +2313,8 @@ void MSCKF2::optimize(bool verbose) {
       // update coordinates of map points, this is only necessary when
       // (1) they are used to predict the points projection in new frames OR
       // (2) to visualize the point quality
-      std::vector<Eigen::Vector2d> obsInPixel;
+      std::vector<Eigen::Vector2d, Eigen::aligned_allocator<Eigen::Vector2d>>
+          obsInPixel;
       std::vector<uint64_t> frameIds;
       std::vector<double> vRi;  // std noise in pixels
       Eigen::Vector4d v4Xhomog;

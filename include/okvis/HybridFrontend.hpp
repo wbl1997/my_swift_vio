@@ -10,7 +10,7 @@
 #include <okvis/DenseMatcher.hpp>
 #include <okvis/timing/Timer.hpp>
 
-#include <okvis/TrackResultReader.h>
+#include <feature_tracker/trail_manager.h>
 
 #include <boost/accumulators/accumulators.hpp>
 #include <boost/accumulators/statistics/density.hpp>
@@ -18,90 +18,6 @@
 
 /// \brief okvis Main namespace of this package.
 namespace okvis {
-
-typedef boost::accumulators::accumulator_set<
-    double, boost::accumulators::features<boost::accumulators::tag::count,
-                                          boost::accumulators::tag::density>>
-    MyAccumulator;
-typedef boost::iterator_range<std::vector<std::pair<double, double>>::iterator>
-    histogram_type;
-
-struct Trailer {
-  Trailer(cv::Point2f fInitP, cv::Point2f fCurrP, uint64_t lmId, size_t kpIdx)
-      : uLandmarkId(lmId),
-        fInitPose(fInitP),
-        fCurrPose(fCurrP),
-        uKeyPointIdx(kpIdx),
-        uOldKeyPointIdx(1e6),
-        uTrackLength(1),
-        uCurrentFrameId(0) {}
-
-  Trailer(cv::Point2f fInitP, cv::Point2f fCurrP, uint64_t lmId, size_t kpIdx,
-          size_t externalLmId)
-      : uLandmarkId(lmId),
-        fInitPose(fInitP),
-        fCurrPose(fCurrP),
-        uKeyPointIdx(kpIdx),
-        uOldKeyPointIdx(1e6),
-        uTrackLength(1),
-        uExternalLmId(externalLmId),
-        uCurrentFrameId(0) {}
-
-  // the copy constructor and assignment operator are only used for copying
-  // trailers into a vector,so do not increase their uID
-  Trailer(const Trailer& b)
-      : uLandmarkId(b.uLandmarkId),
-        fInitPose(b.fInitPose),
-        fCurrPose(b.fCurrPose),
-        uKeyPointIdx(b.uKeyPointIdx),
-        uOldKeyPointIdx(b.uOldKeyPointIdx),
-        uTrackLength(b.uTrackLength),
-        p_W(b.p_W),
-        uExternalLmId(b.uExternalLmId),
-        uCurrentFrameId(b.uCurrentFrameId) {}
-  Trailer& operator=(const Trailer& b) {
-    if (this != &b) {
-      uLandmarkId = b.uLandmarkId;
-      fInitPose = b.fInitPose;
-      fCurrPose = b.fCurrPose;
-      uKeyPointIdx = b.uKeyPointIdx;
-      uOldKeyPointIdx = b.uOldKeyPointIdx;
-      uTrackLength = b.uTrackLength;
-      p_W = b.p_W;
-      uExternalLmId = b.uExternalLmId;
-      uCurrentFrameId = b.uCurrentFrameId;
-    }
-    return *this;
-  }
-  ~Trailer() {}
-
- public:
-  uint64_t uLandmarkId;  // There are two cases a Trail is created. (1) some
-                         // MapPoints have projection on the current frame,
-  // they initialize some trails with pointer to these MapPoints, and push back
-  // to mlTrailers, (2) when there are inadequate tracked points in current
-  // frame, this frame is added as a KeyFrame. Some points are detected from it,
-  // and added to mlTrailers as starting trailers. when another keyframe is
-  // reached, these trailers with null pHingeMP will create a MapPoint.
-  // Therefore, the new MapPoint exists between the last KeyFrame and the new
-  // KeyFrame
-  cv::Point2f fInitPose;  // initial position of the trail in srcKF, which is
-                          // also pHingeMP->pSourceKeyFrame
-  cv::Point2f fCurrPose;  // current position of the trail in current frame, to
-                          // store the predicted position
-  // by MapPoint or rotation compensation and the tracked position by KLT
-  size_t
-      uKeyPointIdx;  // id of the key point in the features of the current frame
-  size_t
-      uOldKeyPointIdx;   // intermediate variable, initialized when used, id of
-                         // the key point in the features of the previous frame
-  size_t uTrackLength;   // how many times the features is tracked, start from 1
-                         // for first observation
-  Eigen::Vector3d p_W;   // an dummy variable position of the point in the world
-                         // frame only for visualization
-  size_t uExternalLmId;  // landmark id used by an external program e.g. orb_vo
-  uint64_t uCurrentFrameId;
-};
 
 /**
  * @brief A frontend using BRISK features
@@ -383,6 +299,7 @@ class HybridFrontend {
    */
   float keyframeInsertionMatchingRatioThreshold_;  // 0.2
 
+  feature_tracker::TrailManager trailManager_;
   /**
    * @brief Decision whether a new frame should be keyframe or not.
    * @param estimator     const reference to the estimator.
@@ -518,74 +435,6 @@ class HybridFrontend {
   /// (re)instantiates feature detectors and descriptor extractors. Used after
   /// settings changed or at startup.
   void initialiseBriskFeatureDetectors();
-
-  /// for KLT tracking
-  bool TrailTracking_Start();
-  int TrailTracking_DetectAndInsert(const cv::Mat& currentFrame, int nInliers,
-                                    std::vector<cv::KeyPoint>&);
-  int TrailTracking_Advance(
-#ifdef USE_MSCKF2
-      okvis::MSCKF2& estimator,
-#else
-      okvis::HybridFilter& estimator,
-#endif
-      uint64_t mfIdA, uint64_t mfIdB, size_t camIdA, size_t camIdB);
-
-  void UpdateEstimatorObservations(
-#ifdef USE_MSCKF2
-      okvis::MSCKF2& estimator,
-#else
-      okvis::HybridFilter& estimator,
-#endif
-      uint64_t mfIdA, uint64_t mfIdB, size_t camIdA, size_t camIdB);
-
-  /**
-   * @brief TrailTracking_Advance2 works with external feature associations
-   * @param keypoints
-   * @param mapPointIds
-   * @param mapPointPositions
-   * @param currentImage
-   * @return
-   */
-  int TrailTracking_Advance2(
-      const std::vector<cv::KeyPoint>& keypoints,
-      const std::vector<size_t>& mapPointIds,
-      const std::vector<Eigen::Vector3d>& mapPointPositions, uint64_t mfIdB,
-      const cv::Mat currentImage);
-
-  /**
-   * @brief UpdateEstimatorObservations2 works with external feature
-   * associations
-   * @param estimator
-   * @param mfIdA
-   * @param mfIdB
-   * @param camIdA
-   * @param camIdB
-   */
-  void UpdateEstimatorObservations2(
-#ifdef USE_MSCKF2
-      okvis::MSCKF2& estimator,
-#else
-      okvis::HybridFilter& estimator,
-#endif
-      uint64_t mfIdA, uint64_t mfIdB, size_t camIdA, size_t camIdB);
-
-  std::list<Trailer> mlTrailers;  // reference to lTrailers in map
-  std::vector<cv::Mat> mCurrentPyramid, mPreviousPyramid;
-  size_t mMaxFeaturesInFrame, mMinFeaturesInFrame;
-  size_t mFrameCounter;  // how many frames have been processed by the frontend
-  cv::Mat mMask;  // mask used to protect existing features during initializing
-                  // features
-  //  size_t mTrackedPoints; // number of well tracked points in the current
-  //  frame
-  std::vector<cv::KeyPoint> mvKeyPoints;  // key points in the current frame
-
-  TrackResultReader* pTracker;
-  // an accumulator for number of features distribution
-  // TODO(jhuai): for now only implemented for features tracked by an external
-  // module, ORB-VO. The accumulator for KLT and OKVIS feature tracking  is to
-  // be implemented
-  MyAccumulator myAccumulator;
 };
 
 }  // namespace okvis

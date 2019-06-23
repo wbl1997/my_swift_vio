@@ -694,7 +694,9 @@ bool HybridFilter::applyMarginalizationStrategy() {
   Eigen::Matrix<double, 3, Eigen::Dynamic> reparamJacobian(
       3,
       covDim_);  // Jacobians of feature reparameterization due to anchor change
-  std::vector<Eigen::Matrix<double, 3, Eigen::Dynamic>>
+  std::vector<
+      Eigen::Matrix<double, 3, Eigen::Dynamic>,
+      Eigen::aligned_allocator<Eigen::Matrix<double, 3, Eigen::Dynamic>>>
       vJacobian;  // container of these reparameterizing Jacobians
   std::vector<size_t> vCovPtId;  // id in covariance of point features to be
                                  // reparameterized, 0 based
@@ -1361,7 +1363,7 @@ bool HybridFilter::computeHoi(const uint64_t hpbid, const MapPoint& mp,
                               Eigen::Matrix<double, Eigen::Dynamic, 3>* pH_fi) {
   computeHTimer.start();
 
-  std::vector<Eigen::Vector2d>
+  std::vector<Eigen::Vector2d, Eigen::aligned_allocator<Eigen::Vector2d>>
       obsInPixel;                  // all observations for this feature point
   std::vector<uint64_t> frameIds;  // id of frames observing this feature point
   std::vector<double> vRi;         // std noise in pixels
@@ -1458,9 +1460,16 @@ bool HybridFilter::computeHoi(const uint64_t hpbid, const MapPoint& mp,
   ImuMeasurement interpolatedInertialData;
 
   // containers of the above Jacobians for all observations of a mappoint
-  std::vector<Eigen::Matrix<double, 2, Eigen::Dynamic>> vJ_X;
-  std::vector<Eigen::Matrix<double, 2, 3>> vJ_pfi;
-  std::vector<Eigen::Matrix<double, 2, 1>> vri;  // residuals for feature i
+  std::vector<
+      Eigen::Matrix<double, 2, Eigen::Dynamic>,
+      Eigen::aligned_allocator<Eigen::Matrix<double, 2, Eigen::Dynamic>>>
+      vJ_X;
+  std::vector<Eigen::Matrix<double, 2, 3>,
+              Eigen::aligned_allocator<Eigen::Matrix<double, 2, 3>>>
+      vJ_pfi;
+  std::vector<Eigen::Matrix<double, 2, 1>,
+              Eigen::aligned_allocator<Eigen::Matrix<double, 2, 1>>>
+      vri;  // residuals for feature i
 
   size_t numPoses = frameIds.size();
   size_t numValidObs = 0;
@@ -1898,18 +1907,28 @@ void HybridFilter::optimize(size_t /*numIter*/, size_t /*numThreads*/,
 void HybridFilter::optimize(bool verbose) {
   optimizeTimer.start();
   // containers of Jacobians of measurements of marginalized features
-  std::vector<Eigen::Matrix<double, Eigen::Dynamic, 1>> vr_o;
-  std::vector<Eigen::MatrixXd>
+  std::vector<
+      Eigen::Matrix<double, Eigen::Dynamic, 1>,
+      Eigen::aligned_allocator<Eigen::Matrix<double, Eigen::Dynamic, 1>>>
+      vr_o;
+  std::vector<Eigen::MatrixXd, Eigen::aligned_allocator<Eigen::MatrixXd>>
       vH_o;  // each entry (2n-3)x(13+9m), n, number of observations, m, states
              // in the sliding window
-  std::vector<Eigen::MatrixXd> vR_o;  // each entry (2n-3)x(2n-3)
+  std::vector<Eigen::MatrixXd, Eigen::aligned_allocator<Eigen::MatrixXd>>
+      vR_o;  // each entry (2n-3)x(2n-3)
   // containers of Jacobians of measurements of points in the states
-  std::vector<Eigen::Vector2d> vr_i;
-  std::vector<Eigen::Matrix<double, 2, Eigen::Dynamic>>
+  std::vector<Eigen::Vector2d, Eigen::aligned_allocator<Eigen::Vector2d>> vr_i;
+  std::vector<
+      Eigen::Matrix<double, 2, Eigen::Dynamic>,
+      Eigen::aligned_allocator<Eigen::Matrix<double, 2, Eigen::Dynamic>>>
       vH_x;  // each entry 2x(42+13+ 9m)
-  std::vector<Eigen::Matrix<double, 2, Eigen::Dynamic>>
+  std::vector<
+      Eigen::Matrix<double, 2, Eigen::Dynamic>,
+      Eigen::aligned_allocator<Eigen::Matrix<double, 2, Eigen::Dynamic>>>
       vH_f;  // each entry 2x(3s_k)
-  std::vector<Eigen::Matrix2d> vR_i;
+  std::vector<Eigen::Matrix2d,
+              Eigen::aligned_allocator<Eigen::Matrix<double, 2, 2>>>
+      vR_i;
 
   const uint64_t currFrameId = currentFrameId();
 
@@ -2180,11 +2199,24 @@ void HybridFilter::optimize(bool verbose) {
     Eigen::MatrixXd H_o;
     Eigen::MatrixXd R_o;
 
-    std::vector<Eigen::Matrix<double, Eigen::Dynamic, 1>> vz_1;
-    std::vector<Eigen::Matrix<double, Eigen::Dynamic, 1>> vz_o;
-    std::vector<Eigen::Matrix<double, 3, Eigen::Dynamic>> vH_1;
-    std::vector<Eigen::Matrix<double, 3, 3>> vH_2;
-    std::vector<Eigen::Matrix<double, 3, 3>> vR_1;
+    std::vector<
+        Eigen::Matrix<double, Eigen::Dynamic, 1>,
+        Eigen::aligned_allocator<Eigen::Matrix<double, Eigen::Dynamic, 1>>>
+        vz_1;
+    std::vector<
+        Eigen::Matrix<double, Eigen::Dynamic, 1>,
+        Eigen::aligned_allocator<Eigen::Matrix<double, Eigen::Dynamic, 1>>>
+        vz_o;
+    std::vector<
+        Eigen::Matrix<double, 3, Eigen::Dynamic>,
+        Eigen::aligned_allocator<Eigen::Matrix<double, 3, Eigen::Dynamic>>>
+        vH_1;
+    std::vector<Eigen::Matrix<double, 3, 3>,
+                Eigen::aligned_allocator<Eigen::Matrix<double, 3, 3>>>
+        vH_2;
+    std::vector<Eigen::Matrix<double, 3, 3>,
+                Eigen::aligned_allocator<Eigen::Matrix<double, 3, 3>>>
+        vR_1;
     vH_o.clear();
     vR_o.clear();
 
@@ -2419,7 +2451,7 @@ void HybridFilter::optimize(bool verbose) {
 #if 0
             //only do the following when observation size is greater than 2
             //Superfluous: Update coordinates of landmarks tracked in the current frame but are not in the states
-            std::vector<Eigen::Vector2d > obsInPixel;
+            std::vector<Eigen::Vector2d, Eigen::aligned_allocator<Eigen::Vector2d> > obsInPixel;
             std::vector<uint64_t> frameIds;
             std::vector<double> vRi; //std noise in pixels
             Eigen::Vector4d v4Xhomog;
@@ -2717,9 +2749,11 @@ void HybridFilter::gatherPoseObservForTriang(
         cameraGeometry,
     std::vector<uint64_t>* frameIds,
     std::vector<okvis::kinematics::Transformation>* T_WSs,
-    std::vector<Eigen::Vector3d>* obsDirections,
-    std::vector<Eigen::Vector2d>* obsInPixel, std::vector<double>* vR_oi,
-    const uint64_t& hpbid) const {
+    std::vector<Eigen::Vector3d, Eigen::aligned_allocator<Eigen::Vector3d>>*
+        obsDirections,
+    std::vector<Eigen::Vector2d, Eigen::aligned_allocator<Eigen::Vector2d>>*
+        obsInPixel,
+    std::vector<double>* vR_oi, const uint64_t& hpbid) const {
   frameIds->clear();
   T_WSs->clear();
   obsDirections->clear();
@@ -2779,7 +2813,9 @@ void HybridFilter::gatherPoseObservForTriang(
 }
 
 bool HybridFilter::triangulateAMapPoint(
-    const MapPoint& mp, std::vector<Eigen::Vector2d>& obsInPixel,
+    const MapPoint& mp,
+    std::vector<Eigen::Vector2d, Eigen::aligned_allocator<Eigen::Vector2d>>&
+        obsInPixel,
     std::vector<uint64_t>& frameIds, Eigen::Vector4d& v4Xhomog,
     std::vector<double>& vR_oi,
     const cameras::PinholeCamera<cameras::RadialTangentialDistortion>&
@@ -2790,9 +2826,10 @@ bool HybridFilter::triangulateAMapPoint(
 
   // each entry is undistorted coordinates in image plane at
   // z=1 in the specific camera frame, [\bar{x},\bar{y},1]
-  std::vector<Eigen::Vector3d> obsDirections;
+  std::vector<Eigen::Vector3d, Eigen::aligned_allocator<Eigen::Vector3d>>
+      obsDirections;
   // the SE3 transform from world to camera frame
-  std::vector<Sophus::SE3d> T_CWs;
+  std::vector<Sophus::SE3d, Eigen::aligned_allocator<Sophus::SE3d>> T_CWs;
 
   std::vector<okvis::kinematics::Transformation> T_WSs;
   gatherPoseObservForTriang(mp, cameraGeometry, &frameIds, &T_WSs,

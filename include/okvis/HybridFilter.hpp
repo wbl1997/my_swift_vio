@@ -621,16 +621,16 @@ class HybridFilter : public VioBackendInterface {
 
   // parameters
   std::vector<okvis::ExtrinsicsEstimationParameters,
-              Eigen::aligned_allocator<okvis::ExtrinsicsEstimationParameters> >
+              Eigen::aligned_allocator<okvis::ExtrinsicsEstimationParameters>>
       extrinsicsEstimationParametersVec_;  ///< Extrinsics parameters.
   std::vector<okvis::ImuParameters,
-              Eigen::aligned_allocator<okvis::ImuParameters> >
+              Eigen::aligned_allocator<okvis::ImuParameters>>
       imuParametersVec_;  ///< IMU parameters.
 
   // loss function for reprojection errors
-  std::shared_ptr< ::ceres::LossFunction>
+  std::shared_ptr<::ceres::LossFunction>
       cauchyLossFunctionPtr_;  ///< Cauchy loss.
-  std::shared_ptr< ::ceres::LossFunction>
+  std::shared_ptr<::ceres::LossFunction>
       huberLossFunctionPtr_;  ///< Huber loss.
 
   // the marginalized error term
@@ -658,9 +658,11 @@ class HybridFilter : public VioBackendInterface {
           &cameraGeometry,
       std::vector<uint64_t> *frameIds,
       std::vector<okvis::kinematics::Transformation> *T_WSs,
-      std::vector<Eigen::Vector3d> *obsDirections,
-      std::vector<Eigen::Vector2d> *obsInPixel, std::vector<double> *vR_oi,
-      const uint64_t &hpbid) const;
+      std::vector<Eigen::Vector3d, Eigen::aligned_allocator<Eigen::Vector3d>>
+          *obsDirections,
+      std::vector<Eigen::Vector2d, Eigen::aligned_allocator<Eigen::Vector2d>>
+          *obsInPixel,
+      std::vector<double> *vR_oi, const uint64_t &hpbid) const;
 
   /**
    * @brief triangulateAMapPoint, does not support rays which arise from static
@@ -679,7 +681,9 @@ class HybridFilter : public VioBackendInterface {
    * @return v4Xhomog
    */
   virtual bool triangulateAMapPoint(
-      const MapPoint &mp, std::vector<Eigen::Vector2d> &obsInPixel,
+      const MapPoint &mp,
+      std::vector<Eigen::Vector2d, Eigen::aligned_allocator<Eigen::Vector2d>>
+          &obsInPixel,
       std::vector<uint64_t> &frameIds, Eigen::Vector4d &v4Xhomog,
       std::vector<double> &vR_oi,
       const okvis::cameras::PinholeCamera<
@@ -831,7 +835,7 @@ class HybridFilter : public VioBackendInterface {
     InState_NotTrackedNow,
     InState_TrackedNow
   };
-  std::vector<std::pair<size_t, ResidualizeCase> >
+  std::vector<std::pair<size_t, ResidualizeCase>>
       mLandmarkID2Residualize;  // each landmark's case of residualize,
   // 0 means a point not in the states is not tracked in current frame,
   // 1 means a point not in states is tracked in current frame but not to be

@@ -57,7 +57,7 @@ void Player::Run() {
               << std::endl;
     return;
   }
-  while (mFG->grabFrame(frame, frameTime)) {
+  while (mFG->grabFrame(frame, frameTime) && frameTime > 0) {
     cv::Mat filtered;
     if (vioParameters_.optimization.useMedianFilter) {
       cv::medianBlur(frame, filtered, 3);

@@ -121,10 +121,13 @@ LIST(APPEND SOURCEFILES
     src/HybridFrameRelativeAdapter.cpp
     src/HybridFrameNoncentralAbsoluteAdapter.cpp
     src/ImuSimulator.cpp
-    src/TrackResultReader.cpp
+
     src/HybridFilter.cpp
     src/camerarig.cpp
     src/PoseViewer.cpp
+    src/feature_tracker/TrackResultReader.cpp
+    src/feature_tracker/trail_manager.cpp
+    src/feature_tracker/feature_trail.cpp
 
     include/okvis/Subscriber.hpp   
     include/okvis/Player.hpp

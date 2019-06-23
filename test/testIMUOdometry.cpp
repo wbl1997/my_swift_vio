@@ -132,8 +132,12 @@ struct CovPropConfig {
         pow(imuParams.sigma_gw_c, 2), pow(imuParams.sigma_gw_c, 2);
     return q_n_aw_babw;
   }
-  std::vector<Eigen::Matrix<double, 7, 1> > get_imu_measurement_vector() const {
-    std::vector<Eigen::Matrix<double, 7, 1> > measurements;
+  std::vector<Eigen::Matrix<double, 7, 1>,
+              Eigen::aligned_allocator<Eigen::Matrix<double, 7, 1>>>
+  get_imu_measurement_vector() const {
+    std::vector<Eigen::Matrix<double, 7, 1>,
+                Eigen::aligned_allocator<Eigen::Matrix<double, 7, 1>>>
+        measurements;
 
     Eigen::Matrix<double, 7, 1> meas;
     for (auto iter = imuMeasurements.begin(); iter != imuMeasurements.end();
@@ -527,8 +531,9 @@ TEST(IMUOdometry, IMUCovariancePropagation) {
   sb = cpc.get_sb0();
   double time_pair[2] = {cpc.get_meas_begin_time().toSec(),
                          cpc.get_meas_end_time().toSec()};
-  std::vector<Eigen::Matrix<double, 7, 1> > measurements =
-      cpc.get_imu_measurement_vector();
+  std::vector<Eigen::Matrix<double, 7, 1>,
+              Eigen::aligned_allocator<Eigen::Matrix<double, 7, 1>>>
+      measurements = cpc.get_imu_measurement_vector();
 
   Eigen::Matrix<double, 6, 1> gwomegaw;
   gwomegaw.setZero();

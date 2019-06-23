@@ -641,7 +641,9 @@ template <typename Scalar>
 void predictStates(
     const Sophus::SE3Group<Scalar>& T_sk_to_w,
     const Eigen::Matrix<Scalar, 9, 1>& speed_bias_k, const Scalar* time_pair,
-    const std::vector<Eigen::Matrix<Scalar, 7, 1> >& measurements,
+    const std::vector<Eigen::Matrix<Scalar, 7, 1>,
+                      Eigen::aligned_allocator<Eigen::Matrix<Scalar, 7, 1>>>&
+        measurements,
     const Eigen::Matrix<Scalar, 6, 1>& gwomegaw,
     const Eigen::Matrix<Scalar, 12, 1>& q_n_aw_babw,
     Sophus::SE3Group<Scalar>* pred_T_skp1_to_w,

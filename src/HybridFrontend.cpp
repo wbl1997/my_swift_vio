@@ -54,16 +54,13 @@ HybridFrontend::HybridFrontend(size_t numCameras, std::string orbTrackOutput)
           std::unique_ptr<okvis::DenseMatcher>(new okvis::DenseMatcher(4))),
       keyframeInsertionOverlapThreshold_(0.6),
       keyframeInsertionMatchingRatioThreshold_(0.2),
-      myAccumulator(boost::accumulators::tag::density::num_bins = 20,
-                    boost::accumulators::tag::density::cache_size = 40) {
+      trailManager_(orbTrackOutput) {
   // create mutexes for feature detectors and descriptor extractors
   for (size_t i = 0; i < numCameras_; ++i) {
     featureDetectorMutexes_.push_back(
         std::unique_ptr<std::mutex>(new std::mutex()));
   }
   initialiseBriskFeatureDetectors();
-
-  pTracker = new TrackResultReader(orbTrackOutput);
 }
 
 // Detection and descriptor extraction on a per image basis.
@@ -431,27 +428,26 @@ int HybridFrontend::matchToLastFrame(
     if (estimator.numFrames() == 2) {
       // build the previous pyramid
       cv::Mat currentImage = estimator.multiFrame(lastFrameId)->getFrame(0);
-      cv::buildOpticalFlowPyramid(currentImage, mCurrentPyramid, winSize,
-                                  LEVELS - 1, withDerivatives);
-      TrailTracking_Start();
+      cv::buildOpticalFlowPyramid(currentImage, trailManager_.mCurrentPyramid,
+                                  winSize, LEVELS - 1, withDerivatives);
+      trailManager_.initialize();
       std::shared_ptr<okvis::MultiFrame> frameB =
           estimator.multiFrame(lastFrameId);
       const size_t camIdB = 0;
-      frameB->resetKeypoints(camIdB, mvKeyPoints);
+      frameB->resetKeypoints(camIdB, trailManager_.mvKeyPoints);
     }
 
     cv::Mat currentImage = estimator.multiFrame(currentFrameId)->getFrame(0);
-    mPreviousPyramid = mCurrentPyramid;
-    mCurrentPyramid.clear();
+    trailManager_.mPreviousPyramid = trailManager_.mCurrentPyramid;
+    trailManager_.mCurrentPyramid.clear();
     // build up the pyramid for KLT tracking
     // the pyramid often involves padding, even though image has no padding
-    cv::buildOpticalFlowPyramid(currentImage, mCurrentPyramid, winSize,
-                                LEVELS - 1, withDerivatives);
-
+    cv::buildOpticalFlowPyramid(currentImage, trailManager_.mCurrentPyramid,
+                                winSize, LEVELS - 1, withDerivatives);
     for (size_t im = 0; im < params.nCameraSystem.numCameras(); ++im) {
       // match 2D-2D for initialization of new (mono-)correspondences
       matches2d2d =
-          TrailTracking_Advance(estimator, lastFrameId, currentFrameId, im,
+          trailManager_.advance(estimator, lastFrameId, currentFrameId, im,
                                 im);  // update feature tracks
 
       retCtr += matches2d2d;
@@ -459,18 +455,20 @@ int HybridFrontend::matchToLastFrame(
       // are added by goodFeaturesToTrack(),
       // and, add this frame as keyframe, updates the tracker's current-frame
       // -KeyFrame struct with any measurements made.
-      if (matches2d2d < 0.5 * mMaxFeaturesInFrame ||
-          (mFrameCounter % 4 == 0 && matches2d2d < 0.6 * mMaxFeaturesInFrame)) {
+      if (matches2d2d < 0.5 * trailManager_.mMaxFeaturesInFrame ||
+          (trailManager_.mFrameCounter % 4 == 0 &&
+           matches2d2d < 0.6 * trailManager_.mMaxFeaturesInFrame)) {
         std::vector<cv::KeyPoint> vNewKPs;
-        TrailTracking_DetectAndInsert(currentImage, matches2d2d, vNewKPs);
-        mvKeyPoints.insert(mvKeyPoints.end(), vNewKPs.begin(), vNewKPs.end());
+        trailManager_.detectAndInsert(currentImage, matches2d2d, vNewKPs);
+        trailManager_.mvKeyPoints.insert(trailManager_.mvKeyPoints.end(),
+                                         vNewKPs.begin(), vNewKPs.end());
       }
 
       // create the feature list for the current frame based on
       // well tracked features
       std::shared_ptr<okvis::MultiFrame> frameB =
           estimator.multiFrame(currentFrameId);
-      frameB->resetKeypoints(im, mvKeyPoints);
+      frameB->resetKeypoints(im, trailManager_.mvKeyPoints);
 
       // TODO(jhuai):
       // use a matching algorithm's triangulation engine and its interface to
@@ -482,10 +480,10 @@ int HybridFrontend::matchToLastFrame(
       //   vpairs[i].distance);
       // }
 
-      UpdateEstimatorObservations(estimator, lastFrameId, currentFrameId, im,
-                                  im);
+      trailManager_.updateEstimatorObservations(estimator, lastFrameId,
+                                                currentFrameId, im, im);
     }
-    ++mFrameCounter;
+    ++trailManager_.mFrameCounter;
   } else if (FLAGS_feature_tracking_method == 0) {
     if (estimator.numFrames() < 2) {
       return 0;
@@ -557,35 +555,41 @@ int HybridFrontend::matchToLastFrame(
     std::vector<size_t> mapPointIds;
     // map point positions in the current image
     // if not empty should of the same length as keypoints
-    std::vector<Eigen::Vector3d> mapPointPositions;
+    std::vector<Eigen::Vector3d, Eigen::aligned_allocator<Eigen::Vector3d> >
+        mapPointPositions;
 
     // if mapPointIds == 0, it means non correspondence
-    pTracker->getNextFrame(currentTime.toSec(), keypoints, mapPointIds,
-                           mapPointPositions, currentFrameId);
+    trailManager_.pTracker->getNextFrame(currentTime.toSec(), keypoints,
+                                         mapPointIds, mapPointPositions,
+                                         currentFrameId);
     std::cout << "#kp, #mp " << keypoints.size() << " " << mapPointIds.size()
               << std::endl;
     if (mapPointIds.empty()) {
       return 0;
     }
-    if (!mapPointIds.empty() && mlTrailers.empty()) {
+    if (!mapPointIds.empty() && trailManager_.mFeatureTrailList.empty()) {
       // should be second keyframe in orb_vo
       // initialize for the first frame
       size_t nToAdd = 200;  // MaxInitialTrails
-      mMaxFeaturesInFrame = nToAdd;
+      trailManager_.mMaxFeaturesInFrame = nToAdd;
       size_t nToThrow = 100;  // MinInitialTrails
-      mMinFeaturesInFrame = nToThrow;
-      mFrameCounter = 0;
+      trailManager_.mMinFeaturesInFrame = nToThrow;
+      trailManager_.mFrameCounter = 0;
 
       for (size_t i = 0; i < keypoints.size(); i++) {
         if (mapPointIds[i] != 0) {
-          Trailer t(keypoints[i].pt, keypoints[i].pt, 0, i, mapPointIds[i]);
-          t.p_W = mapPointPositions[i];
+          feature_tracker::FeatureTrail t(keypoints[i].pt, keypoints[i].pt, 0,
+                                          i, mapPointIds[i]);
+          t.p_W.x = mapPointPositions[i][0];
+          t.p_W.y = mapPointPositions[i][1];
+          t.p_W.z = mapPointPositions[i][2];
           t.uCurrentFrameId = currentFrameId;
-          mlTrailers.push_back(t);
+          trailManager_.mFeatureTrailList.push_back(t);
         }
       }
       std::cout << "Initializing at frameid " << currentFrameId
-                << " with new trails " << mlTrailers.size() << std::endl;
+                << " with new trails " << trailManager_.mFeatureTrailList.size()
+                << std::endl;
 
       const size_t camIdB = 0;
       frameB->resetKeypoints(camIdB, keypoints);
@@ -595,16 +599,16 @@ int HybridFrontend::matchToLastFrame(
     uint64_t lastFrameId = estimator.frameIdByAge(1);
     for (size_t im = 0; im < params.nCameraSystem.numCameras(); ++im) {
       // match 2D-2D for initialization of new (mono-)correspondences
-      matches2d2d = TrailTracking_Advance2(
+      matches2d2d = trailManager_.advance2(
           keypoints, mapPointIds, mapPointPositions, currentFrameId,
           currentImage);  // update feature tracks
       retCtr += matches2d2d;
 
       frameB->resetKeypoints(im, keypoints);
-      UpdateEstimatorObservations2(estimator, lastFrameId, currentFrameId, im,
-                                   im);
+      trailManager_.updateEstimatorObservations2(estimator, lastFrameId,
+                                                 currentFrameId, im, im);
     }
-    ++mFrameCounter;
+    ++trailManager_.mFrameCounter;
   }
   std::cout << "matchToLastFrame matches3d2d, inliers3d2d, matches2d2d "
             << matches3d2d << " " << inliers3d2d << " " << matches2d2d
@@ -947,494 +951,8 @@ void HybridFrontend::initialiseBriskFeatureDetectors() {
   }
 }
 
-/**
- * The current frame is to be the first frame
- */
-bool HybridFrontend::TrailTracking_Start() {
-  // detect good features
-  std::vector<cv::Point2f> vfPoints;
-  size_t nToAdd = 200;  // MaxInitialTrails
-  mMaxFeaturesInFrame = nToAdd;
-  size_t nToThrow = 100;  // MinInitialTrails
-  mMinFeaturesInFrame = nToThrow;
-  mFrameCounter = 0;
-  int nSubPixWinWidth = 7;  // SubPixWinWidth
-  cv::Size subPixWinSize(nSubPixWinWidth, nSubPixWinWidth);
-
-  cv::TermCriteria termcrit(CV_TERMCRIT_ITER | CV_TERMCRIT_EPS, 10, 0.03);
-  cv::goodFeaturesToTrack(mCurrentPyramid[0], vfPoints, nToAdd, 0.01, 10,
-                          cv::Mat(), 3, false, 0.04);
-  cv::cornerSubPix(mCurrentPyramid[0], vfPoints, subPixWinSize,
-                   cv::Size(-1, -1), termcrit);
-  if (vfPoints.size() < nToThrow) {
-    OKVIS_ASSERT_GT(Exception, vfPoints.size(), nToThrow,
-                    "No. features in the first frame is too few");
-    return false;
-  }
-  mvKeyPoints.clear();
-  mvKeyPoints.reserve(mMaxFeaturesInFrame + 50);
-  mlTrailers.clear();
-  for (size_t i = 0; i < vfPoints.size(); i++) {
-    Trailer t(vfPoints[i], vfPoints[i], 0, i);
-    mlTrailers.push_back(t);
-    mvKeyPoints.push_back(cv::KeyPoint(vfPoints[i], 8.f));
-  }
-  std::cout << "create new points " << mvKeyPoints.size() << " at the start "
-            << std::endl;
-  return true;
-}
-
-/**
- * Steady-state trail tracking: Advance from the previous frame,
- * update mlTrailers, remove duds.
- * (1) track the points kept in mlTrailers which contains MapPoints in the
- * last few keyframes and points just detected from the last keyframe
- * since these points appear in the last frame which is stored, we can track
- * these points in the current frame by using KLT tracker
- * @return number of good trails
- */
-int HybridFrontend::TrailTracking_Advance(
-#ifdef USE_MSCKF2
-    okvis::MSCKF2& estimator,
-#else
-    okvis::HybridFilter& estimator,
-#endif
-    uint64_t mfIdA, uint64_t mfIdB, size_t camIdA, size_t camIdB) {
-  typedef okvis::cameras::PinholeCamera<
-      okvis::cameras::RadialTangentialDistortion>
-      CAMERA_GEOMETRY_T;
-  int nGoodTrails = 0;
-
-  // vfPoints[0-1] for forward searching,
-  // vfPoints[2-3] for backward searching
-  std::vector<cv::Point2f> vfPoints[3];
-  // status[0] forward searching indicator
-  // status[1] backward searching indicator
-  std::vector<uchar> status[2];
-  std::vector<float> err;
-
-  std::shared_ptr<okvis::MultiFrame> frameA = estimator.multiFrame(mfIdA);
-  std::shared_ptr<okvis::MultiFrame> frameB = estimator.multiFrame(mfIdB);
-
-  // calculate the relative transformations and uncertainties
-  // TODO(sleuten): donno, if and what we need here - I'll see
-
-  okvis::kinematics::Transformation T_CaCb;
-  okvis::kinematics::Transformation T_CbCa;
-  okvis::kinematics::Transformation T_SaCa;
-  okvis::kinematics::Transformation T_SbCb;
-  okvis::kinematics::Transformation T_WSa;
-  okvis::kinematics::Transformation T_WSb;
-  okvis::kinematics::Transformation T_SaW;
-  okvis::kinematics::Transformation T_SbW;
-  okvis::kinematics::Transformation T_WCa;
-  okvis::kinematics::Transformation T_WCb;
-  okvis::kinematics::Transformation T_CaW;
-  okvis::kinematics::Transformation T_CbW;
-
-  estimator.getCameraSensorStates(mfIdA, camIdA, T_SaCa);
-  estimator.getCameraSensorStates(mfIdB, camIdB, T_SbCb);
-  estimator.get_T_WS(mfIdA, T_WSa);
-  estimator.get_T_WS(mfIdB, T_WSb);
-  T_SaW = T_WSa.inverse();
-  T_SbW = T_WSb.inverse();
-  T_WCa = T_WSa * T_SaCa;
-  T_WCb = T_WSb * T_SbCb;
-  T_CaW = T_WCa.inverse();
-  T_CbW = T_WCb.inverse();
-  T_CaCb = T_WCa.inverse() * T_WCb;
-  T_CbCa = T_CaCb.inverse();
-
-  // assume frameA and frameB of the same size
-  float imageW = static_cast<float>(
-      frameA->geometryAs<CAMERA_GEOMETRY_T>(camIdA)->imageWidth());
-  float imageH = static_cast<float>(
-      frameA->geometryAs<CAMERA_GEOMETRY_T>(camIdA)->imageHeight());
-
-  size_t mMeasAttempted = 0;
-  vfPoints[0].reserve(mlTrailers.size());
-  vfPoints[1].reserve(mlTrailers.size());
-  for (std::list<Trailer>::const_iterator it = mlTrailers.begin();
-       it != mlTrailers.end(); ++it) {
-    // TODO(jhuai): predict point position with its world position when
-    // it->mLandmarkId is not 0.
-    // To implement it cf. VioFrameMatchingAlgorithm doSetup
-
-    // predict pose in the current pose by rotation compensation,
-    // assume the camera tranlates very small compared to the point depth
-    // if it's not projected successfully, we alias it to prevent it
-    // being tracked
-    //            Eigen::Vector2d kptA(it->fCurrPose.x, it->fCurrPose.y);
-    //            Eigen::Vector3d dirVecA;
-    //            if
-    //            (!frameA->geometryAs<CAMERA_GEOMETRY_T>(camIdA)->backProject(
-    //                kptA, &dirVecA)) {
-    //                // pose in last frame
-    //                vfPoints[0].push_back(cv::Point2f(-1,-1));
-    //                // preventing detect anything
-    //                vfPoints[1].push_back(cv::Point2f(-1,-1));
-    //                continue;
-    //            }
-    //            Eigen::Vector3d dirVecB = T_CbCa.C()*dirVecA;
-    //            Eigen::Vector2d kptB;
-    //            if(frameB->geometryAs<CAMERA_GEOMETRY_T>(camIdB)
-    //                ->project(dirVecB, &kptB) !=
-    //                okvis::cameras::CameraBase::
-    //                ProjectionStatus::Successful) {
-    //                // pose in last frame
-    //                vfPoints[0].push_back(cv::Point2f(-1,-1));
-    //                // preventing detect anything
-    //                vfPoints[1].push_back(cv::Point2f(-1,-1));
-    //                continue;
-    //            }
-
-    vfPoints[0].push_back(it->fCurrPose);  // point in previous frame
-    //            vfPoints[1].push_back(cv::Point2f((float)kptB[0],(float)kptB[1]));
-    vfPoints[1].push_back(it->fCurrPose);
-    ++mMeasAttempted;
-  }
-
-  int nWinWidth = 15;  // WinWidth
-  cv::Size winSize(nWinWidth, nWinWidth);
-  cv::TermCriteria termcrit(CV_TERMCRIT_ITER | CV_TERMCRIT_EPS, 10, 0.03);
-  cv::calcOpticalFlowPyrLK(mPreviousPyramid, mCurrentPyramid, vfPoints[0],
-                           vfPoints[1], status[0], err, winSize, 3, termcrit,
-                           cv::OPTFLOW_USE_INITIAL_FLOW, 0.001);
-  // what is returned for points failed to track? the initial position
-  // if a point is out of boundary, it will ended up failing to track
-  vfPoints[2] = vfPoints[0];
-  cv::calcOpticalFlowPyrLK(mCurrentPyramid, mPreviousPyramid, vfPoints[1],
-                           vfPoints[2], status[1], err, winSize, 3, termcrit,
-                           cv::OPTFLOW_USE_INITIAL_FLOW, 0.001);
-
-  mvKeyPoints.clear();
-  mvKeyPoints.reserve(mMaxFeaturesInFrame + 100);  // keypoints in frame B
-  std::list<Trailer>::iterator it = mlTrailers.begin();
-  // note status[0].size() is constant, but not mlTrailers.size()
-  for (size_t which = 0; which < status[0].size(); ++which) {
-    if (status[0][which]) {
-      cv::Point2f delta = vfPoints[2][which] - vfPoints[0][which];
-      bool bInImage =
-          (vfPoints[0][which].x >= 0.f) && (vfPoints[0][which].y >= 0.f) &&
-          (vfPoints[1][which].x >= 0.f) && (vfPoints[1][which].y >= 0.f) &&
-          (vfPoints[0][which].x <= (imageW - 1.f)) &&
-          (vfPoints[0][which].y <= (imageH - 1.f)) &&
-          (vfPoints[1][which].x <= (imageW - 1.f)) &&
-          (vfPoints[1][which].y <= (imageH - 1.f));
-      if (!status[1][which] || !bInImage || (delta.dot(delta)) > 2)
-        status[0][which] = 0;
-
-      //           if(!bInImage){
-      //               std::cout << "vPoint[0][which] "<< vfPoints[0][which].x
-      //               <<" "
-      //                         << vfPoints[0][which].y << " "
-      //                         << vfPoints[1][which].x << " "
-      //                         << vfPoints[1][which].y <<" "<<std::endl;
-      //           }
-
-      it->fCurrPose = vfPoints[1][which];
-    }
-    // Erase from list of trails if not found this frame.
-    if (!status[0][which]) {
-      it = mlTrailers.erase(it);
-    } else {
-      it->uOldKeyPointIdx = it->uKeyPointIdx;
-      it->uKeyPointIdx = nGoodTrails;
-      ++it->uTrackLength;
-
-      mvKeyPoints.push_back(cv::KeyPoint(it->fCurrPose, 8.f));
-      ++it;
-      ++nGoodTrails;
-    }
-  }
-
-  assert(mlTrailers.end() == it &&
-         static_cast<int>(mvKeyPoints.size()) == nGoodTrails);
-
-  /*//added by huai for debug
-  cv::namedWindow( "Display window", cv::WINDOW_AUTOSIZE );
-  // CAUTION: do not draw on pyramid[0], ruining the data
-  cv::Mat image=mCurrentKF.pyramid[0].clone();
-  for (list<Trailer>::const_iterator it = mlTrailers.begin();
-      it!=mlTrailers.end();++it) {
-      line(image, it->fInitPose, it->fCurrPose, CV_RGB(0,0,0));
-      circle( image, it->fCurrPose, 3, Scalar(255,0,0), -1, 8);
-  }
-  //CVDRGB2OpenCVRGB(mimFrameRGB, image);
-  cv::imshow( "Display window", image );
-  cv::waitKey(0);
-  */
-
-  return nGoodTrails;
-}
-
-int HybridFrontend::TrailTracking_Advance2(
-    const std::vector<cv::KeyPoint>& keypoints,
-    const std::vector<size_t>& mapPointIds,
-    const std::vector<Eigen::Vector3d>& mapPointPositions, uint64_t mfIdB,
-    const cv::Mat currentImage) {
-  int nGoodTrails = 0;
-  int nTrackedFeatures = 0;
-  // build a map of mappoint ids for accelerating searching
-  std::map<size_t, std::list<Trailer>::iterator> mpId2Trailer;
-
-  for (std::list<Trailer>::iterator iter = mlTrailers.begin(),
-                                    itEnd = mlTrailers.end();
-       iter != itEnd; ++iter) {
-    mpId2Trailer[iter->uExternalLmId] = iter;
-  }
-
-  std::list<Trailer> tempTrailers;
-  auto it = mapPointIds.begin();
-  size_t counter = 0;
-  while (it != mapPointIds.end()) {
-    if (*it == 0) {
-      ++it;
-      ++counter;
-      continue;
-    }
-    auto iterMap = mpId2Trailer.find(*it);
-    if (iterMap != mpId2Trailer.end()) {
-      std::list<Trailer>::iterator tp = iterMap->second;
-      tp->uOldKeyPointIdx = tp->uKeyPointIdx;
-      tp->uKeyPointIdx = counter;
-      tp->fCurrPose = keypoints[counter].pt;
-      tp->p_W = mapPointPositions[counter];
-      tp->uCurrentFrameId = mfIdB;
-      ++(tp->uTrackLength);
-      ++nGoodTrails;
-    } else {  // a new trail
-      Trailer t(keypoints[counter].pt, keypoints[counter].pt, 0, counter, *it);
-      t.p_W = mapPointPositions[counter];
-      t.uCurrentFrameId = mfIdB;
-      tempTrailers.push_back(t);
-    }
-    ++nTrackedFeatures;
-    ++it;
-    ++counter;
-  }
-
-  assert(counter == mapPointIds.size());
-  mlTrailers.insert(mlTrailers.end(), tempTrailers.begin(), tempTrailers.end());
-
-  // added by huai for debug
-  //    cv::namedWindow( "Display window", cv::WINDOW_AUTOSIZE );
-  // CAUTION: do not draw on pyramid[0], ruining the data
-  //    cv::Mat image= currentImage.clone();
-  //    for (std::list<Trailer>::const_iterator it = mlTrailers.begin();
-  //        it!=mlTrailers.end();++it){
-  //        cv::line(image, it->fInitPose, it->fCurrPose, CV_RGB(0,0,0));
-  //        cv::circle( image, it->fCurrPose, 3, cv::Scalar(255,0,0), -1, 8);
-  //    }
-  //    //CVDRGB2OpenCVRGB(mimFrameRGB, image);
-  //    cv::imshow( "Display window", image );
-  //    cv::waitKey(30);
-
-  myAccumulator(nTrackedFeatures);
-  return nGoodTrails;
-}
-
-// detect some points from just inserted frame, curKF, and insert them
-// into mlTrailers
-int HybridFrontend::TrailTracking_DetectAndInsert(
-    const cv::Mat& currentFrame, int nInliers,
-    std::vector<cv::KeyPoint>& vNewKPs) {
-  vNewKPs.clear();
-  vNewKPs.reserve(500);
-  // how many keypoints already in the current frame?
-  const size_t startIndex = mvKeyPoints.size();
-  // detect good features
-  std::vector<cv::Point2f> vfPoints;
-  int nToAdd = mMaxFeaturesInFrame - nInliers + 50;
-  int nSubPixWinWidth = 7;  // SubPixWinWidth
-  cv::Size subPixWinSize(nSubPixWinWidth, nSubPixWinWidth);
-  cv::TermCriteria termcrit(CV_TERMCRIT_ITER | CV_TERMCRIT_EPS, 10, 0.03);
-  // create mask
-  if (mMask.empty()) mMask.create(currentFrame.size(), CV_8UC1);
-  mMask = cv::Scalar(255);
-  for (std::list<Trailer>::const_iterator lTcIt = mlTrailers.begin();
-       lTcIt != mlTrailers.end(); ++lTcIt) {
-    cv::circle(mMask, lTcIt->fCurrPose, 11, cv::Scalar(0), CV_FILLED);
-  }
-  double minDist = std::min(currentFrame.size().width / 100 + 1.0, 15.0);
-  cv::goodFeaturesToTrack(currentFrame, vfPoints, nToAdd, 0.01, minDist, mMask,
-                          3, false, 0.04);
-  cornerSubPix(currentFrame, vfPoints, subPixWinSize, cv::Size(-1, -1),
-               termcrit);
-
-  std::cout << "Detected additional " << vfPoints.size() << " points"
-            << std::endl;
-  /*//use grid for even distribution. Emprically, without even distribution,
-  // rotations are already very good
-  float bucket_width=50, bucket_height=50, max_features_bin=4;
-  cv::Mat grid((int)ceil(currentFrame.size().width/bucket_width),
-               (int)ceil(currentFrame.size().height/bucket_height),
-               CV_8UC1, Scalar::all(0));
-  for (list<Trailer>::const_iterator lTcIt=mlTrailers.begin();
-      lTcIt!=mlTrailers.end(); ++lTcIt) {
-      ++grid.at<unsigned char>((int)(lTcIt->fCurrPose.x/bucket_width),
-                               (int)(lTcIt->fCurrPose.y/bucket_height));
-  }
-  // feature bucketing: keeps only max_features per bucket, where the domain
-  // is split into buckets of size (bucket_width,bucket_height)
-  */
-  size_t jack = 0u;
-  for (size_t i = 0; i < vfPoints.size(); i++) {
-    /*if (grid.at<unsigned char>((int)(vfPoints[i].x/bucket_width),
-        (int)(vfPoints[i].y/bucket_height))>=max_features_bin)
-        continue;
-    else
-        ++grid.at<unsigned char>((int)(vfPoints[i].x/bucket_width),
-            (int)(vfPoints[i].y/bucket_height));*/
-    Trailer t(vfPoints[i], vfPoints[i], 0, startIndex + jack);
-    mlTrailers.push_back(t);
-    vNewKPs.push_back(cv::KeyPoint(vfPoints[i], 8.f));
-    ++jack;
-  }
-
-  /*//added by huai for debug
-      cv::namedWindow( "Display window", cv::WINDOW_AUTOSIZE );
-      // CAUTION: do not draw on pyramid[0], ruining the data
-      cv::Mat image=mCurrentKF.pyramid[0].clone();
-      for (list<Trailer>::const_iterator i = mlTrailers.begin();
-          i!=mlTrailers.end();++i) {
-      //	line(image, i->fInitPose, i->fCurrPose, CV_RGB(0,0,0));
-          circle( image, i->fCurrPose, 3, Scalar(255,0,0), -1, 8);
-      }
-      //CVDRGB2OpenCVRGB(mimFrameRGB, image);
-      cv::imshow( "Display window", image );
-      cv::waitKey(0);
-  */
-  return vNewKPs.size();
-}
-
-void HybridFrontend::UpdateEstimatorObservations(
-#ifdef USE_MSCKF2
-    okvis::MSCKF2& estimator,
-#else
-    okvis::HybridFilter& estimator,
-#endif
-    uint64_t mfIdA, uint64_t mfIdB, size_t camIdA, size_t camIdB) {
-  // update estimator's observations and keypoints
-  typedef okvis::cameras::PinholeCamera<
-      okvis::cameras::RadialTangentialDistortion>
-      camera_geometry_t;
-  std::shared_ptr<okvis::MultiFrame> frameA = estimator.multiFrame(mfIdA);
-  std::shared_ptr<okvis::MultiFrame> frameB = estimator.multiFrame(mfIdB);
-  for (auto it = mlTrailers.begin(); it != mlTrailers.end(); ++it) {
-    if (it->uLandmarkId != 0) {
-      frameB->setLandmarkId(camIdB, it->uKeyPointIdx, it->uLandmarkId);
-      estimator.addObservation<camera_geometry_t>(it->uLandmarkId, mfIdB,
-                                                  camIdB, it->uKeyPointIdx);
-    } else if (it->uTrackLength == 2) {
-      uint64_t lmId = okvis::IdProvider::instance().newId();
-      Eigen::Matrix<double, 4, 1> hP_W;
-      hP_W.setOnes();  // random initialization
-      bool canBeInitialized = true;
-      estimator.addLandmark(lmId, hP_W);
-      OKVIS_ASSERT_TRUE(Exception, estimator.isLandmarkAdded(lmId),
-                        lmId << " not added, bug");
-      estimator.setLandmarkInitialized(lmId, canBeInitialized);
-
-      frameA->setLandmarkId(camIdA, it->uOldKeyPointIdx, lmId);
-      estimator.addObservation<camera_geometry_t>(lmId, mfIdA, camIdA,
-                                                  it->uOldKeyPointIdx);
-
-      it->uLandmarkId = lmId;
-      frameB->setLandmarkId(camIdB, it->uKeyPointIdx, lmId);
-
-      estimator.addObservation<camera_geometry_t>(lmId, mfIdB, camIdB,
-                                                  it->uKeyPointIdx);
-    }
-  }
-}
-
-void HybridFrontend::UpdateEstimatorObservations2(
-#ifdef USE_MSCKF2
-    okvis::MSCKF2& estimator,
-#else
-    okvis::HybridFilter& estimator,
-#endif
-    uint64_t mfIdA, uint64_t mfIdB, size_t camIdA, size_t camIdB) {
-  const size_t maxTrackLength = 15;  // break the track once it hits this val
-  // update estimator's observations and keypoints
-  typedef okvis::cameras::PinholeCamera<
-      okvis::cameras::RadialTangentialDistortion>
-      camera_geometry_t;
-  std::shared_ptr<okvis::MultiFrame> frameA = estimator.multiFrame(mfIdA);
-  std::shared_ptr<okvis::MultiFrame> frameB = estimator.multiFrame(mfIdB);
-  int deletedTrails = 0;
-  for (auto it = mlTrailers.begin(); it != mlTrailers.end();) {
-    if (it->uCurrentFrameId < mfIdB) {
-      if (it->uTrackLength > 1) ++deletedTrails;
-      it = mlTrailers.erase(it);
-      continue;
-    } else {
-      assert(it->uCurrentFrameId == mfIdB);
-    }
-
-    if (it->uLandmarkId != 0) {
-      if (it->uTrackLength < maxTrackLength) {
-        estimator.addObservation<camera_geometry_t>(it->uLandmarkId, mfIdB,
-                                                    camIdB, it->uKeyPointIdx);
-      } else {  // break up the trail
-        it->fInitPose = it->fCurrPose;
-        it->uLandmarkId = 0;
-        it->uTrackLength = 1;
-      }
-    } else if (it->uTrackLength == 2) {
-      // two observations, we skip those for new features of an observation
-      uint64_t lmId = okvis::IdProvider::instance().newId();
-
-      Eigen::Matrix<double, 4, 1> hP_W;
-      hP_W.head<3>() = it->p_W;  // up to a scale factor
-      hP_W[3] = 1;
-      bool canBeInitialized = true;
-      estimator.addLandmark(lmId, hP_W);
-      OKVIS_ASSERT_TRUE(Exception, estimator.isLandmarkAdded(lmId),
-                        lmId << " not added, bug");
-      estimator.setLandmarkInitialized(lmId, canBeInitialized);
-
-      frameA->setLandmarkId(camIdA, it->uOldKeyPointIdx, lmId);
-      estimator.addObservation<camera_geometry_t>(lmId, mfIdA, camIdA,
-                                                  it->uOldKeyPointIdx);
-
-      it->uLandmarkId = lmId;
-      frameB->setLandmarkId(camIdB, it->uKeyPointIdx, lmId);
-      estimator.addObservation<camera_geometry_t>(lmId, mfIdB, camIdB,
-                                                  it->uKeyPointIdx);
-    } else {
-      assert(it->uTrackLength == 1);
-    }
-    ++it;
-  }
-  std::cout << "Trails after deleted " << deletedTrails << " "
-            << mlTrailers.size() << std::endl;
-}
-
 void HybridFrontend::printNumFeatureDistribution(std::ofstream& stream) {
-  if (!stream.is_open()) {
-    std::cerr << "cannot write feature distribution without proper stream "
-              << std::endl;
-  }
-  std::size_t num_samples = boost::accumulators::count(myAccumulator);
-  if (num_samples == 0) {
-    stream << "Skip computing the histogram of number of features in "
-              "images as no sample is stored!"
-           << std::endl;
-    return;
-  }
-  histogram_type hist = boost::accumulators::density(myAccumulator);
-
-  double total = 0.0;
-  stream << "histogram of number of features in images "
-            "(bin lower bound, value)"
-         << std::endl;
-  for (size_t i = 0; i < hist.size(); i++) {
-    stream << hist[i].first << " " << hist[i].second << std::endl;
-    total += hist[i].second;
-  }
-  std::cout << "Total of densities: " << total << " should be 1." << std::endl;
+  trailManager_.printNumFeatureDistribution(stream);
 }
 
 }  // namespace okvis

@@ -94,8 +94,11 @@ TEST(Triangulate, AllMethods) {
   const int num_methods = 4;
 #endif
 
-  std::vector<Sophus::SE3d> vse3CFromW(3);
-  std::vector<Eigen::Vector2d> vV2ImPlane(3);
+  std::vector<Sophus::SE3d, Eigen::aligned_allocator<Sophus::SE3d>> vse3CFromW(
+      3);
+  std::vector<Eigen::Vector2d,
+              Eigen::aligned_allocator<Eigen::Matrix<double, 2, 1>>>
+      vV2ImPlane(3);
   int trials = 1e3;
 
   vector<double> deviation[num_methods];
@@ -155,7 +158,9 @@ TEST(Triangulate, AllMethods) {
     for (int zinc = 0; zinc < 3; ++zinc)
       obs[zinc] = unproject2d(vV2ImPlane[zinc]);
 
-    vector<Eigen::Vector3d> res(num_methods);
+    vector<Eigen::Vector3d,
+           Eigen::aligned_allocator<Eigen::Matrix<double, 3, 1>>>
+        res(num_methods);
     Eigen::Vector4d v4Xhomog = Get_X_from_xP_lin(obs, vse3CFromW);
     if (fabs(v4Xhomog[3]) < 1e-9)
       res[0] = Vector3d(0, 0, -1000);
