@@ -9,6 +9,9 @@
 #include <vector>
 
 namespace feature_tracker {
+/**
+ * @brief The TrackResultReader class reads feature tracks from an external txt
+ */
 class TrackResultReader {
  public:
   TrackResultReader(const std::string file);

@@ -235,7 +235,7 @@ int TrailManager::advance(
   cv::imshow( "Display window", image );
   cv::waitKey(0);
   */
-
+  ++mFrameCounter;
   return nGoodTrails;
 }
 
@@ -311,6 +311,7 @@ int TrailManager::advance2(
   //    cv::waitKey(30);
 
   myAccumulator(nTrackedFeatures);
+  ++mFrameCounter;
   return nGoodTrails;
 }
 
@@ -385,6 +386,7 @@ int TrailManager::detectAndInsert(const cv::Mat& currentFrame, int nInliers,
       cv::imshow( "Display window", image );
       cv::waitKey(0);
   */
+  mvKeyPoints.insert(mvKeyPoints.end(), vNewKPs.begin(), vNewKPs.end());
   return vNewKPs.size();
 }
 
@@ -518,5 +520,48 @@ void TrailManager::printNumFeatureDistribution(std::ofstream& stream) {
     total += hist[i].second;
   }
   std::cout << "Total of densities: " << total << " should be 1." << std::endl;
+}
+
+std::vector<cv::KeyPoint> TrailManager::getCurrentKeypoints() const {
+  return mvKeyPoints;
+}
+
+bool TrailManager::needToDetectMorePoints(int matches2d2d) {
+  return matches2d2d < 0.5 * mMaxFeaturesInFrame ||
+         (mFrameCounter % 4 == 0 && matches2d2d < 0.6 * mMaxFeaturesInFrame);
+}
+
+const std::list<FeatureTrail>& TrailManager::getFeatureTrailList() const {
+  return mFeatureTrailList;
+}
+
+void TrailManager::initialize2(
+    const std::vector<cv::KeyPoint>& keypoints,
+    const std::vector<size_t>& mapPointIds,
+    const std::vector<Eigen::Vector3d,
+                      Eigen::aligned_allocator<Eigen::Vector3d>>&
+        mapPointPositions,
+    const uint64_t currentFrameId) {
+  // should be second keyframe in orb_vo
+  // initialize for the first frame
+  size_t nToAdd = 200;  // MaxInitialTrails
+  mMaxFeaturesInFrame = nToAdd;
+  size_t nToThrow = 100;  // MinInitialTrails
+  mMinFeaturesInFrame = nToThrow;
+  mFrameCounter = 0;
+
+  for (size_t i = 0; i < keypoints.size(); i++) {
+    if (mapPointIds[i] != 0) {
+      feature_tracker::FeatureTrail t(keypoints[i].pt, keypoints[i].pt, 0, i,
+                                      mapPointIds[i]);
+      t.p_W.x = mapPointPositions[i][0];
+      t.p_W.y = mapPointPositions[i][1];
+      t.p_W.z = mapPointPositions[i][2];
+      t.uCurrentFrameId = currentFrameId;
+      mFeatureTrailList.push_back(t);
+    }
+  }
+  std::cout << "Initializing at frameid " << currentFrameId
+            << " with new trails " << mFeatureTrailList.size() << std::endl;
 }
 }  // namespace feature_tracker

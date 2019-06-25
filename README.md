@@ -66,6 +66,8 @@ catkin_make -DUSE_ROS=ON --pkg vio_common msckf2
 ```
 You will find a demo application in devel/lib/msckf2/msckf2_node. It can process datasets in the ASL/ETH format.
 
+### Configure linter
+
 If you are going to contribute to the project, please configure linter as follows.
 The below instructions were tested on Ubuntu 16.04.
 ```
@@ -79,8 +81,9 @@ bash
 cd ../..
 init_linter_git_hooks
 ```
+### Run gtests
 
-Run gtests. Both gtest and gmock are required.
+Both gtest and gmock are required.
 ```
 sudo apt-get install libgtest-dev google-mock
 cd /usr/src/gtest
@@ -122,7 +125,7 @@ cd msckf2_ws/devel
 rm -rf ./*
 cd ../build
 rm -rf ./*
-catkin_make --pkg vio_common msckf2
+catkin_make -DUSE_ROS=ON --pkg vio_common msckf2
 ```
 
 ### Build msckf2 with QtCreator
@@ -156,7 +159,7 @@ To start debugging, add commandline arguments in the Run option panel, then pres
 
 Example running cases
 
-#### Reading measurements from a video and an IMU csv file
+### Reading measurements from a video and an IMU csv file
 ```
 msckf2_ws/devel/lib/msckf2/msckf2_node $HOME/docker_documents/msckf2_ws/src/msckf2/config/config_parkinglot_jisun_s6.yaml \
   --output_dir=/media/$USER/Seagate/temp/parkinglot/ --use_AIDP=true \
@@ -172,7 +175,7 @@ msckf2_ws/devel/lib/msckf2/msckf2_node $HOME/docker_documents/msckf2_ws/src/msck
 ```
 The running program will exit once the sequence finishes.
 
-#### Measurements from rostopics
+### Measurements from rostopics
 
 1. Download a dataset of your choice from 
    http://projects.asl.ethz.ch/datasets/doku.php?id=kmavvisualinertialdatasets. 

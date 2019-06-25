@@ -80,4 +80,6 @@ use some bool flags to tell if some parameters are fixed, or some parameters are
 
 30. add the calibration parameters to the original OKVIS estimator, use bool flags to indicate if some parameters are fixed. Take a look at OKVIS camera IMU extrinsics for how to fix parameters.
 
+implement KLT feature tracking, conventional MSCKF2 without so many parameters, add point features to the state vector
+
 

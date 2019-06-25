@@ -434,7 +434,7 @@ int HybridFrontend::matchToLastFrame(
       std::shared_ptr<okvis::MultiFrame> frameB =
           estimator.multiFrame(lastFrameId);
       const size_t camIdB = 0;
-      frameB->resetKeypoints(camIdB, trailManager_.mvKeyPoints);
+      frameB->resetKeypoints(camIdB, trailManager_.getCurrentKeypoints());
     }
 
     cv::Mat currentImage = estimator.multiFrame(currentFrameId)->getFrame(0);
@@ -455,20 +455,16 @@ int HybridFrontend::matchToLastFrame(
       // are added by goodFeaturesToTrack(),
       // and, add this frame as keyframe, updates the tracker's current-frame
       // -KeyFrame struct with any measurements made.
-      if (matches2d2d < 0.5 * trailManager_.mMaxFeaturesInFrame ||
-          (trailManager_.mFrameCounter % 4 == 0 &&
-           matches2d2d < 0.6 * trailManager_.mMaxFeaturesInFrame)) {
+      if (trailManager_.needToDetectMorePoints(matches2d2d)) {
         std::vector<cv::KeyPoint> vNewKPs;
         trailManager_.detectAndInsert(currentImage, matches2d2d, vNewKPs);
-        trailManager_.mvKeyPoints.insert(trailManager_.mvKeyPoints.end(),
-                                         vNewKPs.begin(), vNewKPs.end());
       }
 
       // create the feature list for the current frame based on
       // well tracked features
       std::shared_ptr<okvis::MultiFrame> frameB =
           estimator.multiFrame(currentFrameId);
-      frameB->resetKeypoints(im, trailManager_.mvKeyPoints);
+      frameB->resetKeypoints(im, trailManager_.getCurrentKeypoints());
 
       // TODO(jhuai):
       // use a matching algorithm's triangulation engine and its interface to
@@ -483,7 +479,7 @@ int HybridFrontend::matchToLastFrame(
       trailManager_.updateEstimatorObservations(estimator, lastFrameId,
                                                 currentFrameId, im, im);
     }
-    ++trailManager_.mFrameCounter;
+
   } else if (FLAGS_feature_tracking_method == 0) {
     if (estimator.numFrames() < 2) {
       return 0;
@@ -567,29 +563,9 @@ int HybridFrontend::matchToLastFrame(
     if (mapPointIds.empty()) {
       return 0;
     }
-    if (!mapPointIds.empty() && trailManager_.mFeatureTrailList.empty()) {
-      // should be second keyframe in orb_vo
-      // initialize for the first frame
-      size_t nToAdd = 200;  // MaxInitialTrails
-      trailManager_.mMaxFeaturesInFrame = nToAdd;
-      size_t nToThrow = 100;  // MinInitialTrails
-      trailManager_.mMinFeaturesInFrame = nToThrow;
-      trailManager_.mFrameCounter = 0;
-
-      for (size_t i = 0; i < keypoints.size(); i++) {
-        if (mapPointIds[i] != 0) {
-          feature_tracker::FeatureTrail t(keypoints[i].pt, keypoints[i].pt, 0,
-                                          i, mapPointIds[i]);
-          t.p_W.x = mapPointPositions[i][0];
-          t.p_W.y = mapPointPositions[i][1];
-          t.p_W.z = mapPointPositions[i][2];
-          t.uCurrentFrameId = currentFrameId;
-          trailManager_.mFeatureTrailList.push_back(t);
-        }
-      }
-      std::cout << "Initializing at frameid " << currentFrameId
-                << " with new trails " << trailManager_.mFeatureTrailList.size()
-                << std::endl;
+    if (!mapPointIds.empty() && trailManager_.getFeatureTrailList().empty()) {
+      trailManager_.initialize2(keypoints, mapPointIds, mapPointPositions,
+                                currentFrameId);
 
       const size_t camIdB = 0;
       frameB->resetKeypoints(camIdB, keypoints);
@@ -608,7 +584,6 @@ int HybridFrontend::matchToLastFrame(
       trailManager_.updateEstimatorObservations2(estimator, lastFrameId,
                                                  currentFrameId, im, im);
     }
-    ++trailManager_.mFrameCounter;
   }
   std::cout << "matchToLastFrame matches3d2d, inliers3d2d, matches2d2d "
             << matches3d2d << " " << inliers3d2d << " " << matches2d2d
