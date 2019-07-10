@@ -2228,17 +2228,28 @@ void MSCKF2::optimize(bool verbose) {
   }
 
   // Calculate Kalman gain
-  Eigen::MatrixXd S = T_H *
-                          covariance_.block(okvis::ceres::ode::OdoErrorStateDim,
-                                            okvis::ceres::ode::OdoErrorStateDim,
-                                            nVariableDim_, nVariableDim_) *
-                          T_H.transpose() +
-                      R_q;
+  Eigen::MatrixXd Py =
+      T_H *
+          covariance_.block(okvis::ceres::ode::OdoErrorStateDim,
+                            okvis::ceres::ode::OdoErrorStateDim, nVariableDim_,
+                            nVariableDim_) *
+          T_H.transpose() +
+      R_q;
+
+  Eigen::LLT<Eigen::MatrixXd> llt_py(Py);
+  if (llt_py.info() != Eigen::Success) {
+    VLOG(1) << "LLT failed. condition_number(Py) = "
+            << vio::getConditionNumberOfMatrix(Py);
+    OKVIS_ASSERT_TRUE(Exception, false, "failed to invert Py");
+  }
+  Eigen::MatrixXd Pyinv(Py.rows(), Py.cols());
+  Pyinv.setIdentity();
+  llt_py.solveInPlace(Pyinv);
 
   Eigen::MatrixXd K = (covariance_.block(0, okvis::ceres::ode::OdoErrorStateDim,
                                          covDim_, nVariableDim_) *
                        T_H.transpose()) *
-                      S.inverse();
+                      Pyinv;
 
   // State correction
   Eigen::Matrix<double, Eigen::Dynamic, 1> deltaX = K * r_q;
@@ -2248,9 +2259,16 @@ void MSCKF2::optimize(bool verbose) {
   // for debugging
   double tempNorm = deltaX.head<15>().lpNorm<Eigen::Infinity>();
   if (tempNorm > FLAGS_max_inc_tol) {
-    std::cout << deltaX.transpose() << std::endl;
+    std::cout << "Py of condition number:"
+              << vio::getConditionNumberOfMatrix(Py) << "\n"
+              << Py << "\nPyinv\n"
+              << Pyinv << "\nK\n"
+              << K << std::endl;
+    std::cout << "r_q\n"
+              << r_q.transpose() << "\ndeltaX\n"
+              << deltaX.transpose() << std::endl;
     OKVIS_ASSERT_LT(Exception, tempNorm, FLAGS_max_inc_tol,
-                    "Warn too large increment>2 may imply wrong association ");
+                    "Warn too large increment may imply wrong association ");
   }
   // end debugging
   computeKalmanGainTimer.stop();
@@ -2263,9 +2281,9 @@ void MSCKF2::optimize(bool verbose) {
 #if 0
     Eigen::MatrixXd tempMat = Eigen::MatrixXd::Identity(covDim_, covDim_);
     tempMat.block(0, okvis::ceres::ode::OdoErrorStateDim, covDim_, nVariableDim_) -= K*T_H;
-    covariance_ = tempMat * (covariance_ * tempMat.transpose()).eval() + K * R_q * K.transpose(); //joseph form
+    covariance_ = tempMat * (covariance_ * tempMat.transpose()).eval() + K * R_q * K.transpose(); // Joseph form
 #else
-  covariance_ = covariance_ - K * S * K.transpose();  // alternative
+  covariance_ = covariance_ - K * Py * K.transpose();
 #endif
   if (covariance_.diagonal().minCoeff() < 0) {
     std::cout << "Warn: current diagonal" << std::endl
