@@ -585,9 +585,8 @@ int HybridFrontend::matchToLastFrame(
                                                  currentFrameId, im, im);
     }
   }
-  std::cout << "matchToLastFrame matches3d2d, inliers3d2d, matches2d2d "
-            << matches3d2d << " " << inliers3d2d << " " << matches2d2d
-            << std::endl;
+  VLOG(1) << "matchToLastFrame matches3d2d, inliers3d2d, matches2d2d "
+          << matches3d2d << " " << inliers3d2d << " " << matches2d2d;
   return retCtr;
 }
 

@@ -2236,36 +2236,50 @@ void MSCKF2::optimize(bool verbose) {
           T_H.transpose() +
       R_q;
 
-  Eigen::LLT<Eigen::MatrixXd> llt_py(Py);
-  if (llt_py.info() != Eigen::Success) {
-    VLOG(1) << "LLT failed. condition_number(Py) = "
-            << vio::getConditionNumberOfMatrix(Py);
-    OKVIS_ASSERT_TRUE(Exception, false, "failed to invert Py");
-  }
-  Eigen::MatrixXd Pyinv(Py.rows(), Py.cols());
-  Pyinv.setIdentity();
-  llt_py.solveInPlace(Pyinv);
+  typedef Eigen::Matrix<double, Eigen::Dynamic, 1> VecX;
+  VecX SVec =
+      (Py.diagonal().cwiseAbs() + VecX::Constant(Py.cols(), 1)).cwiseSqrt();
+  VecX SVecI = SVec.cwiseInverse();
 
-  Eigen::MatrixXd K = (covariance_.block(0, okvis::ceres::ode::OdoErrorStateDim,
-                                         covDim_, nVariableDim_) *
-                       T_H.transpose()) *
-                      Pyinv;
+  Eigen::MatrixXd PyScaled = SVecI.asDiagonal() * Py * SVecI.asDiagonal();
+  VecX rqScaled = SVecI.asDiagonal() * r_q;
+
+  Eigen::LLT<Eigen::MatrixXd> llt_py(PyScaled);
+  if (llt_py.info() != Eigen::Success) {
+    Eigen::ColPivHouseholderQR<Eigen::MatrixXd> qr_decomp(PyScaled);
+    std::cout << "PyScaled diagonal\n"
+              << PyScaled.diagonal().transpose() << "\n";
+    std::cout << "PyScaled " << PyScaled.rows() << "x" << PyScaled.cols()
+              << " condition number "
+              << vio::getConditionNumberOfMatrix(PyScaled) << " and rank "
+              << qr_decomp.rank() << std::endl;
+    OKVIS_ASSERT_TRUE(Exception, false, "LLT failed for PyScaled!");
+  }
+  Eigen::MatrixXd PyScaledInv(PyScaled.rows(), PyScaled.cols());
+  PyScaledInv.setIdentity();
+  llt_py.solveInPlace(PyScaledInv);
+
+  Eigen::MatrixXd KScaled =
+      (covariance_.block(0, okvis::ceres::ode::OdoErrorStateDim, covDim_,
+                         nVariableDim_) *
+       T_H.transpose()) *
+      SVecI.asDiagonal() * PyScaledInv;
 
   // State correction
-  Eigen::Matrix<double, Eigen::Dynamic, 1> deltaX = K * r_q;
+  Eigen::Matrix<double, Eigen::Dynamic, 1> deltaX = KScaled * rqScaled;
   if (std::isnan(deltaX(0)) || std::isnan(deltaX(1))) {
     OKVIS_ASSERT_TRUE(Exception, false, "nan in kalman filter");
   }
   // for debugging
   double tempNorm = deltaX.head<15>().lpNorm<Eigen::Infinity>();
   if (tempNorm > FLAGS_max_inc_tol) {
-    std::cout << "Py of condition number:"
-              << vio::getConditionNumberOfMatrix(Py) << "\n"
-              << Py << "\nPyinv\n"
-              << Pyinv << "\nK\n"
-              << K << std::endl;
-    std::cout << "r_q\n"
-              << r_q.transpose() << "\ndeltaX\n"
+    std::cout << "PyScaled of condition number:"
+              << vio::getConditionNumberOfMatrix(PyScaled) << "\n"
+              << PyScaled << "\nPyScaledInv\n"
+              << PyScaledInv << "\nKScaled\n"
+              << KScaled << std::endl;
+    std::cout << "rqScaled\n"
+              << rqScaled.transpose() << "\ndeltaX\n"
               << deltaX.transpose() << std::endl;
     OKVIS_ASSERT_LT(Exception, tempNorm, FLAGS_max_inc_tol,
                     "Warn too large increment may imply wrong association ");
@@ -2278,20 +2292,12 @@ void MSCKF2::optimize(bool verbose) {
   // Covariance correction
   updateCovarianceTimer.start();
 
-#if 0
-    Eigen::MatrixXd tempMat = Eigen::MatrixXd::Identity(covDim_, covDim_);
-    tempMat.block(0, okvis::ceres::ode::OdoErrorStateDim, covDim_, nVariableDim_) -= K*T_H;
-    covariance_ = tempMat * (covariance_ * tempMat.transpose()).eval() + K * R_q * K.transpose(); // Joseph form
-#else
-  covariance_ = covariance_ - K * Py * K.transpose();
-#endif
+  covariance_ = covariance_ - KScaled * PyScaled * KScaled.transpose();
+
   if (covariance_.diagonal().minCoeff() < 0) {
-    std::cout << "Warn: current diagonal" << std::endl
+    std::cout << "Warn: negative entry in cov diagonal\n"
               << covariance_.diagonal().transpose() << std::endl;
-    covariance_.diagonal() =
-        covariance_.diagonal().cwiseAbs();  // TODO: hack is ugly!
-    //        OKVIS_ASSERT_GT(Exception, covariance_.diagonal().minCoeff(), 0,
-    //        "negative covariance diagonal elements");
+    covariance_.diagonal() = covariance_.diagonal().cwiseAbs();
   }
   updateCovarianceTimer.stop();
   // update landmarks that are tracked in the current frame(the newly inserted

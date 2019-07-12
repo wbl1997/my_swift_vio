@@ -404,8 +404,7 @@ void HybridVio::frameConsumerLoop(size_t cameraIndex) {
     }
 
     // get T_WC(camIndx) for detectAndDescribe()
-    std::cout << "estimator numFrames in frame loop " << estimator_.numFrames()
-              << std::endl;
+    VLOG(1) << "estimator numFrames in frame loop " << estimator_.numFrames();
     if (estimator_.numFrames() == 0) {
       // first frame ever
       bool success = okvis::HybridFilter::initPoseFromImu(imuData, T_WS);
@@ -774,8 +773,6 @@ void HybridVio::optimizationLoop() {
       int frameIdInSource = -1;
       bool isKF = false;
       estimator_.getFrameId(frame_pairs->id(), frameIdInSource, isKF);
-      printf("Optimizing at frame id %d at %d.%d\n", frameIdInSource,
-             opt_frame_time.sec, opt_frame_time.nsec);
 
       estimator_.optimize(false);
 

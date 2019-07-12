@@ -203,8 +203,7 @@ void VioFrameMatchingAlgorithm<CAMERA_GEOMETRY_T>::doSetup() {
     }
   }
   const size_t numB = frameB_->numKeypoints(camIdB_);
-
-  std::cout << "frame A B #keypoints " << numA << " " << numB << std::endl;
+  VLOG(1) << "frame A B #keypoints " << numA << " " << numB;
 
   skipB_.clear();
   skipB_.reserve(numB);
