@@ -2083,8 +2083,97 @@ void MSCKF2::optimize(bool verbose) {
     LOG(INFO) << mapPtr_->summary.FullReport();
   }
 }
-#else
-// extended kalman filter
+#else  // extended kalman filter
+
+void MSCKF2::EkfUpdate(const Eigen::MatrixXd &T_H,
+                       const Eigen::Matrix<double, Eigen::Dynamic, 1> &r_q,
+                       const Eigen::MatrixXd &R_q) {
+  // Calculate Kalman gain
+  Eigen::MatrixXd Py =
+      T_H *
+          covariance_.block(okvis::ceres::ode::OdoErrorStateDim,
+                            okvis::ceres::ode::OdoErrorStateDim, nVariableDim_,
+                            nVariableDim_) *
+          T_H.transpose() +
+      R_q;
+
+  typedef Eigen::Matrix<double, Eigen::Dynamic, 1> VecX;
+  VecX SVec =
+      (Py.diagonal().cwiseAbs() + VecX::Constant(Py.cols(), 1)).cwiseSqrt();
+  VecX SVecI = SVec.cwiseInverse();
+
+  Eigen::MatrixXd PyScaled = SVecI.asDiagonal() * Py * SVecI.asDiagonal();
+  VecX rqScaled = SVecI.asDiagonal() * r_q;
+
+  Eigen::LLT<Eigen::MatrixXd> llt_py(PyScaled);
+  if (llt_py.info() != Eigen::Success) {
+    Eigen::ColPivHouseholderQR<Eigen::MatrixXd> qr_decomp(PyScaled);
+    std::cout << "PyScaled diagonal\n"
+              << PyScaled.diagonal().transpose() << "\n";
+    std::cout << "PyScaled " << PyScaled.rows() << "x" << PyScaled.cols()
+              << " condition number "
+              << vio::getConditionNumberOfMatrix(PyScaled) << " and rank "
+              << qr_decomp.rank() << " computationInfo " << llt_py.info()
+              << std::endl;
+    OKVIS_ASSERT_TRUE(Exception, false, "LLT failed for PyScaled!");
+  }
+
+  //  Eigen::MatrixXd PyScaledInv(PyScaled.rows(), PyScaled.cols());
+  //  PyScaledInv.setIdentity();
+  //  llt_py.solveInPlace(PyScaledInv);
+  //  Eigen::MatrixXd KScaled =
+  //      (covariance_.block(0, okvis::ceres::ode::OdoErrorStateDim, covDim_,
+  //                         nVariableDim_) *
+  //       T_H.transpose()) *
+  //      SVecI.asDiagonal() * PyScaledInv;
+
+  // There is not much difference between the above and the below approach
+  Eigen::MatrixXd KScaled_transpose =
+      llt_py.solve(SVecI.asDiagonal() *
+                   (T_H * covariance_
+                              .block(0, okvis::ceres::ode::OdoErrorStateDim,
+                                     covDim_, nVariableDim_)
+                              .transpose()));
+  Eigen::MatrixXd KScaled = KScaled_transpose.transpose();
+
+  // State correction
+  Eigen::Matrix<double, Eigen::Dynamic, 1> deltaX = KScaled * rqScaled;
+  if (std::isnan(deltaX(0)) || std::isnan(deltaX(1))) {
+    OKVIS_ASSERT_TRUE(Exception, false, "nan in kalman filter");
+  }
+  // for debugging
+  double tempNorm = deltaX.head<15>().lpNorm<Eigen::Infinity>();
+  if (tempNorm > FLAGS_max_inc_tol) {
+    std::cout << "PyScaled of condition number:"
+              << vio::getConditionNumberOfMatrix(PyScaled) << "\n"
+              << PyScaled << "\nKScaled\n"
+              << KScaled << std::endl;
+    std::cout << "rqScaled\n"
+              << rqScaled.transpose() << "\ndeltaX\n"
+              << deltaX.transpose() << std::endl;
+    OKVIS_ASSERT_LT(Exception, tempNorm, FLAGS_max_inc_tol,
+                    "Warn too large increment may imply wrong association ");
+  }
+  // end debugging
+  computeKalmanGainTimer.stop();
+
+  updateStates(deltaX);
+
+  // Covariance correction
+  updateCovarianceTimer.start();
+
+  covariance_ = covariance_ - KScaled * PyScaled * KScaled.transpose();
+  Eigen::MatrixXd cov_symm = (covariance_.transpose() + covariance_) * 0.5;
+  covariance_ = cov_symm;
+
+  if (covariance_.diagonal().minCoeff() < 0) {
+    std::cout << "Warn: negative entry in cov diagonal\n"
+              << covariance_.diagonal().transpose() << std::endl;
+    covariance_.diagonal() = covariance_.diagonal().cwiseAbs();
+  }
+  updateCovarianceTimer.stop();
+}
+
 // Start msckf2 optimization.
 void MSCKF2::optimize(bool verbose) {
   // containers of Jacobians of measurements
@@ -2210,7 +2299,9 @@ void MSCKF2::optimize(bool verbose) {
     //        Eigen::MatrixXd expandedT_H(dimH_o[0], covDim_);
     //        expandedT_H<< Eigen::MatrixXd::Zero(dimH_o[0], 42), T_H,
     //        Eigen::MatrixXd::Zero(dimH_o[0], 9); T_H= expandedT_H;
-  } else {  // project H_o into H_x, reduce the residual dimension
+  } else {  // project H_o, reduce the residual dimension
+    // TODO: use SPQR instead for computing T_H, refer to MSCKF_stereo
+    // https://github.com/KumarRobotics/msckf_vio/blob/master/src/msckf_vio.cpp#L930-L950
     Eigen::HouseholderQR<Eigen::MatrixXd> qr(H_o);
     Eigen::MatrixXd thinQ(Eigen::MatrixXd::Identity(H_o.rows(), H_o.cols()));
     thinQ = qr.householderQ() * thinQ;
@@ -2227,79 +2318,8 @@ void MSCKF2::optimize(bool verbose) {
     T_H = R.block(0, 0, nVariableDim_, nVariableDim_);
   }
 
-  // Calculate Kalman gain
-  Eigen::MatrixXd Py =
-      T_H *
-          covariance_.block(okvis::ceres::ode::OdoErrorStateDim,
-                            okvis::ceres::ode::OdoErrorStateDim, nVariableDim_,
-                            nVariableDim_) *
-          T_H.transpose() +
-      R_q;
+  EkfUpdate(T_H, r_q, R_q);
 
-  typedef Eigen::Matrix<double, Eigen::Dynamic, 1> VecX;
-  VecX SVec =
-      (Py.diagonal().cwiseAbs() + VecX::Constant(Py.cols(), 1)).cwiseSqrt();
-  VecX SVecI = SVec.cwiseInverse();
-
-  Eigen::MatrixXd PyScaled = SVecI.asDiagonal() * Py * SVecI.asDiagonal();
-  VecX rqScaled = SVecI.asDiagonal() * r_q;
-
-  Eigen::LLT<Eigen::MatrixXd> llt_py(PyScaled);
-  if (llt_py.info() != Eigen::Success) {
-    Eigen::ColPivHouseholderQR<Eigen::MatrixXd> qr_decomp(PyScaled);
-    std::cout << "PyScaled diagonal\n"
-              << PyScaled.diagonal().transpose() << "\n";
-    std::cout << "PyScaled " << PyScaled.rows() << "x" << PyScaled.cols()
-              << " condition number "
-              << vio::getConditionNumberOfMatrix(PyScaled) << " and rank "
-              << qr_decomp.rank() << std::endl;
-    OKVIS_ASSERT_TRUE(Exception, false, "LLT failed for PyScaled!");
-  }
-  Eigen::MatrixXd PyScaledInv(PyScaled.rows(), PyScaled.cols());
-  PyScaledInv.setIdentity();
-  llt_py.solveInPlace(PyScaledInv);
-
-  Eigen::MatrixXd KScaled =
-      (covariance_.block(0, okvis::ceres::ode::OdoErrorStateDim, covDim_,
-                         nVariableDim_) *
-       T_H.transpose()) *
-      SVecI.asDiagonal() * PyScaledInv;
-
-  // State correction
-  Eigen::Matrix<double, Eigen::Dynamic, 1> deltaX = KScaled * rqScaled;
-  if (std::isnan(deltaX(0)) || std::isnan(deltaX(1))) {
-    OKVIS_ASSERT_TRUE(Exception, false, "nan in kalman filter");
-  }
-  // for debugging
-  double tempNorm = deltaX.head<15>().lpNorm<Eigen::Infinity>();
-  if (tempNorm > FLAGS_max_inc_tol) {
-    std::cout << "PyScaled of condition number:"
-              << vio::getConditionNumberOfMatrix(PyScaled) << "\n"
-              << PyScaled << "\nPyScaledInv\n"
-              << PyScaledInv << "\nKScaled\n"
-              << KScaled << std::endl;
-    std::cout << "rqScaled\n"
-              << rqScaled.transpose() << "\ndeltaX\n"
-              << deltaX.transpose() << std::endl;
-    OKVIS_ASSERT_LT(Exception, tempNorm, FLAGS_max_inc_tol,
-                    "Warn too large increment may imply wrong association ");
-  }
-  // end debugging
-  computeKalmanGainTimer.stop();
-
-  updateStates(deltaX);
-
-  // Covariance correction
-  updateCovarianceTimer.start();
-
-  covariance_ = covariance_ - KScaled * PyScaled * KScaled.transpose();
-
-  if (covariance_.diagonal().minCoeff() < 0) {
-    std::cout << "Warn: negative entry in cov diagonal\n"
-              << covariance_.diagonal().transpose() << std::endl;
-    covariance_.diagonal() = covariance_.diagonal().cwiseAbs();
-  }
-  updateCovarianceTimer.stop();
   // update landmarks that are tracked in the current frame(the newly inserted
   // state)
   {

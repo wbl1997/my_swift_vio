@@ -103,7 +103,7 @@ Ref: https://www.eriksmistad.no/getting-started-with-google-test-on-ubuntu/
 
 ```
 catkin_make run_tests
-# To run single tests
+# To run a few tests
 devel/lib/msckf2/allTests --gtest_filter="*Eigen*"
 
 ```

@@ -131,6 +131,7 @@ int main(int argc, char **argv) {
   setInputParameters(&parameters.input);
   okvis::HybridVio okvis_estimator(parameters);
   std::string path = FLAGS_output_dir;
+  path = okvis::removeTrailingSlash(path);
 
   if (FLAGS_dump_output_option == 0) {
     okvis_estimator.setFullStateCallback(

@@ -154,7 +154,9 @@ TEST(Triangulate, AllMethods) {
     vse3CFromW[2] = SE3d(rot, -rot * tcinw);
 #endif
 
-    vector<Vector3d> obs(3);
+    vector<Eigen::Vector3d,
+           Eigen::aligned_allocator<Eigen::Matrix<double, 3, 1>>>
+        obs(3);
     for (int zinc = 0; zinc < 3; ++zinc)
       obs[zinc] = unproject2d(vV2ImPlane[zinc]);
 

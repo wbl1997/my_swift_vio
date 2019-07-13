@@ -88,6 +88,9 @@ class MSCKF2 : public HybridFilter {
    */
   virtual bool applyMarginalizationStrategy() final;
 
+  void EkfUpdate(const Eigen::MatrixXd& T_H,
+                 const Eigen::Matrix<double, Eigen::Dynamic, 1>& r_q,
+                 const Eigen::MatrixXd& R_q);
   /**
    * @brief MSCKF2 with iterated EKF. c.f., Faraz Mirzaei, a Kalman filter based
    * algorithm for IMU-Camera calibration

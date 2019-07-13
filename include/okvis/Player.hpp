@@ -92,6 +92,8 @@ class Player {
   Player& operator=(const Player&) = delete;
 };
 
+std::string removeTrailingSlash(const std::string& path);
+
 }  // namespace okvis
 
 #endif /* INCLUDE_MSCKF2_PLAYER_HPP_ */
