@@ -139,9 +139,9 @@ ylabel('m/sec^2', 'FontSize', 18);
 set(gca,'FontSize',18);
 saveas(gcf,[outputPath, '\Error ba'],'epsc');
 
-figNumber = intermediatePlotter(figNumber, data, gt);
+intermediatePlotter(data);
 
-figNumber = figNumber +1;
+figNumber = figNumber + 5;
 figure(figNumber);
 plot(data(:,1), gt(:,3)-data(:, 3), '-r'); hold on;
 plot(data(:,1), gt(:,4)-data(:, 4), '-g');

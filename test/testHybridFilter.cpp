@@ -619,7 +619,6 @@ void compute_errors(
   (*rmsError)[54] = tr_est * tr_est;
 }
 
-// TODO(jhuai): curiously, MSCKF2 or IEKF often diverges after 300 seconds.
 // Note the std for noises used in covariance propagation should be slightly
 // larger than the std used in sampling noises, becuase the process model
 // involves many approximations other than these noise terms.

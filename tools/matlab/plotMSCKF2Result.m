@@ -1,59 +1,27 @@
-%usage: matlab
+function plotMSCKF2Result()
 close all;
-
-addpath('cgraumann-umeyama')
-addpath('/media/jhuai/Seagate/jhuai/huai_work/ekfmonoslam/instk');
-addpath('/media/jhuai/Seagate/jhuai/huai_work/ekfmonoslam/voicebox');
+export_fig_path = '/media/jhuai/Seagate/jhuai/export_fig/';
+addpath(export_fig_path);
 
 filename = input('msckf2_csv:', 's');
 output_dir = input('output_dir:', 's');
-% filename = 'F:\jhuai\huai work\dissertation\figure_data\...
-% msckf2_estimator_output_noniter_float.csv'; 
-% filename ='F:\west_campus_parking_lot\calibration\Greg\... 
-% output\msckf2_estimator_output_greg_fixedTgTsTa.csv';
-nominal_intrinsics = [ 1554.622, 1554.622, 960, 540 ] / 2;
-nominal_intrinsics = [ 1000, 1000, 640, 360] / 2;
+nominal_fx = input('nominal_fx:');
+nominal_fy = input('nominal_fy:');
+nominal_cx = input('nominal_cx:');
+nominal_cy = input('nominal_cy:');
+nominal_intrinsics = [nominal_fx, nominal_fy, nominal_cx, nominal_cy];
 
-% p_bc = R_bc * -t_cb;
-p_bc = -[ 0, -1, 0; - 1, 0, 0; 0, 0, -1 ] * [0.0652; - 0.0207; - 0.0081];
-
-fontsize= 18;
-
+fontsize = 18;
 data = dlmread(filename, ',', 1, 0);
-startTime = data(1,1);
-endTime = data(end,1); %2.188e13-4.5e9;
-index= find(abs(endTime - data(:,1))<2.5e7, 1);
-if(isempty(index))
-    index= size(data,1);
-end
-data= data(1:index,:);
+original_data = data;
+startTime = data(1, 1);
+endTime = data(end, 1);
 
-% output the average estimated values for the calibration paramters
-
-period= 5; %sec
-startIndex = find(abs(endTime -period - data(:,1))<2.5e7, 1);
-if(isempty(startIndex))
-    startIndex=1;
-end
-
-estimate_average= mean(data(startIndex:end, :), 1);
-fprintf('bg ba\n');
-fprintf('%.4f\n', estimate_average(13:18));
-fprintf('pbinc\n');
-fprintf('%.3f\n', estimate_average(46:48)*100);
-fprintf('fx fy cx cy\n');
-fprintf('%.3f\n', estimate_average(49:52)*2);
-fprintf('k1 k2\n');
-fprintf('%.3f\n', estimate_average(53:54));
-fprintf('p1 p2\n');
-fprintf('%.6f\n', estimate_average(55:56));
-fprintf('tr [ms]\n');
-fprintf('%.3f\n', estimate_average(58)*1e3);
-
+sec_to_nanos = 1e9;
 % ground truth file must have the same number of rows as output data
-gt = [];
-if(~isempty(gt))
-    gt = csvread('G:\state_groundtruth_estimate0\data_copy.csv');
+gt_file = input('Ground truth csv:', 's');
+if (gt_file)
+    gt = csvread(gt_file);
     index= find(abs(gt(:,1) - startTime)<10000);
     gt = gt(index:end,:);
     if(endTime>gt(end,1))
@@ -99,15 +67,17 @@ if(~isempty(gt))
     end
     data(:,10:12) = (R_res*data(:, 10:12)')';
 else
-    data(:,1)= (data(:,1)- startTime)/1e9;
+    gt = [];    
+    data(:,1) = (data(:,1) - startTime) / sec_to_nanos;
 end
 
-figNumber = 0;
-figNumber = figNumber +1;
-figure(figNumber);
-plot3(data(:,3), data(:,4), data(:,5), '-b'); hold on;
-plot3(data(1,3),data(1,4),data(1,5), '-sr');
-plot3(data(end,3),data(end,4),data(end,5), '-sb');
+figure;
+plot3(data(:, Msckf2Constants.r(1)), data(:, Msckf2Constants.r(2)), ...
+    data(:, Msckf2Constants.r(3)), '-b'); hold on;
+plot3(data(1, Msckf2Constants.r(1)), data(1, Msckf2Constants.r(2)), ...
+    data(1, Msckf2Constants.r(3)), '-or');
+plot3(data(end, Msckf2Constants.r(1)), data(end, Msckf2Constants.r(2)), ...
+    data(end, Msckf2Constants.r(3)), '-sr');
 legend_list = {'msckf2', 'start', 'finish'};
 
 if(~isempty(gt))
@@ -123,13 +93,17 @@ if (cmp_data_file)
     legend_list{end+1} = 'okvis';
 end
 legend(legend_list);
-title ('p_b^g', 'FontSize', fontsize);
-xlabel ('x [m]', 'FontSize', fontsize);
-ylabel ('y [m]', 'FontSize', fontsize);
-zlabel ('z [m]', 'FontSize', fontsize);
+title('p_B^G');
+xlabel('x[m]');
+ylabel('y[m]');
+zlabel('z[m]');
 axis equal;
 grid on;
-set(gca,'FontSize',fontsize);
+outputfig = [output_dir, '/p_GB.eps'];
+if exist(outputfig, 'file')==2
+  delete(outputfig);
+end
+export_fig(outputfig);
 
 if(~isempty(gt))
     % compute totla distance, max error, rmse
@@ -167,197 +141,98 @@ if(~isempty(gt))
     set(gca,'FontSize',fontsize);
 end
 
-figNumber = figNumber +1;
-figure(figNumber);
-plot(data(:,1), data(:,6), '-r');
+figure;
+plot(data(:,1), data(:, Msckf2Constants.q(1)), '-r');
 hold on;
-plot(data(:,1), data(:,7), '-g');
-plot(data(:,1), data(:,8), '-b');
+plot(data(:,1), data(:, Msckf2Constants.q(2)), '-g');
+plot(data(:,1), data(:, Msckf2Constants.q(3)), '-b');
 
 if(~isempty(gt))
     plot(gt(:,1), gt(:,6), '--r');
     plot(gt(:,1), gt(:,7), '--g');
     plot(gt(:,1), gt(:,8), '--b');
 end
-xlabel('time [sec]', 'FontSize', fontsize);
-legend('qx', 'qy', 'qz', 'gt qx','gt qy','gt qz');
+xlabel('time[sec]');
+legend('qx', 'qy', 'qz', 'gt qx', 'gt qy', 'gt qz');
 grid on;
-set(gca,'FontSize',fontsize);
-
-figNumber = figNumber +1;
-figure(figNumber);
-plot(data(:,1), data(:, 10), '-r'); hold on;
-plot(data(:,1), data(:, 11), '-g');
-plot(data(:,1), data(:, 12), '-b');
-if(~isempty(gt))
-    plot(gt(:,1), gt(:, 9), '--r');
-    plot(gt(:,1), gt(:, 10), '--g');
-    plot(gt(:,1), gt(:, 11), '--b');
+outputfig = [output_dir, '/qxyz_GB.eps'];
+if exist(outputfig, 'file')==2
+  delete(outputfig);
 end
-legend('x', 'y', 'z','gt x','gt y','gt z');
-xlabel('time [sec]');
-ylabel('m/sec');
-title('v_b^g')
-grid on;
-set(gca,'FontSize',fontsize);
+export_fig(outputfig);
 
-figNumber = figNumber +1;
-figure(figNumber);
-pid180 = 180/pi;
-plot(data(:,1), data(:,13)*pid180, '-r'); hold on;
-plot(data(:,1), data(:,14)*pid180, '-g');
-plot(data(:,1), data(:,15)*pid180, '-b');
-
-plot(data(:,1), (3*data(:,68)+ data(:, 13))*pid180, '--r');
-plot(data(:,1), (3*data(:,69)+ data(:, 14))*pid180, '--g');
-plot(data(:,1), (3*data(:,70)+ data(:, 15))*pid180, '--b');
-if(~isempty(gt))
-    plot(gt(:,1), gt(:,12)*pid180, '-k'); hold on;
-    plot(gt(:,1), gt(:,13)*pid180, '-c');
-    plot(gt(:,1), gt(:,14)*pid180, '-m');
+figure;
+draw_ekf_triplet_with_std(data, Msckf2Constants.v, Msckf2Constants.v_std);
+ylabel('v_{GB}[m/s]');
+outputfig = [output_dir, '/v_GB.eps'];
+if exist(outputfig, 'file')==2
+  delete(outputfig);
 end
-plot(data(:,1), (-3*data(:,68)+ data(:, 13))*pid180, '--r');
-plot(data(:,1), (-3*data(:,69)+ data(:, 14))*pid180, '--g');
-plot(data(:,1), (-3*data(:,70)+ data(:, 15))*pid180, '--b');
+export_fig(outputfig);
 
-xlabel('time [sec]', 'FontSize', fontsize);
-s = sprintf('%c/sec', char(176));
-ylabel(s, 'FontSize', fontsize);
-title('b_g', 'FontSize', fontsize);
-legend('x', 'y', 'z', '3\sigma_x','3\sigma_y','3\sigma_z', 'gt x','gt y','gt z');
-set(gca,'FontSize',fontsize);
-grid on;
-
-figNumber = figNumber +1;
-figure(figNumber);
-plot(data(:,1), data(:, 16), '-r'); hold on;
-plot(data(:,1), data(:, 17), '-g');
-plot(data(:,1), data(:, 18), '-b');
-
-plot(data(:,1), 3*data(:,71)+ data(:, 16), '--r');
-plot(data(:,1), 3*data(:,72)+ data(:, 17), '--g');
-plot(data(:,1), 3*data(:,73)+ data(:, 18), '--b');
-if(~isempty(gt))
-    plot(gt(:,1), gt(:, 15), '-k'); hold on;
-    plot(gt(:,1), gt(:, 16), '-c');
-    plot(gt(:,1), gt(:, 17), '-m');
+figure;
+draw_ekf_triplet_with_std(data, Msckf2Constants.b_g, Msckf2Constants.b_g_std, 180/pi);
+ylabel(['b_g[' char(176) '/s]']);
+outputfig = [output_dir, '/b_g.eps'];
+if exist(outputfig, 'file')==2
+  delete(outputfig);
 end
-plot(data(:,1), -3*data(:,71)+ data(:, 16), '--r');
-plot(data(:,1), -3*data(:,72)+ data(:, 17), '--g');
-plot(data(:,1), -3*data(:,73)+ data(:, 18), '--b');
+export_fig(outputfig);
 
-xlabel('time [sec]', 'FontSize', fontsize);
-ylabel('m/sec^2', 'FontSize', fontsize);
-title('b_a', 'FontSize', fontsize);
-legend('x', 'y', 'z','3\sigma_x','3\sigma_y','3\sigma_z', 'gt x','gt y','gt z');
-set(gca,'FontSize',fontsize);
-grid on;
-
-figNumber = figNumber +1;
-figure(figNumber);
-ruler=100;
-plot(data(:,1), data(:, 46)*ruler, '-r'); hold on;
-plot(data(:,1), data(:, 47)*ruler, '-g');
-plot(data(:,1), data(:, 48)*ruler, '-b');
-
-plot(data(:,1), (3*data(:,101)+ data(:, 46))*ruler, '--r');
-plot(data(:,1), (3*data(:,102)+ data(:, 47))*ruler, '--g');
-plot(data(:,1), (3*data(:,103)+ data(:, 48))*ruler, '--b');
-
-if(~isempty(gt) && ~isempty(p_bc))
-    plot(gt(:,1), ones(size(gt,1),1)*p_bc(1)*ruler, '-k'); hold on;
-    plot(gt(:,1), ones(size(gt,1),1)*p_bc(2)*ruler, '-c');
-    plot(gt(:,1), ones(size(gt,1),1)*p_bc(3)*ruler, '-m');
+figure;
+draw_ekf_triplet_with_std(data, Msckf2Constants.b_a, Msckf2Constants.b_a_std, 1.0);
+ylabel('b_a[m/s^2]');
+outputfig = [output_dir, '/b_a.eps'];
+if exist(outputfig, 'file')==2
+  delete(outputfig);
 end
-plot(data(:,1), (-3*data(:,101)+ data(:, 46))*ruler, '--r');
-plot(data(:,1), (-3*data(:,102)+ data(:, 47))*ruler, '--g');
-plot(data(:,1), (-3*data(:,103)+ data(:, 48))*ruler, '--b');
+export_fig(outputfig);
 
-xlabel('time [sec]', 'FontSize', fontsize);
-ylabel('cm', 'FontSize', fontsize);
-title('p_c^b', 'FontSize', fontsize);
-legend('x', 'y', 'z','3\sigma_x','3\sigma_y','3\sigma_z', 'gt x','gt y','gt z');
-set(gca,'FontSize',fontsize);
-grid on;
-saveas(gcf,[output_dir, '\Error p_CB'],'epsc');
+figure;
+draw_ekf_triplet_with_std(data, Msckf2Constants.p_BC, Msckf2Constants.p_BC_std, 100.0);
+ylabel('p_{BC}[cm]');
+outputfig = [output_dir, '/p_BC.eps'];
+if exist(outputfig, 'file')==2
+  delete(outputfig);
+end
+export_fig(outputfig);
 
-
-figNumber = figNumber +1;
-figure(figNumber);
-
-plot(data(:,1), data(:, 49)-nominal_intrinsics(1), '-r'); hold on;
-plot(data(:,1), data(:, 50)-nominal_intrinsics(2), '-g');
-plot(data(:,1), data(:, 51)-nominal_intrinsics(3), '-b');
-plot(data(:,1), data(:, 52)-nominal_intrinsics(4), '-k');
-
-% photoscan_calib_result= [1551.91 1551.91 934.853 529.925]/2;
-% tile_data= repmat(photoscan_calib_result, size(data,1), 1);
-% plot(data(:,1), tile_data(:,1)-nominal_intrinsics(1), '.r'); hold on;
-% plot(data(:,1), tile_data(:,2)-nominal_intrinsics(2), '.g');
-% plot(data(:,1), tile_data(:,3)-nominal_intrinsics(3), '.b');
-% plot(data(:,1), tile_data(:,4)-nominal_intrinsics(4), '.k');
-
-plot(data(:,1), data(:, 49)-nominal_intrinsics(1)+3*data(:, 104), '--r'); hold on;
-plot(data(:,1), data(:, 50)-nominal_intrinsics(2)+3*data(:, 105), '--g');
-plot(data(:,1), data(:, 51)-nominal_intrinsics(3)+3*data(:, 106), '--b');
-plot(data(:,1), data(:, 52)-nominal_intrinsics(4)+3*data(:, 107), '--k');
-
-plot(data(:,1), data(:, 49)-nominal_intrinsics(1)-3*data(:, 104), '--r'); hold on;
-plot(data(:,1), data(:, 50)-nominal_intrinsics(2)-3*data(:, 105), '--g');
-plot(data(:,1), data(:, 51)-nominal_intrinsics(3)-3*data(:, 106), '--b');
-plot(data(:,1), data(:, 52)-nominal_intrinsics(4)-3*data(:, 107), '--k');
-
-% legend('f_x','f_y','c_x','c_y', 'ref f_x','ref f_y','ref c_x','ref c_y','3\sigma_f_x', '3\sigma_f_y','3\sigma_c_x','3\sigma_c_y');
+figure;
+data(:, Msckf2Constants.fxy_cxy) = data(:, Msckf2Constants.fxy_cxy) - ...
+    repmat(nominal_intrinsics, size(data, 1), 1);
+draw_ekf_triplet_with_std(data, Msckf2Constants.fxy_cxy, ...
+    Msckf2Constants.fxy_cxy_std);
 legend('f_x','f_y','c_x','c_y','3\sigma_f_x', '3\sigma_f_y','3\sigma_c_x','3\sigma_c_y');
-grid on;
-xlabel('time [sec]');
-title('Error ($f_x$, $f_y$), ($c_x$, $c_y$)', 'Interpreter', 'Latex');
-ylabel('pixel');
-set(gca,'FontSize',fontsize);
+ylabel('deviation from nominal values ($f_x$, $f_y$), ($c_x$, $c_y$)[px]', 'Interpreter', 'Latex');
+outputfig = [output_dir, '/fxy_cxy.eps'];
+if exist(outputfig, 'file')==2
+  delete(outputfig);
+end
+export_fig(outputfig);
 
+figure;
+draw_ekf_triplet_with_std(data, Msckf2Constants.k1_k2, Msckf2Constants.k1_k2_std);
+ylabel('k_1 and k_2[1]');
+legend('k_1','k_2', '3\sigma_{k_1}', '3\sigma_{k_2}');
+outputfig = [output_dir, '/k1_k2.eps'];
+if exist(outputfig, 'file')==2
+  delete(outputfig);
+end
+export_fig(outputfig);
 
-figNumber = figNumber +1;
-figure(figNumber);
-p1p2Scale= 1e2;
-showP1P2= true;
-plot(data(:,1), data(:, 53), '-r'); hold on;
-plot(data(:,1), data(:, 54), '-g');
-if(showP1P2)
-    plot(data(:,1), data(:, 55)*p1p2Scale, '-b');
-    plot(data(:,1), data(:, 56)*p1p2Scale, '-k');
+figure;
+p1p2Scale = 1e2;
+draw_ekf_triplet_with_std(data, Msckf2Constants.p1_p2, Msckf2Constants.p1_p2_std, p1p2Scale);
+ylabel('p_1 and p_2[0.01]');
+legend('p_1','p_2', '3\sigma_{p_1}', '3\sigma_{p_2}');
+outputfig = [output_dir, '/p1_p2.eps'];
+if exist(outputfig, 'file')==2
+  delete(outputfig);
 end
-% photoscan_calib_result= [0.1377 -0.3436 5.2e-4 -3.5e-4];
-% tile_data= repmat(photoscan_calib_result, size(data,1), 1);
-% plot(data(:,1), tile_data(:,1), '.r'); hold on;
-% plot(data(:,1), tile_data(:,2), '.g');
-if(showP1P2)
-%     plot(data(:,1), tile_data(:,3)*p1p2Scale, '.b');
-%     plot(data(:,1), tile_data(:,4)*p1p2Scale, '.k');
-end
-plot(data(:,1), data(:, 53)+3*data(:, 108), '--r');
-plot(data(:,1), data(:, 54)+3*data(:, 109), '--g');
-if(showP1P2)
-    plot(data(:,1), (data(:, 55)+3*data(:, 110))*p1p2Scale, '--b');
-    plot(data(:,1), (data(:, 56)+3*data(:, 111))*p1p2Scale, '--k');
-end
-plot(data(:,1), data(:, 53)-3*data(:, 108), '--r');
-plot(data(:,1), data(:, 54)-3*data(:, 109), '--g');
-if(showP1P2)
-    plot(data(:,1), (data(:, 55)-3*data(:, 110))*p1p2Scale, '--b');
-    plot(data(:,1), (data(:, 56)-3*data(:, 111))*p1p2Scale, '--k');
-    
-    legend('k_1','k_2','p_1','p_2','ref k_1','ref k_2','ref p_1','ref p_2', '3\sigma_{k_1}', '3\sigma_{k_2}', '3\sigma_{p_1}', '3\sigma_{p_2}');
-    
-    title('($k_1$, $k_2$, $p_1$, $p_2$)', 'Interpreter', 'Latex');
-else
-    legend('k_1','k_2','ref k_1','ref k_2', '3\sigma_{k_1}', '3\sigma_{k_2}');
-    legend('k_1','k_2', '3\sigma_{k_1}', '3\sigma_{k_2}');
-    
-    title('($k_1$, $k_2$)', 'Interpreter', 'Latex');
-end
-grid on;
-xlabel('time [sec]');
-set(gca,'FontSize',fontsize);
+export_fig(outputfig);
 
-figNumber = intermediatePlotter(figNumber, data, ...
-   nominal_intrinsics'*2, output_dir, fontsize);
+intermediatePlotter(data, output_dir);
+
+averageMsckf2VariableEstimates(original_data);
+end
+
