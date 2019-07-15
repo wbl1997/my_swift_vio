@@ -1033,6 +1033,8 @@ void MSCKF2::retrieveEstimatesOfConstants() {
 }
 
 // TODO(jhuai): hpbid homogeneous point block id, used only for debug
+// TODO(jhuai): make the func const relative to MSCKF2 instance by removing
+// timers and make iem_ local
 // assume the rolling shutter camera reads data row by row, and rows are
 //     aligned with the width of a frame
 // some heuristics to defend outliers is used, e.g., ignore correspondences of
@@ -1794,319 +1796,9 @@ void MSCKF2::updateStates(
   updateStatesTimer.stop();
 }
 
-#ifdef USE_IEKF
-// iterated extended Kalman filter
-void MSCKF2::optimize(bool verbose) {
-  // containers of Jacobians of measurements
-  std::vector<Eigen::MatrixXd, Eigen::aligned_allocator<Eigen::MatrixXd>> vr_o;
-  std::vector<Eigen::MatrixXd, Eigen::aligned_allocator<Eigen::MatrixXd>> vH_o;
-  std::vector<Eigen::MatrixXd, Eigen::aligned_allocator<Eigen::MatrixXd>> vR_o;
-  // gather tracks of features that are not tracked in current frame
-  uint64_t currFrameId = currentFrameId();
-
-  OKVIS_ASSERT_EQ(
-      Exception,
-      covDim_ - 51 -
-          cameras::RadialTangentialDistortion::NumDistortionIntrinsics,
-      9 * statesMap_.size(), "Inconsistent covDim and number of states");
-
-  retrieveEstimatesOfConstants();
-  size_t dimH_o[2] = {0, nVariableDim_};
-
-  mLandmarkID2Residualize.clear();
-  size_t tempCounter = 0;
-  Eigen::MatrixXd variableCov = covariance_.block(42, 42, dimH_o[1], dimH_o[1]);
-
-  for (auto it = landmarksMap_.begin(); it != landmarksMap_.end();
-       ++it, ++tempCounter) {
-    ResidualizeCase toResidualize = NotInState_NotTrackedNow;
-
-    for (auto itObs = it->second.observations.rbegin(),
-              iteObs = it->second.observations.rend();
-         itObs != iteObs; ++itObs) {
-      if (itObs->first.frameId == currFrameId) {
-        toResidualize = NotToAdd_TrackedNow;
-        break;
-      }
-    }
-    mLandmarkID2Residualize.push_back(
-        std::make_pair(it->second.id, toResidualize));
-  }
-
-  /// iterations of EKF
-  Eigen::Matrix<double, Eigen::Dynamic, 1> deltaX,
-      tempDeltaX;  // record the last update step, used to cancel last update in
-                   // IEKF
-  size_t numIteration = 0;
-  const double epsilon = 1e-3;
-  Eigen::MatrixXd r_q, T_H, R_q, S, K;
-
-  while (numIteration < 5) {
-    if (numIteration) {
-      updateStates(-deltaX);  // effectively undo last update in IEKF
-      //            std::cout << "after undo update "<< print(std::cout)<<
-      //            std::endl;
-    }
-    size_t nMarginalizedFeatures = 0;
-    tempCounter = 0;
-    dimH_o[0] = 0;
-    vr_o.clear();
-    vR_o.clear();
-    vH_o.clear();
-
-    for (auto it = landmarksMap_.begin(); it != landmarksMap_.end();
-         ++it, ++tempCounter) {
-      const size_t nNumObs = it->second.observations.size();
-      if (mLandmarkID2Residualize[tempCounter].second !=
-              NotInState_NotTrackedNow ||
-          nNumObs < 3)  // TODO: is 3 too harsh?
-        continue;
-
-      // the rows of H_oi (denoted by nObsDim), and r_oi, and size of R_oi may
-      // be resized in computeHoi
-      Eigen::MatrixXd H_oi;                           //(nObsDim, dimH_o[1])
-      Eigen::Matrix<double, Eigen::Dynamic, 1> r_oi;  //(nObsDim, 1)
-      Eigen::MatrixXd R_oi;                           //(nObsDim, nObsDim)
-      bool isValidJacobian =
-          computeHoi(it->first, it->second, r_oi, H_oi, R_oi);
-      if (!isValidJacobian) continue;
-
-      if (FLAGS_use_mahalanobis) {
-        // this test looks time consuming as it involves matrix inversion.
-        // alternatively, some heuristics in computeHoi is used, e.g., ignore
-        // correspondences of too large discrepancy remove outliders, cf. Li
-        // ijrr2014 visual inertial navigation with rolling shutter cameras
-        double gamma =
-            r_oi.transpose() *
-            (H_oi * variableCov * H_oi.transpose() + R_oi).inverse() * r_oi;
-        if (gamma > chi2_95percentile[r_oi.rows()]) continue;
-      }
-
-      vr_o.push_back(r_oi);
-      vR_o.push_back(R_oi);
-      vH_o.push_back(H_oi);
-      dimH_o[0] += r_oi.rows();
-      ++nMarginalizedFeatures;
-    }
-
-    if (dimH_o[0] == 0) {
-      //            LOG(WARNING) << "zero valid support from landmarks#"<<
-      //            landmarksMap_.size();
-
-      // update minValidStateID, so that these old frames are removed later
-      size_t tempCounter = 0;
-      minValidStateID = statesMap_.rbegin()->first;
-      for (auto it = landmarksMap_.begin(); it != landmarksMap_.end();
-           ++it, ++tempCounter) {
-        if (mLandmarkID2Residualize[tempCounter].second ==
-            NotInState_NotTrackedNow)
-          continue;
-
-        auto itObs = it->second.observations.begin();
-        if (itObs->first.frameId <
-            minValidStateID)  // this assume that it->second.observations is an
-                              // ordered map
-          minValidStateID = itObs->first.frameId;
-      }
-      return;
-    }
-
-    computeKalmanGainTimer.start();
-    // stack the marginalized Jacobians and residuals
-    Eigen::MatrixXd H_o = Eigen::MatrixXd::Zero(dimH_o[0], nVariableDim_);
-    Eigen::MatrixXd r_o(dimH_o[0], 1);
-    Eigen::MatrixXd R_o = Eigen::MatrixXd::Zero(dimH_o[0], dimH_o[0]);
-    int startRow = 0;
-
-    for (size_t jack = 0; jack < nMarginalizedFeatures; ++jack) {
-      H_o.block(startRow, 0, vH_o[jack].rows(), dimH_o[1]) = vH_o[jack];
-      r_o.block(startRow, 0, vH_o[jack].rows(), 1) = vr_o[jack];
-      R_o.block(startRow, startRow, vH_o[jack].rows(), vH_o[jack].rows()) =
-          vR_o[jack];
-      startRow += vH_o[jack].rows();
-    }
-
-    if (r_o.rows() <= (int)nVariableDim_)  // no need to reduce rows of H_o
-    {
-      r_q = r_o;
-      T_H = H_o;
-      R_q = R_o;
-    } else {  // project H_o into H_x, reduce the residual dimension
-      Eigen::HouseholderQR<Eigen::MatrixXd> qr(H_o);
-      Eigen::MatrixXd thinQ(Eigen::MatrixXd::Identity(H_o.rows(), H_o.cols()));
-      thinQ = qr.householderQ() * thinQ;
-
-      r_q = thinQ.transpose() * r_o;
-      R_q = thinQ.transpose() * R_o * thinQ;
-      Eigen::MatrixXd R = qr.matrixQR().triangularView<Eigen::Upper>();
-
-      for (size_t row = 0; row < nVariableDim_ /*R.rows()*/; ++row) {
-        for (size_t col = 0; col < nVariableDim_ /*R.cols()*/; ++col) {
-          if (fabs(R(row, col)) < 1e-10) R(row, col) = 0;
-        }
-      }
-      T_H = R.block(0, 0, nVariableDim_, nVariableDim_);
-    }
-
-    // Calculate Kalman gain
-    S = T_H *
-            covariance_.block(okvis::ceres::ode::OdoErrorStateDim,
-                              okvis::ceres::ode::OdoErrorStateDim,
-                              nVariableDim_, nVariableDim_) *
-            T_H.transpose() +
-        R_q;
-
-    K = (covariance_.block(0, okvis::ceres::ode::OdoErrorStateDim, covDim_,
-                           nVariableDim_) *
-         T_H.transpose()) *
-        S.inverse();
-
-    // State correction
-    //        std::cout << "before update "<< print(std::cout)<< std::endl;
-    if (numIteration) {
-      tempDeltaX =
-          K * (r_q + T_H * deltaX.segment(okvis::ceres::ode::OdoErrorStateDim,
-                                          nVariableDim_));
-      if (std::isnan(tempDeltaX(0)) || std::isnan(tempDeltaX(1))) {
-        OKVIS_ASSERT_TRUE(Exception, false, "nan in kalman filter");
-      }
-      computeKalmanGainTimer.stop();
-      //            if((tempDeltaX.head<15>().cwiseQuotient(deltaX.head<15>())).lpNorm<Eigen::Infinity>()>2)//this
-      //            causes worse result
-      //                break;
-
-      updateStates(tempDeltaX);
-      if ((deltaX - tempDeltaX).lpNorm<Eigen::Infinity>() < epsilon) break;
-
-      //            double normInf = (deltaX-
-      //            tempDeltaX).lpNorm<Eigen::Infinity>(); std::cout <<"iter "<<
-      //            numIteration<<" normInf "<<normInf<<" normInf<eps?"<<
-      //            (bool)(normInf<epsilon)<<std::endl<<
-      //                            (deltaX- tempDeltaX).transpose()<<std::endl;
-
-    } else {
-      tempDeltaX = K * r_q;
-      if (std::isnan(tempDeltaX(0)) || std::isnan(tempDeltaX(1))) {
-        OKVIS_ASSERT_TRUE(Exception, false, "nan in kalman filter");
-      }
-      computeKalmanGainTimer.stop();
-
-      updateStates(tempDeltaX);
-      if (tempDeltaX.lpNorm<Eigen::Infinity>() < epsilon) break;
-    }
-    // for debugging
-    double tempNorm = tempDeltaX.head<15>().lpNorm<Eigen::Infinity>();
-    if (tempNorm > FLAGS_max_inc_tol) {
-      std::cout << tempDeltaX.transpose() << std::endl;
-      OKVIS_ASSERT_LT(Exception, tempNorm, FLAGS_max_inc_tol,
-                      "Warn too large increment>2 may imply wrong association");
-    }
-    // end debugging
-    deltaX = tempDeltaX;
-    ++numIteration;
-  }
-
-  //    std::cout << "IEKF iterations "<<numIteration<<std::endl;
-  // Covariance correction
-  updateCovarianceTimer.start();
-
-#if 0
-    Eigen::MatrixXd tempMat = Eigen::MatrixXd::Identity(covDim_, covDim_);
-    tempMat.block(0, okvis::ceres::ode::OdoErrorStateDim, covDim_, nVariableDim_) -= K*T_H;
-    covariance_ = tempMat * (covariance_ * tempMat.transpose()).eval() + K * R_q * K.transpose(); //joseph form
-#else
-  covariance_ = covariance_ - K * S * K.transpose();  // alternative
-#endif
-  double minDiagVal = covariance_.diagonal().minCoeff();
-  if (minDiagVal < 0) {
-    std::cout << "Warn: current diagonal has negative " << std::endl
-              << covariance_.diagonal().transpose() << std::endl;
-    OKVIS_ASSERT_GT(Exception, minDiagVal, 0,
-                    "negative covariance diagonal elements less than 0.000");
-    covariance_.diagonal() =
-        covariance_.diagonal().cwiseAbs();  // TODO: hack is ugly!
-  }
-  updateCovarianceTimer.stop();
-  // update landmarks that are tracked in the current frame(the newly inserted
-  // state)
-  {
-    updateLandmarksTimer.start();
-    retrieveEstimatesOfConstants();  // do this because states are just updated
-    size_t tempCounter = 0;
-    minValidStateID = statesMap_.rbegin()->first;
-    for (auto it = landmarksMap_.begin(); it != landmarksMap_.end();
-         ++it, ++tempCounter) {
-      if (mLandmarkID2Residualize[tempCounter].second ==
-          NotInState_NotTrackedNow)
-        continue;
-      // this happens with a just inserted landmark without triangulation.
-      if (it->second.observations.size() < 2) continue;
-
-      auto itObs = it->second.observations.begin();
-      if (itObs->first.frameId <
-          minValidStateID)  // this assume that it->second.observations is an
-                            // ordered map
-        minValidStateID = itObs->first.frameId;
-
-      // update coordinates of map points, this is only necessary when
-      // (1) they are used to predict the points projection in new frames OR
-      // (2) to visualize the point quality
-      std::vector<Eigen::Vector2d, Eigen::aligned_allocator<Eigen::Vector2d>>
-          obsInPixel;
-      std::vector<uint64_t> frameIds;
-      std::vector<double> vRi;  // std noise in pixels
-      Eigen::Vector4d v4Xhomog;
-      const int camIdx = 0;
-      okvis::cameras::PinholeCamera<okvis::cameras::RadialTangentialDistortion>
-          *tempCameraGeometry = dynamic_cast<okvis::cameras::PinholeCamera<
-              okvis::cameras::RadialTangentialDistortion> *>(
-              camera_rig_.getCameraGeometry(camIdx).get());
-      bool bSucceeded =
-          triangulateAMapPoint(it->second, obsInPixel, frameIds, v4Xhomog, vRi,
-                               *tempCameraGeometry, T_SC0_, it->first, false);
-      if (bSucceeded) {
-        it->second.quality = 1.0;
-        it->second.pointHomog = v4Xhomog;
-      } else {
-        it->second.quality = 0.0;
-      }
-    }
-    updateLandmarksTimer.stop();
-  }
-
-  // summary output
-  if (verbose) {
-    LOG(INFO) << mapPtr_->summary.FullReport();
-  }
-}
-#else  // extended kalman filter
-
-void MSCKF2::optimize(bool verbose) {
-  uint64_t currFrameId = currentFrameId();
-  OKVIS_ASSERT_EQ(
-      Exception,
-      covDim_ - 51 -
-          cameras::RadialTangentialDistortion::NumDistortionIntrinsics,
-      9 * statesMap_.size(), "Inconsistent covDim and number of states");
-  retrieveEstimatesOfConstants();
-
-  // mark tracks of features that are not tracked in current frame
-  mLandmarkID2Residualize.clear();
-  for (auto it = landmarksMap_.begin(); it != landmarksMap_.end(); ++it) {
-    ResidualizeCase toResidualize = NotInState_NotTrackedNow;
-
-    for (auto itObs = it->second.observations.rbegin(),
-              iteObs = it->second.observations.rend();
-         itObs != iteObs; ++itObs) {
-      if (itObs->first.frameId == currFrameId) {
-        toResidualize = NotToAdd_TrackedNow;
-        break;
-      }
-    }
-    mLandmarkID2Residualize.push_back(
-        std::make_pair(it->second.id, toResidualize));
-  }
-
+int MSCKF2::computeStackedJacobianAndResidual(
+    Eigen::MatrixXd *T_H, Eigen::Matrix<double, Eigen::Dynamic, 1> *r_q,
+    Eigen::MatrixXd *R_q) {
   // compute and stack Jacobians and Residuals for landmarks observed no more
   size_t nMarginalizedFeatures = 0;
   int culledPoints[2] = {0};
@@ -2123,8 +1815,9 @@ void MSCKF2::optimize(bool verbose) {
     const size_t nNumObs = it->second.observations.size();
     if (mLandmarkID2Residualize[tempCounter].second !=
             NotInState_NotTrackedNow ||
-        nNumObs < 3)  // TODO: is 3 too harsh?
+        nNumObs < 3) {  // TODO: is 3 too harsh?
       continue;
+    }
 
     // the rows of H_oi (denoted by nObsDim), and r_oi, and size of R_oi may
     // be resized in computeHoi
@@ -2162,28 +1855,8 @@ void MSCKF2::optimize(bool verbose) {
   //    nMarginalizedFeatures<<" cull points "<< culledPoints[0] << " "<<
   //    culledPoints[1]<<std::endl;
   if (dimH_o[0] == 0) {
-    //        LOG(WARNING) << "zero valid support from landmarks#"<<
-    //        landmarksMap_.size();
-
-    // update minValidStateID, so that these old frames are removed later
-    size_t tempCounter = 0;
-    minValidStateID = statesMap_.rbegin()->first;
-    for (auto it = landmarksMap_.begin(); it != landmarksMap_.end();
-         ++it, ++tempCounter) {
-      if (mLandmarkID2Residualize[tempCounter].second ==
-          NotInState_NotTrackedNow)
-        continue;
-
-      auto itObs = it->second.observations.begin();
-      if (itObs->first.frameId <
-          minValidStateID)  // this assume that it->second.observations is an
-                            // ordered map
-        minValidStateID = itObs->first.frameId;
-    }
-    return;
+    return 0;
   }
-
-  computeKalmanGainTimer.start();
   // stack the marginalized Jacobians and residuals
   Eigen::MatrixXd H_o = Eigen::MatrixXd::Zero(dimH_o[0], nVariableDim_);
   Eigen::MatrixXd r_o(dimH_o[0], 1);
@@ -2198,19 +1871,17 @@ void MSCKF2::optimize(bool verbose) {
     startRow += vH_o[jack].rows();
   }
 
-  Eigen::MatrixXd r_q, T_H, R_q;
-
   if (r_o.rows() <= (int)nVariableDim_)  // no need to reduce rows of H_o
   {
-    r_q = r_o;
-    T_H = H_o;
-    R_q = R_o;
+    *r_q = r_o;
+    *T_H = H_o;
+    *R_q = R_o;
 
-    // make T_H compatible with covariance dimension by expanding T_H with zeros
-    // corresponding to the rest states besides nVariableDim
+    // make T_H compatible with covariance dimension by expanding T_H with
+    // zeros corresponding to the rest states besides nVariableDim
     //        Eigen::MatrixXd expandedT_H(dimH_o[0], covDim_);
-    //        expandedT_H<< Eigen::MatrixXd::Zero(dimH_o[0], 42), T_H,
-    //        Eigen::MatrixXd::Zero(dimH_o[0], 9); T_H= expandedT_H;
+    //        expandedT_H<< Eigen::MatrixXd::Zero(dimH_o[0], 42), *T_H,
+    //        Eigen::MatrixXd::Zero(dimH_o[0], 9); *T_H = expandedT_H;
   } else {  // project H_o, reduce the residual dimension
     // TODO: use SPQR instead for computing T_H, refer to MSCKF_stereo
     // https://github.com/KumarRobotics/msckf_vio/blob/master/src/msckf_vio.cpp#L930-L950
@@ -2218,8 +1889,8 @@ void MSCKF2::optimize(bool verbose) {
     Eigen::MatrixXd thinQ(Eigen::MatrixXd::Identity(H_o.rows(), H_o.cols()));
     thinQ = qr.householderQ() * thinQ;
 
-    r_q = thinQ.transpose() * r_o;
-    R_q = thinQ.transpose() * R_o * thinQ;
+    *r_q = thinQ.transpose() * r_o;
+    *R_q = thinQ.transpose() * R_o * thinQ;
     Eigen::MatrixXd R = qr.matrixQR().triangularView<Eigen::Upper>();
 
     for (size_t row = 0; row < nVariableDim_ /*R.rows()*/; ++row) {
@@ -2227,18 +1898,120 @@ void MSCKF2::optimize(bool verbose) {
         if (fabs(R(row, col)) < 1e-10) R(row, col) = 0;
       }
     }
-    T_H = R.block(0, 0, nVariableDim_, nVariableDim_);
+    *T_H = R.block(0, 0, nVariableDim_, nVariableDim_);
   }
-  computeKalmanGainTimer.stop();
-  PreconditionedEkfUpdater pceu(covariance_, nVariableDim_);
-  Eigen::Matrix<double, Eigen::Dynamic, 1> deltaX =
-      pceu.computeCorrection(T_H, r_q, R_q);
-  updateStates(deltaX);
-  // Covariance correction
-  updateCovarianceTimer.start();
-  pceu.updateCovariance(&covariance_);
-  updateCovarianceTimer.stop();
 
+  return dimH_o[0];
+}
+
+uint64_t MSCKF2::getMinValidStateID() const {
+  size_t tempCounter = 0;
+  uint64_t min_state_id = statesMap_.rbegin()->first;
+  for (auto it = landmarksMap_.begin(); it != landmarksMap_.end();
+       ++it, ++tempCounter) {
+    if (mLandmarkID2Residualize[tempCounter].second == NotInState_NotTrackedNow)
+      continue;
+
+    auto itObs = it->second.observations.begin();
+    if (itObs->first.frameId <
+        min_state_id) {  // this assume that it->second.observations is an
+                         // ordered map
+      min_state_id = itObs->first.frameId;
+    }
+  }
+  return min_state_id;
+}
+
+void MSCKF2::optimize(bool verbose) {
+  uint64_t currFrameId = currentFrameId();
+  OKVIS_ASSERT_EQ(
+      Exception,
+      covDim_ - 51 -
+          cameras::RadialTangentialDistortion::NumDistortionIntrinsics,
+      9 * statesMap_.size(), "Inconsistent covDim and number of states");
+  retrieveEstimatesOfConstants();
+
+  // mark tracks of features that are not tracked in current frame
+  mLandmarkID2Residualize.clear();
+  for (auto it = landmarksMap_.begin(); it != landmarksMap_.end(); ++it) {
+    ResidualizeCase toResidualize = NotInState_NotTrackedNow;
+
+    for (auto itObs = it->second.observations.rbegin(),
+              iteObs = it->second.observations.rend();
+         itObs != iteObs; ++itObs) {
+      if (itObs->first.frameId == currFrameId) {
+        toResidualize = NotToAdd_TrackedNow;
+        break;
+      }
+    }
+    mLandmarkID2Residualize.push_back(
+        std::make_pair(it->second.id, toResidualize));
+  }
+
+  if (FLAGS_use_IEKF) {
+    Eigen::Matrix<double, Eigen::Dynamic, 1> deltaX,
+        tempDeltaX;  // record the last update step, used to cancel last update
+                     // in IEKF
+    size_t numIteration = 0;
+    const double epsilon = 1e-3;
+    PreconditionedEkfUpdater pceu(covariance_, nVariableDim_);
+    while (numIteration < 5) {
+      if (numIteration) {
+        updateStates(-deltaX);  // effectively undo last update in IEKF
+      }
+      Eigen::MatrixXd T_H, R_q;
+      Eigen::Matrix<double, Eigen::Dynamic, 1> r_q;
+      int numResiduals = computeStackedJacobianAndResidual(&T_H, &r_q, &R_q);
+      if (numResiduals == 0) {
+        // update minValidStateID, so that these old
+        // frames are removed later
+        minValidStateID = getMinValidStateID();
+        return;  // no need to optimize
+      }
+      computeKalmanGainTimer.start();
+      if (numIteration) {
+        tempDeltaX = pceu.computeCorrection(T_H, r_q, R_q, &deltaX);
+        updateStates(tempDeltaX);
+        if ((deltaX - tempDeltaX).lpNorm<Eigen::Infinity>() < epsilon) break;
+
+        //            double normInf = (deltaX-
+        //            tempDeltaX).lpNorm<Eigen::Infinity>(); std::cout <<"iter
+        //            "<< numIteration<<" normInf "<<normInf<<" normInf<eps?"<<
+        //            (bool)(normInf<epsilon)<<std::endl<<
+        //                            (deltaX-
+        //                            tempDeltaX).transpose()<<std::endl;
+
+      } else {
+        tempDeltaX = pceu.computeCorrection(T_H, r_q, R_q);
+        updateStates(tempDeltaX);
+        if (tempDeltaX.lpNorm<Eigen::Infinity>() < epsilon) break;
+      }
+      computeKalmanGainTimer.stop();
+      deltaX = tempDeltaX;
+      ++numIteration;
+    }
+    pceu.updateCovariance(&covariance_);
+  } else {
+    Eigen::MatrixXd T_H, R_q;
+    Eigen::Matrix<double, Eigen::Dynamic, 1> r_q;
+    int numResiduals = computeStackedJacobianAndResidual(&T_H, &r_q, &R_q);
+    if (numResiduals == 0) {
+      // update minValidStateID, so that these old
+      // frames are removed later
+      minValidStateID = getMinValidStateID();
+      return;  // no need to optimize
+    }
+    PreconditionedEkfUpdater pceu(covariance_, nVariableDim_);
+    computeKalmanGainTimer.start();
+    Eigen::Matrix<double, Eigen::Dynamic, 1> deltaX =
+        pceu.computeCorrection(T_H, r_q, R_q);
+    computeKalmanGainTimer.stop();
+    updateStates(deltaX);
+    // Covariance correction
+    updateCovarianceTimer.start();
+    pceu.updateCovariance(&covariance_);
+    updateCovarianceTimer.stop();
+  }
   // update landmarks that are tracked in the current frame(the newly inserted
   // state)
   {
@@ -2291,6 +2064,5 @@ void MSCKF2::optimize(bool verbose) {
     LOG(INFO) << mapPtr_->summary.FullReport();
   }
 }
-#endif
 
 }  // namespace okvis
