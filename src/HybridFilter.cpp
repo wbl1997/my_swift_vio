@@ -1095,6 +1095,8 @@ void HybridFilter::retrieveEstimatesOfConstants() {
       currFrameId, 0, SensorStates::Imu, ImuSensorStates::TA, vSM);
   vTGTSTA_.tail<9>() = vSM;
 
+  // we do not set bg and ba here because
+  // every time iem_ is used, resetBgBa is called
   iem_ = IMUErrorModel<double>(Eigen::Matrix<double, 6, 1>::Zero(), vTGTSTA_);
 }
 
@@ -1205,7 +1207,8 @@ bool HybridFilter::computeHxf(const uint64_t hpbid, const MapPoint& mp,
 
   kinematics::Transformation T_WB = T_WBj;
   SpeedAndBiases sb = sbj;
-  iem_.resetBgBa(sb.tail<6>());
+  IMUErrorModel<double> iem(iem_);
+  iem.resetBgBa(sb.tail<6>());
 
   if (FLAGS_use_RK4) {
     if (featureTime >= Duration()) {
@@ -1222,17 +1225,17 @@ bool HybridFilter::computeHxf(const uint64_t hpbid, const MapPoint& mp,
     int numUsedImuMeasurements = -1;
     if (featureTime >= Duration()) {
       numUsedImuMeasurements = IMUOdometry::propagation(
-          imuMeas, imuParametersVec_.at(0), T_WB, tempV_WS, iem_, stateEpoch,
+          imuMeas, imuParametersVec_.at(0), T_WB, tempV_WS, iem, stateEpoch,
           stateEpoch + featureTime);
     } else {
       numUsedImuMeasurements = IMUOdometry::propagationBackward(
-          imuMeas, imuParametersVec_.at(0), T_WB, tempV_WS, iem_, stateEpoch,
+          imuMeas, imuParametersVec_.at(0), T_WB, tempV_WS, iem, stateEpoch,
           stateEpoch + featureTime);
     }
     sb.head<3>() = tempV_WS;
   }
 
-  IMUOdometry::interpolateInertialData(imuMeas, iem_, stateEpoch + featureTime,
+  IMUOdometry::interpolateInertialData(imuMeas, iem, stateEpoch + featureTime,
                                        interpolatedInertialData);
   okvis::kinematics::Transformation T_WBa;
   get_T_WS(anchorId, T_WBa);
@@ -1282,11 +1285,11 @@ bool HybridFilter::computeHxf(const uint64_t hpbid, const MapPoint& mp,
     int numUsedImuMeasurements = -1;
     if (featureTime >= Duration()) {
       numUsedImuMeasurements = IMUOdometry::propagation(
-          imuMeas, imuParametersVec_.at(0), lP_T_WB, tempV_WS, iem_, stateEpoch,
+          imuMeas, imuParametersVec_.at(0), lP_T_WB, tempV_WS, iem, stateEpoch,
           stateEpoch + featureTime);
     } else {
       numUsedImuMeasurements = IMUOdometry::propagationBackward(
-          imuMeas, imuParametersVec_.at(0), lP_T_WB, tempV_WS, iem_, stateEpoch,
+          imuMeas, imuParametersVec_.at(0), lP_T_WB, tempV_WS, iem, stateEpoch,
           stateEpoch + featureTime);
     }
     lP_sb.head<3>() = tempV_WS;
@@ -1354,11 +1357,11 @@ bool HybridFilter::computeHxf(const uint64_t hpbid, const MapPoint& mp,
 // aligned with the width of a frame some heuristics to defend outliers is
 // used, e.g., ignore correspondences of too large discrepancy between
 // prediction and measurement
-bool HybridFilter::computeHoi(const uint64_t hpbid, const MapPoint& mp,
-                              Eigen::Matrix<double, Eigen::Dynamic, 1>& r_oi,
-                              Eigen::MatrixXd& H_oi, Eigen::MatrixXd& R_oi,
-                              Eigen::Vector4d& ab1rho,
-                              Eigen::Matrix<double, Eigen::Dynamic, 3>* pH_fi) {
+bool HybridFilter::computeHoi(
+    const uint64_t hpbid, const MapPoint& mp,
+    Eigen::Matrix<double, Eigen::Dynamic, 1>& r_oi, Eigen::MatrixXd& H_oi,
+    Eigen::MatrixXd& R_oi, Eigen::Vector4d& ab1rho,
+    Eigen::Matrix<double, Eigen::Dynamic, 3>* pH_fi) const {
   computeHTimer.start();
 
   std::vector<Eigen::Vector2d, Eigen::aligned_allocator<Eigen::Vector2d>>
@@ -1500,7 +1503,8 @@ bool HybridFilter::computeHoi(const uint64_t hpbid, const MapPoint& mp,
 
     kinematics::Transformation T_WB = T_WBj;
     SpeedAndBiases sb = sbj;
-    iem_.resetBgBa(sb.tail<6>());
+    IMUErrorModel<double> iem(iem_);
+    iem.resetBgBa(sb.tail<6>());
     if (FLAGS_use_RK4) {
       if (featureTime >= Duration()) {
         IMUOdometry::propagation_RungeKutta(imuMeas, imuParametersVec_.at(0),
@@ -1516,18 +1520,18 @@ bool HybridFilter::computeHoi(const uint64_t hpbid, const MapPoint& mp,
       int numUsedImuMeasurements = -1;
       if (featureTime >= Duration()) {
         numUsedImuMeasurements = IMUOdometry::propagation(
-            imuMeas, imuParametersVec_.at(0), T_WB, tempV_WS, iem_, stateEpoch,
+            imuMeas, imuParametersVec_.at(0), T_WB, tempV_WS, iem, stateEpoch,
             stateEpoch + featureTime);
       } else {
         numUsedImuMeasurements = IMUOdometry::propagationBackward(
-            imuMeas, imuParametersVec_.at(0), T_WB, tempV_WS, iem_, stateEpoch,
+            imuMeas, imuParametersVec_.at(0), T_WB, tempV_WS, iem, stateEpoch,
             stateEpoch + featureTime);
       }
       sb.head<3>() = tempV_WS;
     }
 
-    IMUOdometry::interpolateInertialData(
-        imuMeas, iem_, stateEpoch + featureTime, interpolatedInertialData);
+    IMUOdometry::interpolateInertialData(imuMeas, iem, stateEpoch + featureTime,
+                                         interpolatedInertialData);
 
     okvis::kinematics::Transformation T_CA =
         (T_WB * T_SC0_).inverse() *
@@ -1578,11 +1582,11 @@ bool HybridFilter::computeHoi(const uint64_t hpbid, const MapPoint& mp,
       int numUsedImuMeasurements = -1;
       if (featureTime >= Duration()) {
         numUsedImuMeasurements = IMUOdometry::propagation(
-            imuMeas, imuParametersVec_.at(0), lP_T_WB, tempV_WS, iem_,
+            imuMeas, imuParametersVec_.at(0), lP_T_WB, tempV_WS, iem,
             stateEpoch, stateEpoch + featureTime);
       } else {
         numUsedImuMeasurements = IMUOdometry::propagationBackward(
-            imuMeas, imuParametersVec_.at(0), lP_T_WB, tempV_WS, iem_,
+            imuMeas, imuParametersVec_.at(0), lP_T_WB, tempV_WS, iem,
             stateEpoch, stateEpoch + featureTime);
       }
       lP_sb.head<3>() = tempV_WS;
@@ -1618,20 +1622,26 @@ bool HybridFilter::computeHoi(const uint64_t hpbid, const MapPoint& mp,
                                  NumDistortionIntrinsics>() = J_Xc;
 
     if (poseId == anchorId) {
+      std::map<uint64_t, int>::const_iterator poseid_iter =
+          mStateID2CovID_.find(poseId);
       H_x.block<2, 6>(0, 9 +
                              okvis::cameras::RadialTangentialDistortion::
                                  NumDistortionIntrinsics +
-                             9 * mStateID2CovID_[poseId] + 3) =
+                             9 * poseid_iter->second + 3) =
           (J_XBj + J_XBa).block<2, 6>(0, 3);
     } else {
+      std::map<uint64_t, int>::const_iterator poseid_iter =
+          mStateID2CovID_.find(poseId);
       H_x.block<2, 9>(0, 9 +
                              okvis::cameras::RadialTangentialDistortion::
                                  NumDistortionIntrinsics +
-                             9 * mStateID2CovID_[poseId]) = J_XBj;
+                             9 * poseid_iter->second) = J_XBj;
+      std::map<uint64_t, int>::const_iterator anchorid_iter =
+          mStateID2CovID_.find(anchorId);
       H_x.block<2, 9>(0, 9 +
                              okvis::cameras::RadialTangentialDistortion::
                                  NumDistortionIntrinsics +
-                             9 * mStateID2CovID_[anchorId]) = J_XBa;
+                             9 * anchorid_iter->second) = J_XBa;
     }
 
     vJ_X.push_back(H_x);
@@ -2824,7 +2834,7 @@ bool HybridFilter::triangulateAMapPoint(
     const cameras::PinholeCamera<cameras::RadialTangentialDistortion>&
         cameraGeometry,
     const kinematics::Transformation& T_SC0, const uint64_t& hpbid,
-    bool use_AIDP) {
+    bool use_AIDP) const {
   triangulateTimer.start();
 
   // each entry is undistorted coordinates in image plane at

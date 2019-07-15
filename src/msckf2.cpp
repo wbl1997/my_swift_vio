@@ -1029,19 +1029,19 @@ void MSCKF2::retrieveEstimatesOfConstants() {
       vSM);
   vTGTSTA_.tail<9>() = vSM;
 
+  // we do not set bg and ba here because
+  // every time iem_ is used, resetBgBa is called
   iem_ = IMUErrorModel<double>(Eigen::Matrix<double, 6, 1>::Zero(), vTGTSTA_);
 }
 
 // TODO(jhuai): hpbid homogeneous point block id, used only for debug
-// TODO(jhuai): make the func const relative to MSCKF2 instance by removing
-// timers and make iem_ local
 // assume the rolling shutter camera reads data row by row, and rows are
 //     aligned with the width of a frame
 // some heuristics to defend outliers is used, e.g., ignore correspondences of
 //     too large discrepancy between prediction and measurement
 bool MSCKF2::computeHoi(const uint64_t hpbid, const MapPoint &mp,
                         Eigen::Matrix<double, Eigen::Dynamic, 1> &r_oi,
-                        Eigen::MatrixXd &H_oi, Eigen::MatrixXd &R_oi) {
+                        Eigen::MatrixXd &H_oi, Eigen::MatrixXd &R_oi) const {
   const int camIdx = 0;
   okvis::cameras::PinholeCamera<okvis::cameras::RadialTangentialDistortion>
       *tempCameraGeometry = dynamic_cast<okvis::cameras::PinholeCamera<
@@ -1187,7 +1187,8 @@ bool MSCKF2::computeHoi(const uint64_t hpbid, const MapPoint &mp,
 
       kinematics::Transformation T_WB = T_WBj;
       SpeedAndBiases sb = sbj;
-      iem_.resetBgBa(sb.tail<6>());
+      IMUErrorModel<double> iem(iem_);
+      iem.resetBgBa(sb.tail<6>());
       if (FLAGS_use_RK4) {
         if (featureTime >= Duration()) {
           IMUOdometry::propagation_RungeKutta(imuMeas, imuParametersVec_.at(0),
@@ -1203,18 +1204,18 @@ bool MSCKF2::computeHoi(const uint64_t hpbid, const MapPoint &mp,
         int numUsedImuMeasurements = -1;
         if (featureTime >= Duration()) {
           numUsedImuMeasurements = IMUOdometry::propagation(
-              imuMeas, imuParametersVec_.at(0), T_WB, tempV_WS, iem_,
-              stateEpoch, stateEpoch + featureTime);
+              imuMeas, imuParametersVec_.at(0), T_WB, tempV_WS, iem, stateEpoch,
+              stateEpoch + featureTime);
         } else {
           numUsedImuMeasurements = IMUOdometry::propagationBackward(
-              imuMeas, imuParametersVec_.at(0), T_WB, tempV_WS, iem_,
-              stateEpoch, stateEpoch + featureTime);
+              imuMeas, imuParametersVec_.at(0), T_WB, tempV_WS, iem, stateEpoch,
+              stateEpoch + featureTime);
         }
         sb.head<3>() = tempV_WS;
       }
 
       IMUOdometry::interpolateInertialData(
-          imuMeas, iem_, stateEpoch + featureTime, interpolatedInertialData);
+          imuMeas, iem, stateEpoch + featureTime, interpolatedInertialData);
 
       okvis::kinematics::Transformation T_CA =
           (T_WB * T_SC0_).inverse() *
@@ -1266,11 +1267,11 @@ bool MSCKF2::computeHoi(const uint64_t hpbid, const MapPoint &mp,
         int numUsedImuMeasurements = -1;
         if (featureTime >= Duration()) {
           numUsedImuMeasurements = IMUOdometry::propagation(
-              imuMeas, imuParametersVec_.at(0), lP_T_WB, tempV_WS, iem_,
+              imuMeas, imuParametersVec_.at(0), lP_T_WB, tempV_WS, iem,
               stateEpoch, stateEpoch + featureTime);
         } else {
           numUsedImuMeasurements = IMUOdometry::propagationBackward(
-              imuMeas, imuParametersVec_.at(0), lP_T_WB, tempV_WS, iem_,
+              imuMeas, imuParametersVec_.at(0), lP_T_WB, tempV_WS, iem,
               stateEpoch, stateEpoch + featureTime);
         }
         lP_sb.head<3>() = tempV_WS;
@@ -1307,20 +1308,26 @@ bool MSCKF2::computeHoi(const uint64_t hpbid, const MapPoint &mp,
       H_x.topLeftCorner<2, 9 + okvis::cameras::RadialTangentialDistortion::
                                    NumDistortionIntrinsics>() = J_Xc;
       if (poseId == anchorId) {
+        std::map<uint64_t, int>::const_iterator poseid_iter =
+            mStateID2CovID_.find(poseId);
         H_x.block<2, 6>(0, 9 +
                                okvis::cameras::RadialTangentialDistortion::
                                    NumDistortionIntrinsics +
-                               9 * mStateID2CovID_[poseId] + 3) =
+                               9 * poseid_iter->second + 3) =
             (J_XBj + J_XBa).block<2, 6>(0, 3);
       } else {
+        std::map<uint64_t, int>::const_iterator poseid_iter =
+            mStateID2CovID_.find(poseId);
         H_x.block<2, 9>(0, 9 +
                                okvis::cameras::RadialTangentialDistortion::
                                    NumDistortionIntrinsics +
-                               9 * mStateID2CovID_[poseId]) = J_XBj;
+                               9 * poseid_iter->second) = J_XBj;
+        std::map<uint64_t, int>::const_iterator anchorid_iter =
+            mStateID2CovID_.find(anchorId);
         H_x.block<2, 9>(0, 9 +
                                okvis::cameras::RadialTangentialDistortion::
                                    NumDistortionIntrinsics +
-                               9 * mStateID2CovID_[anchorId]) = J_XBa;
+                               9 * anchorid_iter->second) = J_XBa;
       }
 
       vJ_X.push_back(H_x);
@@ -1467,7 +1474,8 @@ bool MSCKF2::computeHoi(const uint64_t hpbid, const MapPoint &mp,
 
       kinematics::Transformation T_WB = T_WBj;
       SpeedAndBiases sb = sbj;
-      iem_.resetBgBa(sb.tail<6>());
+      IMUErrorModel<double> iem(iem_);
+      iem.resetBgBa(sb.tail<6>());
       if (FLAGS_use_RK4) {
         if (featureTime >= Duration()) {
           IMUOdometry::propagation_RungeKutta(imuMeas, imuParametersVec_.at(0),
@@ -1483,18 +1491,18 @@ bool MSCKF2::computeHoi(const uint64_t hpbid, const MapPoint &mp,
         int numUsedImuMeasurements = -1;
         if (featureTime >= Duration()) {
           numUsedImuMeasurements = IMUOdometry::propagation(
-              imuMeas, imuParametersVec_.at(0), T_WB, tempV_WS, iem_,
-              stateEpoch, stateEpoch + featureTime);
+              imuMeas, imuParametersVec_.at(0), T_WB, tempV_WS, iem, stateEpoch,
+              stateEpoch + featureTime);
         } else {
           numUsedImuMeasurements = IMUOdometry::propagationBackward(
-              imuMeas, imuParametersVec_.at(0), T_WB, tempV_WS, iem_,
-              stateEpoch, stateEpoch + featureTime);
+              imuMeas, imuParametersVec_.at(0), T_WB, tempV_WS, iem, stateEpoch,
+              stateEpoch + featureTime);
         }
         sb.head<3>() = tempV_WS;
       }
 
       IMUOdometry::interpolateInertialData(
-          imuMeas, iem_, stateEpoch + featureTime, interpolatedInertialData);
+          imuMeas, iem, stateEpoch + featureTime, interpolatedInertialData);
 
       Eigen::Vector3d pfiinC = ((T_WB * T_SC0_).inverse() * v4Xhomog).head<3>();
       cameras::CameraBase::ProjectionStatus status =
@@ -1542,11 +1550,11 @@ bool MSCKF2::computeHoi(const uint64_t hpbid, const MapPoint &mp,
         int numUsedImuMeasurements = -1;
         if (featureTime >= Duration()) {
           numUsedImuMeasurements = IMUOdometry::propagation(
-              imuMeas, imuParametersVec_.at(0), lP_T_WB, tempV_WS, iem_,
+              imuMeas, imuParametersVec_.at(0), lP_T_WB, tempV_WS, iem,
               stateEpoch, stateEpoch + featureTime);
         } else {
           numUsedImuMeasurements = IMUOdometry::propagationBackward(
-              imuMeas, imuParametersVec_.at(0), lP_T_WB, tempV_WS, iem_,
+              imuMeas, imuParametersVec_.at(0), lP_T_WB, tempV_WS, iem,
               stateEpoch, stateEpoch + featureTime);
         }
         lP_sb.head<3>() = tempV_WS;
@@ -1597,11 +1605,12 @@ bool MSCKF2::computeHoi(const uint64_t hpbid, const MapPoint &mp,
       size_t saga2 = saga * 2;
       H_xi.block<2, 9 + okvis::cameras::RadialTangentialDistortion::
                             NumDistortionIntrinsics>(saga2, 0) = vJ_Xc[saga];
+      std::map<uint64_t, int>::const_iterator frmid_iter =
+          mStateID2CovID_.find(frameIds[saga]);
       H_xi.block<2, 9>(saga2, 9 +
                                   okvis::cameras::RadialTangentialDistortion::
                                       NumDistortionIntrinsics +
-                                  9 * mStateID2CovID_[frameIds[saga]]) =
-          vJ_XBj[saga];
+                                  9 * frmid_iter->second) = vJ_XBj[saga];
       H_fi.block<2, 3>(saga2, 0) = vJ_pfi[saga];
       ri.segment<2>(saga2) = vri[saga];
       Ri(saga2, saga2) *= (vRi[saga2] * vRi[saga2]);
@@ -1798,7 +1807,7 @@ void MSCKF2::updateStates(
 
 int MSCKF2::computeStackedJacobianAndResidual(
     Eigen::MatrixXd *T_H, Eigen::Matrix<double, Eigen::Dynamic, 1> *r_q,
-    Eigen::MatrixXd *R_q) {
+    Eigen::MatrixXd *R_q) const {
   // compute and stack Jacobians and Residuals for landmarks observed no more
   size_t nMarginalizedFeatures = 0;
   int culledPoints[2] = {0};
@@ -1968,9 +1977,11 @@ void MSCKF2::optimize(bool verbose) {
         minValidStateID = getMinValidStateID();
         return;  // no need to optimize
       }
-      computeKalmanGainTimer.start();
+
       if (numIteration) {
+        computeKalmanGainTimer.start();
         tempDeltaX = pceu.computeCorrection(T_H, r_q, R_q, &deltaX);
+        computeKalmanGainTimer.stop();
         updateStates(tempDeltaX);
         if ((deltaX - tempDeltaX).lpNorm<Eigen::Infinity>() < epsilon) break;
 
@@ -1982,15 +1993,19 @@ void MSCKF2::optimize(bool verbose) {
         //                            tempDeltaX).transpose()<<std::endl;
 
       } else {
+        computeKalmanGainTimer.start();
         tempDeltaX = pceu.computeCorrection(T_H, r_q, R_q);
+        computeKalmanGainTimer.stop();
         updateStates(tempDeltaX);
         if (tempDeltaX.lpNorm<Eigen::Infinity>() < epsilon) break;
       }
-      computeKalmanGainTimer.stop();
+
       deltaX = tempDeltaX;
       ++numIteration;
     }
+    updateCovarianceTimer.start();
     pceu.updateCovariance(&covariance_);
+    updateCovarianceTimer.stop();
   } else {
     Eigen::MatrixXd T_H, R_q;
     Eigen::Matrix<double, Eigen::Dynamic, 1> r_q;
@@ -2007,11 +2022,12 @@ void MSCKF2::optimize(bool verbose) {
         pceu.computeCorrection(T_H, r_q, R_q);
     computeKalmanGainTimer.stop();
     updateStates(deltaX);
-    // Covariance correction
+
     updateCovarianceTimer.start();
     pceu.updateCovariance(&covariance_);
     updateCovarianceTimer.stop();
   }
+
   // update landmarks that are tracked in the current frame(the newly inserted
   // state)
   {

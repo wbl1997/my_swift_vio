@@ -1,6 +1,10 @@
-function averageMsckf2VariableEstimates(msckf2_data)
+function averageMsckf2VariableEstimates(msckf2_data, log_file)
 % The msckf2 result has a format described in Msckf2Constants.m
-
+if nargin < 2
+    fileID = 1;
+else
+    fileID = fopen(log_file, 'w');    
+end
 startTime = msckf2_data(1, 1);
 endTime = msckf2_data(end, 1);
 sec_to_nanos = 1e9;
@@ -23,24 +27,46 @@ if(isempty(startIndex))
 end
 
 estimate_average = mean(msckf2_data(startIndex:endIndex, :), 1);
-fprintf(['average over [', ...
+fprintf(fileID, ['average over [', ...
     num2str(msckf2_data(startIndex, 1) / sec_to_nanos), ...  
     ',', num2str(msckf2_data(endIndex, 1) / sec_to_nanos), ...
-    '] secs.\n' ]);
-fprintf(['b_g[' char(176) '/s]:']);
-fprintf('%.4f,', estimate_average(Msckf2Constants.b_g) * 180/pi);
-fprintf('\nb_a[m/s^2]:');
-fprintf('%.4f,', estimate_average(Msckf2Constants.b_a));
-fprintf('\np_{BC}[cm]:');
-fprintf('%.3f,', estimate_average(Msckf2Constants.p_BC)*100);
-fprintf('\nfx fy cx cy[px]:');
-fprintf('%.3f,', estimate_average(Msckf2Constants.fxy_cxy));
-fprintf('\nk1 k2[1]:');
-fprintf('%.3f,', estimate_average(Msckf2Constants.k1_k2));
-fprintf('\np1 p2[1]:');
-fprintf('%.6f,', estimate_average(Msckf2Constants.p1_p2));
-fprintf('\ntd[ms]:');
-fprintf('%.3f\n', estimate_average(Msckf2Constants.td)*1e3);
-fprintf('tr[ms]:');
-fprintf('%.3f\n', estimate_average(Msckf2Constants.tr)*1e3);
+    '] secs, i.e., (', num2str(avg_since_start), ...
+    ' s since start and ', num2str(avg_trim_end), ...
+    ' s back from the end).\n' ]);
+fprintf(fileID, ['b_g[' char(176) '/s]:']);
+fprintf(fileID, '%.4f ', estimate_average(Msckf2Constants.b_g) * 180/pi);
+fprintf(fileID, '+/- ');
+fprintf(fileID, '%.5f ', estimate_average(Msckf2Constants.b_g_std) * 180/pi);
+fprintf(fileID, '\nb_a[m/s^2]:');
+fprintf(fileID, '%.4f ', estimate_average(Msckf2Constants.b_a));
+fprintf(fileID, '+/- ');
+fprintf(fileID, '%.5f ', estimate_average(Msckf2Constants.b_a_std));
+fprintf(fileID, '\np_{BC}[cm]:');
+fprintf(fileID, '%.3f ', estimate_average(Msckf2Constants.p_BC)*100);
+fprintf(fileID, '+/- ');
+fprintf(fileID, '%.4f ', estimate_average(Msckf2Constants.p_BC_std)*100);
+fprintf(fileID, '\nfx fy cx cy[px]:');
+fprintf(fileID, '%.3f ', estimate_average(Msckf2Constants.fxy_cxy));
+fprintf(fileID, '+/- ');
+fprintf(fileID, '%.4f ', estimate_average(Msckf2Constants.fxy_cxy_std));
+fprintf(fileID, '\nk1 k2[1]:');
+fprintf(fileID, '%.3f ', estimate_average(Msckf2Constants.k1_k2));
+fprintf(fileID, '+/- ');
+fprintf(fileID, '%.4f ', estimate_average(Msckf2Constants.k1_k2_std));
+fprintf(fileID, '\np1 p2[1]:');
+fprintf(fileID, '%.6f ', estimate_average(Msckf2Constants.p1_p2));
+fprintf(fileID, '+/- ');
+fprintf(fileID, '%.6f ', estimate_average(Msckf2Constants.p1_p2_std));
+fprintf(fileID, '\ntd[ms]:');
+fprintf(fileID, '%.3f ', estimate_average(Msckf2Constants.td)*1e3);
+fprintf(fileID, '+/- ');
+fprintf(fileID, '%.3f\n', estimate_average(Msckf2Constants.td_std)*1e3);
+fprintf(fileID, 'tr[ms]:');
+fprintf(fileID, '%.3f ', estimate_average(Msckf2Constants.tr)*1e3);
+fprintf(fileID, '+/- ');
+fprintf(fileID, '%.3f\n', estimate_average(Msckf2Constants.tr_std)*1e3);
+if fileID ~= 1
+    fclose(fileID);
+    fprintf('The average estimates are saved at \n%s.\n', log_file);
+end
 end

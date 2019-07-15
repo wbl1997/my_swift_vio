@@ -99,6 +99,12 @@ class MSCKF2 : public HybridFilter {
   // feature point observations
   virtual void retrieveEstimatesOfConstants() final;
 
+  virtual void updateStates(
+      const Eigen::Matrix<double, Eigen::Dynamic, 1>& deltaX) final;
+
+ private:
+  uint64_t getMinValidStateID() const;
+
   /**
    * @brief computeHoi, compute the marginalized Jacobian for a feature i's
    * track assume the number of observations of the map points is at least two
@@ -113,17 +119,11 @@ class MSCKF2 : public HybridFilter {
    */
   bool computeHoi(const uint64_t hpbid, const MapPoint& mp,
                   Eigen::Matrix<double, Eigen::Dynamic, 1>& r_oi,
-                  Eigen::MatrixXd& H_oi, Eigen::MatrixXd& R_oi);
-
-  virtual void updateStates(
-      const Eigen::Matrix<double, Eigen::Dynamic, 1>& deltaX) final;
-
- private:
-  uint64_t getMinValidStateID() const;
+                  Eigen::MatrixXd& H_oi, Eigen::MatrixXd& R_oi) const;
 
   int computeStackedJacobianAndResidual(
       Eigen::MatrixXd* T_H, Eigen::Matrix<double, Eigen::Dynamic, 1>* r_q,
-      Eigen::MatrixXd* R_q);
+      Eigen::MatrixXd* R_q) const;
 };
 
 }  // namespace okvis

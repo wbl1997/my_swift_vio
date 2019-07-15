@@ -689,7 +689,7 @@ class HybridFilter : public VioBackendInterface {
       const okvis::cameras::PinholeCamera<
           okvis::cameras::RadialTangentialDistortion> &cameraGeometry,
       const okvis::kinematics::Transformation &T_SC0, const uint64_t &hpbid,
-      bool use_AIDP = false) final;
+      bool use_AIDP = false) const final;
   /**
    * @brief computeHxf, compute the residual and Jacobians for a SLAM feature i
    * observed in current frame
@@ -733,7 +733,7 @@ class HybridFilter : public VioBackendInterface {
                   Eigen::MatrixXd &H_oi, Eigen::MatrixXd &R_oi,
                   Eigen::Vector4d &ab1rho,
                   Eigen::Matrix<double, Eigen::Dynamic, 3> *pH_fi =
-                      (Eigen::Matrix<double, Eigen::Dynamic, 3> *)(NULL));
+                      (Eigen::Matrix<double, Eigen::Dynamic, 3> *)(NULL)) const;
 
   virtual void updateStates(
       const Eigen::Matrix<double, Eigen::Dynamic, 1> &deltaX);
@@ -847,8 +847,8 @@ class HybridFilter : public VioBackendInterface {
   uint64_t minValidStateID;  // the minimum of the ids of the states that have
                              // tracked features
 
-  okvis::timing::Timer triangulateTimer;
-  okvis::timing::Timer computeHTimer;
+  mutable okvis::timing::Timer triangulateTimer;
+  mutable okvis::timing::Timer computeHTimer;
   okvis::timing::Timer computeKalmanGainTimer;
   okvis::timing::Timer updateStatesTimer;
   okvis::timing::Timer updateCovarianceTimer;

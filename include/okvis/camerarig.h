@@ -26,20 +26,24 @@ class CameraRig {
   std::vector<double> time_delay_;
 
  public:
-  inline double getTimeDelay(int camera_id) { return time_delay_[camera_id]; }
-  inline double getReadoutTime(int camera_id) {
+  inline double getTimeDelay(int camera_id) const {
+    return time_delay_[camera_id];
+  }
+  inline double getReadoutTime(int camera_id) const {
     return frame_readout_time_[camera_id];
   }
-  inline uint32_t getImageWidth(int camera_id) {
+  inline uint32_t getImageWidth(int camera_id) const {
     return camera_geometries_[camera_id]->imageWidth();
   }
-  inline uint32_t getImageHeight(int camera_id) {
+  inline uint32_t getImageHeight(int camera_id) const {
     return camera_geometries_[camera_id]->imageHeight();
   }
-  inline okvis::kinematics::Transformation getCameraExtrinsic(int camera_id) {
+  inline okvis::kinematics::Transformation getCameraExtrinsic(
+      int camera_id) const {
     return *(T_SC_[camera_id]);
   }
-  inline std::shared_ptr<cameras::CameraBase> getCameraGeometry(int camera_id) {
+  inline std::shared_ptr<cameras::CameraBase> getCameraGeometry(
+      int camera_id) const {
     return camera_geometries_[camera_id];
   }
   inline void setTimeDelay(int camera_id, double td) {

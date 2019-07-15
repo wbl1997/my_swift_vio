@@ -5,19 +5,25 @@ addpath(export_fig_path);
 
 filename = input('msckf2_csv:', 's');
 output_dir = input('output_dir:', 's');
-nominal_fx = input('nominal_fx:');
-nominal_fy = input('nominal_fy:');
-nominal_cx = input('nominal_cx:');
-nominal_cy = input('nominal_cy:');
-nominal_intrinsics = [nominal_fx, nominal_fy, nominal_cx, nominal_cy];
+if isempty(output_dir)
+    [filepath, ~, ~] = fileparts(filename);
+    output_dir = filepath;
+    disp(['output_dir is set to ', output_dir]);
+end
 
 fontsize = 18;
 data = dlmread(filename, ',', 1, 0);
 original_data = data;
 startTime = data(1, 1);
 endTime = data(end, 1);
+nominal_intrinsics = data(1, Msckf2Constants.fxy_cxy);
+disp('The nominal fxy cxy is set to ');
+disp(nominal_intrinsics);
 
 sec_to_nanos = 1e9;
+% eg., 'Seagate/temp/parkinglot/opt_states.txt';
+cmp_data_file = input('okvis_classic:', 's'); 
+
 % ground truth file must have the same number of rows as output data
 gt_file = input('Ground truth csv:', 's');
 if (gt_file)
@@ -85,8 +91,6 @@ if(~isempty(gt))
     legend_list{end+1} = 'gt';
 end
 
-% eg., 'Seagate/temp/parkinglot/opt_states.txt';
-cmp_data_file = input('okvis_classic:', 's'); 
 if (cmp_data_file)
     cmp_data = dlmread(cmp_data_file, ' ', 3, 0);
     plot3(cmp_data(:, 4), cmp_data(:, 5), cmp_data(:, 6), '-g');
@@ -233,6 +237,7 @@ export_fig(outputfig);
 
 intermediatePlotter(data, output_dir);
 
-averageMsckf2VariableEstimates(original_data);
+averageMsckf2VariableEstimates(original_data, ...
+    [output_dir, '/avg_estimates.txt']);
 end
 
