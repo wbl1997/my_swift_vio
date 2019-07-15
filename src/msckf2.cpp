@@ -35,6 +35,7 @@ DEFINE_double(max_inc_tol, 2,
 
 DECLARE_bool(use_mahalanobis);
 DECLARE_bool(use_first_estimate);
+DECLARE_bool(use_RK4);
 
 /// \brief okvis Main namespace of this package.
 namespace okvis {
@@ -42,13 +43,10 @@ const double maxProjTolerance =
     7;  // maximum tolerable discrepancy between predicted and measured point
         // coordinates in image in pixel
 
-#undef USE_RK4  // use 4th order runge-kutta for integrating IMU data and
-                // compute Jacobians,
+DEFINE_bool(use_IEKF, false,
+            "use iterated EKF in optimization, empirically IEKF cost at"
+            "least twice as much time as EKF");
 
-#undef USE_IEKF  // use iterated EKF in optimization, empirically IEKF cost at
-                 // least twice as much time as EKF,
-// and its accuracy in case of inprecise tracked features with real data is
-// worse than EKF Constructor if a ceres map is already available.
 MSCKF2::MSCKF2(std::shared_ptr<okvis::ceres::Map> mapPtr,
                const double readoutTime)
     : HybridFilter(mapPtr, readoutTime) {}
@@ -177,22 +175,22 @@ bool MSCKF2::addStates(okvis::MultiFramePtr multiFrame,
       speedAndBias.head<3>() = tempV_WS;
     } else {
       /// use latest estimate to propagate pose, speed and bias, and covariance
-#ifdef USE_RK4
-      // method 1 RK4 a little bit more accurate but 4 times slower
-      F_tot.setIdentity();
-      int numUsedImuMeasurements = IMUOdometry::propagation_RungeKutta(
-          imuMeasurements, imuParametersVec_.at(0), T_WS, speedAndBias, vTgTsTa,
-          startTime, correctedStateTime, &Pkm1, &F_tot);
-#else
-      // method 2, i.e., adapt the imuError::propagation function of okvis by
-      // the msckf2 derivation in Michael Andrew Shelley
-      Eigen::Vector3d tempV_WS = speedAndBias.head<3>();
-      IMUErrorModel<double> tempIEM(speedAndBias.tail<6>(), vTgTsTa);
-      numUsedImuMeasurements = IMUOdometry::propagation(
-          imuMeasurements, imuParametersVec_.at(0), T_WS, tempV_WS, tempIEM,
-          startTime, correctedStateTime, &Pkm1, &F_tot);
-      speedAndBias.head<3>() = tempV_WS;
-#endif
+      if (FLAGS_use_RK4) {
+        // method 1 RK4 a little bit more accurate but 4 times slower
+        F_tot.setIdentity();
+        numUsedImuMeasurements = IMUOdometry::propagation_RungeKutta(
+            imuMeasurements, imuParametersVec_.at(0), T_WS, speedAndBias,
+            vTgTsTa, startTime, correctedStateTime, &Pkm1, &F_tot);
+      } else {
+        // method 2, i.e., adapt the imuError::propagation function of okvis by
+        // the msckf2 derivation in Michael Andrew Shelley
+        Eigen::Vector3d tempV_WS = speedAndBias.head<3>();
+        IMUErrorModel<double> tempIEM(speedAndBias.tail<6>(), vTgTsTa);
+        numUsedImuMeasurements = IMUOdometry::propagation(
+            imuMeasurements, imuParametersVec_.at(0), T_WS, tempV_WS, tempIEM,
+            startTime, correctedStateTime, &Pkm1, &F_tot);
+        speedAndBias.head<3>() = tempV_WS;
+      }
     }
 
     covariance_.topLeftCorner(ceres::ode::OdoErrorStateDim,
@@ -1190,30 +1188,30 @@ bool MSCKF2::computeHoi(const uint64_t hpbid, const MapPoint &mp,
       kinematics::Transformation T_WB = T_WBj;
       SpeedAndBiases sb = sbj;
       iem_.resetBgBa(sb.tail<6>());
-#ifdef USE_RK4
-      if (featureTime >= Duration()) {
-        IMUOdometry::propagation_RungeKutta(imuMeas, imuParametersVec_.at(0),
-                                            T_WB, sb, vTGTSTA_, stateEpoch,
-                                            stateEpoch + featureTime);
+      if (FLAGS_use_RK4) {
+        if (featureTime >= Duration()) {
+          IMUOdometry::propagation_RungeKutta(imuMeas, imuParametersVec_.at(0),
+                                              T_WB, sb, vTGTSTA_, stateEpoch,
+                                              stateEpoch + featureTime);
+        } else {
+          IMUOdometry::propagationBackward_RungeKutta(
+              imuMeas, imuParametersVec_.at(0), T_WB, sb, vTGTSTA_, stateEpoch,
+              stateEpoch + featureTime);
+        }
       } else {
-        IMUOdometry::propagationBackward_RungeKutta(
-            imuMeas, imuParametersVec_.at(0), T_WB, sb, vTGTSTA_, stateEpoch,
-            stateEpoch + featureTime);
+        Eigen::Vector3d tempV_WS = sb.head<3>();
+        int numUsedImuMeasurements = -1;
+        if (featureTime >= Duration()) {
+          numUsedImuMeasurements = IMUOdometry::propagation(
+              imuMeas, imuParametersVec_.at(0), T_WB, tempV_WS, iem_,
+              stateEpoch, stateEpoch + featureTime);
+        } else {
+          numUsedImuMeasurements = IMUOdometry::propagationBackward(
+              imuMeas, imuParametersVec_.at(0), T_WB, tempV_WS, iem_,
+              stateEpoch, stateEpoch + featureTime);
+        }
+        sb.head<3>() = tempV_WS;
       }
-#else
-      Eigen::Vector3d tempV_WS = sb.head<3>();
-      int numUsedImuMeasurements = -1;
-      if (featureTime >= Duration()) {
-        numUsedImuMeasurements = IMUOdometry::propagation(
-            imuMeas, imuParametersVec_.at(0), T_WB, tempV_WS, iem_, stateEpoch,
-            stateEpoch + featureTime);
-      } else {
-        numUsedImuMeasurements = IMUOdometry::propagationBackward(
-            imuMeas, imuParametersVec_.at(0), T_WB, tempV_WS, iem_, stateEpoch,
-            stateEpoch + featureTime);
-      }
-      sb.head<3>() = tempV_WS;
-#endif
 
       IMUOdometry::interpolateInertialData(
           imuMeas, iem_, stateEpoch + featureTime, interpolatedInertialData);
@@ -1264,8 +1262,8 @@ bool MSCKF2::computeHoi(const uint64_t hpbid, const MapPoint &mp,
                                              T_WBj.q());
         lP_sb = sbj;
         lP_sb.head<3>() = posVelFirstEstimate.tail<3>();
-        tempV_WS = posVelFirstEstimate.tail<3>();
-        numUsedImuMeasurements = -1;
+        Eigen::Vector3d tempV_WS = posVelFirstEstimate.tail<3>();
+        int numUsedImuMeasurements = -1;
         if (featureTime >= Duration()) {
           numUsedImuMeasurements = IMUOdometry::propagation(
               imuMeas, imuParametersVec_.at(0), lP_T_WB, tempV_WS, iem_,
@@ -1470,30 +1468,30 @@ bool MSCKF2::computeHoi(const uint64_t hpbid, const MapPoint &mp,
       kinematics::Transformation T_WB = T_WBj;
       SpeedAndBiases sb = sbj;
       iem_.resetBgBa(sb.tail<6>());
-#ifdef USE_RK4
-      if (featureTime >= Duration()) {
-        IMUOdometry::propagation_RungeKutta(imuMeas, imuParametersVec_.at(0),
-                                            T_WB, sb, vTGTSTA_, stateEpoch,
-                                            stateEpoch + featureTime);
+      if (FLAGS_use_RK4) {
+        if (featureTime >= Duration()) {
+          IMUOdometry::propagation_RungeKutta(imuMeas, imuParametersVec_.at(0),
+                                              T_WB, sb, vTGTSTA_, stateEpoch,
+                                              stateEpoch + featureTime);
+        } else {
+          IMUOdometry::propagationBackward_RungeKutta(
+              imuMeas, imuParametersVec_.at(0), T_WB, sb, vTGTSTA_, stateEpoch,
+              stateEpoch + featureTime);
+        }
       } else {
-        IMUOdometry::propagationBackward_RungeKutta(
-            imuMeas, imuParametersVec_.at(0), T_WB, sb, vTGTSTA_, stateEpoch,
-            stateEpoch + featureTime);
+        Eigen::Vector3d tempV_WS = sb.head<3>();
+        int numUsedImuMeasurements = -1;
+        if (featureTime >= Duration()) {
+          numUsedImuMeasurements = IMUOdometry::propagation(
+              imuMeas, imuParametersVec_.at(0), T_WB, tempV_WS, iem_,
+              stateEpoch, stateEpoch + featureTime);
+        } else {
+          numUsedImuMeasurements = IMUOdometry::propagationBackward(
+              imuMeas, imuParametersVec_.at(0), T_WB, tempV_WS, iem_,
+              stateEpoch, stateEpoch + featureTime);
+        }
+        sb.head<3>() = tempV_WS;
       }
-#else
-      Eigen::Vector3d tempV_WS = sb.head<3>();
-      int numUsedImuMeasurements = -1;
-      if (featureTime >= Duration()) {
-        numUsedImuMeasurements = IMUOdometry::propagation(
-            imuMeas, imuParametersVec_.at(0), T_WB, tempV_WS, iem_, stateEpoch,
-            stateEpoch + featureTime);
-      } else {
-        numUsedImuMeasurements = IMUOdometry::propagationBackward(
-            imuMeas, imuParametersVec_.at(0), T_WB, tempV_WS, iem_, stateEpoch,
-            stateEpoch + featureTime);
-      }
-      sb.head<3>() = tempV_WS;
-#endif
 
       IMUOdometry::interpolateInertialData(
           imuMeas, iem_, stateEpoch + featureTime, interpolatedInertialData);
@@ -1540,8 +1538,8 @@ bool MSCKF2::computeHoi(const uint64_t hpbid, const MapPoint &mp,
                                              lP_T_WB.q());
         lP_sb.head<3>() = posVelFirstEstimate.tail<3>();
 
-        tempV_WS = lP_sb.head<3>();
-        numUsedImuMeasurements = -1;
+        Eigen::Vector3d tempV_WS = lP_sb.head<3>();
+        int numUsedImuMeasurements = -1;
         if (featureTime >= Duration()) {
           numUsedImuMeasurements = IMUOdometry::propagation(
               imuMeas, imuParametersVec_.at(0), lP_T_WB, tempV_WS, iem_,
@@ -1627,7 +1625,7 @@ bool MSCKF2::computeHoi(const uint64_t hpbid, const MapPoint &mp,
     computeHTimer.stop();
     return true;
   }
-}
+}  // namespace okvis
 
 // TODO(jhuai): merge with the superclass implementation
 void MSCKF2::updateStates(
@@ -2085,121 +2083,132 @@ void MSCKF2::optimize(bool verbose) {
 }
 #else  // extended kalman filter
 
-void MSCKF2::EkfUpdate(const Eigen::MatrixXd &T_H,
-                       const Eigen::Matrix<double, Eigen::Dynamic, 1> &r_q,
-                       const Eigen::MatrixXd &R_q) {
-  // Calculate Kalman gain
-  Eigen::MatrixXd Py =
-      T_H *
-          covariance_.block(okvis::ceres::ode::OdoErrorStateDim,
-                            okvis::ceres::ode::OdoErrorStateDim, nVariableDim_,
-                            nVariableDim_) *
-          T_H.transpose() +
-      R_q;
+class PreconditionedEkfUpdater {
+ public:
+  OKVIS_DEFINE_EXCEPTION(Exception, std::runtime_error)
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
-  typedef Eigen::Matrix<double, Eigen::Dynamic, 1> VecX;
-  VecX SVec =
-      (Py.diagonal().cwiseAbs() + VecX::Constant(Py.cols(), 1)).cwiseSqrt();
-  VecX SVecI = SVec.cwiseInverse();
+ private:
+  const Eigen::MatrixXd &cov_ref_;
+  const int cov_dim_;
+  const int variable_dim_;
+  Eigen::MatrixXd KScaled_;
+  Eigen::MatrixXd PyScaled_;
 
-  Eigen::MatrixXd PyScaled = SVecI.asDiagonal() * Py * SVecI.asDiagonal();
-  VecX rqScaled = SVecI.asDiagonal() * r_q;
+ public:
+  PreconditionedEkfUpdater(const Eigen::MatrixXd &cov, int variable_dim)
+      : cov_ref_(cov), cov_dim_(cov_ref_.rows()), variable_dim_(variable_dim) {}
 
-  Eigen::LLT<Eigen::MatrixXd> llt_py(PyScaled);
-  if (llt_py.info() != Eigen::Success) {
-    Eigen::ColPivHouseholderQR<Eigen::MatrixXd> qr_decomp(PyScaled);
-    std::cout << "PyScaled diagonal\n"
-              << PyScaled.diagonal().transpose() << "\n";
-    std::cout << "PyScaled " << PyScaled.rows() << "x" << PyScaled.cols()
-              << " condition number "
-              << vio::getConditionNumberOfMatrix(PyScaled) << " and rank "
-              << qr_decomp.rank() << " computationInfo " << llt_py.info()
-              << std::endl;
-    OKVIS_ASSERT_TRUE(Exception, false, "LLT failed for PyScaled!");
+  Eigen::Matrix<double, Eigen::Dynamic, 1> computeCorrection(
+      const Eigen::MatrixXd &T_H,
+      const Eigen::Matrix<double, Eigen::Dynamic, 1> &r_q,
+      const Eigen::MatrixXd &R_q,
+      const Eigen::Matrix<double, Eigen::Dynamic, 1> *prev_deltaX = nullptr) {
+    // Calculate Kalman gain
+    Eigen::MatrixXd Py = T_H *
+                             cov_ref_.block(okvis::ceres::ode::OdoErrorStateDim,
+                                            okvis::ceres::ode::OdoErrorStateDim,
+                                            variable_dim_, variable_dim_) *
+                             T_H.transpose() +
+                         R_q;
+
+    typedef Eigen::Matrix<double, Eigen::Dynamic, 1> VecX;
+    VecX SVec =
+        (Py.diagonal().cwiseAbs() + VecX::Constant(Py.cols(), 1)).cwiseSqrt();
+    VecX SVecI = SVec.cwiseInverse();
+
+    PyScaled_ = SVecI.asDiagonal() * Py * SVecI.asDiagonal();
+    VecX rqScaled = SVecI.asDiagonal() * r_q;
+
+    Eigen::LLT<Eigen::MatrixXd> llt_py(PyScaled_);
+    if (llt_py.info() != Eigen::Success) {
+      Eigen::ColPivHouseholderQR<Eigen::MatrixXd> qr_decomp(PyScaled_);
+      std::cout << "PyScaled diagonal\n"
+                << PyScaled_.diagonal().transpose() << "\n";
+      std::cout << "PyScaled " << PyScaled_.rows() << "x" << PyScaled_.cols()
+                << " condition number "
+                << vio::getConditionNumberOfMatrix(PyScaled_) << " and rank "
+                << qr_decomp.rank() << " computationInfo " << llt_py.info()
+                << std::endl;
+      OKVIS_ASSERT_TRUE(Exception, false, "LLT failed for PyScaled!");
+    }
+
+    //  Eigen::MatrixXd PyScaledInv(PyScaled_.rows(), PyScaled_.cols());
+    //  PyScaledInv.setIdentity();
+    //  llt_py.solveInPlace(PyScaledInv);
+    //  Eigen::MatrixXd KScaled =
+    //      (cov_ref_.block(0, okvis::ceres::ode::OdoErrorStateDim, cov_dim_,
+    //                         variable_dim_) *
+    //       T_H.transpose()) *
+    //      SVecI.asDiagonal() * PyScaledInv;
+
+    // There is not much difference between the above and the below approach
+    Eigen::MatrixXd KScaled_transpose =
+        llt_py.solve(SVecI.asDiagonal() *
+                     (T_H * cov_ref_
+                                .block(0, okvis::ceres::ode::OdoErrorStateDim,
+                                       cov_dim_, variable_dim_)
+                                .transpose()));
+    KScaled_ = KScaled_transpose.transpose();
+
+    // State correction
+    Eigen::Matrix<double, Eigen::Dynamic, 1> deltaX;
+    if (prev_deltaX == nullptr) {
+      deltaX = KScaled_ * rqScaled;
+    } else {
+      deltaX =
+          KScaled_ * (rqScaled + SVecI.asDiagonal() * T_H *
+                                     prev_deltaX->segment(
+                                         okvis::ceres::ode::OdoErrorStateDim,
+                                         variable_dim_));
+    }
+    if (std::isnan(deltaX(0)) || std::isnan(deltaX(1))) {
+      OKVIS_ASSERT_TRUE(Exception, false, "nan in kalman filter");
+    }
+
+    // for debugging
+    double tempNorm = deltaX.head<15>().lpNorm<Eigen::Infinity>();
+    if (tempNorm > FLAGS_max_inc_tol) {
+      std::cout << "PyScaled of condition number:"
+                << vio::getConditionNumberOfMatrix(PyScaled_) << "\n"
+                << "\nKScaled\n"
+                << KScaled_ << std::endl;
+      std::cout << "rqScaled\n"
+                << rqScaled.transpose() << "\ndeltaX\n"
+                << deltaX.transpose() << std::endl;
+      OKVIS_ASSERT_LT(Exception, tempNorm, FLAGS_max_inc_tol,
+                      "Warn too large increment may imply wrong association ");
+    }
+    // end debugging
+    return deltaX;
   }
 
-  //  Eigen::MatrixXd PyScaledInv(PyScaled.rows(), PyScaled.cols());
-  //  PyScaledInv.setIdentity();
-  //  llt_py.solveInPlace(PyScaledInv);
-  //  Eigen::MatrixXd KScaled =
-  //      (covariance_.block(0, okvis::ceres::ode::OdoErrorStateDim, covDim_,
-  //                         nVariableDim_) *
-  //       T_H.transpose()) *
-  //      SVecI.asDiagonal() * PyScaledInv;
-
-  // There is not much difference between the above and the below approach
-  Eigen::MatrixXd KScaled_transpose =
-      llt_py.solve(SVecI.asDiagonal() *
-                   (T_H * covariance_
-                              .block(0, okvis::ceres::ode::OdoErrorStateDim,
-                                     covDim_, nVariableDim_)
-                              .transpose()));
-  Eigen::MatrixXd KScaled = KScaled_transpose.transpose();
-
-  // State correction
-  Eigen::Matrix<double, Eigen::Dynamic, 1> deltaX = KScaled * rqScaled;
-  if (std::isnan(deltaX(0)) || std::isnan(deltaX(1))) {
-    OKVIS_ASSERT_TRUE(Exception, false, "nan in kalman filter");
+  void updateCovariance(Eigen::MatrixXd *cov_ptr) const {
+    (*cov_ptr) = (*cov_ptr) - KScaled_ * PyScaled_ * KScaled_.transpose();
+    Eigen::MatrixXd cov_symm = (cov_ptr->transpose() + (*cov_ptr)) * 0.5;
+    (*cov_ptr) = cov_symm;
+    if (cov_ptr->diagonal().minCoeff() < 0) {
+      std::cout << "Warn: negative entry in cov diagonal\n"
+                << cov_ptr->diagonal().transpose() << std::endl;
+      cov_ptr->diagonal() = cov_ptr->diagonal().cwiseAbs();
+    }
   }
-  // for debugging
-  double tempNorm = deltaX.head<15>().lpNorm<Eigen::Infinity>();
-  if (tempNorm > FLAGS_max_inc_tol) {
-    std::cout << "PyScaled of condition number:"
-              << vio::getConditionNumberOfMatrix(PyScaled) << "\n"
-              << PyScaled << "\nKScaled\n"
-              << KScaled << std::endl;
-    std::cout << "rqScaled\n"
-              << rqScaled.transpose() << "\ndeltaX\n"
-              << deltaX.transpose() << std::endl;
-    OKVIS_ASSERT_LT(Exception, tempNorm, FLAGS_max_inc_tol,
-                    "Warn too large increment may imply wrong association ");
-  }
-  // end debugging
-  computeKalmanGainTimer.stop();
+};
 
-  updateStates(deltaX);
-
-  // Covariance correction
-  updateCovarianceTimer.start();
-
-  covariance_ = covariance_ - KScaled * PyScaled * KScaled.transpose();
-  Eigen::MatrixXd cov_symm = (covariance_.transpose() + covariance_) * 0.5;
-  covariance_ = cov_symm;
-
-  if (covariance_.diagonal().minCoeff() < 0) {
-    std::cout << "Warn: negative entry in cov diagonal\n"
-              << covariance_.diagonal().transpose() << std::endl;
-    covariance_.diagonal() = covariance_.diagonal().cwiseAbs();
-  }
-  updateCovarianceTimer.stop();
-}
-
-// Start msckf2 optimization.
 void MSCKF2::optimize(bool verbose) {
-  // containers of Jacobians of measurements
-  std::vector<Eigen::MatrixXd, Eigen::aligned_allocator<Eigen::MatrixXd>> vr_o;
-  std::vector<Eigen::MatrixXd, Eigen::aligned_allocator<Eigen::MatrixXd>> vH_o;
-  std::vector<Eigen::MatrixXd, Eigen::aligned_allocator<Eigen::MatrixXd>> vR_o;
-  // gather tracks of features that are not tracked in current frame
   uint64_t currFrameId = currentFrameId();
-
   OKVIS_ASSERT_EQ(
       Exception,
       covDim_ - 51 -
           cameras::RadialTangentialDistortion::NumDistortionIntrinsics,
       9 * statesMap_.size(), "Inconsistent covDim and number of states");
-
   retrieveEstimatesOfConstants();
-  size_t dimH_o[2] = {0, nVariableDim_};
-  size_t nMarginalizedFeatures = 0;
+
+  // mark tracks of features that are not tracked in current frame
   mLandmarkID2Residualize.clear();
-  size_t tempCounter = 0;
-  Eigen::MatrixXd variableCov = covariance_.block(42, 42, dimH_o[1], dimH_o[1]);
-  int culledPoints[2] = {0};
-  for (auto it = landmarksMap_.begin(); it != landmarksMap_.end();
-       ++it, ++tempCounter) {
+  for (auto it = landmarksMap_.begin(); it != landmarksMap_.end(); ++it) {
     ResidualizeCase toResidualize = NotInState_NotTrackedNow;
-    const size_t nNumObs = it->second.observations.size();
+
     for (auto itObs = it->second.observations.rbegin(),
               iteObs = it->second.observations.rend();
          itObs != iteObs; ++itObs) {
@@ -2210,10 +2219,26 @@ void MSCKF2::optimize(bool verbose) {
     }
     mLandmarkID2Residualize.push_back(
         std::make_pair(it->second.id, toResidualize));
-    if (toResidualize != NotInState_NotTrackedNow ||
-        nNumObs < 3) {  // TODO: is 3 too harsh?
+  }
+
+  // compute and stack Jacobians and Residuals for landmarks observed no more
+  size_t nMarginalizedFeatures = 0;
+  int culledPoints[2] = {0};
+  size_t dimH_o[2] = {0, nVariableDim_};
+  const Eigen::MatrixXd variableCov =
+      covariance_.block(42, 42, dimH_o[1], dimH_o[1]);
+  // containers of Jacobians of measurements
+  std::vector<Eigen::MatrixXd, Eigen::aligned_allocator<Eigen::MatrixXd>> vr_o;
+  std::vector<Eigen::MatrixXd, Eigen::aligned_allocator<Eigen::MatrixXd>> vH_o;
+  std::vector<Eigen::MatrixXd, Eigen::aligned_allocator<Eigen::MatrixXd>> vR_o;
+  size_t tempCounter = 0;
+  for (auto it = landmarksMap_.begin(); it != landmarksMap_.end();
+       ++it, ++tempCounter) {
+    const size_t nNumObs = it->second.observations.size();
+    if (mLandmarkID2Residualize[tempCounter].second !=
+            NotInState_NotTrackedNow ||
+        nNumObs < 3)  // TODO: is 3 too harsh?
       continue;
-    }
 
     // the rows of H_oi (denoted by nObsDim), and r_oi, and size of R_oi may
     // be resized in computeHoi
@@ -2231,9 +2256,10 @@ void MSCKF2::optimize(bool verbose) {
       // alternatively, some heuristics in computeHoi is used, e.g., ignore
       // correspondences of too large discrepancy remove outliders, cf. Li
       // ijrr2014 visual inertial navigation with rolling shutter cameras
-      double gamma = r_oi.transpose() *
-                     (H_oi * variableCov * H_oi.transpose() + R_oi).inverse() *
-                     r_oi;
+      double gamma =
+          r_oi.transpose() *
+          (H_oi * variableCov * H_oi.transpose() + R_oi).ldlt().solve(r_oi);
+      // TODO(jhuai): do we use 2DOF? refer msckf vio Kumar
       if (gamma > chi2_95percentile[r_oi.rows()]) {
         ++culledPoints[1];
         continue;
@@ -2317,8 +2343,15 @@ void MSCKF2::optimize(bool verbose) {
     }
     T_H = R.block(0, 0, nVariableDim_, nVariableDim_);
   }
-
-  EkfUpdate(T_H, r_q, R_q);
+  computeKalmanGainTimer.stop();
+  PreconditionedEkfUpdater pceu(covariance_, nVariableDim_);
+  Eigen::Matrix<double, Eigen::Dynamic, 1> deltaX =
+      pceu.computeCorrection(T_H, r_q, R_q);
+  updateStates(deltaX);
+  // Covariance correction
+  updateCovarianceTimer.start();
+  pceu.updateCovariance(&covariance_);
+  updateCovarianceTimer.stop();
 
   // update landmarks that are tracked in the current frame(the newly inserted
   // state)

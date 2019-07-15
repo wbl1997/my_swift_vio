@@ -24,6 +24,11 @@
 #include "vio/eigen_utils.h"
 #include "vio/rand_sampler.h"
 
+DEFINE_bool(use_RK4, false,
+            "use 4th order runge-kutta or the trapezoidal "
+            "rule for integrating IMU data and computing"
+            " Jacobians");
+
 DECLARE_bool(use_mahalanobis);
 DECLARE_bool(use_first_estimate);
 /// \brief okvis Main namespace of this package.
@@ -218,22 +223,22 @@ bool HybridFilter::addStates(okvis::MultiFramePtr multiFrame,
       speedAndBias.head<3>() = tempV_WS;
     } else {
       /// use latest estimate to propagate pose, speed and bias, and covariance
-#ifdef USE_RK4
-      // method 1 RK4 a little bit more accurate but 4 times slower
-      F_tot.setIdentity();
-      int numUsedImuMeasurements = IMUOdometry::propagation_RungeKutta(
-          imuMeasurements, imuParametersVec_.at(0), T_WS, speedAndBias, vTgTsTa,
-          startTime, correctedStateTime, &Pkm1, &F_tot);
-#else
-      // method 2, i.e., adapt the imuError::propagation function of okvis by
-      // the msckf2 derivation in Michael Andrew Shelley
-      Eigen::Vector3d tempV_WS = speedAndBias.head<3>();
-      IMUErrorModel<double> tempIEM(speedAndBias.tail<6>(), vTgTsTa);
-      numUsedImuMeasurements = IMUOdometry::propagation(
-          imuMeasurements, imuParametersVec_.at(0), T_WS, tempV_WS, tempIEM,
-          startTime, correctedStateTime, &Pkm1, &F_tot);
-      speedAndBias.head<3>() = tempV_WS;
-#endif
+      if (FLAGS_use_RK4) {
+        // method 1 RK4 a little bit more accurate but 4 times slower
+        F_tot.setIdentity();
+        numUsedImuMeasurements = IMUOdometry::propagation_RungeKutta(
+            imuMeasurements, imuParametersVec_.at(0), T_WS, speedAndBias,
+            vTgTsTa, startTime, correctedStateTime, &Pkm1, &F_tot);
+      } else {
+        // method 2, i.e., adapt the imuError::propagation function of okvis by
+        // the msckf2 derivation in Michael Andrew Shelley
+        Eigen::Vector3d tempV_WS = speedAndBias.head<3>();
+        IMUErrorModel<double> tempIEM(speedAndBias.tail<6>(), vTgTsTa);
+        numUsedImuMeasurements = IMUOdometry::propagation(
+            imuMeasurements, imuParametersVec_.at(0), T_WS, tempV_WS, tempIEM,
+            startTime, correctedStateTime, &Pkm1, &F_tot);
+        speedAndBias.head<3>() = tempV_WS;
+      }
     }
 
     covariance_.topLeftCorner(ceres::ode::OdoErrorStateDim,
@@ -524,8 +529,8 @@ bool HybridFilter::addStates(okvis::MultiFramePtr multiFrame,
                         "sigma absolute rotation should be 0");
 
       covPBinC = Eigen::Matrix3d::Identity() *
-                 translationVariance;  // note in covariance PBinC is different
-                                       // from the state PCinB
+                 translationVariance;  // note in covariance PBinC is
+                                       // different from the state PCinB
       covProjIntrinsics = Eigen::Matrix<double, 4, 4>::Identity();
       covProjIntrinsics.topLeftCorner<2, 2>() *= std::pow(
           extrinsicsEstimationParametersVec_.at(i).sigma_focal_length, 2);
@@ -681,7 +686,8 @@ bool HybridFilter::applyMarginalizationStrategy() {
 
   Eigen::Matrix<double, 3, Eigen::Dynamic> reparamJacobian(
       3,
-      covDim_);  // Jacobians of feature reparameterization due to anchor change
+      covDim_);  // Jacobians of feature reparameterization due to anchor
+                 // change
   std::vector<
       Eigen::Matrix<double, 3, Eigen::Dynamic>,
       Eigen::aligned_allocator<Eigen::Matrix<double, 3, Eigen::Dynamic>>>
@@ -696,7 +702,8 @@ bool HybridFilter::applyMarginalizationStrategy() {
   // number of navigation, imu, and camera states in the covariance
   const size_t numNavImuCamPoseStates =
       numNavImuCamStates + 9 * statesMap_.size();
-  // number of navigation, imu, camera, and pose copies states in the covariance
+  // number of navigation, imu, camera, and pose copies states in the
+  // covariance
 
   std::cout << "checking removed map points" << std::endl;
   for (PointMap::iterator pit = landmarksMap_.begin();
@@ -731,14 +738,15 @@ bool HybridFilter::applyMarginalizationStrategy() {
       ++tempCounter;
 
     } else {
-      /// change anchor pose for features whose anchor is not in states anymore
+      /// change anchor pose for features whose anchor is not in states
+      /// anymore
       if (residualizeCase == InState_TrackedNow) {
         if (pit->second.anchorStateId < minValidStateID) {
           uint64_t currFrameId = currentFrameId();
 
           okvis::kinematics::Transformation
-              T_GBa;  // transform from the body frame at the anchor frame epoch
-                      // to the global frame
+              T_GBa;  // transform from the body frame at the anchor frame
+                      // epoch to the global frame
           get_T_WS(pit->second.anchorStateId, T_GBa);
           okvis::kinematics::Transformation T_GBc;
           get_T_WS(currFrameId, T_GBc);
@@ -803,7 +811,8 @@ bool HybridFilter::applyMarginalizationStrategy() {
   // actual covariance update for reparameterized features
   tempCounter = 0;
   Eigen::MatrixXd featureJacobian = Eigen::MatrixXd::Identity(
-      covDim_, covDim_);  // Jacobian of all the new states w.r.t the old states
+      covDim_,
+      covDim_);  // Jacobian of all the new states w.r.t the old states
   for (auto it = vJacobian.begin(); it != vJacobian.end();
        ++it, ++tempCounter) {
     featureJacobian.block(numNavImuCamPoseStates + vCovPtId[tempCounter] * 3, 0,
@@ -913,8 +922,8 @@ bool HybridFilter::applyMarginalizationStrategy() {
       multiFramePtrMap_.erase(rit->first);
 
       //            std::advance(rit, 1);
-      //            statesMap_.erase( rit.base() );//unfortunately this deletion
-      //            does not work for statesMap_
+      //            statesMap_.erase( rit.base() );//unfortunately this
+      //            deletion does not work for statesMap_
     }
     //        else
     ++rit;
@@ -1017,13 +1026,13 @@ bool HybridFilter::initPoseFromImu(
   return true;
 }
 
-// set latest estimates for the assumed constant states which are commonly used
-// in computing Jacobians of all feature observations
+// set latest estimates for the assumed constant states which are commonly
+// used in computing Jacobians of all feature observations
 void HybridFilter::retrieveEstimatesOfConstants() {
-  // X_c and all the augmented states including the last inserted one in which a
-  // marginalized point has no observation in it
-  // p_B^C, f_x, f_y, c_x, c_y, k_1, k_2, p_1, p_2, [k_3], t_d, t_r,
-  // \pi_{B_i}(=[p_{B_i}^G, q_{B_i}^G, v_{B_i}^G]),
+  // X_c and all the augmented states including the last inserted one in which
+  // a marginalized point has no observation in it p_B^C, f_x, f_y, c_x, c_y,
+  // k_1, k_2, p_1, p_2, [k_3], t_d, t_r, \pi_{B_i}(=[p_{B_i}^G, q_{B_i}^G,
+  // v_{B_i}^G]),
   numCamPosePointStates_ =
       9 + cameras::RadialTangentialDistortion::NumDistortionIntrinsics +
       9 * (statesMap_.size()) + 3 * mInCovLmIds.size();
@@ -1089,10 +1098,10 @@ void HybridFilter::retrieveEstimatesOfConstants() {
   iem_ = IMUErrorModel<double>(Eigen::Matrix<double, 6, 1>::Zero(), vTGTSTA_);
 }
 
-// assume the rolling shutter camera reads data row by row, and rows are aligned
-// with the width of a frame some heuristics to defend outliers is used, e.g.,
-// ignore correspondences of too large discrepancy between prediction and
-// measurement
+// assume the rolling shutter camera reads data row by row, and rows are
+// aligned with the width of a frame some heuristics to defend outliers is
+// used, e.g., ignore correspondences of too large discrepancy between
+// prediction and measurement
 
 bool HybridFilter::computeHxf(const uint64_t hpbid, const MapPoint& mp,
                               Eigen::Matrix<double, 2, 1>& r_i,
@@ -1105,7 +1114,8 @@ bool HybridFilter::computeHxf(const uint64_t hpbid, const MapPoint& mp,
   Eigen::Vector4d ab1rho =
       std::static_pointer_cast<okvis::ceres::HomogeneousPointParameterBlock>(
           mapPtr_->parameterBlockPtr(hpbid))
-          ->estimate();  // inverse depth parameterization in the anchor frame,
+          ->estimate();  // inverse depth parameterization in the anchor
+                         // frame,
                          // [\alpha= X/Z, \beta= Y/Z, 1, \rho=1/Z]
   const uint64_t currFrameId = currentFrameId();
   const uint64_t anchorId = mp.anchorStateId;
@@ -1144,10 +1154,11 @@ bool HybridFilter::computeHxf(const uint64_t hpbid, const MapPoint& mp,
       intrinsicsJacobian;  //$\frac{\partial [z_u, z_v]^T}{\partial( f_x, f_v,
                            // c_x, c_y, k_1, k_2, p_1, p_2, [k_3])}$
   Eigen::Matrix<double, 2, 3>
-      pointJacobian3;  // $\frac{\partial [z_u, z_v]^T}{\partial p_{f_i}^{C_j}}$
+      pointJacobian3;  // $\frac{\partial [z_u, z_v]^T}{\partial
+                       // p_{f_i}^{C_j}}$
 
-  // $\frac{\partial [z_u, z_v]^T}{p_B^C, fx, fy, cx, cy, k1, k2, p1, p2, [k3],
-  // t_d, t_r}$
+  // $\frac{\partial [z_u, z_v]^T}{p_B^C, fx, fy, cx, cy, k1, k2, p1, p2,
+  // [k3], t_d, t_r}$
   Eigen::Matrix<
       double, 2,
       9 + cameras::RadialTangentialDistortion::NumDistortionIntrinsics>
@@ -1195,30 +1206,31 @@ bool HybridFilter::computeHxf(const uint64_t hpbid, const MapPoint& mp,
   kinematics::Transformation T_WB = T_WBj;
   SpeedAndBiases sb = sbj;
   iem_.resetBgBa(sb.tail<6>());
-#ifdef USE_RK4
-  if (featureTime >= Duration()) {
-    IMUOdometry::propagation_RungeKutta(imuMeas, imuParametersVec_.at(0), T_WB,
-                                        sb, vTGTSTA_, stateEpoch,
-                                        stateEpoch + featureTime);
+
+  if (FLAGS_use_RK4) {
+    if (featureTime >= Duration()) {
+      IMUOdometry::propagation_RungeKutta(imuMeas, imuParametersVec_.at(0),
+                                          T_WB, sb, vTGTSTA_, stateEpoch,
+                                          stateEpoch + featureTime);
+    } else {
+      IMUOdometry::propagationBackward_RungeKutta(
+          imuMeas, imuParametersVec_.at(0), T_WB, sb, vTGTSTA_, stateEpoch,
+          stateEpoch + featureTime);
+    }
   } else {
-    IMUOdometry::propagationBackward_RungeKutta(
-        imuMeas, imuParametersVec_.at(0), T_WB, sb, vTGTSTA_, stateEpoch,
-        stateEpoch + featureTime);
+    Eigen::Vector3d tempV_WS = sb.head<3>();
+    int numUsedImuMeasurements = -1;
+    if (featureTime >= Duration()) {
+      numUsedImuMeasurements = IMUOdometry::propagation(
+          imuMeas, imuParametersVec_.at(0), T_WB, tempV_WS, iem_, stateEpoch,
+          stateEpoch + featureTime);
+    } else {
+      numUsedImuMeasurements = IMUOdometry::propagationBackward(
+          imuMeas, imuParametersVec_.at(0), T_WB, tempV_WS, iem_, stateEpoch,
+          stateEpoch + featureTime);
+    }
+    sb.head<3>() = tempV_WS;
   }
-#else
-  Eigen::Vector3d tempV_WS = sb.head<3>();
-  int numUsedImuMeasurements = -1;
-  if (featureTime >= Duration()) {
-    numUsedImuMeasurements = IMUOdometry::propagation(
-        imuMeas, imuParametersVec_.at(0), T_WB, tempV_WS, iem_, stateEpoch,
-        stateEpoch + featureTime);
-  } else {
-    numUsedImuMeasurements = IMUOdometry::propagationBackward(
-        imuMeas, imuParametersVec_.at(0), T_WB, tempV_WS, iem_, stateEpoch,
-        stateEpoch + featureTime);
-  }
-  sb.head<3>() = tempV_WS;
-#endif
 
   IMUOdometry::interpolateInertialData(imuMeas, iem_, stateEpoch + featureTime,
                                        interpolatedInertialData);
@@ -1266,8 +1278,8 @@ bool HybridFilter::computeHxf(const uint64_t hpbid, const MapPoint& mp,
         kinematics::Transformation(posVelFirstEstimate.head<3>(), lP_T_WB.q());
     lP_sb.head<3>() = posVelFirstEstimate.tail<3>();
 
-    tempV_WS = lP_sb.head<3>();
-    numUsedImuMeasurements = -1;
+    Eigen::Vector3d tempV_WS = lP_sb.head<3>();
+    int numUsedImuMeasurements = -1;
     if (featureTime >= Duration()) {
       numUsedImuMeasurements = IMUOdometry::propagation(
           imuMeas, imuParametersVec_.at(0), lP_T_WB, tempV_WS, iem_, stateEpoch,
@@ -1338,10 +1350,10 @@ bool HybridFilter::computeHxf(const uint64_t hpbid, const MapPoint& mp,
 
 // TODO: hpbid homogeneous point block id, used only for debug
 
-// assume the rolling shutter camera reads data row by row, and rows are aligned
-// with the width of a frame some heuristics to defend outliers is used, e.g.,
-// ignore correspondences of too large discrepancy between prediction and
-// measurement
+// assume the rolling shutter camera reads data row by row, and rows are
+// aligned with the width of a frame some heuristics to defend outliers is
+// used, e.g., ignore correspondences of too large discrepancy between
+// prediction and measurement
 bool HybridFilter::computeHoi(const uint64_t hpbid, const MapPoint& mp,
                               Eigen::Matrix<double, Eigen::Dynamic, 1>& r_oi,
                               Eigen::MatrixXd& H_oi, Eigen::MatrixXd& R_oi,
@@ -1353,8 +1365,8 @@ bool HybridFilter::computeHoi(const uint64_t hpbid, const MapPoint& mp,
       obsInPixel;                  // all observations for this feature point
   std::vector<uint64_t> frameIds;  // id of frames observing this feature point
   std::vector<double> vRi;         // std noise in pixels
-  Eigen::Vector4d v4Xhomog;  // triangulated point position in the global frame
-                             // expressed in [X,Y,Z,W],
+  Eigen::Vector4d v4Xhomog;        // triangulated point position in the global
+                                   // frame expressed in [X,Y,Z,W],
   // representing either an ordinary point or a ray, e.g., a point at infinity
   const int camIdx = 0;
   std::shared_ptr<okvis::cameras::CameraBase> tempCameraGeometry =
@@ -1371,8 +1383,8 @@ bool HybridFilter::computeHoi(const uint64_t hpbid, const MapPoint& mp,
     return false;
   }
 
-  // the anchor frame is chosen as the last frame observing the point, i.e., the
-  // frame just before the current frame
+  // the anchor frame is chosen as the last frame observing the point, i.e.,
+  // the frame just before the current frame
   uint64_t anchorId = frameIds.back();
 
   size_t numCamPoseStates = numCamPosePointStates_ - 3 * mInCovLmIds.size();
@@ -1394,8 +1406,8 @@ bool HybridFilter::computeHoi(const uint64_t hpbid, const MapPoint& mp,
   // current frame, Ba refers to body frame associated with the anchor frame,
   // f_i is the feature in consideration
   okvis::kinematics::Transformation
-      T_WBa;  // transform from the body frame at the anchor frame epoch to the
-              // world frame
+      T_WBa;  // transform from the body frame at the anchor frame epoch to
+              // the world frame
   get_T_WS(anchorId, T_WBa);
   okvis::kinematics::Transformation T_GA =
       T_WBa * T_SC0_;  // anchor frame to global frame
@@ -1407,8 +1419,8 @@ bool HybridFilter::computeHoi(const uint64_t hpbid, const MapPoint& mp,
     computeHTimer.stop();
     return false;
   }
-  ab1rho /=
-      ab1rho[2];  //[\alpha = X/Z, \beta= Y/Z, 1, \rho=1/Z] in the anchor frame
+  ab1rho /= ab1rho[2];  //[\alpha = X/Z, \beta= Y/Z, 1, \rho=1/Z] in the
+                        // anchor frame
 
   Eigen::Vector2d imagePoint;  // projected pixel coordinates of the point
                                // ${z_u, z_v}$ in pixel units
@@ -1416,25 +1428,26 @@ bool HybridFilter::computeHoi(const uint64_t hpbid, const MapPoint& mp,
       intrinsicsJacobian;  //$\frac{\partial [z_u, z_v]^T}{\partial( f_x, f_v,
                            // c_x, c_y, k_1, k_2, p_1, p_2, [k_3])}$
   Eigen::Matrix<double, 2, 3>
-      pointJacobian3;  // $\frac{\partial [z_u, z_v]^T}{\partial p_{f_i}^{C_j}}$
+      pointJacobian3;  // $\frac{\partial [z_u, z_v]^T}{\partial
+                       // p_{f_i}^{C_j}}$
 
-  // $\frac{\partial [z_u, z_v]^T}{p_B^C, fx, fy, cx, cy, k1, k2, p1, p2, [k3],
-  // t_d, t_r}$
+  // $\frac{\partial [z_u, z_v]^T}{p_B^C, fx, fy, cx, cy, k1, k2, p1, p2,
+  // [k3], t_d, t_r}$
   Eigen::Matrix<
       double, 2,
       9 + cameras::RadialTangentialDistortion::NumDistortionIntrinsics>
       J_Xc;
 
   Eigen::Matrix<double, 2, 9>
-      J_XBj;  // $\frac{\partial [z_u, z_v]^T}{delta\p_{B_j}^G, \delta\alpha (of
-              // q_{B_j}^G), \delta v_{B_j}^G$
+      J_XBj;  // $\frac{\partial [z_u, z_v]^T}{delta\p_{B_j}^G, \delta\alpha
+              // (of q_{B_j}^G), \delta v_{B_j}^G$
   Eigen::Matrix<double, 3, 9>
       factorJ_XBj;  // the second factor of J_XBj, see Michael Andrew Shelley
                     // Master thesis sec 6.5, p.55 eq 6.66
   Eigen::Matrix<double, 3, 9> factorJ_XBa;
 
-  Eigen::Matrix<double, 2, 3>
-      J_pfi;  // $\frac{\partial [z_u, z_v]^T}{\partial [\alpha, \beta, \rho]}$
+  Eigen::Matrix<double, 2, 3> J_pfi;  // $\frac{\partial [z_u, z_v]^T}{\partial
+                                      // [\alpha, \beta, \rho]}$
   Eigen::Vector2d J_td;
   Eigen::Vector2d J_tr;
   Eigen::Matrix<double, 2, 9>
@@ -1488,30 +1501,30 @@ bool HybridFilter::computeHoi(const uint64_t hpbid, const MapPoint& mp,
     kinematics::Transformation T_WB = T_WBj;
     SpeedAndBiases sb = sbj;
     iem_.resetBgBa(sb.tail<6>());
-#ifdef USE_RK4
-    if (featureTime >= Duration()) {
-      IMUOdometry::propagation_RungeKutta(imuMeas, imuParametersVec_.at(0),
-                                          T_WB, sb, vTGTSTA_, stateEpoch,
-                                          stateEpoch + featureTime);
+    if (FLAGS_use_RK4) {
+      if (featureTime >= Duration()) {
+        IMUOdometry::propagation_RungeKutta(imuMeas, imuParametersVec_.at(0),
+                                            T_WB, sb, vTGTSTA_, stateEpoch,
+                                            stateEpoch + featureTime);
+      } else {
+        IMUOdometry::propagationBackward_RungeKutta(
+            imuMeas, imuParametersVec_.at(0), T_WB, sb, vTGTSTA_, stateEpoch,
+            stateEpoch + featureTime);
+      }
     } else {
-      IMUOdometry::propagationBackward_RungeKutta(
-          imuMeas, imuParametersVec_.at(0), T_WB, sb, vTGTSTA_, stateEpoch,
-          stateEpoch + featureTime);
+      Eigen::Vector3d tempV_WS = sb.head<3>();
+      int numUsedImuMeasurements = -1;
+      if (featureTime >= Duration()) {
+        numUsedImuMeasurements = IMUOdometry::propagation(
+            imuMeas, imuParametersVec_.at(0), T_WB, tempV_WS, iem_, stateEpoch,
+            stateEpoch + featureTime);
+      } else {
+        numUsedImuMeasurements = IMUOdometry::propagationBackward(
+            imuMeas, imuParametersVec_.at(0), T_WB, tempV_WS, iem_, stateEpoch,
+            stateEpoch + featureTime);
+      }
+      sb.head<3>() = tempV_WS;
     }
-#else
-    Eigen::Vector3d tempV_WS = sb.head<3>();
-    int numUsedImuMeasurements = -1;
-    if (featureTime >= Duration()) {
-      numUsedImuMeasurements = IMUOdometry::propagation(
-          imuMeas, imuParametersVec_.at(0), T_WB, tempV_WS, iem_, stateEpoch,
-          stateEpoch + featureTime);
-    } else {
-      numUsedImuMeasurements = IMUOdometry::propagationBackward(
-          imuMeas, imuParametersVec_.at(0), T_WB, tempV_WS, iem_, stateEpoch,
-          stateEpoch + featureTime);
-    }
-    sb.head<3>() = tempV_WS;
-#endif
 
     IMUOdometry::interpolateInertialData(
         imuMeas, iem_, stateEpoch + featureTime, interpolatedInertialData);
@@ -1526,9 +1539,10 @@ bool HybridFilter::computeHoi(const uint64_t hpbid, const MapPoint& mp,
             pfiinC, intrinsicParameters_, &imagePoint, &pointJacobian3,
             &intrinsicsJacobian);
     if (status != cameras::CameraBase::ProjectionStatus::Successful) {
-      LOG(WARNING)
-          << "Failed to compute Jacobian for distortion with anchored point : "
-          << ab1rho.transpose() << " and [r,q]_CA" << T_CA.coeffs().transpose();
+      LOG(WARNING) << "Failed to compute Jacobian for distortion with "
+                      "anchored point : "
+                   << ab1rho.transpose() << " and [r,q]_CA"
+                   << T_CA.coeffs().transpose();
 
       itFrameIds = frameIds.erase(itFrameIds);
       itRoi = vRi.erase(itRoi);
@@ -1560,8 +1574,8 @@ bool HybridFilter::computeHoi(const uint64_t hpbid, const MapPoint& mp,
                                            lP_T_WB.q());
       lP_sb.head<3>() = posVelFirstEstimate.tail<3>();
 
-      tempV_WS = lP_sb.head<3>();
-      numUsedImuMeasurements = -1;
+      Eigen::Vector3d tempV_WS = lP_sb.head<3>();
+      int numUsedImuMeasurements = -1;
       if (featureTime >= Duration()) {
         numUsedImuMeasurements = IMUOdometry::propagation(
             imuMeas, imuParametersVec_.at(0), lP_T_WB, tempV_WS, iem_,
@@ -1822,8 +1836,9 @@ void HybridFilter::updateStates(
   double tr = trParamBlockPtr->estimate();
   trParamBlockPtr->setEstimate(tr + deltaX[50 + nDistortionCoeffDim]);
 
-  // Update augmented states except for the last one which is the current state
-  // already updated this section assumes that the statesMap is an ordered map
+  // Update augmented states except for the last one which is the current
+  // state already updated this section assumes that the statesMap is an
+  // ordered map
   size_t jack = 0;
   auto finalIter = statesMap_.end();
   --finalIter;
@@ -1840,8 +1855,8 @@ void HybridFilter::updateStates(
         vio::quaternionFromSmallAngle(deltaAlpha);  // rvec2quat(deltaAlpha);
     T_WS = kinematics::Transformation(
         T_WS.r() + deltaX.segment<3>(qStart - 3),
-        deltaq *
-            T_WS.q());  // in effect this amounts to PoseParameterBlock::plus()
+        deltaq * T_WS.q());  // in effect this amounts to
+                             // PoseParameterBlock::plus()
     poseParamBlockPtr->setEstimate(T_WS);
 
     SBId = iter->second.sensors.at(SensorStates::Imu)
@@ -1888,8 +1903,8 @@ void HybridFilter::optimize(size_t /*numIter*/, size_t /*numThreads*/,
 }
 
 // TODO: theoretically the filtering update step can run several times for one
-// set of observations, i.e., iterative EKF but the current implementation does
-// not account for that.
+// set of observations, i.e., iterative EKF but the current implementation
+// does not account for that.
 void HybridFilter::optimize(bool verbose) {
   // containers of Jacobians of measurements of marginalized features
   std::vector<
@@ -1897,8 +1912,8 @@ void HybridFilter::optimize(bool verbose) {
       Eigen::aligned_allocator<Eigen::Matrix<double, Eigen::Dynamic, 1>>>
       vr_o;
   std::vector<Eigen::MatrixXd, Eigen::aligned_allocator<Eigen::MatrixXd>>
-      vH_o;  // each entry (2n-3)x(13+9m), n, number of observations, m, states
-             // in the sliding window
+      vH_o;  // each entry (2n-3)x(13+9m), n, number of observations, m,
+             // states in the sliding window
   std::vector<Eigen::MatrixXd, Eigen::aligned_allocator<Eigen::MatrixXd>>
       vR_o;  // each entry (2n-3)x(2n-3)
   // containers of Jacobians of measurements of points in the states
@@ -1936,7 +1951,8 @@ void HybridFilter::optimize(bool verbose) {
 
   Eigen::MatrixXd variableCov = covariance_.block(
       okvis::ceres::ode::OdoErrorStateDim, okvis::ceres::ode::OdoErrorStateDim,
-      dimH_o[1], dimH_o[1]);  // covariance of camera and pose copy states
+      dimH_o[1],
+      dimH_o[1]);  // covariance of camera and pose copy states
   Eigen::MatrixXd variableCov2 = covariance_.block(
       okvis::ceres::ode::OdoErrorStateDim, okvis::ceres::ode::OdoErrorStateDim,
       dimH_o[1] + 9,
@@ -1993,9 +2009,9 @@ void HybridFilter::optimize(bool verbose) {
       if (!isValidJacobian) continue;
 
       if (FLAGS_use_mahalanobis) {
-        // the below test looks time consuming as it involves matrix inversion.
-        // alternatively, some heuristics in computeHoi is used, e.g., ignore
-        // correspondences of too large discrepancy
+        // the below test looks time consuming as it involves matrix
+        // inversion. alternatively, some heuristics in computeHoi is used,
+        // e.g., ignore correspondences of too large discrepancy
         /// remove outliders, cf. Li RSS12 optimization based ... eq 6
         double gamma =
             r_oi.transpose() *
@@ -2042,8 +2058,8 @@ void HybridFilter::optimize(bool verbose) {
     computeKalmanGainTimer.start();
     std::cout << "kalman observation dimH_o and 2*tracked instateFeatures "
               << dimH_o[0] << " " << 2 * nInStateFeatures << std::endl;
-    // stack Jacobians and residuals for only marginalized features, prepare for
-    // QR decomposition to reduce dimension
+    // stack Jacobians and residuals for only marginalized features, prepare
+    // for QR decomposition to reduce dimension
     Eigen::MatrixXd H_o(dimH_o[0], dimH_o[1]);
     Eigen::Matrix<double, Eigen::Dynamic, 1> r_o(dimH_o[0], 1);
     Eigen::MatrixXd R_o = Eigen::MatrixXd::Zero(dimH_o[0], dimH_o[0]);
@@ -2083,7 +2099,8 @@ void HybridFilter::optimize(bool verbose) {
       T_H = R.topLeftCorner(dimH_o[1], dimH_o[1]);
     }
 
-    // stack Jacobians and residuals for features in state, i.e., SLAM features
+    // stack Jacobians and residuals for features in state, i.e., SLAM
+    // features
     const size_t rqRows = r_q.rows();
     const size_t obsRows = rqRows + 2 * nInStateFeatures;
     const size_t numPointStates = 3 * mInCovLmIds.size();
@@ -2145,8 +2162,8 @@ void HybridFilter::optimize(bool verbose) {
                 << covariance_.diagonal().transpose() << std::endl;
       covariance_.diagonal() =
           covariance_.diagonal().cwiseAbs();  // TODO: hack is ugly!
-      //        OKVIS_ASSERT_GT(Exception, covariance_.diagonal().minCoeff(), 0,
-      //        "negative covariance diagonal elements");
+      //        OKVIS_ASSERT_GT(Exception, covariance_.diagonal().minCoeff(),
+      //        0, "negative covariance diagonal elements");
     }
     // another check the copied state should have the same covariance as its
     // source
@@ -2205,7 +2222,8 @@ void HybridFilter::optimize(bool verbose) {
     vH_o.clear();
     vR_o.clear();
 
-    retrieveEstimatesOfConstants();  // do this because states are just updated
+    retrieveEstimatesOfConstants();  // do this because states are just
+                                     // updated
 
     tempCounter = 0;
     size_t totalObsDim = 0;  // total dimensions of all features' observations
@@ -2321,8 +2339,8 @@ void HybridFilter::optimize(bool verbose) {
         startRow += vH_o[tempCounter].rows();
       }
       // TODO: in case H_o has too many rows, we should update the state and
-      // covariance for each feature, or use the qr decomposition approach as in
-      // MSCKF2 in that case H_o is replaced by T_H, and z_o is replaced by
+      // covariance for each feature, or use the qr decomposition approach as
+      // in MSCKF2 in that case H_o is replaced by T_H, and z_o is replaced by
       // Q_1'*z_o
 
       Eigen::MatrixXd S =
@@ -2368,8 +2386,9 @@ void HybridFilter::optimize(bool verbose) {
                   << covariance_.diagonal().transpose() << std::endl;
         covariance_.diagonal() =
             covariance_.diagonal().cwiseAbs();  // TODO: hack is ugly!
-        //        OKVIS_ASSERT_GT(Exception, covariance_.diagonal().minCoeff(),
-        //        0, "negative covariance diagonal elements");
+        //        OKVIS_ASSERT_GT(Exception,
+        //        covariance_.diagonal().minCoeff(), 0, "negative covariance
+        //        diagonal elements");
       }
       // another check the copied state should have the same covariance as its
       // source
@@ -2409,8 +2428,8 @@ void HybridFilter::optimize(bool verbose) {
 
   /// update minValidStateID for removing old states
   /// also update landmark positions which is only necessary when
-  /// (1) landmark coordinates are used to predict the points projection in new
-  /// frames OR (2) to visualize the points
+  /// (1) landmark coordinates are used to predict the points projection in
+  /// new frames OR (2) to visualize the points
   tempCounter = 0;
   minValidStateID = currFrameId;
   for (auto it = landmarksMap_.begin(); it != landmarksMap_.end();
@@ -2877,8 +2896,8 @@ bool HybridFilter::triangulateAMapPoint(
                            // uncertainty
   bool isParallel(false);  // is a ray
 
-  // test parallel following okvis::triangulateFast using only the first, last,
-  // and middle observations
+  // test parallel following okvis::triangulateFast using only the first,
+  // last, and middle observations
   okvis::kinematics::Transformation T_AW(T_CWs.front().translation(),
                                          T_CWs.front().unit_quaternion());
   okvis::kinematics::Transformation T_BW(T_CWs.back().translation(),
@@ -2917,9 +2936,9 @@ bool HybridFilter::triangulateAMapPoint(
   double e1e32 = e1e3 * e1e3;
   // ray parallax test
   const double parallaxThreshold =
-      1.0 -
-      5e-5;  // the value is chosen to be comparable with
-             // okvis::triangulateFast, yet a little easier to declare parallel
+      1.0 - 5e-5;  // the value is chosen to be comparable with
+                   // okvis::triangulateFast, yet a little easier to declare
+                   // parallel
   if (e1e22 > parallaxThreshold && e1e32 > parallaxThreshold) {
     isParallel = true;
     if ((e1.cross(e2)).norm() < 6 * sigmaR &&
