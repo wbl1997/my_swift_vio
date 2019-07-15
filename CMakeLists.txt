@@ -121,6 +121,7 @@ LIST(APPEND SOURCEFILES
     src/HybridFrameRelativeAdapter.cpp
     src/HybridFrameNoncentralAbsoluteAdapter.cpp
     src/ImuSimulator.cpp
+    src/preconditioned_ekf_updater.cpp
 
     src/HybridFilter.cpp
     src/camerarig.cpp
