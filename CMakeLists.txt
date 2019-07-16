@@ -1,12 +1,12 @@
 cmake_minimum_required(VERSION 2.8.3)
-project(msckf2)
+project(msckf)
 
 # { Begin: special handling for building with QtCreator
 if(NOT CMAKE_SOURCE_DIR MATCHES "src$" AND NOT CMAKE_BINARY_DIR MATCHES "build$")
 # If catkin_make is to be invoked, CMAKE_SOURCE_DIR will be like <workspace>/src
 # and CMAKE_BINARY_DIR will be like <workspace>/build
-# If Build within QtCreator is invoked, CMAKE_SOURCE_DIR will be like <workspace>/src/msckf2
-# and CMAKE_BINARY_DIR will be like <workspace>/build/msckf2
+# If Build within QtCreator is invoked, CMAKE_SOURCE_DIR will be like <workspace>/src/msckf
+# and CMAKE_BINARY_DIR will be like <workspace>/build/msckf
 
 get_filename_component(SUPER_SOURCE_DIR ${CMAKE_SOURCE_DIR} DIRECTORY)
 get_filename_component(SUPER_BINARY_DIR ${CMAKE_BINARY_DIR} DIRECTORY)
@@ -24,7 +24,7 @@ endif()
 message("CATKIN_DEVEL_PREFIX ${CATKIN_DEVEL_PREFIX}")
 
 SET(USE_ROS TRUE)
-SET(MSCKF2 TRUE) # build with msck2 or hybridfilter
+SET(MSCKF TRUE) # build with msck2 or hybridfilter
 
 IF(NOT CMAKE_BUILD_TYPE)
   SET(CMAKE_BUILD_TYPE Release)
@@ -33,16 +33,16 @@ IF(CMAKE_BUILD_TYPE MATCHES Release)
   ADD_DEFINITIONS(-DNDEBUG)
 ENDIF()
 
-IF(MSCKF2)
-  ADD_DEFINITIONS(-DUSE_MSCKF2)
+IF(MSCKF)
+  ADD_DEFINITIONS(-DUSE_MSCKF)
 ENDIF()
 IF(USE_ROS)
   add_definitions(-DSLAM_USE_ROS)
 ENDIF()
 
-#ADD_DEFINITIONS(-DDEACTIVATE_TIMERS)
+# ADD_DEFINITIONS(-DDEACTIVATE_TIMERS)
 
-message(STATUS "Building MSCKF2 with ${CMAKE_BUILD_TYPE}")
+message(STATUS "Building MSCKF with ${CMAKE_BUILD_TYPE}")
 
 set(OKVIS_SOURCE_PATH okvis)
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS}  -Wall -O3 -march=native ")
@@ -101,50 +101,38 @@ add_definitions(-fPIC -march=native -Wextra -Winit-self -Woverloaded-virtual
                 -Wnon-virtual-dtor -Wsign-promo -Wno-long-long -std=c++0x)
 
 LIST(APPEND SOURCEFILES
-    src/Subscriber.cpp  
-    src/Player.cpp
-    src/Publisher.cpp
-    src/RosParametersReader.cpp
-    src/IMUOdometry.cpp  
-    src/CameraIntrinsicParamBlock.cpp
-    src/CameraDistortionParamBlock.cpp
-    src/CameraTimeParamBlock.cpp
-    src/ShapeMatrixParamBlock.cpp
-    src/CameraIntrinsicError.cpp   
-    src/HybridVio.cpp
-    src/initialpvandstd.cpp
-    src/HybridFrontend.cpp
-    src/triangulate.cpp
-    src/triangulateFast.cpp
-    src/VioFrameMatchingAlgorithm.cpp
-    src/HybridFrameRelativeAdapter.cpp
-    src/HybridFrameNoncentralAbsoluteAdapter.cpp
-    src/ImuSimulator.cpp
-    src/preconditioned_ekf_updater.cpp
+    src/io_wrap/Subscriber.cpp
+    src/io_wrap/Player.cpp
+    src/io_wrap/Publisher.cpp
+    src/io_wrap/RosParametersReader.cpp
+    src/io_wrap/PoseViewer.cpp
 
-    src/HybridFilter.cpp
-    src/camerarig.cpp
-    src/PoseViewer.cpp
+
+    src/okvis/ceres/CameraIntrinsicParamBlock.cpp
+    src/okvis/ceres/CameraDistortionParamBlock.cpp
+    src/okvis/ceres/CameraTimeParamBlock.cpp
+    src/okvis/ceres/ShapeMatrixParamBlock.cpp
+    src/okvis/ceres/CameraIntrinsicError.cpp
+
+    src/msckf/ImuOdometry.cpp
+    src/msckf/HybridVio.cpp
+    src/msckf/InitialPVandStd.cpp
+    src/msckf/HybridFrontend.cpp
+    src/msckf/triangulate.cpp
+    src/msckf/triangulateFast.cpp
+    src/msckf/VioFrameMatchingAlgorithm.cpp
+    src/msckf/HybridFrameRelativeAdapter.cpp
+    src/msckf/HybridFrameNoncentralAbsoluteAdapter.cpp
+    src/msckf/ImuSimulator.cpp
+    src/msckf/PreconditionedEkfUpdater.cpp
+    src/msckf/HybridFilter.cpp
+    src/msckf/CameraRig.cpp
+    src/msckf/MSCKF2.cpp
+
     src/feature_tracker/TrackResultReader.cpp
-    src/feature_tracker/trail_manager.cpp
-    src/feature_tracker/feature_trail.cpp
-
-    include/okvis/Subscriber.hpp   
-    include/okvis/Player.hpp
-    include/okvis/Publisher.hpp
-    include/okvis/RosParametersReader.hpp
-    include/okvis/HybridVio.hpp
-    include/okvis/odeHybrid.hpp
-    include/okvis/ImuSimulator.h
-    include/okvis/HybridFilter.hpp
+    src/feature_tracker/TrailManager.cpp
+    src/feature_tracker/FeatureTrail.cpp
 )
-
-IF(MSCKF2)
-  LIST(APPEND SOURCEFILES
-    include/okvis/msckf2.hpp
-    src/msckf2.cpp
-  )
-ENDIF()
 
 add_library(${PROJECT_NAME} STATIC
   ${SOURCEFILES}
@@ -192,27 +180,32 @@ target_link_libraries(${PROJECT_NAME}
   ${LINK_LIBRARIES}
 )
 
+# now the actual applications
 # a wrapper to invoke a specific test
-add_executable(invoke_one_test src/invoke_one_test.cpp )
+add_executable(invoke_one_test src/apps/invoke_one_test.cpp )
 target_link_libraries(invoke_one_test ${PROJECT_NAME} )
 
-# now the actual applications
-add_executable(msckf2_node src/okvis_node.cpp)
-target_link_libraries(msckf2_node ${PROJECT_NAME})
+add_executable(okvis_node src/apps/okvis_node.cpp)
+target_link_libraries(okvis_node ${PROJECT_NAME})
 
 list(APPEND TEST_SRC_FILES
     test/test_main.cpp
-    test/BinaryOperators.cpp
-    test/BoostAccumulators.cpp
-    test/EigenMatrixInitialization.cpp
-    test/MapKeyOrder.cpp
-    test/Sizeof.cpp
-    test/StdAccumulate.cpp
-    test/testHybridFilter.cpp
-    test/testEigenQR.cpp
-    test/testIMUOdometry.cpp
-    test/testTriangulate.cpp
-    test/testVioDatasetPlayer.cpp
+
+    test/boost/TestBoostAccumulators.cpp
+
+    test/eigen/TestEigenMatrixInitialization.cpp
+    test/eigen/TestEigenQR.cpp
+
+    test/std/TestBinaryOperators.cpp
+    test/std/TestMapKeyOrder.cpp
+    test/std/TestSizeof.cpp
+    test/std/TestStdAccumulate.cpp
+
+    test/msckf/TestHybridFilter.cpp
+    test/msckf/TestImuOdometry.cpp
+    test/msckf/TestTriangulate.cpp
+
+    test/io_wrap/TestVioDatasetPlayer.cpp
     )
 
 #QtCreator may not create the allTests target
@@ -223,6 +216,7 @@ list(APPEND TEST_SRC_FILES
 #endif()
 
 if(BUILD_TESTS)
+# The below lines cause tr1 not found issue in Ubuntu 16.04
 #  if(APPLE)
 #    add_definitions(-DGTEST_HAS_TR1_TUPLE=1)
 #  else()

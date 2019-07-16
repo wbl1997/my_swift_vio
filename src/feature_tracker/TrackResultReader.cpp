@@ -91,7 +91,7 @@ bool readKeyPointsFromStream(
       kp_stream >> kp.pt.x >> kp.pt.y >> kp.size >> kp.angle >> kp.response >>
           kp.octave >> kp.class_id >> mpId >> dummy3[0] >> dummy3[1] >>
           dummy3[2];
-      kp.size = kp.size * 8 / 31;  // HACK: to make it compatible with msckf2
+      kp.size = kp.size * 8 / 31;  // HACK: to make it compatible with msckf
                                    // optimizer observation noise
       mapPointIds[jack] = mpId;
       mapPointPositions[jack] = dummy3;
