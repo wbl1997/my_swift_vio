@@ -497,7 +497,7 @@ void TrailManager::updateEstimatorObservations2(
             << mFeatureTrailList.size() << std::endl;
 }
 
-void TrailManager::printNumFeatureDistribution(std::ofstream& stream) {
+void TrailManager::printNumFeatureDistribution(std::ofstream& stream) const {
   if (!stream.is_open()) {
     std::cerr << "cannot write feature distribution without proper stream "
               << std::endl;

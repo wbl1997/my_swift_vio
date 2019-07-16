@@ -360,7 +360,7 @@ void testHybridFilterCircle() {
         }
       }
       // run the optimization
-      estimator.optimize(false);
+      estimator.optimize(1, 1, false);
 
       estimator.applyMarginalizationStrategy();
     }
@@ -1048,7 +1048,7 @@ void testHybridFilterSinusoid(const std::string &outputPath,
         }
         myAccumulator(trackedFeatures);
 
-        estimator.optimize(false);
+        estimator.optimize(1, 1, false);
         estimator.applyMarginalizationStrategy();
 
         Eigen::Vector3d v_WS_true = cst.computeGlobalLinearVelocity(*iter);

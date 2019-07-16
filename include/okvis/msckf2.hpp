@@ -88,11 +88,8 @@ class MSCKF2 : public HybridFilter {
    */
   virtual bool applyMarginalizationStrategy() final;
 
-  /**
-   * @brief MSCKF2 with iterated EKF. c.f., Faraz Mirzaei, a Kalman filter based
-   * algorithm for IMU-Camera calibration
-   */
-  virtual void optimize(bool verbose = false) final;
+  virtual void optimize(size_t numIter, size_t numThreads = 1,
+                        bool verbose = false) final;
 
  public:
   // set intermediate variables which are used for computing Jacobians of

@@ -1905,17 +1905,11 @@ void HybridFilter::updateStates(
   updateStatesTimer.stop();
 }
 
-void HybridFilter::optimize(size_t /*numIter*/, size_t /*numThreads*/,
-                            bool /*verbose*/) {
-  OKVIS_ASSERT_TRUE(
-      Exception, 0,
-      "This dummy implementation of optimize should never be called!");
-}
-
 // TODO: theoretically the filtering update step can run several times for one
 // set of observations, i.e., iterative EKF but the current implementation
 // does not account for that.
-void HybridFilter::optimize(bool verbose) {
+void HybridFilter::optimize(size_t /*numIter*/, size_t /*numThreads*/,
+                            bool verbose) {
   // containers of Jacobians of measurements of marginalized features
   std::vector<
       Eigen::Matrix<double, Eigen::Dynamic, 1>,
@@ -3226,7 +3220,7 @@ void HybridFilter::checkStates() {
 }
 // print states and their std
 // std::string debugFile; // to store the states and stds
-bool HybridFilter::print(const std::string debugFile) {
+bool HybridFilter::print(const std::string debugFile) const {
   static std::ofstream mDebug;  // the stream corresponding to the debugFile
   if (!mDebug.is_open()) {
     mDebug.open(debugFile, std::ofstream::out);
@@ -3238,7 +3232,7 @@ bool HybridFilter::print(const std::string debugFile) {
   return print(mDebug);
 }
 
-bool HybridFilter::print(std::ostream& mDebug) {
+bool HybridFilter::print(std::ostream& mDebug) const {
   uint64_t poseId = statesMap_.rbegin()->first;
   std::shared_ptr<ceres::PoseParameterBlock> poseParamBlockPtr =
       std::static_pointer_cast<ceres::PoseParameterBlock>(
@@ -3378,7 +3372,7 @@ size_t HybridFilter::numObservations(uint64_t landmarkId) {
     return 0;
 }
 
-void HybridFilter::printTrackLengthHistogram(std::ostream& mDebug) {
+void HybridFilter::printTrackLengthHistogram(std::ostream& mDebug) const {
   mDebug << std::endl
          << "track length histogram in one test with bins 0,1,2..."
          << std::endl;

@@ -104,7 +104,6 @@ LIST(APPEND SOURCEFILES
     src/Subscriber.cpp  
     src/Player.cpp
     src/Publisher.cpp
-    src/HybridVioParametersReader.cpp
     src/RosParametersReader.cpp
     src/IMUOdometry.cpp  
     src/CameraIntrinsicParamBlock.cpp
@@ -133,7 +132,6 @@ LIST(APPEND SOURCEFILES
     include/okvis/Subscriber.hpp   
     include/okvis/Player.hpp
     include/okvis/Publisher.hpp
-    include/okvis/HybridVioParametersReader.hpp
     include/okvis/RosParametersReader.hpp
     include/okvis/HybridVio.hpp
     include/okvis/odeHybrid.hpp
@@ -202,7 +200,8 @@ target_link_libraries(invoke_one_test ${PROJECT_NAME} )
 add_executable(msckf2_node src/okvis_node.cpp)
 target_link_libraries(msckf2_node ${PROJECT_NAME})
 
-catkin_add_gtest(allTests test/test_main.cpp
+list(APPEND TEST_SRC_FILES
+    test/test_main.cpp
     test/BinaryOperators.cpp
     test/BoostAccumulators.cpp
     test/EigenMatrixInitialization.cpp
@@ -213,6 +212,30 @@ catkin_add_gtest(allTests test/test_main.cpp
     test/testEigenQR.cpp
     test/testIMUOdometry.cpp
     test/testTriangulate.cpp
-    test/testVioDatasetPlayer.cpp)
+    test/testVioDatasetPlayer.cpp
+    )
 
-target_link_libraries(allTests ${PROJECT_NAME} gtest gmock pthread)
+#QtCreator may not create the allTests target
+#if(CATKIN_ENABLE_TESTING)
+#  set(PROJECT_TEST_NAME ${PROJECT_NAME}_test)
+#  catkin_add_gtest(${PROJECT_TEST_NAME} ${TEST_SRC_FILES})
+#  target_link_libraries(${PROJECT_TEST_NAME} ${PROJECT_NAME} gtest gmock pthread)
+#endif()
+
+if(BUILD_TESTS)
+#  if(APPLE)
+#    add_definitions(-DGTEST_HAS_TR1_TUPLE=1)
+#  else()
+#    add_definitions(-DGTEST_HAS_TR1_TUPLE=0)
+#  endif(APPLE)
+  enable_testing()
+  set(PROJECT_TEST_NAME ${PROJECT_NAME}_test)
+  add_executable(${PROJECT_TEST_NAME}
+    ${TEST_SRC_FILES}
+  )
+  target_link_libraries(${PROJECT_TEST_NAME}
+    ${PROJECT_NAME}
+    gtest gmock
+    pthread)
+  add_test(test ${PROJECT_TEST_NAME})
+endif()

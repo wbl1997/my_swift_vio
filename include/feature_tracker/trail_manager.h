@@ -89,7 +89,7 @@ class TrailManager {
       uint64_t mfIdA, uint64_t mfIdB, size_t camIdA, size_t camIdB);
 
   // output the distribution of number of features in images
-  void printNumFeatureDistribution(std::ofstream& stream);
+  void printNumFeatureDistribution(std::ofstream& stream) const;
 
   std::vector<cv::KeyPoint> getCurrentKeypoints() const;
 

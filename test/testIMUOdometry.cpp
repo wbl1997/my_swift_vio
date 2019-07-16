@@ -181,11 +181,6 @@ TEST(IMUOdometry, BackwardIntegration) {
 
   CovPropConfig cpc(true, false);
 
-  Eigen::Matrix<double, okvis::ceres::ode::OdoErrorStateDim,
-                okvis::ceres::ode::OdoErrorStateDim>* P_ptr = 0;
-  Eigen::Matrix<double, okvis::ceres::ode::OdoErrorStateDim,
-                okvis::ceres::ode::OdoErrorStateDim>* F_tot_ptr = 0;
-
   Eigen::Vector3d p_WS_W = cpc.get_p_WS_W0();
   Eigen::Quaterniond q_WS = cpc.get_q_WS0();
   okvis::SpeedAndBiases sb = cpc.get_sb0();
@@ -321,23 +316,25 @@ void IMUOdometryTrapezoidRule(
       F_tot;
   F_tot.setIdentity();
 
-#if 0  // this is the same as the first case in effect
-      int numUsedImuMeasurements = IMUOdometry::propagation_RungeKutta(imuMeasurements,
-                                                                       imuParams,
-                                                                       T_WS, sb, vTgTsTa, imuMeasurements.begin()->timeStamp,
-                                                                       imuMeasurements.rbegin()->timeStamp, &P2, &F_tot);
-#else
-  Eigen::Vector3d tempV_WS = sb.head<3>();
-  IMUErrorModel<double> tempIEM(sb.tail<6>(), vTgTsTa);
-  Eigen::Matrix<double, 6, 1> lP;
-  lP << T_WS.r(), tempV_WS;
-  int numUsedImuMeasurements = okvis::IMUOdometry::propagation(
-      imuMeasurements, imuParams, T_WS, tempV_WS, tempIEM,
-      imuMeasurements.begin()->timeStamp, imuMeasurements.rbegin()->timeStamp,
-      &P2, &F_tot, &lP);
-  sb.head<3>() = tempV_WS;
+  int numUsedImuMeasurements = 0;
+  if (0) {  // this is the same as the first case in effect which uses
+            // integrateOneStep_RungeKutta
+    numUsedImuMeasurements = okvis::IMUOdometry::propagation_RungeKutta(
+        imuMeasurements, imuParams, T_WS, sb, vTgTsTa,
+        imuMeasurements.begin()->timeStamp, imuMeasurements.rbegin()->timeStamp,
+        &P2, &F_tot);
+  } else {
+    Eigen::Vector3d tempV_WS = sb.head<3>();
+    IMUErrorModel<double> tempIEM(sb.tail<6>(), vTgTsTa);
+    Eigen::Matrix<double, 6, 1> lP;
+    lP << T_WS.r(), tempV_WS;
+    numUsedImuMeasurements = okvis::IMUOdometry::propagation(
+        imuMeasurements, imuParams, T_WS, tempV_WS, tempIEM,
+        imuMeasurements.begin()->timeStamp, imuMeasurements.rbegin()->timeStamp,
+        &P2, &F_tot, &lP);
+    sb.head<3>() = tempV_WS;
+  }
 
-#endif
   double timeElapsed = okvisTimer.stop();
 
   *p_WS_W2 = T_WS.r();
@@ -456,6 +453,9 @@ TEST(IMUOdometry, IMUCovariancePropagation) {
   Eigen::Matrix<double, 15, 15> leutenF;
   leutenF.setIdentity();
 
+  // The Leutenegger's ImuError propagation function starts propagation with an
+  // zero covariance. The original implementation has some issue in covariance
+  // propagation, its Jacobian is correct though.
   int numUsedImuMeasurements = okvis::ceres::ImuError::propagation(
       cpc.get_imu_measurements(), cpc.get_imu_params(), T_WS, sb,
       cpc.get_meas_begin_time(), cpc.get_meas_end_time(), &leutenP, &leutenF);
@@ -477,7 +477,7 @@ TEST(IMUOdometry, IMUCovariancePropagation) {
               << leuten_q_WS.y() << " " << leuten_q_WS.z() << std::endl;
     std::cout << "p_WS_W " << leuten_p_WS_W.transpose() << std::endl;
     std::cout << "speed and bias " << leuten_sb.transpose() << std::endl;
-    std::cout << "cov diagonal sqrt " << std::endl;
+    std::cout << "starting with 0s, cov diagonal sqrt " << std::endl;
     std::cout << leuten_sqrtDiagCov.transpose() << std::endl;
     std::cout << "Jacobian diagonal " << std::endl;
     std::cout << vio::superdiagonal(leutenF).transpose() << std::endl;
@@ -584,8 +584,7 @@ TEST(IMUOdometry, IMUCovariancePropagation) {
               fabs(q_WS2.z() - q_WS1.z()) < 1e-5);
   EXPECT_LT((p_WS_W1 - p_WS_W2).norm(), 50);
   EXPECT_LT((sb1 - sb2).norm(), 2);
-  // 1,3 states
-
+  // 1,5 states
   EXPECT_TRUE(fabs(q_WS3.w() - q_WS1.w()) < 5e-2 &&
               fabs(q_WS3.x() - q_WS1.x()) < 5e-2 &&
               fabs(q_WS3.y() - q_WS1.y()) < 5e-2 &&
@@ -632,7 +631,7 @@ TEST(IMUOdometry, IMUCovariancePropagation) {
                 firstRow1.segment<9>(33).norm(),
             1e-3);
 
-  // 1,3 covariance
+  // 1,5 covariance
   EXPECT_LT((sqrtDiagCov3.head<3>() - sqrtDiagCov1.head<3>()).norm() /
                 sqrtDiagCov3.head<3>().norm(),
             5e-2);

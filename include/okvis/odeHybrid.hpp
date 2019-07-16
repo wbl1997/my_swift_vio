@@ -555,11 +555,11 @@ inline Eigen::Matrix<typename Derived::Scalar, 3, 3> skew3d(
 // predicted covariance for better accuracy and possibly slower computation, use
 // the covariance propagation model in ethz asl msf on github
 template <typename Scalar>
-void sys_local_dcm_bias(const Eigen::Matrix<Scalar, 3, 1>& rs0,
-                        const Eigen::Matrix<Scalar, 3, 1>& vs0,
+void sys_local_dcm_bias(const Eigen::Matrix<Scalar, 3, 1>& /*rs0*/,
+                        const Eigen::Matrix<Scalar, 3, 1>& /*vs0*/,
                         const Eigen::Quaternion<Scalar>& qs0_2_s,
                         const Eigen::Matrix<Scalar, 3, 1>& acc,
-                        const Eigen::Matrix<Scalar, 3, 1>& gyro, Scalar dt,
+                        const Eigen::Matrix<Scalar, 3, 1>& /*gyro*/, Scalar dt,
                         const Eigen::Matrix<Scalar, 3, 1>& q_n_a,
                         const Eigen::Matrix<Scalar, 3, 1>& q_n_w,
                         const Eigen::Matrix<Scalar, 3, 1>& q_n_ba,

@@ -925,7 +925,7 @@ void HybridFrontend::initialiseBriskFeatureDetectors() {
   }
 }
 
-void HybridFrontend::printNumFeatureDistribution(std::ofstream& stream) {
+void HybridFrontend::printNumFeatureDistribution(std::ofstream& stream) const {
   trailManager_.printNumFeatureDistribution(stream);
 }
 

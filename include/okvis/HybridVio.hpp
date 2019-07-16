@@ -46,17 +46,6 @@ namespace okvis {
  * congestions to the user callback.
  */
 
-typedef std::function<void(
-    const okvis::Time&, const okvis::kinematics::Transformation&,
-    const Eigen::Matrix<double, 9, 1>&, const Eigen::Matrix<double, 3, 1>&,
-    const int,
-    const std::vector<
-        okvis::kinematics::Transformation,
-        Eigen::aligned_allocator<okvis::kinematics::Transformation>>&,
-    const Eigen::Matrix<double, 27, 1>&, const Eigen::Matrix<double, 10, 1>&,
-    const Eigen::Matrix<double, 55, 1>&)>
-    FullStateCallbackWithAllCalibration;
-
 class HybridVio : public VioInterface {
  public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
@@ -207,10 +196,6 @@ class HybridVio : public VioInterface {
    * only when the processing is complete.
    */
   virtual void setBlocking(bool blocking);
-
-  virtual void setFullStateCallbackWithAllCalibration(
-      const FullStateCallbackWithAllCalibration&
-          fullStateCallbackWithAllCalibration);
 
   /// \}
 
@@ -462,21 +447,8 @@ class HybridVio : public VioInterface {
   /// Max position measurements before dropping.
   const size_t maxPositionInputQueueSize_ = 10;
 
-  FullStateCallbackWithAllCalibration
-      fullStateCallbackWithAllCalibration_;  ///< Full state and calibration
-                                             ///< callback function.
-
  public:
-  inline void saveStatistics(std::string filename) {
-    std::ofstream stream(filename, std::ios_base::app);
-    if (!stream.is_open()) {
-      std::cout << "error in opening " << filename << std::endl;
-      return;
-    }
-    estimator_.printTrackLengthHistogram(stream);
-    frontend_.printNumFeatureDistribution(stream);
-    if (stream.is_open()) stream.close();
-  }
+  virtual void saveStatistics(const std::string& filename) const final;
 };
 
 }  // namespace okvis

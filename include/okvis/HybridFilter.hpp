@@ -169,13 +169,8 @@ class HybridFilter : public VioBackendInterface {
   static bool initPoseFromImu(const okvis::ImuMeasurementDeque &imuMeasurements,
                               okvis::kinematics::Transformation &T_WS);
 
-  /**
-   * @brief Hybrid filtering.
-   */
-  virtual void optimize(bool verbose = false);
-
   virtual void optimize(size_t numIter, size_t numThreads = 1,
-                        bool verbose = false) final;
+                        bool verbose = false);
 
   /**
    * @brief Set a time limit for the optimization process.
@@ -746,10 +741,11 @@ class HybridFilter : public VioBackendInterface {
   /// print out the most recent state vector and the stds of its elements. This
   /// function can be called in the optimizationLoop, but a better way to save
   /// results is use the publisher loop
-  bool print(const std::string);
-  bool print(std::ostream &mDebug);
+  bool print(const std::string) const;
 
-  void printTrackLengthHistogram(std::ostream &mDebug);
+  bool print(std::ostream &mDebug) const;
+
+  void printTrackLengthHistogram(std::ostream &mDebug) const;
 
   /// reset initial condition
   inline void resetInitialPVandStd(const InitialPVandStd &rhs,

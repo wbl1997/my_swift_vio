@@ -1931,7 +1931,7 @@ uint64_t MSCKF2::getMinValidStateID() const {
   return min_state_id;
 }
 
-void MSCKF2::optimize(bool verbose) {
+void MSCKF2::optimize(size_t /*numIter*/, size_t /*numThreads*/, bool verbose) {
   uint64_t currFrameId = currentFrameId();
   OKVIS_ASSERT_EQ(
       Exception,
@@ -1958,6 +1958,8 @@ void MSCKF2::optimize(bool verbose) {
   }
 
   if (FLAGS_use_IEKF) {
+    // c.f., Faraz Mirzaei, a Kalman filter based algorithm for IMU-Camera
+    // calibration
     Eigen::Matrix<double, Eigen::Dynamic, 1> deltaX,
         tempDeltaX;  // record the last update step, used to cancel last update
                      // in IEKF

@@ -230,7 +230,7 @@ class HybridFrontend {
   }
 
   // output the distribution of number of features in images
-  void printNumFeatureDistribution(std::ofstream& stream);
+  void printNumFeatureDistribution(std::ofstream& stream) const;
   /// @}
 
  private:

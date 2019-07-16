@@ -774,7 +774,7 @@ void HybridVio::optimizationLoop() {
       bool isKF = false;
       estimator_.getFrameId(frame_pairs->id(), frameIdInSource, isKF);
 
-      estimator_.optimize(false);
+      estimator_.optimize(1, 1, false);
 
       optimizationTimer.stop();
 
@@ -917,11 +917,15 @@ void HybridVio::publisherLoop() {
   }
 }
 
-// Set the callback to be called every time a new state is estimated.
-void HybridVio::setFullStateCallbackWithAllCalibration(
-    const FullStateCallbackWithAllCalibration
-        &fullStateCallbackWithAllCalibration) {
-  fullStateCallbackWithAllCalibration_ = fullStateCallbackWithAllCalibration;
+void HybridVio::saveStatistics(const std::string &filename) const {
+  std::ofstream stream(filename, std::ios_base::app);
+  if (!stream.is_open()) {
+    std::cout << "error in opening " << filename << std::endl;
+    return;
+  }
+  estimator_.printTrackLengthHistogram(stream);
+  frontend_.printNumFeatureDistribution(stream);
+  if (stream.is_open()) stream.close();
 }
 
 }  // namespace okvis
