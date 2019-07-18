@@ -586,6 +586,7 @@ class HybridFilter : public VioBackendInterface {
   /// t_j - t_{d_j} + t_d + (v-N/2)t_r/N here t_d and t_r are the true time
   /// offset and image readout time t_{f_i} is the time feature i is observed
   struct States {
+    EIGEN_MAKE_ALIGNED_OPERATOR_NEW
     States() : isKeyframe(false), id(0), tdAtCreation(0) {}
     // _timestamp = image timestamp - imageDelay + _tdAtCreation
     States(bool isKeyframe, uint64_t id, okvis::Time _timestamp,

@@ -17,16 +17,20 @@
 namespace okvis {
 /// \brief ceres Namespace for ceres-related functionality implemented in okvis.
 namespace ceres {
-const int nShapeMatrixDim =9, nShapeMatrixMinDim =9;
-typedef Eigen::Matrix<double, nShapeMatrixDim, 1> ShapeMatrixVector; //Tg, Ts, or Ta
+const int nShapeMatrixDim = 9, nShapeMatrixMinDim = 9;
+typedef Eigen::Matrix<double, nShapeMatrixDim, 1>
+    ShapeMatrixVector;  // Tg, Ts, or Ta
 
 /// \brief Wraps the parameter block for shape matrix's elements' estimate
-class ShapeMatrixParamBlock :
-    public ParameterBlockSized< nShapeMatrixDim, nShapeMatrixMinDim, ShapeMatrixVector> {
+class ShapeMatrixParamBlock
+    : public ParameterBlockSized<nShapeMatrixDim, nShapeMatrixMinDim,
+                                 ShapeMatrixVector> {
  public:
-
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
   /// \brief The base class type.
-  typedef ParameterBlockSized<nShapeMatrixDim, nShapeMatrixMinDim, ShapeMatrixVector> base_t;
+  typedef ParameterBlockSized<nShapeMatrixDim, nShapeMatrixMinDim,
+                              ShapeMatrixVector>
+      base_t;
 
   /// \brief The estimate type (9D vector).
   typedef ShapeMatrixVector estimate_t;
@@ -39,7 +43,7 @@ class ShapeMatrixParamBlock :
   /// @param[in] id The (unique) ID of this block.
   /// @param[in] timestamp The timestamp of this state.
   ShapeMatrixParamBlock(const ShapeMatrixVector& shapeMatrixVector, uint64_t id,
-                             const okvis::Time& timestamp);
+                        const okvis::Time& timestamp);
 
   /// \brief Trivial destructor.
   virtual ~ShapeMatrixParamBlock();
@@ -51,9 +55,7 @@ class ShapeMatrixParamBlock :
 
   /// \brief Set the time.
   /// @param[in] timestamp The timestamp of this state.
-  void setTimestamp(const okvis::Time& timestamp) {
-    timestamp_ = timestamp;
-  }
+  void setTimestamp(const okvis::Time& timestamp) { timestamp_ = timestamp; }
 
   // getters
   /// @brief Get estimate.
@@ -62,9 +64,7 @@ class ShapeMatrixParamBlock :
 
   /// \brief Get the time.
   /// \return The timestamp of this state.
-  okvis::Time timestamp() const {
-    return timestamp_;
-  }
+  okvis::Time timestamp() const { return timestamp_; }
 
   // minimal internal parameterization
   // x0_plus_Delta=Delta_Chi[+]x0
@@ -77,23 +77,27 @@ class ShapeMatrixParamBlock :
   virtual void plus(const double* x0, const double* Delta_Chi,
                     double* x0_plus_Delta) const {
     Eigen::Map<const Eigen::Matrix<double, nShapeMatrixDim, 1> > x0_(x0);
-    Eigen::Map<const Eigen::Matrix<double, nShapeMatrixDim, 1> > Delta_Chi_(Delta_Chi);
-    Eigen::Map<Eigen::Matrix<double, nShapeMatrixDim, 1> > x0_plus_Delta_(x0_plus_Delta);
+    Eigen::Map<const Eigen::Matrix<double, nShapeMatrixDim, 1> > Delta_Chi_(
+        Delta_Chi);
+    Eigen::Map<Eigen::Matrix<double, nShapeMatrixDim, 1> > x0_plus_Delta_(
+        x0_plus_Delta);
     x0_plus_Delta_ = x0_ + Delta_Chi_;
   }
 
   /// \brief The jacobian of Plus(x, delta) w.r.t delta at delta = 0.
-//  /// @param[in] x0 Variable.
+  //  /// @param[in] x0 Variable.
   /// @param[out] jacobian The Jacobian.
   virtual void plusJacobian(const double* /*unused: x*/,
                             double* jacobian) const {
-    Eigen::Map<Eigen::Matrix<double, nShapeMatrixMinDim, nShapeMatrixMinDim, Eigen::RowMajor> > identity(
-        jacobian);
+    Eigen::Map<Eigen::Matrix<double, nShapeMatrixMinDim, nShapeMatrixMinDim,
+                             Eigen::RowMajor> >
+        identity(jacobian);
     identity.setIdentity();
   }
 
   // Delta_Chi=x0_plus_Delta[-]x0
-  /// \brief Computes the minimal difference between a variable x and a perturbed variable x_plus_delta
+  /// \brief Computes the minimal difference between a variable x and a
+  /// perturbed variable x_plus_delta
   /// @param[in] x0 Variable.
   /// @param[in] x0_plus_Delta Perturbed variable.
   /// @param[out] Delta_Chi Minimal difference.
@@ -101,30 +105,31 @@ class ShapeMatrixParamBlock :
   virtual void minus(const double* x0, const double* x0_plus_Delta,
                      double* Delta_Chi) const {
     Eigen::Map<const Eigen::Matrix<double, nShapeMatrixDim, 1> > x0_(x0);
-    Eigen::Map<Eigen::Matrix<double, nShapeMatrixDim, 1> > Delta_Chi_(Delta_Chi);
+    Eigen::Map<Eigen::Matrix<double, nShapeMatrixDim, 1> > Delta_Chi_(
+        Delta_Chi);
     Eigen::Map<const Eigen::Matrix<double, nShapeMatrixDim, 1> > x0_plus_Delta_(
         x0_plus_Delta);
     Delta_Chi_ = x0_plus_Delta_ - x0_;
   }
 
-  /// \brief Computes the Jacobian from minimal space to naively overparameterised space as used by ceres.
-//  /// @param[in] x0 Variable.
+  /// \brief Computes the Jacobian from minimal space to naively
+  /// overparameterised space as used by ceres.
+  //  /// @param[in] x0 Variable.
   /// @param[out] jacobian the Jacobian (dimension minDim x dim).
   /// \return True on success.
   virtual void liftJacobian(const double* /*unused: x*/,
                             double* jacobian) const {
-    Eigen::Map<Eigen::Matrix<double, nShapeMatrixMinDim, nShapeMatrixDim, Eigen::RowMajor> > identity(
-        jacobian);
+    Eigen::Map<Eigen::Matrix<double, nShapeMatrixMinDim, nShapeMatrixDim,
+                             Eigen::RowMajor> >
+        identity(jacobian);
     identity.setIdentity();
   }
 
   /// @brief Return parameter block type as string
-  virtual std::string typeInfo() const {
-    return "ShapeMatrixParamBlock";
-  }
+  virtual std::string typeInfo() const { return "ShapeMatrixParamBlock"; }
 
  private:
-  okvis::Time timestamp_; ///< Time of this state.
+  okvis::Time timestamp_;  ///< Time of this state.
 };
 
 }  // namespace ceres

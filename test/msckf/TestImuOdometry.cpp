@@ -175,8 +175,6 @@ static void print_p_q_sb(const Eigen::Vector3d& p_WS_W,
 
 // compare RungeKutta and Euler forward and backward integration
 TEST(IMUOdometry, BackwardIntegration) {
-  using namespace Eigen;
-  using namespace okvis;
   srand((unsigned int)time(0));
 
   CovPropConfig cpc(true, false);
@@ -366,8 +364,6 @@ void IMUOdometryTrapezoidRule(
 /// test and compare the propagation for both states and covariance by both the
 /// classic RK4 and okvis's state transition method
 TEST(IMUOdometry, IMUCovariancePropagation) {
-  using namespace Eigen;
-  using namespace okvis;
   bool bVarianceForShapeMatrices =
       false;             // use positive variance for elements in Tg Ts Ta?
   bool bVerbose = true;  // print the covariance and jacobian results

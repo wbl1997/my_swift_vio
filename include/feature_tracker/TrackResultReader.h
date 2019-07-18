@@ -14,6 +14,7 @@ namespace feature_tracker {
  */
 class TrackResultReader {
  public:
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
   TrackResultReader(const std::string file);
 
   ~TrackResultReader();

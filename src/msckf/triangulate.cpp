@@ -14,10 +14,6 @@ using ceres::Solve;
 using ceres::Solver;
 #endif
 
-using namespace std;
-using namespace Eigen;
-using namespace Sophus;
-
 Eigen::Vector4d Get_X_from_xP_lin(
     std::vector<Eigen::Vector3d, Eigen::aligned_allocator<Eigen::Vector3d>>&
         vV3Xn,
@@ -88,13 +84,14 @@ Eigen::Vector3d triangulate2View_midpoint(
         vV2Xn,
     std::vector<Sophus::SE3d, Eigen::aligned_allocator<Sophus::SE3d>>& vSE3) {
   Eigen::MatrixXd A(3, 2);
-  Matrix3d rel_rot =
+  Eigen::Matrix3d rel_rot =
       (vSE3[0].unit_quaternion() * vSE3[1].unit_quaternion().conjugate())
           .toRotationMatrix();
   A.col(0) = unproject2d(vV2Xn[0]);
   A.col(1) = -rel_rot * unproject2d(vV2Xn[1]);
-  Vector3d b = vSE3[0].translation() - rel_rot * vSE3[1].translation();
-  Eigen::JacobiSVD<Eigen::MatrixXd> svdM(A, ComputeThinU | ComputeThinV);
+  Eigen::Vector3d b = vSE3[0].translation() - rel_rot * vSE3[1].translation();
+  Eigen::JacobiSVD<Eigen::MatrixXd> svdM(
+      A, Eigen::ComputeThinU | Eigen::ComputeThinV);
 
   Eigen::Vector2d v3Xhomog = svdM.solve(b);
   Eigen::Matrix3d Ap;
@@ -112,14 +109,14 @@ Eigen::Matrix<double, 2, 3> householder(Eigen::Vector3d x) {
   Eigen::Vector3d a(0, 0, 0);
   // Vector3d::Index   minIndexRow, minIndexCol;
   Eigen::Vector3d absx = x.cwiseAbs();
-  MatrixXd::Index minIndex;
+  Eigen::MatrixXd::Index minIndex;
   absx.minCoeff(&minIndex);
   a(minIndex) = 1;
-  Vector3d u = x.cross(a);
+  Eigen::Vector3d u = x.cross(a);
   u.normalize();
-  Vector3d v = x.cross(u);
+  Eigen::Vector3d v = x.cross(u);
   v.normalize();
-  Matrix<double, 3, 2> res;
+  Eigen::Matrix<double, 3, 2> res;
   res.col(0) = u;
   res.col(1) = v;
   return res.transpose();
@@ -131,13 +128,13 @@ Eigen::Vector3d triangulate_midpoint(
     int num_elements) {
   //  Triangulate a landmark from two or more views using the midpoint method.
   assert(vV2Xn.size() == vSE3.size());
-  Matrix3d jtj = Matrix3d::Zero();
-  Vector3d jtr = Vector3d::Zero();
+  Eigen::Matrix3d jtj = Eigen::Matrix3d::Zero();
+  Eigen::Vector3d jtr = Eigen::Vector3d::Zero();
   num_elements = num_elements == 0 ? vSE3.size() : num_elements;
   for (int jack = 0; jack < num_elements; ++jack) {
-    Matrix<double, 2, 3> h = householder(unproject2d(vV2Xn[jack]));
-    Matrix<double, 2, 3> a = h * vSE3[jack].rotationMatrix();
-    Matrix<double, 2, 1> b = -h * vSE3[jack].translation();
+    Eigen::Matrix<double, 2, 3> h = householder(unproject2d(vV2Xn[jack]));
+    Eigen::Matrix<double, 2, 3> a = h * vSE3[jack].rotationMatrix();
+    Eigen::Matrix<double, 2, 1> b = -h * vSE3[jack].translation();
     jtj += a.transpose() * a;
     jtr += a.transpose() * b;
   }

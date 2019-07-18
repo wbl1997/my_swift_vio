@@ -15,10 +15,6 @@ using ceres::Solve;
 using ceres::Solver;
 #endif
 
-using namespace std;
-using namespace Eigen;
-using namespace Sophus;
-
 // test AutoDiffCostFunction and AddResidualBlock dimensions with Powell's
 // minimization problem compare with examples/powell.cc in ceres
 

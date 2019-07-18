@@ -17,16 +17,19 @@
 namespace okvis {
 /// \brief ceres Namespace for ceres-related functionality implemented in okvis.
 namespace ceres {
-const int nIntrinsicDim =4, nIntrinsicMinDim =4;
-typedef Eigen::Matrix<double, nIntrinsicDim, 1> IntrinsicParams; // fx, fy, cx, cy in pixel units
+const int nIntrinsicDim = 4, nIntrinsicMinDim = 4;
+typedef Eigen::Matrix<double, nIntrinsicDim, 1>
+    IntrinsicParams;  // fx, fy, cx, cy in pixel units
 
 /// \brief Wraps the parameter block for camera intrinsics estimate
-class CameraIntrinsicParamBlock :
-    public ParameterBlockSized< nIntrinsicDim, nIntrinsicMinDim, IntrinsicParams> {
+class CameraIntrinsicParamBlock
+    : public ParameterBlockSized<nIntrinsicDim, nIntrinsicMinDim,
+                                 IntrinsicParams> {
  public:
-
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
   /// \brief The base class type.
-  typedef ParameterBlockSized<nIntrinsicDim, nIntrinsicMinDim, IntrinsicParams> base_t;
+  typedef ParameterBlockSized<nIntrinsicDim, nIntrinsicMinDim, IntrinsicParams>
+      base_t;
 
   /// \brief The estimate type (9D vector).
   typedef IntrinsicParams estimate_t;
@@ -39,7 +42,7 @@ class CameraIntrinsicParamBlock :
   /// @param[in] id The (unique) ID of this block.
   /// @param[in] timestamp The timestamp of this state.
   CameraIntrinsicParamBlock(const IntrinsicParams& intrinsicParams, uint64_t id,
-                             const okvis::Time& timestamp);
+                            const okvis::Time& timestamp);
 
   /// \brief Trivial destructor.
   virtual ~CameraIntrinsicParamBlock();
@@ -51,9 +54,7 @@ class CameraIntrinsicParamBlock :
 
   /// \brief Set the time.
   /// @param[in] timestamp The timestamp of this state.
-  void setTimestamp(const okvis::Time& timestamp) {
-    timestamp_ = timestamp;
-  }
+  void setTimestamp(const okvis::Time& timestamp) { timestamp_ = timestamp; }
 
   // getters
   /// @brief Get estimate.
@@ -62,9 +63,7 @@ class CameraIntrinsicParamBlock :
 
   /// \brief Get the time.
   /// \return The timestamp of this state.
-  okvis::Time timestamp() const {
-    return timestamp_;
-  }
+  okvis::Time timestamp() const { return timestamp_; }
 
   // minimal internal parameterization
   // x0_plus_Delta=Delta_Chi[+]x0
@@ -77,23 +76,27 @@ class CameraIntrinsicParamBlock :
   virtual void plus(const double* x0, const double* Delta_Chi,
                     double* x0_plus_Delta) const {
     Eigen::Map<const Eigen::Matrix<double, nIntrinsicDim, 1> > x0_(x0);
-    Eigen::Map<const Eigen::Matrix<double, nIntrinsicDim, 1> > Delta_Chi_(Delta_Chi);
-    Eigen::Map<Eigen::Matrix<double, nIntrinsicDim, 1> > x0_plus_Delta_(x0_plus_Delta);
+    Eigen::Map<const Eigen::Matrix<double, nIntrinsicDim, 1> > Delta_Chi_(
+        Delta_Chi);
+    Eigen::Map<Eigen::Matrix<double, nIntrinsicDim, 1> > x0_plus_Delta_(
+        x0_plus_Delta);
     x0_plus_Delta_ = x0_ + Delta_Chi_;
   }
 
   /// \brief The jacobian of Plus(x, delta) w.r.t delta at delta = 0.
-//  /// @param[in] x0 Variable.
+  //  /// @param[in] x0 Variable.
   /// @param[out] jacobian The Jacobian.
   virtual void plusJacobian(const double* /*unused: x*/,
                             double* jacobian) const {
-    Eigen::Map<Eigen::Matrix<double, nIntrinsicMinDim, nIntrinsicMinDim, Eigen::RowMajor> > identity(
-        jacobian);
+    Eigen::Map<Eigen::Matrix<double, nIntrinsicMinDim, nIntrinsicMinDim,
+                             Eigen::RowMajor> >
+        identity(jacobian);
     identity.setIdentity();
   }
 
   // Delta_Chi=x0_plus_Delta[-]x0
-  /// \brief Computes the minimal difference between a variable x and a perturbed variable x_plus_delta
+  /// \brief Computes the minimal difference between a variable x and a
+  /// perturbed variable x_plus_delta
   /// @param[in] x0 Variable.
   /// @param[in] x0_plus_Delta Perturbed variable.
   /// @param[out] Delta_Chi Minimal difference.
@@ -107,24 +110,24 @@ class CameraIntrinsicParamBlock :
     Delta_Chi_ = x0_plus_Delta_ - x0_;
   }
 
-  /// \brief Computes the Jacobian from minimal space to naively overparameterised space as used by ceres.
-//  /// @param[in] x0 Variable.
+  /// \brief Computes the Jacobian from minimal space to naively
+  /// overparameterised space as used by ceres.
+  //  /// @param[in] x0 Variable.
   /// @param[out] jacobian the Jacobian (dimension minDim x dim).
   /// \return True on success.
   virtual void liftJacobian(const double* /*unused: x*/,
                             double* jacobian) const {
-    Eigen::Map<Eigen::Matrix<double, nIntrinsicMinDim, nIntrinsicDim, Eigen::RowMajor> > identity(
-        jacobian);
+    Eigen::Map<Eigen::Matrix<double, nIntrinsicMinDim, nIntrinsicDim,
+                             Eigen::RowMajor> >
+        identity(jacobian);
     identity.setIdentity();
   }
 
   /// @brief Return parameter block type as string
-  virtual std::string typeInfo() const {
-    return "CameraIntrinsicParamBlock";
-  }
+  virtual std::string typeInfo() const { return "CameraIntrinsicParamBlock"; }
 
  private:
-  okvis::Time timestamp_; ///< Time of this state.
+  okvis::Time timestamp_;  ///< Time of this state.
 };
 
 }  // namespace ceres

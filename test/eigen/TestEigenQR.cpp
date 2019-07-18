@@ -8,8 +8,6 @@
 #include "vio/rand_sampler.h"
 
 TEST(Eigen, Quaternion) {
-  using namespace std;
-  using namespace Eigen;
   std::vector<int> meas;
   for (int i = 0; i < 9; ++i) meas.push_back(i + 1);
   meas.front() = meas.back();
@@ -33,7 +31,6 @@ TEST(Eigen, Quaternion) {
 }
 
 TEST(Eigen, RowColMajor) {
-  using namespace Eigen;
   Matrix<double, 3, 5, Eigen::RowMajor> rand1;
   rand1 << 10, 20, 30, 40, 50, 60, 70, 80, 90, 10, 11, 12, 13, 14, 15;
   Matrix<double, 3, 5, Eigen::ColMajor> rand2 = rand1;

@@ -181,6 +181,7 @@ class CircularSinusoidalTrajectory {
   const Eigen::Vector3d gw;  // gravity in the global frame
 
  public:
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
   CircularSinusoidalTrajectory();
   CircularSinusoidalTrajectory(double imuFreq, Eigen::Vector3d ginw);
   virtual ~CircularSinusoidalTrajectory(){};
@@ -217,6 +218,7 @@ class CircularSinusoidalTrajectory2 : public CircularSinusoidalTrajectory {
   const double wr;    // angular rate that the radius changes
   const double xosc;  // the oscillation mag in global x direction
  public:
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
   CircularSinusoidalTrajectory2();
   CircularSinusoidalTrajectory2(double imuFreq, Eigen::Vector3d ginw);
   virtual ~CircularSinusoidalTrajectory2(){};
@@ -233,6 +235,7 @@ class CircularSinusoidalTrajectory2 : public CircularSinusoidalTrajectory {
 class CircularSinusoidalTrajectory3 : public CircularSinusoidalTrajectory {
  protected:
  public:
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
   CircularSinusoidalTrajectory3();
   CircularSinusoidalTrajectory3(double imuFreq, Eigen::Vector3d ginw);
   virtual ~CircularSinusoidalTrajectory3(){};
