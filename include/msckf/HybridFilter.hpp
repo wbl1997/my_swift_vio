@@ -42,9 +42,19 @@ namespace okvis {
  The estimator class. This does all the backend work.
  Frames:
  W: World
- B: Body
+ B: Body, usu. tied to S and denoted by S in this codebase
  C: Camera
- S: Sensor (IMU)
+ S: Sensor (IMU), S frame is defined such that its rotation component is
+     fixed to the nominal value of R_SC0 and its origin is at the
+     accelerometer intersection as discussed in Huai diss. In this case, the
+     remaining misalignment between the conventional IMU frame (A) and the C
+     frame will be absorbed into T_a, the IMU accelerometer misalignment matrix
+
+     w_m = T_g * w_B + T_s * a_B + b_w + n_w
+     a_m = T_a * a_B + b_a + n_a = S * M * R_AB * a_B + b_a + n_a
+
+     The conventional IMU frame has origin at the accelerometers intersection
+     and x-axis aligned with accelerometer x.
  */
 class HybridFilter : public VioBackendInterface {
  public:
@@ -808,7 +818,9 @@ class HybridFilter : public VioBackendInterface {
       mStateID2CovID_;  // maps state id to the ordered cloned states in the
                         // covariance matrix
 
+  // transformation from the camera frame to the sensor frame
   kinematics::Transformation T_SC0_;
+
   Eigen::Matrix<
       double, 4 + cameras::RadialTangentialDistortion::NumDistortionIntrinsics,
       1>

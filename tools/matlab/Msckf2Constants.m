@@ -15,6 +15,8 @@ classdef Msckf2Constants
   T_a = 37:45;
   T_a_diag = [37, 41, 45];
   p_BC = 46:48;
+  q_BC = 114:117; % added after conversion
+  
   fxy_cxy = 49:52;
   k1_k2 = 53:54;
   p1_p2 = 55:56;

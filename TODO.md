@@ -86,3 +86,20 @@ b, use all feature tracks to update states at the last frame
 Have to add point states into the state vector. Otherwise have to assume that all the frames undergoes motion.
 refer to R-VIO to detect static motion with IMU measurements
 
+33. Use the IMU model defined in Rheder ICRA 2016 extending Kalibr
+% In msckf2 implementation
+% w_m = T_g * w_b + T_s * a_b + b_w + n_w
+% a_m = T_a * a_b + b_a + n_a
+% where body frame {b} is aligned with the camera frame by a nominal R_SC in orientation,
+% but its origin is at the accelerometer triad intersection,
+% T_g, T_s, and T_a are fully populated
+
+% In ICRA 16 Extending Kalibr, ignoring the lever arm between
+% accelerometers
+% w_m = T_g * w_b + T_s * a_b + b_w + n_w
+% a_m = T_a * a_b + b_a + n_a
+% where b is aligned with the x-axis of the accelerometer triad, and has an
+% origin at the accelerometer triad intersection
+% T_g, T_s is fully populated, T_a is a lower triangular matrix
+
+

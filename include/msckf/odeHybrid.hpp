@@ -74,7 +74,10 @@ __inline__ double sinc(double x) {
     return 1.0 - c_2 * x_2 + c_4 * x_4 - c_6 * x_6;
   }
 }
-const int OdoErrorStateDim = 15 + 27;
+
+const int NavErrorStateDim = 9;
+const int ImuErrorStateDim = 6 + 9 + 9 + 9;
+const int OdoErrorStateDim = NavErrorStateDim + ImuErrorStateDim;
 // Note this function assume that the W frame is with z up, negative gravity
 // direction, because in computing sb_dot and G world-centric velocities
 __inline__ void evaluateContinuousTimeOde(

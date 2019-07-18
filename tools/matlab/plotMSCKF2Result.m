@@ -1,9 +1,19 @@
 function plotMSCKF2Result()
 close all;
-export_fig_path = '/media/jhuai/Seagate/jhuai/export_fig/';
+export_fig_path = input('export_fig_path:', 's');
+if isempty(export_fig_path)
+    export_fig_path = '/media/jhuai/Seagate/jhuai/export_fig/';
+end
+voicebox_path = input('voicebox_path:', 's');
+if isempty(voicebox_path)
+    voicebox_path = '/media/jhuai/Seagate/jhuai/huai_work/ekfmonoslam/voicebox';
+end
 addpath(export_fig_path);
 
 filename = input('msckf2_csv:', 's');
+if isempty(filename)
+    return
+end
 output_dir = input('output_dir:', 's');
 if isempty(output_dir)
     [filepath, ~, ~] = fileparts(filename);
@@ -12,7 +22,9 @@ if isempty(output_dir)
 end
 
 fontsize = 18;
-data = dlmread(filename, ',', 1, 0);
+msckf_estimates = dlmread(filename, ',', 1, 0);
+% data = convert_imu_intrinsic_param(msckf_estimates, voicebox_path);
+data = msckf_estimates;
 original_data = data;
 startTime = data(1, 1);
 endTime = data(end, 1);
