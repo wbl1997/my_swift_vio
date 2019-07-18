@@ -39,7 +39,7 @@
 #ifndef INCLUDE_OKVIS_CERES_ODE_ODE_HPP_
 #define INCLUDE_OKVIS_CERES_ODE_ODE_HPP_
 
-#include "vio/IMUErrorModel.h"
+#include <vio/ImuErrorModel.h>
 
 #include <Eigen/Core>
 #include <okvis/FrameTypedefs.hpp>

@@ -20,9 +20,9 @@
 #include <okvis/timing/Timer.hpp>
 
 // the following 3 headers are only for testing
-#include "vio/IMUErrorModel.h"
+#include "vio/ImuErrorModel.h"
+#include "vio/Sample.h"
 #include "vio/eigen_utils.h"
-#include "vio/rand_sampler.h"
 
 DEFINE_bool(use_RK4, false,
             "use 4th order runge-kutta or the trapezoidal "

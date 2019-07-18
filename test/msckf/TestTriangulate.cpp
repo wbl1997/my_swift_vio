@@ -97,9 +97,9 @@ TEST(Triangulate, AllMethods) {
       vV2ImPlane(3);
   int trials = 1e3;
 
-  vector<double> deviation[num_methods];
+  std::vector<double> deviation[num_methods];
   for (int jack = 0; jack < num_methods; ++jack)
-    deviation[jack] = vector<double>(trials, 0);
+    deviation[jack] = std::vector<double>(trials, 0);
   for (int i = 0; i < trials; ++i) {
 #if 1
     int N = 100;
@@ -126,17 +126,17 @@ TEST(Triangulate, AllMethods) {
         continue;
       }
       vV2ImPlane[i] =
-          v3Cam.head<2>() / v3Cam[2] + Vector2d(1, 1) * (rand() % 10) / 1000;
+          v3Cam.head<2>() / v3Cam[2] + Eigen::Vector2d(1, 1) * (rand() % 10) / 1000;
     }
 #else
-    Vector3d true_point(2.31054434, -1.58786347, 9.79390227);
-    vV2ImPlane[0] = Vector2d(0.1444439, -0.0433997);
-    vV2ImPlane[1] = Vector2d(0.21640816, -0.34998059);
-    vV2ImPlane[2] = Vector2d(0.23628522, -0.31005748);
+    Eigen::Vector3d true_point(2.31054434, -1.58786347, 9.79390227);
+    vV2ImPlane[0] = Eigen::Vector2d(0.1444439, -0.0433997);
+    vV2ImPlane[1] = Eigen::Vector2d(0.21640816, -0.34998059);
+    vV2ImPlane[2] = Eigen::Vector2d(0.23628522, -0.31005748);
     Matrix3d rot;
     rot << 0.99469755, -0.02749299, -0.09910054, 0.02924625, 0.99943961,
         0.0162823, 0.09859735, -0.01909428, 0.9949442;
-    Vector3d tcinw(0.37937094, -1.06289834, 1.93156378);
+    Eigen::Vector3d tcinw(0.37937094, -1.06289834, 1.93156378);
     vse3CFromW[0] = SE3d(rot, -rot * tcinw);
 
     rot << 0.99722659, -0.0628095, 0.03992603, 0.0671776, 0.99054536,
@@ -150,18 +150,18 @@ TEST(Triangulate, AllMethods) {
     vse3CFromW[2] = SE3d(rot, -rot * tcinw);
 #endif
 
-    vector<Eigen::Vector3d,
+    std::vector<Eigen::Vector3d,
            Eigen::aligned_allocator<Eigen::Matrix<double, 3, 1>>>
         obs(3);
     for (int zinc = 0; zinc < 3; ++zinc)
       obs[zinc] = unproject2d(vV2ImPlane[zinc]);
 
-    vector<Eigen::Vector3d,
+    std::vector<Eigen::Vector3d,
            Eigen::aligned_allocator<Eigen::Matrix<double, 3, 1>>>
         res(num_methods);
     Eigen::Vector4d v4Xhomog = Get_X_from_xP_lin(obs, vse3CFromW);
     if (fabs(v4Xhomog[3]) < 1e-9)
-      res[0] = Vector3d(0, 0, -1000);
+      res[0] = Eigen::Vector3d(0, 0, -1000);
     else
       res[0] = v4Xhomog.head<3>() / v4Xhomog[3];
     res[1] = triangulate2View_midpoint(vV2ImPlane, vse3CFromW);
@@ -187,12 +187,12 @@ TEST(Triangulate, AllMethods) {
   }
   std::cout << "SquaredResidual of DLT, 2 view MP, multiview MP, GN refined "
                "2view MP, LM AD, Dogleg AD, LM anal, Dogleg anal"
-            << endl;
-  cout << "residual medians:";
+            << std::endl;
+  std::cout << "residual medians:";
   for (int zinc = 0; zinc < num_methods; ++zinc) {
     double medianDev = CalcMHWScore(deviation[zinc]);
-    cout << medianDev << " ";
+    std::cout << medianDev << " ";
     ASSERT_LT(medianDev, 0.5);
   }
-  cout << endl;
+  std::cout << std::endl;
 }

@@ -29,7 +29,7 @@
 #include <okvis/timing/Timer.hpp>
 #include "msckf/InitialPVandStd.hpp"
 #include "vio/CsvReader.h"
-#include "vio/IMUErrorModel.h"
+#include <vio/ImuErrorModel.h>
 
 /// \brief okvis Main namespace of this package.
 namespace okvis {

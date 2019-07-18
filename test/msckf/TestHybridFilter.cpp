@@ -23,7 +23,7 @@
 #include <okvis/ceres/SpeedAndBiasError.hpp>
 #include <okvis/ceres/SpeedAndBiasParameterBlock.hpp>
 
-#include <vio/rand_sampler.h>
+#include <vio/Sample.h>
 #include <okvis/ceres/CameraDistortionParamBlock.hpp>
 #include <okvis/ceres/CameraIntrinsicParamBlock.hpp>
 #include <okvis/ceres/CameraTimeParamBlock.hpp>

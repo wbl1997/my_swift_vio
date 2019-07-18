@@ -129,7 +129,7 @@ Eigen::Vector3d CircularSinusoidalTrajectory::computeGlobalLinearVelocity(
   double cwzt = cos(wz * dTime);
   double thetaZ = maxThetaZ * swzt;
   double thetaZDot = maxThetaZ * cwzt * wz;
-  double thetaZDDot = -maxThetaZ * swzt * wz * wz;
+  //  double thetaZDDot = -maxThetaZ * swzt * wz * wz;
 
   double sThetaZ = sin(thetaZ);
   double cThetaZ = cos(thetaZ);
@@ -152,7 +152,7 @@ okvis::kinematics::Transformation
 CircularSinusoidalTrajectory::computeGlobalPose(const okvis::Time time) {
   double dTime = time.toSec();
   double swzt = sin(wz * dTime);
-  double cwzt = cos(wz * dTime);
+  //  double cwzt = cos(wz * dTime);
   double thetaZ = maxThetaZ * swzt;
 
   double sThetaZ = sin(thetaZ);

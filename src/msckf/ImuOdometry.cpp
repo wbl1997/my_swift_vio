@@ -1,5 +1,5 @@
 #include "msckf/ImuOdometry.h"
-#include "vio/IMUErrorModel.h"
+#include <vio/ImuErrorModel.h>
 
 #include <glog/logging.h>
 

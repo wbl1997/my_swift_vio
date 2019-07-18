@@ -4,8 +4,8 @@
 #include <vector>
 
 #include <okvis/timing/Timer.hpp>
+#include "vio/Sample.h"
 #include "vio/eigen_utils.h"
-#include "vio/rand_sampler.h"
 
 TEST(Eigen, Quaternion) {
   std::vector<int> meas;
@@ -13,31 +13,31 @@ TEST(Eigen, Quaternion) {
   meas.front() = meas.back();
   meas.resize(1);
   ASSERT_EQ(meas[0], 9);
-  Quaterniond quat(0.2, 0.5, -0.7, 1.5);
+  Eigen::Quaterniond quat(0.2, 0.5, -0.7, 1.5);
   quat.normalize();
 
-  Vector3d rotvec(3, -2, 1);
+  Eigen::Vector3d rotvec(3, -2, 1);
 
-  Vector3d rotres = quat._transformVector(rotvec);
-  Vector3d rotres0(-1.16502, 0.442244, 3.52805);
+  Eigen::Vector3d rotres = quat._transformVector(rotvec);
+  Eigen::Vector3d rotres0(-1.16502, 0.442244, 3.52805);
   EXPECT_LT((rotres - rotres0).norm(), 1e-5);
 
-  Quaterniond quat2(3, -2, 5, 0.7);
+  Eigen::Quaterniond quat2(3, -2, 5, 0.7);
   quat2.normalize();
   Eigen::Matrix3d rot2 = quat2.toRotationMatrix();
-  Vector3d euler = vio::rotro2eu(quat2.toRotationMatrix());
+  Eigen::Vector3d euler = vio::rotro2eu(quat2.toRotationMatrix());
   Eigen::Matrix3d rot0 = vio::roteu2ro(euler);
   EXPECT_LT((rot2 - rot0).norm(), 1e-8);
 }
 
 TEST(Eigen, RowColMajor) {
-  Matrix<double, 3, 5, Eigen::RowMajor> rand1;
+  Eigen::Matrix<double, 3, 5, Eigen::RowMajor> rand1;
   rand1 << 10, 20, 30, 40, 50, 60, 70, 80, 90, 10, 11, 12, 13, 14, 15;
-  Matrix<double, 3, 5, Eigen::ColMajor> rand2 = rand1;
-  Matrix<double, 3, 5, Eigen::ColMajor> rand20;
+  Eigen::Matrix<double, 3, 5, Eigen::ColMajor> rand2 = rand1;
+  Eigen::Matrix<double, 3, 5, Eigen::ColMajor> rand20;
   rand20 << 10, 20, 30, 40, 50, 60, 70, 80, 90, 10, 11, 12, 13, 14, 15;
-  Matrix<double, 3, 2, Eigen::ColMajor> rand3 = rand1.block<3, 2>(0, 3);
-  Matrix<double, 3, 2, Eigen::ColMajor> rand30;
+  Eigen::Matrix<double, 3, 2, Eigen::ColMajor> rand3 = rand1.block<3, 2>(0, 3);
+  Eigen::Matrix<double, 3, 2, Eigen::ColMajor> rand30;
   rand30 << 40, 50, 90, 10, 14, 15;
 
   Eigen::Matrix3d rand4 = vio::skew3d(rand1.col(4));

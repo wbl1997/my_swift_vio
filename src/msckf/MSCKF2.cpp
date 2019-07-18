@@ -22,8 +22,8 @@
 
 // the following #include's are only for testing
 #include <okvis/timing/Timer.hpp>
-#include "vio/IMUErrorModel.h"
-#include "vio/rand_sampler.h"
+#include "vio/ImuErrorModel.h"
+#include "vio/Sample.h"
 
 DEFINE_bool(use_AIDP, false,
             "use anchored inverse depth parameterization for a feature point?"

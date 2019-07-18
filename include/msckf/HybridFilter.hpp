@@ -30,7 +30,7 @@
 #include <okvis/timing/Timer.hpp>
 
 #include <vio/CsvReader.h>
-#include <vio/IMUErrorModel.h>
+#include <vio/ImuErrorModel.h>
 
 #include "msckf/InitialPVandStd.hpp"
 

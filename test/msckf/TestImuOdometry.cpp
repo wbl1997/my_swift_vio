@@ -2,16 +2,16 @@
 #include <msckf/ImuOdometry.h>
 #include <okvis/ceres/ImuError.hpp>
 #include <okvis/timing/Timer.hpp>
-#include "vio/IMUErrorModel.h"
-#include "vio/rand_sampler.h"
+#include "vio/ImuErrorModel.h"
+#include "vio/Sample.h"
 
 #include <gtest/gtest.h>
 
 static void check_q_near(const Eigen::Quaterniond& q_WS0,
                          const Eigen::Quaterniond& q_WS1, const double tol) {
   ASSERT_TRUE(
-      fabs(q_WS0.w() - q_WS1.w()) < tol && fabs(q_WS0.x() - q_WS1.x()) < tol &&
-      fabs(q_WS0.y() - q_WS1.y()) < tol && fabs(q_WS0.z() - q_WS1.z()) < tol);
+      std::fabs(q_WS0.w() - q_WS1.w()) < tol && std::fabs(q_WS0.x() - q_WS1.x()) < tol &&
+      std::fabs(q_WS0.y() - q_WS1.y()) < tol && std::fabs(q_WS0.z() - q_WS1.z()) < tol);
 }
 
 static void check_sb_near(const Eigen::Matrix<double, 9, 1>& sb0,
@@ -186,11 +186,11 @@ TEST(IMUOdometry, BackwardIntegration) {
 
   std::cout << "States before forward-backward RK integration:" << std::endl;
   print_p_q_sb(p_WS_W, q_WS, sb);
-  IMUOdometry::propagation_RungeKutta(
+  okvis::IMUOdometry::propagation_RungeKutta(
       cpc.get_imu_measurements(), cpc.get_imu_params(), T_WB, sb,
       cpc.get_vTgTsTa(), cpc.get_meas_begin_time(), cpc.get_meas_end_time());
 
-  IMUOdometry::propagationBackward_RungeKutta(
+  okvis::IMUOdometry::propagationBackward_RungeKutta(
       cpc.get_imu_measurements(), cpc.get_imu_params(), T_WB, sb,
       cpc.get_vTgTsTa(), cpc.get_meas_end_time(), cpc.get_meas_begin_time());
   p_WS_W = T_WB.r();
@@ -252,10 +252,10 @@ TEST(IMUOdometry, BackwardIntegration) {
   print_p_q_sb(cpc.get_p_WS_W0(), cpc.get_q_WS0(), cpc.get_sb0());
 
   sb = cpc.get_sb0();
-  T_WB = kinematics::Transformation(cpc.get_p_WS_W0(), cpc.get_q_WS0());
+  T_WB = okvis::kinematics::Transformation(cpc.get_p_WS_W0(), cpc.get_q_WS0());
   Eigen::Vector3d tempV_WS = sb.head<3>();
   IMUErrorModel<double> iem(sb.tail<6>(), cpc.get_vTgTsTa());
-  IMUOdometry::propagation(cpc.get_imu_measurements(), cpc.get_imu_params(),
+  okvis::IMUOdometry::propagation(cpc.get_imu_measurements(), cpc.get_imu_params(),
                            T_WB, tempV_WS, iem, cpc.get_meas_begin_time(),
                            cpc.get_meas_end_time());
 
@@ -263,7 +263,7 @@ TEST(IMUOdometry, BackwardIntegration) {
   sb.head<3>() = tempV_WS;
   print_p_q_sb(T_WB.r(), T_WB.q(), sb);
 
-  IMUOdometry::propagationBackward(
+  okvis::IMUOdometry::propagationBackward(
       cpc.get_imu_measurements(), cpc.get_imu_params(), T_WB, tempV_WS, iem,
       cpc.get_meas_end_time(), cpc.get_meas_begin_time());
   p_WS_W = T_WB.r();
@@ -386,7 +386,7 @@ TEST(IMUOdometry, IMUCovariancePropagation) {
       F_tot;
   F_tot.setIdentity();
 
-  timing::Timer RK4Timer("RK4", false);
+  okvis::timing::Timer RK4Timer("RK4", false);
   okvis::ImuMeasurementDeque imuMeasurements = cpc.get_imu_measurements();
   auto iterLast = imuMeasurements.begin();
   for (auto iter = imuMeasurements.begin(); iter != imuMeasurements.end();
@@ -442,7 +442,7 @@ TEST(IMUOdometry, IMUCovariancePropagation) {
   okvis::kinematics::Transformation T_WS =
       okvis::kinematics::Transformation(cpc.get_p_WS_W0(), cpc.get_q_WS0());
   sb = cpc.get_sb0();
-  timing::Timer leutenTimer("leutenegger", false);
+  okvis::timing::Timer leutenTimer("leutenegger", false);
 
   Eigen::Matrix<double, 15, 15> leutenP;
   leutenP.setIdentity();
@@ -485,7 +485,7 @@ TEST(IMUOdometry, IMUCovariancePropagation) {
   /// huai
   T_WS = okvis::kinematics::Transformation(cpc.get_p_WS_W0(), cpc.get_q_WS0());
   sb = cpc.get_sb0();
-  timing::Timer leutenTimer2("leuteneggerCorrected", false);
+  okvis::timing::Timer leutenTimer2("leuteneggerCorrected", false);
   Eigen::Matrix<double, 15, 15> leutenP2, leutenF2;
   leutenP2.setIdentity();
   leutenF2.setIdentity();
@@ -544,7 +544,7 @@ TEST(IMUOdometry, IMUCovariancePropagation) {
 
   Sophus::SE3d pred_T_s2_to_w;
   Eigen::Matrix<double, 3, 1> pred_speed_2;
-  timing::Timer simpleTimer("simple", false);
+  okvis::timing::Timer simpleTimer("simple", false);
   okvis::ceres::ode::predictStates(T_s1_to_w, sb, time_pair, measurements,
                                    gwomegaw, q_n_aw_babw, &pred_T_s2_to_w,
                                    &pred_speed_2, &P3, cpc.get_vTgTsTa());
@@ -574,17 +574,17 @@ TEST(IMUOdometry, IMUCovariancePropagation) {
     std::cout << sqrtDiagCov3.transpose() << std::endl;
   }
   // 1,2 states
-  EXPECT_TRUE(fabs(q_WS2.w() - q_WS1.w()) < 1e-5 &&
-              fabs(q_WS2.x() - q_WS1.x()) < 1e-5 &&
-              fabs(q_WS2.y() - q_WS1.y()) < 1e-5 &&
-              fabs(q_WS2.z() - q_WS1.z()) < 1e-5);
+  EXPECT_TRUE(std::fabs(q_WS2.w() - q_WS1.w()) < 1e-5 &&
+              std::fabs(q_WS2.x() - q_WS1.x()) < 1e-5 &&
+              std::fabs(q_WS2.y() - q_WS1.y()) < 1e-5 &&
+              std::fabs(q_WS2.z() - q_WS1.z()) < 1e-5);
   EXPECT_LT((p_WS_W1 - p_WS_W2).norm(), 50);
   EXPECT_LT((sb1 - sb2).norm(), 2);
   // 1,5 states
-  EXPECT_TRUE(fabs(q_WS3.w() - q_WS1.w()) < 5e-2 &&
-              fabs(q_WS3.x() - q_WS1.x()) < 5e-2 &&
-              fabs(q_WS3.y() - q_WS1.y()) < 5e-2 &&
-              fabs(q_WS3.z() - q_WS1.z()) < 5e-2);
+  EXPECT_TRUE(std::fabs(q_WS3.w() - q_WS1.w()) < 5e-2 &&
+              std::fabs(q_WS3.x() - q_WS1.x()) < 5e-2 &&
+              std::fabs(q_WS3.y() - q_WS1.y()) < 5e-2 &&
+              std::fabs(q_WS3.z() - q_WS1.z()) < 5e-2);
   EXPECT_LT((p_WS_W1 - p_WS_W3).norm(), 2000);
   EXPECT_LT((sb1 - sb3).norm(), 50);
 
