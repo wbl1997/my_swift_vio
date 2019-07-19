@@ -1071,11 +1071,15 @@ void HybridFilter::retrieveEstimatesOfConstants() {
       distortionCoeffs[0], distortionCoeffs[1], distortionCoeffs[2],
       distortionCoeffs[3]);
 
-  intrinsicParameters_ << intrinsic[0], intrinsic[1], intrinsic[2],
-      intrinsic[3], distortionCoeffs[0], distortionCoeffs[1],
-      distortionCoeffs[2], distortionCoeffs[3];
+  Eigen::Matrix<
+      double, 4 + cameras::RadialTangentialDistortion::NumDistortionIntrinsics,
+      1>
+      intrinsicParameters;
+  intrinsicParameters << intrinsic[0], intrinsic[1], intrinsic[2], intrinsic[3],
+      distortionCoeffs[0], distortionCoeffs[1], distortionCoeffs[2],
+      distortionCoeffs[3];
 
-  camera_rig_.setCameraIntrinsics(camIdx, intrinsicParameters_);
+  camera_rig_.setCameraIntrinsics(camIdx, intrinsicParameters);
 
   getSensorStateEstimateAs<ceres::CameraTimeParamBlock>(
       currFrameId, camIdx, SensorStates::Camera, CameraSensorStates::TD,
@@ -1246,10 +1250,8 @@ bool HybridFilter::computeHxf(const uint64_t hpbid, const MapPoint& mp,
   Eigen::Vector3d pfiinC = (T_CA * ab1rho).head<3>();
   std::shared_ptr<okvis::cameras::CameraBase> tempCameraGeometry =
       camera_rig_.getCameraGeometry(camIdx);
-  cameras::CameraBase::ProjectionStatus status =
-      tempCameraGeometry->projectWithExternalParameters(
-          pfiinC, intrinsicParameters_, &imagePoint, &pointJacobian3,
-          &intrinsicsJacobian);
+  cameras::CameraBase::ProjectionStatus status = tempCameraGeometry->project(
+      pfiinC, &imagePoint, &pointJacobian3, &intrinsicsJacobian);
   if (status != cameras::CameraBase::ProjectionStatus::Successful) {
     LOG(WARNING)
         << "Failed to compute Jacobian for distortion with anchored point : "
@@ -1538,10 +1540,8 @@ bool HybridFilter::computeHoi(
         T_GA;  // anchor frame to current camera frame
     Eigen::Vector3d pfiinC = (T_CA * ab1rho).head<3>();
 
-    cameras::CameraBase::ProjectionStatus status =
-        tempCameraGeometry->projectWithExternalParameters(
-            pfiinC, intrinsicParameters_, &imagePoint, &pointJacobian3,
-            &intrinsicsJacobian);
+    cameras::CameraBase::ProjectionStatus status = tempCameraGeometry->project(
+        pfiinC, &imagePoint, &pointJacobian3, &intrinsicsJacobian);
     if (status != cameras::CameraBase::ProjectionStatus::Successful) {
       LOG(WARNING) << "Failed to compute Jacobian for distortion with "
                       "anchored point : "

@@ -173,7 +173,8 @@ msckf_ws/devel/lib/msckf/msckf_node $HOME/docker_documents/msckf_ws/src/msckf/co
   --finish_index=28900 \
   --max_inc_tol=10.0 \
   --dump_output_option=0 \ 
-  --feature_tracking_method=1
+  --feature_tracking_method=0 \
+  --backend_solver=1
 
 # 16500, 22500
 ```
@@ -190,7 +191,7 @@ The running program will exit once the sequence finishes.
 2. Run the node
 
 ```
-rosrun msckf msckf_node $HOME/docker_documents/msckf_ws/src/msckf/config/config_fpga_p2_euroc_dissertation.yaml --dump_output_option=0 --load_input_option=0 \
+rosrun msckf okvis_node $HOME/docker_documents/msckf_ws/src/msckf/config/config_fpga_p2_euroc_dissertation.yaml --dump_output_option=0 --load_input_option=0 \
   --output_dir=$HOME/Desktop/temp  --use_AIDP=true
 # use start to skip the static segment
 rosbag play --pause --start=45.0 --rate=1.0 /media/$USER/Seagate/data/euroc/MH_01_easy.bag /cam0/image_raw:=/camera0 /imu0:=/imu

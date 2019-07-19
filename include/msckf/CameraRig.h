@@ -10,7 +10,6 @@ std::shared_ptr<cameras::CameraBase> cloneCameraGeometry(
     std::shared_ptr<const cameras::CameraBase> cameraGeometry);
 
 class CameraRig {
-  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
  private:
   ///< Mounting transformations from IMU
   std::vector<std::shared_ptr<okvis::kinematics::Transformation>> T_SC_;
@@ -26,6 +25,8 @@ class CameraRig {
   std::vector<double> time_delay_;
 
  public:
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+  inline CameraRig() {}
   inline double getTimeDelay(int camera_id) const {
     return time_delay_[camera_id];
   }

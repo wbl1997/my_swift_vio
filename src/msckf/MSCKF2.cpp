@@ -1000,11 +1000,15 @@ void MSCKF2::retrieveEstimatesOfConstants() {
       distortionCoeffs[0], distortionCoeffs[1], distortionCoeffs[2],
       distortionCoeffs[3]);
 
-  intrinsicParameters_ << intrinsic[0], intrinsic[1], intrinsic[2],
-      intrinsic[3], distortionCoeffs[0], distortionCoeffs[1],
-      distortionCoeffs[2], distortionCoeffs[3];
+  Eigen::Matrix<
+      double, 4 + cameras::RadialTangentialDistortion::NumDistortionIntrinsics,
+      1>
+      intrinsicParameters;
+  intrinsicParameters << intrinsic[0], intrinsic[1], intrinsic[2], intrinsic[3],
+      distortionCoeffs[0], distortionCoeffs[1], distortionCoeffs[2],
+      distortionCoeffs[3];
 
-  camera_rig_.setCameraIntrinsics(camIdx, intrinsicParameters_);
+  camera_rig_.setCameraIntrinsics(camIdx, intrinsicParameters);
 
   getSensorStateEstimateAs<ceres::CameraTimeParamBlock>(
       statesMap_.rbegin()->first, camIdx, SensorStates::Camera,
@@ -1221,9 +1225,8 @@ bool MSCKF2::computeHoi(const uint64_t hpbid, const MapPoint &mp,
       Eigen::Vector3d pfiinC = (T_CA * ab1rho).head<3>();
 
       cameras::CameraBase::ProjectionStatus status =
-          tempCameraGeometry->projectWithExternalParameters(
-              pfiinC, intrinsicParameters_, &imagePoint, &pointJacobian3,
-              &intrinsicsJacobian);
+          tempCameraGeometry->project(pfiinC, &imagePoint, &pointJacobian3,
+                                      &intrinsicsJacobian);
       if (status != cameras::CameraBase::ProjectionStatus::Successful) {
         //            LOG(WARNING) << "Failed to compute Jacobian for distortion
         //            with anchored point : " << ab1rho.transpose() <<
@@ -1504,9 +1507,8 @@ bool MSCKF2::computeHoi(const uint64_t hpbid, const MapPoint &mp,
 
       Eigen::Vector3d pfiinC = ((T_WB * T_SC0_).inverse() * v4Xhomog).head<3>();
       cameras::CameraBase::ProjectionStatus status =
-          tempCameraGeometry->projectWithExternalParameters(
-              pfiinC, intrinsicParameters_, &imagePoint, &pointJacobian3,
-              &intrinsicsJacobian);
+          tempCameraGeometry->project(pfiinC, &imagePoint, &pointJacobian3,
+                                      &intrinsicsJacobian);
       if (status != cameras::CameraBase::ProjectionStatus::Successful) {
         //            LOG(WARNING) << "Failed to project or to compute Jacobian
         //            for distortion with triangulated point in W: " <<
@@ -2062,6 +2064,12 @@ void MSCKF2::optimize(size_t /*numIter*/, size_t /*numThreads*/, bool verbose) {
           *tempCameraGeometry = dynamic_cast<okvis::cameras::PinholeCamera<
               okvis::cameras::RadialTangentialDistortion> *>(
               camera_rig_.getCameraGeometry(camIdx).get());
+      if (tempCameraGeometry == nullptr) {
+        OKVIS_ASSERT_TRUE(
+            Exception, false,
+            "Camera RadialTangentialDistortion is expected, actual is " +
+                camera_rig_.getCameraGeometry(camIdx)->distortionType());
+      }
       bool bSucceeded =
           triangulateAMapPoint(it->second, obsInPixel, frameIds, v4Xhomog, vRi,
                                *tempCameraGeometry, T_SC0_, it->first, false);

@@ -188,6 +188,9 @@ target_link_libraries(invoke_one_test ${PROJECT_NAME} )
 add_executable(okvis_node src/apps/okvis_node.cpp)
 target_link_libraries(okvis_node ${PROJECT_NAME})
 
+add_executable(okvis_node_synchronous src/apps/okvis_node_synchronous.cpp)
+target_link_libraries(okvis_node_synchronous ${PROJECT_NAME} )
+
 list(APPEND TEST_SRC_FILES
     test/test_main.cpp
 

@@ -608,7 +608,8 @@ class HybridFilter : public VioBackendInterface {
 
   // the following keeps track of all the states at different time instances
   // (key=poseId)
-  std::map<uint64_t, States>
+  std::map<uint64_t, States, std::less<uint64_t>,
+           Eigen::aligned_allocator<std::pair<const uint64_t, States>>>
       statesMap_;  ///< Buffer for currently considered states.
   std::map<uint64_t, okvis::MultiFramePtr>
       multiFramePtrMap_;  ///< remember all needed okvis::MultiFrame.
@@ -788,6 +789,8 @@ class HybridFilter : public VioBackendInterface {
    */
   void getVariance(Eigen::Matrix<double, 55, 1> &variances);
 
+  bool getFrameId(uint64_t poseId, int &frameIdInSource, bool &isKF) const;
+
   size_t covDim_;  ///< rows(cols) of covariance, dynamically changes
   Eigen::MatrixXd
       covariance_;  ///< covariance of the error vector of all states, error is
@@ -800,7 +803,10 @@ class HybridFilter : public VioBackendInterface {
 
   // map from state ID to segments of imu measurements, the imu measurements
   // covers the last state and current state of the id and extends on both sides
-  std::map<uint64_t, okvis::ImuMeasurementDeque> mStateID2Imu;
+  std::map<uint64_t, okvis::ImuMeasurementDeque, std::less<uint64_t>,
+           Eigen::aligned_allocator<
+               std::pair<const uint64_t, okvis::ImuMeasurementDeque>>>
+      mStateID2Imu;
 
   // intermediate variables used for computeHoi and computeHxf, refresh them
   // with retrieveEstimatesOfConstants before calling it
@@ -822,10 +828,6 @@ class HybridFilter : public VioBackendInterface {
   // transformation from the camera frame to the sensor frame
   kinematics::Transformation T_SC0_;
 
-  Eigen::Matrix<
-      double, 4 + cameras::RadialTangentialDistortion::NumDistortionIntrinsics,
-      1>
-      intrinsicParameters_;
   double tdLatestEstimate;
   double trLatestEstimate;
 
@@ -862,8 +864,6 @@ class HybridFilter : public VioBackendInterface {
   okvis::timing::Timer updateStatesTimer;
   okvis::timing::Timer updateCovarianceTimer;
   okvis::timing::Timer updateLandmarksTimer;
-
-  bool getFrameId(uint64_t poseId, int &frameIdInSource, bool &isKF) const;
 
   std::deque<uint64_t>
       mInCovLmIds;  // for each point in the state vector/covariance,

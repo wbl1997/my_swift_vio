@@ -7,6 +7,8 @@
 #include <mutex>
 #include <thread>
 
+#include <Eigen/StdVector>
+
 #include <okvis/Measurements.hpp>
 #include <okvis/MultiFrame.hpp>
 #include <okvis/Parameters.hpp>

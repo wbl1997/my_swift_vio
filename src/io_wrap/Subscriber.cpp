@@ -38,6 +38,7 @@
  * @author Andreas Forster
  */
 
+#include <cv_bridge/cv_bridge.h>
 #include <glog/logging.h>
 #include <functional>
 #include <io_wrap/Subscriber.hpp>
@@ -100,11 +101,66 @@ void Subscriber::setNodeHandle(ros::NodeHandle& nh) {
   subImu_ = nh_->subscribe("/imu", 1000, &Subscriber::imuCallback, this);
 }
 
+static std::string type2str(int type) {
+  std::string r;
+
+  uchar depth = type & CV_MAT_DEPTH_MASK;
+  uchar chans = 1 + (type >> CV_CN_SHIFT);
+
+  switch (depth) {
+    case CV_8U:
+      r = "8U";
+      break;
+    case CV_8S:
+      r = "8S";
+      break;
+    case CV_16U:
+      r = "16U";
+      break;
+    case CV_16S:
+      r = "16S";
+      break;
+    case CV_32S:
+      r = "32S";
+      break;
+    case CV_32F:
+      r = "32F";
+      break;
+    case CV_64F:
+      r = "64F";
+      break;
+    default:
+      r = "User";
+      break;
+  }
+
+  r += "C";
+  r += (chans + '0');
+
+  return r;
+}
+
 void Subscriber::imageCallback(const sensor_msgs::ImageConstPtr& msg, /*
   const sensor_msgs::CameraInfoConstPtr& info,*/
                                unsigned int cameraIndex) {
-  const cv::Mat raw(msg->height, msg->width, CV_8UC1,
-                    const_cast<uint8_t*>(&msg->data[0]), msg->step);
+  //  const cv::Mat raw(msg->height, msg->width, CV_8UC1,
+  //                    const_cast<uint8_t*>(&msg->data[0]), msg->step);
+
+  // Copy the ros image message to cv::Mat.
+  cv_bridge::CvImageConstPtr cv_ptr;
+  try {
+    cv_ptr = cv_bridge::toCvShare(msg);
+  } catch (cv_bridge::Exception& e) {
+    LOG(ERROR) << "cv_bridge exception:" << e.what();
+    return;
+  }
+
+  cv::Mat raw;
+  if (type2str(cv_ptr->image.type()).compare("16UC1") == 0) {
+    cv_ptr->image.convertTo(raw, CV_8UC1, 1.0 / 128, 0.0);
+  } else {
+    raw = cv_ptr->image;
+  }
 
   cv::Mat filtered;
   if (vioParameters_.optimization.useMedianFilter) {

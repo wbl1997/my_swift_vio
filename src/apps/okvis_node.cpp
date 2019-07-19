@@ -135,15 +135,17 @@ int main(int argc, char **argv) {
   setInputParameters(&parameters.input);
 
   std::shared_ptr<okvis::VioInterface> okvis_estimator;
+  // http://eigen.tuxfamily.org/bz/show_bug.cgi?id=1049
   switch (FLAGS_backend_solver) {
     case 0:
-      okvis_estimator = std::make_shared<okvis::ThreadedKFVio>(parameters);
+      okvis_estimator.reset(new okvis::ThreadedKFVio(parameters));
       break;
     case 1:
     case 2:
-      okvis_estimator = std::make_shared<okvis::HybridVio>(parameters);
+      okvis_estimator.reset(new okvis::HybridVio(parameters));
       break;
   }
+
   std::string path = FLAGS_output_dir;
   path = okvis::removeTrailingSlash(path);
 
