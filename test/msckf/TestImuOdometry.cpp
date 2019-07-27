@@ -630,7 +630,7 @@ TEST(IMUOdometry, IMUCovariancePropagation) {
   // 1,5 covariance
   EXPECT_LT((sqrtDiagCov3.head<3>() - sqrtDiagCov1.head<3>()).norm() /
                 sqrtDiagCov3.head<3>().norm(),
-            5e-2);
+            8e-2);
   EXPECT_LT((sqrtDiagCov3.segment<3>(3) - sqrtDiagCov1.segment<3>(3)).norm() /
                 sqrtDiagCov3.segment<3>(3).norm(),
             5e-2);

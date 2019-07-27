@@ -65,11 +65,7 @@ bool TrailManager::initialize() {
  * @return number of good trails
  */
 int TrailManager::advance(
-#ifdef USE_MSCKF
-    okvis::MSCKF2& estimator,
-#else
     okvis::HybridFilter& estimator,
-#endif
     uint64_t mfIdA, uint64_t mfIdB, size_t camIdA, size_t camIdB) {
   typedef okvis::cameras::PinholeCamera<
       okvis::cameras::RadialTangentialDistortion>
@@ -391,11 +387,7 @@ int TrailManager::detectAndInsert(const cv::Mat& currentFrame, int nInliers,
 }
 
 void TrailManager::updateEstimatorObservations(
-#ifdef USE_MSCKF
-    okvis::MSCKF2& estimator,
-#else
     okvis::HybridFilter& estimator,
-#endif
     uint64_t mfIdA, uint64_t mfIdB, size_t camIdA, size_t camIdB) {
   // update estimator's observations and keypoints
   typedef okvis::cameras::PinholeCamera<
@@ -433,11 +425,7 @@ void TrailManager::updateEstimatorObservations(
 }
 
 void TrailManager::updateEstimatorObservations2(
-#ifdef USE_MSCKF
-    okvis::MSCKF2& estimator,
-#else
     okvis::HybridFilter& estimator,
-#endif
     uint64_t mfIdA, uint64_t mfIdB, size_t camIdA, size_t camIdB) {
   const size_t maxTrackLength = 15;  // break the track once it hits this val
   // update estimator's observations and keypoints

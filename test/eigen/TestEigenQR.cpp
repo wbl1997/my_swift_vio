@@ -174,3 +174,15 @@ TEST(Eigen, QRvsSVD) {
             << elapsedTime[0] << " " << elapsedTime[1] << " " << elapsedTime[2]
             << std::endl;
 }
+
+
+TEST(Eigen, LDLT) {
+  Eigen::Matrix3d A, Ainv;
+  A << 3, 1, 2, 1, 4, 1, 2, 1, 5;
+  Ainv << 0.4750, -0.0750, -0.1750, -0.0750, 0.2750, -0.0250, -0.1750, -0.0250,
+      0.2750;
+  Eigen::Vector3d b = Eigen::Vector3d::Random();
+  Eigen::Vector3d error = A.ldlt().solve(b) - Ainv * b;
+  std::cout << "ldlt diff with true inv " << error.transpose() << std::endl;
+  EXPECT_LT(error.lpNorm<Eigen::Infinity>(), 1e-8);
+}

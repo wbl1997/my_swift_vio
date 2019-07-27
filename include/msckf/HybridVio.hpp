@@ -426,11 +426,7 @@ class HybridVio : public VioInterface {
   okvis::MockVioBackendInterface& estimator_;
   okvis::MockVioFrontendInterface& frontend_;
 #else
-#ifdef USE_MSCKF
-  okvis::MSCKF2 estimator_;
-#else
-  okvis::HybridFilter estimator_;  ///< The backend estimator.
-#endif
+  std::shared_ptr<okvis::HybridFilter> estimator_;  ///< The backend estimator.
   okvis::HybridFrontend frontend_;  ///< The frontend.
 #endif
 

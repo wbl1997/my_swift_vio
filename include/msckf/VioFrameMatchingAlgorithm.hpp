@@ -44,11 +44,7 @@ class VioFrameMatchingAlgorithm : public okvis::MatchingAlgorithm {
    * @param usePoseUncertainty  Use the pose uncertainty for matching.
    */
   VioFrameMatchingAlgorithm(
-#ifdef USE_MSCKF
-      okvis::MSCKF2& estimator,
-#else
       okvis::HybridFilter& estimator,
-#endif
       int matchingType, float distanceThreshold,
       bool usePoseUncertainty = true);
 
@@ -138,11 +134,7 @@ class VioFrameMatchingAlgorithm : public okvis::MatchingAlgorithm {
 
  private:
   /// \brief This is essentially the map.
-#ifdef USE_MSCKF
-  okvis::MSCKF2* estimator_;
-#else
   okvis::HybridFilter* estimator_;
-#endif
 
   /// \name Which frames to take
   /// \{

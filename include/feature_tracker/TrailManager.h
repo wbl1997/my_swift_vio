@@ -28,19 +28,11 @@ class TrailManager {
   int detectAndInsert(const cv::Mat& currentFrame, int nInliers,
                       std::vector<cv::KeyPoint>&);
   int advance(
-#ifdef USE_MSCKF
-      okvis::MSCKF2& estimator,
-#else
       okvis::HybridFilter& estimator,
-#endif
       uint64_t mfIdA, uint64_t mfIdB, size_t camIdA, size_t camIdB);
 
   void updateEstimatorObservations(
-#ifdef USE_MSCKF
-      okvis::MSCKF2& estimator,
-#else
       okvis::HybridFilter& estimator,
-#endif
       uint64_t mfIdA, uint64_t mfIdB, size_t camIdA, size_t camIdB);
 
   // for feature tracks provided by an external module
@@ -83,11 +75,7 @@ class TrailManager {
    * @param camIdB
    */
   void updateEstimatorObservations2(
-#ifdef USE_MSCKF
-      okvis::MSCKF2& estimator,
-#else
       okvis::HybridFilter& estimator,
-#endif
       uint64_t mfIdA, uint64_t mfIdB, size_t camIdA, size_t camIdB);
 
   // output the distribution of number of features in images

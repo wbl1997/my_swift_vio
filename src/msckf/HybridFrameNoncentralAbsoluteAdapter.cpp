@@ -12,11 +12,7 @@
 // Constructor.
 opengv::absolute_pose::HybridFrameNoncentralAbsoluteAdapter::
     HybridFrameNoncentralAbsoluteAdapter(
-#ifdef USE_MSCKF
-        const okvis::MSCKF2& estimator,
-#else
         const okvis::HybridFilter& estimator,
-#endif
         const okvis::cameras::NCameraSystem& nCameraSystem,
         std::shared_ptr<okvis::MultiFrame> frame) {
 

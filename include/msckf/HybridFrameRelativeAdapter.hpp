@@ -41,11 +41,7 @@ class HybridFrameRelativeAdapter : public RelativeAdapterBase {
    *                      in order to access the relevant frame.
    */
   HybridFrameRelativeAdapter(
-#ifdef USE_MSCKF
-      const okvis::MSCKF2& estimator,
-#else
       const okvis::HybridFilter& estimator,
-#endif
       const okvis::cameras::NCameraSystem& nCameraSystem,
       uint64_t multiFrameIdA, size_t camIdA, uint64_t multiFrameIdB,
       size_t camIdB);

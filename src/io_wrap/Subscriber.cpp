@@ -146,21 +146,21 @@ void Subscriber::imageCallback(const sensor_msgs::ImageConstPtr& msg, /*
   //  const cv::Mat raw(msg->height, msg->width, CV_8UC1,
   //                    const_cast<uint8_t*>(&msg->data[0]), msg->step);
 
-  // Copy the ros image message to cv::Mat.
-  cv_bridge::CvImageConstPtr cv_ptr;
-  try {
-    cv_ptr = cv_bridge::toCvShare(msg);
-  } catch (cv_bridge::Exception& e) {
-    LOG(ERROR) << "cv_bridge exception:" << e.what();
-    return;
-  }
+  cv_bridge::CvImageConstPtr ptr;
+  if (msg->encoding == "8UC1") {
+    sensor_msgs::Image img;
+    img.header = msg->header;
+    img.height = msg->height;
+    img.width = msg->width;
+    img.is_bigendian = msg->is_bigendian;
+    img.step = msg->step;
+    img.data = msg->data;
+    img.encoding = "mono8";
+    ptr = cv_bridge::toCvCopy(img, sensor_msgs::image_encodings::MONO8);
+  } else
+    ptr = cv_bridge::toCvCopy(msg, sensor_msgs::image_encodings::MONO8);
 
-  cv::Mat raw;
-  if (type2str(cv_ptr->image.type()).compare("16UC1") == 0) {
-    cv_ptr->image.convertTo(raw, CV_8UC1, 1.0 / 128, 0.0);
-  } else {
-    raw = cv_ptr->image;
-  }
+  cv::Mat raw = ptr->image;
 
   cv::Mat filtered;
   if (vioParameters_.optimization.useMedianFilter) {

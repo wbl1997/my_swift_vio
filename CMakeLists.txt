@@ -23,21 +23,11 @@ endif()
 # } End
 message("CATKIN_DEVEL_PREFIX ${CATKIN_DEVEL_PREFIX}")
 
-SET(USE_ROS TRUE)
-SET(MSCKF TRUE) # build with msck2 or hybridfilter
-
 IF(NOT CMAKE_BUILD_TYPE)
   SET(CMAKE_BUILD_TYPE Release)
 ENDIF()
 IF(CMAKE_BUILD_TYPE MATCHES Release)
   ADD_DEFINITIONS(-DNDEBUG)
-ENDIF()
-
-IF(MSCKF)
-  ADD_DEFINITIONS(-DUSE_MSCKF)
-ENDIF()
-IF(USE_ROS)
-  add_definitions(-DSLAM_USE_ROS)
 ENDIF()
 
 # ADD_DEFINITIONS(-DDEACTIVATE_TIMERS)
@@ -200,6 +190,7 @@ list(APPEND TEST_SRC_FILES
     test/eigen/TestEigenQR.cpp
 
     test/std/TestBinaryOperators.cpp
+    test/std/TestDerivedClass.cpp
     test/std/TestMapKeyOrder.cpp
     test/std/TestSizeof.cpp
     test/std/TestStdAccumulate.cpp

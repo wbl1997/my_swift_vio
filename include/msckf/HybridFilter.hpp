@@ -652,11 +652,14 @@ class HybridFilter : public VioBackendInterface {
       ceresCallback_;  ///< Maybe there was a callback registered, store it
                        ///< here.
 
- public:
+ protected:
   // set intermediate variables which are used for computing Jacobians of
   // feature point observations
   virtual void retrieveEstimatesOfConstants();
+  virtual void updateStates(
+      const Eigen::Matrix<double, Eigen::Dynamic, 1> &deltaX);
 
+public:
   okvis::Time firstStateTimestamp();
 
   void gatherPoseObservForTriang(
@@ -687,7 +690,7 @@ class HybridFilter : public VioBackendInterface {
    * @param hpbid
    * @return v4Xhomog
    */
-  virtual bool triangulateAMapPoint(
+  bool triangulateAMapPoint(
       const MapPoint &mp,
       std::vector<Eigen::Vector2d, Eigen::aligned_allocator<Eigen::Vector2d>>
           &obsInPixel,
@@ -696,7 +699,7 @@ class HybridFilter : public VioBackendInterface {
       const okvis::cameras::PinholeCamera<
           okvis::cameras::RadialTangentialDistortion> &cameraGeometry,
       const okvis::kinematics::Transformation &T_SC0, const uint64_t &hpbid,
-      bool use_AIDP = false) const final;
+      bool use_AIDP = false) const;
   /**
    * @brief computeHxf, compute the residual and Jacobians for a SLAM feature i
    * observed in current frame
@@ -741,9 +744,6 @@ class HybridFilter : public VioBackendInterface {
                   Eigen::Vector4d &ab1rho,
                   Eigen::Matrix<double, Eigen::Dynamic, 3> *pH_fi =
                       (Eigen::Matrix<double, Eigen::Dynamic, 3> *)(NULL)) const;
-
-  virtual void updateStates(
-      const Eigen::Matrix<double, Eigen::Dynamic, 1> &deltaX);
 
   /// OBSOLETE: check states by comparing current estimates with the ground
   /// truth. To use this function, make sure the ground truth is linked

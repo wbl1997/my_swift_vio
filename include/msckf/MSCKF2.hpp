@@ -91,7 +91,7 @@ class MSCKF2 : public HybridFilter {
   virtual void optimize(size_t numIter, size_t numThreads = 1,
                         bool verbose = false) final;
 
- public:
+ protected:
   // set intermediate variables which are used for computing Jacobians of
   // feature point observations
   virtual void retrieveEstimatesOfConstants() final;

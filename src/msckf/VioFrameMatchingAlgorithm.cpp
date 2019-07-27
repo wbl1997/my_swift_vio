@@ -19,11 +19,7 @@ namespace okvis {
 // Constructor.
 template <class CAMERA_GEOMETRY_T>
 VioFrameMatchingAlgorithm<CAMERA_GEOMETRY_T>::VioFrameMatchingAlgorithm(
-#ifdef USE_MSCKF
-    okvis::MSCKF2& estimator,
-#else
     okvis::HybridFilter& estimator,
-#endif
     int matchingType, float distanceThreshold, bool usePoseUncertainty) {
   matchingType_ = matchingType;
   distanceThreshold_ = distanceThreshold;

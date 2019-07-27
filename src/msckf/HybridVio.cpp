@@ -22,6 +22,10 @@ DEFINE_bool(
     " threshold in computing jacobians. true by default, set false"
     " in simulation as it may prune many valid correspondences");
 
+DEFINE_int32(
+    estimator_algorithm, 1,
+    "0 for okvis optimization, 1 for msckf, 2 for hybrid filter");
+
 DECLARE_int32(feature_tracking_method);
 
 /// \brief okvis Main namespace of this package.
@@ -58,14 +62,21 @@ HybridVio::HybridVio(okvis::VioParameters &parameters)
       frameSynchronizer_(okvis::FrameSynchronizer(parameters)),
       lastAddedImageTimestamp_(okvis::Time(0, 0)),
       optimizationDone_(true),
-      estimator_(parameters.sensors_information.imageReadoutTime),
+
       frontend_(parameters.nCameraSystem.numCameras(),
                 parameters.input.voFeatureTracksFile),
       parameters_(parameters),
       maxImuInputQueueSize_(2 * max_camera_input_queue_size *
                             parameters.imu.rate /
                             parameters.sensors_information.cameraRate) {
-  estimator_.resetInitialPVandStd(
+    if (FLAGS_estimator_algorithm == 1) {
+        estimator_.reset(new okvis::MSCKF2(
+            parameters.sensors_information.imageReadoutTime));
+    } else {
+        estimator_.reset(new okvis::HybridFilter(
+            parameters.sensors_information.imageReadoutTime));
+    }
+    estimator_->resetInitialPVandStd(
       InitialPVandStd(parameters.initialState),
       parameters.initialState.bUseExternalInitState);
   setBlocking(false);
@@ -93,9 +104,9 @@ void HybridVio::init() {
   // returns big number)
   lastAddedStateTimestamp_ = okvis::Time(0.0) + temporal_imu_data_overlap;
 
-  estimator_.addImu(parameters_.imu);
+  estimator_->addImu(parameters_.imu);
   for (size_t i = 0; i < numCameras_; ++i) {
-    estimator_.addCamera(parameters_.camera_extrinsics);
+    estimator_->addCamera(parameters_.camera_extrinsics);
     cameraMeasurementsReceived_.emplace_back(
         std::shared_ptr<threadsafe::ThreadSafeQueue<
             std::shared_ptr<okvis::CameraMeasurement>>>(
@@ -167,7 +178,7 @@ HybridVio::~HybridVio() {
   publisherThread_.join();
 
   /*okvis::kinematics::Transformation endPosition;
-  estimator_.get_T_WS(estimator_.currentFrameId(), endPosition);
+  estimator_->get_T_WS(estimator_->currentFrameId(), endPosition);
   std::stringstream s;
   s << endPosition.r();
   LOG(INFO) << "Sensor end position:\n" << s.str();
@@ -307,7 +318,7 @@ void HybridVio::setBlocking(bool blocking) {
   // disable time limit for optimization
   if (blocking_) {
     std::lock_guard<std::mutex> lock(estimator_mutex_);
-    estimator_.setOptimizationTimeLimit(
+    estimator_->setOptimizationTimeLimit(
         -1.0, parameters_.optimization.max_iterations);
   }
 }
@@ -404,8 +415,8 @@ void HybridVio::frameConsumerLoop(size_t cameraIndex) {
     }
 
     // get T_WC(camIndx) for detectAndDescribe()
-    VLOG(1) << "estimator numFrames in frame loop " << estimator_.numFrames();
-    if (estimator_.numFrames() == 0) {
+    VLOG(1) << "estimator numFrames in frame loop " << estimator_->numFrames();
+    if (estimator_->numFrames() == 0) {
       // first frame ever
       bool success = okvis::HybridFilter::initPoseFromImu(imuData, T_WS);
       std::cout << "estimator initialized using inertial data " << std::endl;
@@ -512,7 +523,7 @@ void HybridVio::matchingLoop() {
                               << "current frametimestamp " << frame->timestamp()
                               << " (id: " << frame->id() << "last timestamp "
                               << lastAddedStateTimestamp_
-                              << " (id: " << estimator_.currentFrameId());
+                              << " (id: " << estimator_->currentFrameId());
 
     // wait until all relevant imu messages have arrived and check for
     // termination request
@@ -545,7 +556,7 @@ void HybridVio::matchingLoop() {
       addStateTimer.start();
       okvis::Time t0Matching = okvis::Time::now();
       bool asKeyframe = true;  // for msckf always set a frame as keyframe
-      if (estimator_.addStates(frame, imuData, asKeyframe)) {
+      if (estimator_->addStates(frame, imuData, asKeyframe)) {
         lastAddedStateTimestamp_ = frame->timestamp();
         addStateTimer.stop();
       } else {
@@ -556,20 +567,20 @@ void HybridVio::matchingLoop() {
 
       // -- matching keypoints, initialising landmarks etc.
       okvis::kinematics::Transformation T_WS;
-      estimator_.get_T_WS(frame->id(), T_WS);
+      estimator_->get_T_WS(frame->id(), T_WS);
       matchingTimer.start();
-      frontend_.dataAssociationAndInitialization(estimator_, T_WS, parameters_,
+      frontend_.dataAssociationAndInitialization(*estimator_, T_WS, parameters_,
                                                  map_, frame, &asKeyframe);
 
       matchingTimer.stop();
       if (asKeyframe) {
-        estimator_.setKeyframe(frame->id(), asKeyframe);
+        estimator_->setKeyframe(frame->id(), asKeyframe);
       }
       if (!blocking_) {
         double timeLimit =
             parameters_.optimization.timeLimitForMatchingAndOptimization -
             (okvis::Time::now() - t0Matching).toSec();
-        estimator_.setOptimizationTimeLimit(
+        estimator_->setOptimizationTimeLimit(
             std::max<double>(0.0, timeLimit),
             parameters_.optimization.min_iterations);
       }
@@ -772,17 +783,17 @@ void HybridVio::optimizationLoop() {
       okvis::Time opt_frame_time = frame_pairs->timestamp();
       int frameIdInSource = -1;
       bool isKF = false;
-      estimator_.getFrameId(frame_pairs->id(), frameIdInSource, isKF);
+      estimator_->getFrameId(frame_pairs->id(), frameIdInSource, isKF);
 
-      estimator_.optimize(1, 1, false);
+      estimator_->optimize(1, 1, false);
 
       optimizationTimer.stop();
 
       deleteImuMeasurementsUntil =
-          estimator_.firstStateTimestamp() - temporal_imu_data_overlap;
+          estimator_->firstStateTimestamp() - temporal_imu_data_overlap;
 
       marginalizationTimer.start();
-      estimator_.applyMarginalizationStrategy();
+      estimator_->applyMarginalizationStrategy();
       marginalizationTimer.stop();
       afterOptimizationTimer.start();
 
@@ -792,14 +803,14 @@ void HybridVio::optimizationLoop() {
       // saving optimized state and saving it in OptimizationResults struct
       {
         std::lock_guard<std::mutex> lock(lastState_mutex_);
-        estimator_.get_T_WS(frame_pairs->id(), lastOptimized_T_WS_);
-        estimator_.getSpeedAndBias(frame_pairs->id(), 0,
+        estimator_->get_T_WS(frame_pairs->id(), lastOptimized_T_WS_);
+        estimator_->getSpeedAndBias(frame_pairs->id(), 0,
                                    lastOptimizedSpeedAndBiases_);
         lastOptimizedStateTimestamp_ = frame_pairs->timestamp();
 
         int frameIdInSource = -1;
         bool isKF = false;
-        estimator_.getFrameId(frame_pairs->id(), frameIdInSource, isKF);
+        estimator_->getFrameId(frame_pairs->id(), frameIdInSource, isKF);
         // if we publish the state after each IMU propagation we do not need
         // to publish it here.
         if (!parameters_.publishing.publishImuPropagatedState) {
@@ -809,15 +820,15 @@ void HybridVio::optimizationLoop() {
           result.onlyPublishLandmarks = false;
           result.frameIdInSource = frameIdInSource;
           result.isKeyframe = isKF;
-          estimator_.getTgTsTaEstimate(result.vTgTsTa_);
+          estimator_->getTgTsTaEstimate(result.vTgTsTa_);
           // returned poseId by getCameraCalibrationEstimate should be
           // frame_pairs->id()
-          estimator_.getCameraCalibrationEstimate(result.vfckptdr_);
-          estimator_.getVariance(result.vVariance_);
+          estimator_->getCameraCalibrationEstimate(result.vfckptdr_);
+          estimator_->getVariance(result.vVariance_);
         } else {
           result.onlyPublishLandmarks = true;
         }
-        estimator_.getLandmarks(result.landmarksVector);
+        estimator_->getLandmarks(result.landmarksVector);
 
         repropagationNeeded_ = true;
       }
@@ -842,10 +853,10 @@ void HybridVio::optimizationLoop() {
             it->cameraIdx = camIndex;
             it->frameId = frame_pairs->id();
             it->landmarkId = frame_pairs->landmarkId(camIndex, k);
-            if (estimator_.isLandmarkAdded(it->landmarkId)) {
-              estimator_.getLandmark(it->landmarkId, landmark);
+            if (estimator_->isLandmarkAdded(it->landmarkId)) {
+              estimator_->getLandmark(it->landmarkId, landmark);
               it->landmark_W = landmark.pointHomog;
-              if (estimator_.isLandmarkInitialized(it->landmarkId))
+              if (estimator_->isLandmarkInitialized(it->landmarkId))
                 it->isInitialized = true;
               else
                 it->isInitialized = false;
@@ -857,8 +868,8 @@ void HybridVio::optimizationLoop() {
           }
         }
         visualizationDataPtr->keyFrames =
-            estimator_.multiFrame(estimator_.currentKeyframeId());
-        estimator_.get_T_WS(estimator_.currentKeyframeId(),
+            estimator_->multiFrame(estimator_->currentKeyframeId());
+        estimator_->get_T_WS(estimator_->currentKeyframeId(),
                             visualizationDataPtr->T_WS_keyFrame);
       }
 
@@ -870,7 +881,7 @@ void HybridVio::optimizationLoop() {
       // adding further elements to result that do not access estimator.
       for (size_t i = 0; i < parameters_.nCameraSystem.numCameras(); ++i) {
         okvis::kinematics::Transformation T_SCA;
-        estimator_.getCameraSensorStates(frame_pairs->id(), i, T_SCA);
+        estimator_->getCameraSensorStates(frame_pairs->id(), i, T_SCA);
         result.vector_of_T_SCi.push_back(T_SCA);
       }
     }
@@ -923,7 +934,7 @@ void HybridVio::saveStatistics(const std::string &filename) const {
     std::cout << "error in opening " << filename << std::endl;
     return;
   }
-  estimator_.printTrackLengthHistogram(stream);
+  estimator_->printTrackLengthHistogram(stream);
   frontend_.printNumFeatureDistribution(stream);
   if (stream.is_open()) stream.close();
 }

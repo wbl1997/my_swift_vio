@@ -40,6 +40,7 @@
 #include <feature_tracker/TrailManager.h>
 
 DECLARE_bool(use_mahalanobis);
+DECLARE_bool(estimator_algorithm);
 
 // Get a subset of the recorded IMU measurements from source imuMeasurements_.
 okvis::ImuMeasurementDeque getImuMeasurments(
@@ -203,11 +204,13 @@ void testHybridFilterCircle() {
         okvis::cameras::NCameraSystem::DistortionType::RadialTangential);
 
     // create an Estimator
-#ifdef USE_MSCKF
-    okvis::MSCKF2 estimator(mapPtr);
-#else
-    okvis::HybridFilter estimator(mapPtr);
-#endif
+    std::shared_ptr<okvis::HybridFilter> estimator;
+    if (FLAGS_estimator_algorithm == 2) {
+      estimator.reset(new okvis::HybridFilter(mapPtr));
+    } else {
+      estimator.reset(new okvis::MSCKF2(mapPtr));
+    }
+
     // create landmark grid
     std::vector<Eigen::Vector4d, Eigen::aligned_allocator<Eigen::Vector4d>>
         homogeneousPoints;
@@ -254,8 +257,8 @@ void testHybridFilterCircle() {
     }
 
     // add sensors
-    estimator.addCamera(extrinsicsEstimationParameters);
-    estimator.addImu(imuParameters);
+    estimator->addCamera(extrinsicsEstimationParameters);
+    estimator->addImu(imuParameters);
 
     const size_t K = 15 * DURATION;  // total keyframes
     uint64_t id = -1;
@@ -289,7 +292,7 @@ void testHybridFilterCircle() {
       okvis::Time lastKFTime(t0);
 
       okvis::Time currentKFTime = t0 + okvis::Duration(epoch);
-      if (k != 0) lastKFTime = estimator.statesMap_.rbegin()->second.timestamp;
+      if (k != 0) lastKFTime = estimator->statesMap_.rbegin()->second.timestamp;
       okvis::ImuMeasurementDeque imuSegment =
           getImuMeasurments(imuMeasurements, lastKFTime, currentKFTime);
       if (k == 0) {
@@ -314,10 +317,10 @@ void testHybridFilterCircle() {
         pvstd.std_p_WS = Eigen::Vector3d(1e-2, 1e-2, 1e-2);
         pvstd.std_v_WS = Eigen::Vector3d(1e-1, 1e-1, 1e-1);
         pvstd.std_q_WS = Eigen::Vector3d(5e-2, 5e-2, 5e-2);
-        estimator.resetInitialPVandStd(pvstd, true);
-        estimator.addStates(mf, imuSegment, true);
+        estimator->resetInitialPVandStd(pvstd, true);
+        estimator->addStates(mf, imuSegment, true);
       } else {
-        estimator.addStates(mf, imuSegment, true);
+        estimator->addStates(mf, imuSegment, true);
       }
       std::cout << "Frame " << k << " successfully added." << std::endl;
 
@@ -350,19 +353,19 @@ void testHybridFilterCircle() {
         }
         mf->resetKeypoints(camId, keypoints);
         for (size_t jack = 0; jack < kpIds.size(); ++jack) {
-          if (!estimator.isLandmarkAdded(lmIds[kpIds[jack]]))
-            estimator.addLandmark(lmIds[kpIds[jack]],
+          if (!estimator->isLandmarkAdded(lmIds[kpIds[jack]]))
+            estimator->addLandmark(lmIds[kpIds[jack]],
                                   homogeneousPoints[kpIds[jack]]);
 
-          estimator.addObservation<okvis::cameras::PinholeCamera<
+          estimator->addObservation<okvis::cameras::PinholeCamera<
               okvis::cameras::RadialTangentialDistortion>>(lmIds[kpIds[jack]],
                                                            id, camId, jack);
         }
       }
       // run the optimization
-      estimator.optimize(1, 1, false);
+      estimator->optimize(1, 1, false);
 
-      estimator.applyMarginalizationStrategy();
+      estimator->applyMarginalizationStrategy();
     }
 
     std::cout << okvis::timing::Timing::print();
@@ -386,12 +389,12 @@ void testHybridFilterCircle() {
               << speedAndBias.transpose() << std::endl;
 
     // get the estimates
-    estimator.get_T_WS(multiFrameIds.back(), T_WS_est);
+    estimator->get_T_WS(multiFrameIds.back(), T_WS_est);
     std::cout << "id and T_WS estimated " << std::endl;
     std::cout << multiFrameIds.back() << " " << T_WS_est.coeffs().transpose()
               << std::endl;
 
-    estimator.getSpeedAndBias(multiFrameIds.back(), 0, speedAndBias_est);
+    estimator->getSpeedAndBias(multiFrameIds.back(), 0, speedAndBias_est);
     std::cout << "speed and bias estimated " << std::endl;
     std::cout << speedAndBias_est.transpose() << std::endl;
 
@@ -404,8 +407,7 @@ void testHybridFilterCircle() {
         okvis::cameras::RadialTangentialDistortion::NumDistortionIntrinsics;
     Eigen::VectorXd distIntrinsic = intrinsics.tail<nDistortionCoeffDim>();
     Eigen::Matrix<double, nDistortionCoeffDim, 1> cameraDistortion;
-    estimator
-        .getSensorStateEstimateAs<okvis::ceres::CameraDistortionParamBlock>(
+    estimator->getSensorStateEstimateAs<okvis::ceres::CameraDistortionParamBlock>(
             multiFrameIds.back(), 0, okvis::HybridFilter::SensorStates::Camera,
             okvis::HybridFilter::CameraSensorStates::Distortion,
             cameraDistortion);
@@ -413,8 +415,8 @@ void testHybridFilterCircle() {
     std::cout << "distortion deviation "
               << (cameraDistortion - distIntrinsic).transpose() << std::endl;
 
-    estimator.get_T_WS(multiFrameIds.back(), T_WS_est);
-    estimator.getSpeedAndBias(multiFrameIds.back(), 0, speedAndBias_est);
+    estimator->get_T_WS(multiFrameIds.back(), T_WS_est);
+    estimator->getSpeedAndBias(multiFrameIds.back(), 0, speedAndBias_est);
     OKVIS_ASSERT_LT(Exception, (speedAndBias_est - speedAndBias).norm(), 0.04,
                     "speed and biases not close enough");
     OKVIS_ASSERT_LT(Exception,
@@ -933,19 +935,21 @@ void testHybridFilterSinusoid(const std::string &outputPath,
     if (cases[c].addPriorNoise)
       trNoisy = vio::gauss_rand(0, extrinsicsEstimationParameters.sigma_tr);
 
-#ifdef USE_MSCKF
-    okvis::MSCKF2 estimator(mapPtr, trNoisy);
-#else
-    okvis::HybridFilter estimator(mapPtr, trNoisy);
-#endif
+    std::shared_ptr<okvis::HybridFilter> estimator;
+    if (FLAGS_estimator_algorithm == 2) {
+      estimator.reset(new okvis::HybridFilter(mapPtr, trNoisy));
+    } else {
+      estimator.reset(new okvis::MSCKF2(mapPtr, trNoisy));
+    }
+
     std::vector<Eigen::Vector4d, Eigen::aligned_allocator<Eigen::Vector4d>>
         homogeneousPoints;
     std::vector<uint64_t> lmIds;
 
     create_landmark_grid(&homogeneousPoints, &lmIds, bVerbose ? pointFile : "");
 
-    estimator.addCamera(extrinsicsEstimationParameters);
-    estimator.addImu(imuParameters);
+    estimator->addCamera(extrinsicsEstimationParameters);
+    estimator->addImu(imuParameters);
 
     std::vector<uint64_t> multiFrameIds;
 
@@ -995,11 +999,11 @@ void testHybridFilterSinusoid(const std::string &outputPath,
             //                p_WS += 0.1*Eigen::Vector3d::Random();
             v_WS += vio::Sample::gaussian(1, 3).cwiseProduct(pvstd.std_v_WS);
           }
-          estimator.resetInitialPVandStd(pvstd, true);
-          estimator.addStates(mf, imuSegment, true);
+          estimator->resetInitialPVandStd(pvstd, true);
+          estimator->addStates(mf, imuSegment, true);
         } else {
           mf->resetCameraSystemAndFrames(*cameraSystem1);  // dummy
-          estimator.addStates(mf, imuSegment, true);
+          estimator->addStates(mf, imuSegment, true);
           ++k;
         }
 
@@ -1026,17 +1030,17 @@ void testHybridFilterSinusoid(const std::string &outputPath,
                 keypoints.push_back(
                     cv::KeyPoint(measurement[0], measurement[1], 8.0));
                 mf->resetKeypoints(i, keypoints);
-                size_t numObs = estimator.numObservations(lmIds[j]);
+                size_t numObs = estimator->numObservations(lmIds[j]);
                 if (numObs == 0) {
-                  estimator.addLandmark(lmIds[j], homogeneousPoints[j]);
-                  estimator.addObservation<okvis::cameras::PinholeCamera<
+                  estimator->addLandmark(lmIds[j], homogeneousPoints[j]);
+                  estimator->addObservation<okvis::cameras::PinholeCamera<
                       okvis::cameras::RadialTangentialDistortion>>(
                       lmIds[j], mf->id(), i, mf->numKeypoints(i) - 1);
                   ++trackedFeatures;
                 } else {
                   double sam = vio::Sample::uniform();
                   if (sam > numObs / maxTrackLength) {
-                    estimator.addObservation<okvis::cameras::PinholeCamera<
+                    estimator->addObservation<okvis::cameras::PinholeCamera<
                         okvis::cameras::RadialTangentialDistortion>>(
                         lmIds[j], mf->id(), i, mf->numKeypoints(i) - 1);
                     ++trackedFeatures;
@@ -1048,12 +1052,12 @@ void testHybridFilterSinusoid(const std::string &outputPath,
         }
         myAccumulator(trackedFeatures);
 
-        estimator.optimize(1, 1, false);
-        estimator.applyMarginalizationStrategy();
+        estimator->optimize(1, 1, false);
+        estimator->applyMarginalizationStrategy();
 
         Eigen::Vector3d v_WS_true = cst.computeGlobalLinearVelocity(*iter);
 
-        estimator.print(mDebug);
+        estimator->print(mDebug);
         if (bVerbose) {
           Eigen::VectorXd allIntrinsics;
           cameraGeometry0->getIntrinsics(allIntrinsics);
@@ -1074,7 +1078,7 @@ void testHybridFilterSinusoid(const std::string &outputPath,
 
         Eigen::Vector3d normalizedError;
         Eigen::Matrix<double, 15 + 27 + 13, 1> rmsError;
-        compute_errors(&estimator, T_WS, v_WS_true, trueBiasIter->measurement,
+        compute_errors(estimator.get(), T_WS, v_WS_true, trueBiasIter->measurement,
                        cameraGeometry0, &normalizedError, &rmsError);
         nees.push_back(std::make_pair(*iter, normalizedError));
         rmse.push_back(std::make_pair(*iter, rmsError));
@@ -1099,7 +1103,7 @@ void testHybridFilterSinusoid(const std::string &outputPath,
       if (!truthStream.is_open()) {
         truthStream.open(truthFile, std::ios_base::app);
       }
-      estimator.printTrackLengthHistogram(truthStream);
+      estimator->printTrackLengthHistogram(truthStream);
       if (truthStream.is_open()) truthStream.close();
       // end output track length distribution
 
@@ -1158,15 +1162,4 @@ void testHybridFilterSinusoid(const std::string &outputPath,
   for (auto it = rmseSum.begin(); it != rmseSum.end(); ++it)
     rmseStream << it->first << " " << it->second.transpose() << std::endl;
   rmseStream.close();
-}
-
-void testEigenLDLT() {
-  Eigen::Matrix3d A, Ainv;
-  A << 3, 1, 2, 1, 4, 1, 2, 1, 5;
-  Ainv << 0.4750, -0.0750, -0.1750, -0.0750, 0.2750, -0.0250, -0.1750, -0.0250,
-      0.2750;
-  Eigen::Vector3d b = Eigen::Vector3d::Random();
-  Eigen::Vector3d error = A.ldlt().solve(b) - Ainv * b;
-  std::cout << "ldlt diff with true inv " << error.transpose() << std::endl;
-  assert(error.lpNorm<Eigen::Infinity>() < 1e-8);
 }

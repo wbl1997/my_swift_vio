@@ -74,11 +74,7 @@ class HybridFrontend {
    * @return True if successful.
    */
   virtual bool dataAssociationAndInitialization(
-#ifdef USE_MSCKF
-      okvis::MSCKF2& estimator,
-#else
       okvis::HybridFilter& estimator,
-#endif
       okvis::kinematics::Transformation& T_WS_propagated,
       const okvis::VioParameters& params,
       const std::shared_ptr<okvis::MapPointVector> map,
@@ -306,11 +302,7 @@ class HybridFrontend {
    * @return True if it should be a new keyframe.
    */
   bool doWeNeedANewKeyframe(
-#ifdef USE_MSCKF
-      const okvis::MSCKF2& estimator,
-#else
       const okvis::HybridFilter& estimator,
-#endif
       std::shared_ptr<okvis::MultiFrame>
           currentFrame);  // based on some overlap area heuristics
 
@@ -335,11 +327,7 @@ class HybridFrontend {
    */
   template <class MATCHING_ALGORITHM>
   int matchToKeyframes(
-#ifdef USE_MSCKF
-      okvis::MSCKF2& estimator,
-#else
       okvis::HybridFilter& estimator,
-#endif
       const okvis::VioParameters& params, const uint64_t currentFrameId,
       bool& rotationOnly, bool usePoseUncertainty = true,
       double* uncertainMatchFraction = 0,
@@ -361,11 +349,7 @@ class HybridFrontend {
    */
   template <class MATCHING_ALGORITHM>
   int matchToLastFrame(
-#ifdef USE_MSCKF
-      okvis::MSCKF2& estimator,
-#else
       okvis::HybridFilter& estimator,
-#endif
       const okvis::VioParameters& params, const uint64_t currentFrameId,
       bool usePoseUncertainty = true, bool removeOutliers = true);
 
@@ -380,11 +364,7 @@ class HybridFrontend {
    */
   template <class MATCHING_ALGORITHM>
   void matchStereo(
-#ifdef USE_MSCKF
-      okvis::MSCKF2& estimator,
-#else
       okvis::HybridFilter& estimator,
-#endif
       std::shared_ptr<okvis::MultiFrame> multiFrame);
 
   /**
@@ -397,11 +377,7 @@ class HybridFrontend {
    * @return Number of inliers.
    */
   int runRansac3d2d(
-#ifdef USE_MSCKF
-      okvis::MSCKF2& estimator,
-#else
       okvis::HybridFilter& estimator,
-#endif
       const okvis::cameras::NCameraSystem& nCameraSystem,
       std::shared_ptr<okvis::MultiFrame> currentFrame, bool removeOutliers);
 
@@ -422,11 +398,7 @@ class HybridFrontend {
    * @return Number of inliers.
    */
   int runRansac2d2d(
-#ifdef USE_MSCKF
-      okvis::MSCKF2& estimator,
-#else
       okvis::HybridFilter& estimator,
-#endif
       const okvis::VioParameters& params, uint64_t currentFrameId,
       uint64_t olderFrameId, bool initializePose, bool removeOutliers,
       bool* rotationOnly);
