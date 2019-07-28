@@ -116,7 +116,6 @@ LIST(APPEND SOURCEFILES
     src/msckf/ImuSimulator.cpp
     src/msckf/PreconditionedEkfUpdater.cpp
     src/msckf/HybridFilter.cpp
-    src/msckf/CameraRig.cpp
     src/msckf/MSCKF2.cpp
 
     src/feature_tracker/TrackResultReader.cpp

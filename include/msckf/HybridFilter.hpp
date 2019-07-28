@@ -23,7 +23,7 @@
 #include <okvis/ceres/SpeedAndBiasParameterBlock.hpp>
 
 //#include <okvis/ceres/ImuError.hpp>
-#include <msckf/CameraRig.h>
+#include <msckf/CameraRig.hpp>
 #include <okvis/cameras/PinholeCamera.hpp>
 #include <okvis/cameras/RadialTangentialDistortion.hpp>
 
