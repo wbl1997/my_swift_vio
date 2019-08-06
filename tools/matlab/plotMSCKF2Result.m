@@ -1,10 +1,10 @@
 function plotMSCKF2Result()
 close all;
-export_fig_path = input('export_fig_path:', 's');
+export_fig_path = input('path to export_fig:', 's');
 if isempty(export_fig_path)
     export_fig_path = '/media/jhuai/Seagate/jhuai/export_fig/';
 end
-voicebox_path = input('voicebox_path:', 's');
+voicebox_path = input('path to voicebox:', 's');
 if isempty(voicebox_path)
     voicebox_path = '/media/jhuai/Seagate/jhuai/huai_work/ekfmonoslam/voicebox';
 end
@@ -14,7 +14,7 @@ filename = input('msckf2_csv:', 's');
 if isempty(filename)
     return
 end
-output_dir = input('output_dir:', 's');
+output_dir = input('output_dir, if empty, set to dir of the csv:', 's');
 if isempty(output_dir)
     [filepath, ~, ~] = fileparts(filename);
     output_dir = filepath;
