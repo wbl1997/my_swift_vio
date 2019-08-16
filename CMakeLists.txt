@@ -104,6 +104,7 @@ LIST(APPEND SOURCEFILES
     src/okvis/ceres/ShapeMatrixParamBlock.cpp
     src/okvis/ceres/CameraIntrinsicError.cpp
 
+    src/msckf/BoundedImuDeque.cpp
     src/msckf/ImuOdometry.cpp
     src/msckf/HybridVio.cpp
     src/msckf/InitialPVandStd.cpp
@@ -197,7 +198,7 @@ list(APPEND TEST_SRC_FILES
     test/msckf/TestHybridFilter.cpp
     test/msckf/TestImuOdometry.cpp
     test/msckf/TestTriangulate.cpp
-
+    test/msckf/TestBoundedImuDeque.cpp
     test/io_wrap/TestVioDatasetPlayer.cpp
     )
 
