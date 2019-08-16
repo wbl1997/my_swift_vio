@@ -1,12 +1,12 @@
 function plotMSCKF2Result()
 close all;
-export_fig_path = input('path to export_fig:', 's');
+export_fig_path = input('path of export_fig:', 's');
 if isempty(export_fig_path)
     export_fig_path = '/media/jhuai/Seagate/jhuai/export_fig/';
 end
-voicebox_path = input('path to voicebox:', 's');
+voicebox_path = input('path of voicebox:', 's');
 if isempty(voicebox_path)
-    voicebox_path = '/media/jhuai/Seagate/jhuai/huai_work/ekfmonoslam/voicebox';
+    voicebox_path = '/media/jhuai/Seagate/jhuai/doctoral_work/ekfmonoslam/voicebox';
 end
 addpath(export_fig_path);
 

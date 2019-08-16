@@ -8,7 +8,7 @@ end
 startTime = msckf2_data(1, 1);
 endTime = msckf2_data(end, 1);
 sec_to_nanos = 1e9;
-sticky_time_range = 2.5e7; % nanosec
+sticky_time_range = 1e9; % nanosec
 avg_since_start = input(['To compute average of estimated parameters,', ...
     ' specify num of secs since start:']);
 avg_trim_end = input(['To compute average of estimated parameters,', ...
@@ -23,6 +23,7 @@ end
 startIndex = find(abs(startTime + avg_since_start*sec_to_nanos - msckf2_data(:,1)) ...
     < sticky_time_range, 1);
 if(isempty(startIndex))
+    disp(['unable to locate start index at time since start ', num2str(startTime)]);
     return;
 end
 
