@@ -946,23 +946,6 @@ const double chi2_95percentile[] = {
     229, 265.3012434, 230, 266.3781007, 231, 267.4547907, 232, 268.5313145,
     233, 269.6076732, 234, 270.6838679};
 
-/**
- * @brief Does a vector contain a certain element.
- * @tparam Class of a vector element.
- * @param vector Vector to search element in.
- * @param query Element to search for.
- * @return True if query is an element of vector.
- */
-template <class T>
-bool vectorContains(const std::vector<T> &vector, const T &query) {
-  for (size_t i = 0; i < vector.size(); ++i) {
-    if (vector[i] == query) {
-      return true;
-    }
-  }
-  return false;
-}
-
 }  // namespace okvis
 
 #include "implementation/HybridFilter.hpp"

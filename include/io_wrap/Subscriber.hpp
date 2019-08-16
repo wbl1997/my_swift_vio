@@ -117,6 +117,7 @@ class Subscriber {
   /// @brief The IMU callback.
   void imuCallback(const sensor_msgs::ImuConstPtr& msg);
 
+  bool blockMsgWithOldTimestamps(const sensor_msgs::ImuConstPtr& msg);
   /// @}
   /// @name Direct (no ROS) callbacks and other sensor related methods.
   /// @{
@@ -165,7 +166,10 @@ class Subscriber {
       vioParameters_;  ///< The parameters and settings. //huai: although
                        ///< cameraGeometry info is included but not used through
                        ///< this member
+  okvis::Time lastImuMsgTime_;
 };
+
+cv::Mat convertImageMsgToMat(const sensor_msgs::ImageConstPtr& msg);
 }  // namespace okvis
 
 #endif /* INCLUDE_OKVIS_SUBSCRIBER_HPP_ */

@@ -101,51 +101,7 @@ void Subscriber::setNodeHandle(ros::NodeHandle& nh) {
   subImu_ = nh_->subscribe("/imu", 1000, &Subscriber::imuCallback, this);
 }
 
-static std::string type2str(int type) {
-  std::string r;
-
-  uchar depth = type & CV_MAT_DEPTH_MASK;
-  uchar chans = 1 + (type >> CV_CN_SHIFT);
-
-  switch (depth) {
-    case CV_8U:
-      r = "8U";
-      break;
-    case CV_8S:
-      r = "8S";
-      break;
-    case CV_16U:
-      r = "16U";
-      break;
-    case CV_16S:
-      r = "16S";
-      break;
-    case CV_32S:
-      r = "32S";
-      break;
-    case CV_32F:
-      r = "32F";
-      break;
-    case CV_64F:
-      r = "64F";
-      break;
-    default:
-      r = "User";
-      break;
-  }
-
-  r += "C";
-  r += (chans + '0');
-
-  return r;
-}
-
-void Subscriber::imageCallback(const sensor_msgs::ImageConstPtr& msg, /*
-  const sensor_msgs::CameraInfoConstPtr& info,*/
-                               unsigned int cameraIndex) {
-  //  const cv::Mat raw(msg->height, msg->width, CV_8UC1,
-  //                    const_cast<uint8_t*>(&msg->data[0]), msg->step);
-
+cv::Mat convertImageMsgToMat(const sensor_msgs::ImageConstPtr& msg) {
   cv_bridge::CvImageConstPtr ptr;
   if (msg->encoding == "8UC1") {
     sensor_msgs::Image img;
@@ -160,8 +116,15 @@ void Subscriber::imageCallback(const sensor_msgs::ImageConstPtr& msg, /*
   } else
     ptr = cv_bridge::toCvCopy(msg, sensor_msgs::image_encodings::MONO8);
 
-  cv::Mat raw = ptr->image;
+  return ptr->image;
+}
 
+void Subscriber::imageCallback(const sensor_msgs::ImageConstPtr& msg, /*
+  const sensor_msgs::CameraInfoConstPtr& info,*/
+                               unsigned int cameraIndex) {
+  //  const cv::Mat raw(msg->height, msg->width, CV_8UC1,
+  //                    const_cast<uint8_t*>(&msg->data[0]), msg->step);
+  cv::Mat raw = convertImageMsgToMat(msg);
   cv::Mat filtered;
   if (vioParameters_.optimization.useMedianFilter) {
     cv::medianBlur(raw, filtered, 3);
@@ -180,12 +143,27 @@ void Subscriber::imageCallback(const sensor_msgs::ImageConstPtr& msg, /*
 }
 
 void Subscriber::imuCallback(const sensor_msgs::ImuConstPtr& msg) {
+  bool block = blockMsgWithOldTimestamps(msg);
+  if (block)
+    return;
   vioInterface_->addImuMeasurement(
       okvis::Time(msg->header.stamp.sec, msg->header.stamp.nsec),
       Eigen::Vector3d(msg->linear_acceleration.x, msg->linear_acceleration.y,
                       msg->linear_acceleration.z),
       Eigen::Vector3d(msg->angular_velocity.x, msg->angular_velocity.y,
                       msg->angular_velocity.z));
+}
+
+bool Subscriber::blockMsgWithOldTimestamps(
+    const sensor_msgs::ImuConstPtr& msg) {
+  okvis::Time msgTime(msg->header.stamp.sec, msg->header.stamp.nsec);
+  // The corner case msgTime == okvis::Time(0, 0) is not handled.
+  if (lastImuMsgTime_ >= msgTime) {
+    return true;
+  } else {
+    lastImuMsgTime_ = msgTime;
+    return false;
+  }
 }
 
 #ifdef HAVE_LIBVISENSOR

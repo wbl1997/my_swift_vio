@@ -209,11 +209,14 @@ int main(int argc, char **argv) {
 
     // add images
     okvis::Time t;
+    okvis::Time lastImuMsgTime;
     for (size_t i = 0; i < numCameras; ++i) {
       sensor_msgs::ImageConstPtr msg1 =
           view_cam_iterators[i]->instantiate<sensor_msgs::Image>();
-      cv::Mat filtered(msg1->height, msg1->width, CV_8UC1);
-      memcpy(filtered.data, &msg1->data[0], msg1->height * msg1->width);
+      cv::Mat filtered = okvis::convertImageMsgToMat(msg1);
+//      cv::Mat filtered(msg1->height, msg1->width, CV_8UC1,
+//                       const_cast<uint8_t*>(&msg1->data[0]), msg1->step);
+//      memcpy(filtered.data, &msg1->data[0], msg1->height * msg1->width);
       t = okvis::Time(msg1->header.stamp.sec, msg1->header.stamp.nsec);
       if (start == okvis::Time(0.0)) {
         start = t;
@@ -231,7 +234,11 @@ int main(int argc, char **argv) {
                             msg->linear_acceleration.z);
 
         t_imu = okvis::Time(msg->header.stamp.sec, msg->header.stamp.nsec);
-
+        if (lastImuMsgTime >= t_imu) {
+          continue;
+        } else {
+          lastImuMsgTime = t_imu;
+        }
         // add the IMU measurement for (blocking) processing
         if (t_imu - start > deltaT)
           okvis_estimator.addImuMeasurement(t_imu, acc, gyr);
