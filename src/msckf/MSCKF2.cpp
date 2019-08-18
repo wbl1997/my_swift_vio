@@ -503,7 +503,7 @@ bool MSCKF2::addStates(okvis::MultiFramePtr multiFrame,
                             49 + ceres::nDistortionDim) = covTDTR;
   }
   // record the imu measurements between two consecutive states
-  mStateID2Imu[states.id] = imuMeasurements;
+  mStateID2Imu.push_back(imuMeasurements);
 
   // augment states in the propagated covariance matrix
   size_t covDimAugmented = covDim_ + 9;  //$\delta p,\delta \alpha,\delta v$
@@ -551,7 +551,7 @@ bool MSCKF2::applyMarginalizationStrategy() {
                                       .at(ImuSensorStates::SpeedAndBias)
                                       .id);
 
-    mStateID2Imu.erase(it->second.id);
+    mStateID2Imu.pop_front(statesMap_.find(it->second.id)->second.timestamp - half_window_);
     multiFramePtrMap_.erase(it->second.id);
     statesMap_.erase(it->second.id);
   }
@@ -1169,12 +1169,11 @@ bool MSCKF2::computeHoi(const uint64_t hpbid, const MapPoint &mp,
       SpeedAndBiases sbj;
       getSpeedAndBias(poseId, 0, sbj);
 
-      auto imuMeasPtr = mStateID2Imu.find(poseId);
-      OKVIS_ASSERT_TRUE(Exception, imuMeasPtr != mStateID2Imu.end(),
-                        "the IMU measurement does not exist");
-      const ImuMeasurementDeque &imuMeas = imuMeasPtr->second;
-
       Time stateEpoch = statesMap_.at(poseId).timestamp;
+      auto imuMeas = mStateID2Imu.findWindow(stateEpoch, half_window_);
+      OKVIS_ASSERT_GT(Exception, imuMeas.size(), 0,
+                      "the IMU measurement does not exist");
+
       const int camIdx = 0;
       uint32_t imageHeight =
           camera_rig_.getCameraGeometry(camIdx)->imageHeight();
@@ -1454,13 +1453,12 @@ bool MSCKF2::computeHoi(const uint64_t hpbid, const MapPoint &mp,
       get_T_WS(poseId, T_WBj);
       SpeedAndBiases sbj;
       getSpeedAndBias(poseId, 0, sbj);
-
-      auto imuMeasPtr = mStateID2Imu.find(poseId);
-      OKVIS_ASSERT_TRUE(Exception, imuMeasPtr != mStateID2Imu.end(),
-                        "the IMU measurement does not exist");
-      const ImuMeasurementDeque &imuMeas = imuMeasPtr->second;
-
+      // TODO(jhuai): for a few frames at the beginning, the imu meas may not cover the frame readout window
       Time stateEpoch = statesMap_.at(poseId).timestamp;
+      auto imuMeas = mStateID2Imu.findWindow(stateEpoch, half_window_);
+      OKVIS_ASSERT_GT(Exception, imuMeas.size(), 0,
+                      "the IMU measurement does not exist");
+
       const int camIdx = 0;
       uint32_t imageHeight =
           camera_rig_.getCameraGeometry(camIdx)->imageHeight();
@@ -1634,7 +1632,7 @@ bool MSCKF2::computeHoi(const uint64_t hpbid, const MapPoint &mp,
     computeHTimer.stop();
     return true;
   }
-}  // namespace okvis
+}
 
 // TODO(jhuai): merge with the superclass implementation
 void MSCKF2::updateStates(

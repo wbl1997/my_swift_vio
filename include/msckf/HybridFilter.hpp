@@ -33,6 +33,7 @@
 #include <vio/ImuErrorModel.h>
 
 #include "msckf/InitialPVandStd.hpp"
+#include "msckf/BoundedImuDeque.hpp"
 
 /// \brief okvis Main namespace of this package.
 namespace okvis {
@@ -803,10 +804,7 @@ public:
 
   // map from state ID to segments of imu measurements, the imu measurements
   // covers the last state and current state of the id and extends on both sides
-  std::map<uint64_t, okvis::ImuMeasurementDeque, std::less<uint64_t>,
-           Eigen::aligned_allocator<
-               std::pair<const uint64_t, okvis::ImuMeasurementDeque>>>
-      mStateID2Imu;
+  okvis::BoundedImuDeque mStateID2Imu;
 
   // intermediate variables used for computeHoi and computeHxf, refresh them
   // with retrieveEstimatesOfConstants before calling it
@@ -882,6 +880,13 @@ public:
   std::vector<size_t>
       mTrackLengthAccumulator;  // histogram of the track lengths, start from
                                 // 0,1,2, to a fixed number
+
+  // The window centered at a stateEpoch for retrieving the inertial data
+  // which is used for propagating the camera pose to epochs in the window,
+  // i.e., timestamps of observations in a rolling shutter image.
+  // A value greater than (t_d + t_r)/2 is recommended.
+  // Note camera observations in MSCKF will not occur at the latest frame.
+  static const okvis::Duration half_window_;
 };
 
 const double chi2_95percentile[] = {

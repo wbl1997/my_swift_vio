@@ -32,9 +32,10 @@ DECLARE_int32(feature_tracking_method);
 namespace okvis {
 
 static const int max_camera_input_queue_size = 10;
-// was 0.02, overlap of imu data before and after two consecutive frames
-// [seconds]
-static const okvis::Duration temporal_imu_data_overlap(0.6);
+// overlap of imu data before and after two consecutive frames
+// [seconds] if too large, frame consumer loop will be blocked for too long
+// by waiting for imu meas
+static const okvis::Duration temporal_imu_data_overlap(0.02);
 
 #ifdef USE_MOCK
 // Constructor for gmock.
@@ -723,7 +724,7 @@ okvis::ImuMeasurementDeque HybridVio::getImuMeasurments(
       imuMeasurements_.begin();
   okvis::ImuMeasurementDeque::iterator last_imu_package =
       imuMeasurements_.end();
-  // TODO(jhuai): go backwards through queue. Is probably faster.
+
   for (auto iter = imuMeasurements_.begin(); iter != imuMeasurements_.end();
        ++iter) {
     // move first_imu_package iterator back until iter->timeStamp is higher

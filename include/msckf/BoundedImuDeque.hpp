@@ -1,8 +1,8 @@
 #ifndef INCLUDE_MSCKF_BOUNDED_IMU_DEQUE_HPP_
 #define INCLUDE_MSCKF_BOUNDED_IMU_DEQUE_HPP_
 
-#include <okvis/Measurements.hpp>
 #include <mutex>
+#include <okvis/Measurements.hpp>
 
 namespace okvis {
 // keep measurements streamed from one IMU
@@ -18,7 +18,11 @@ class BoundedImuDeque {
   int pop_front(const okvis::Time& eraseUtil);
   const okvis::ImuMeasurementDeque find(const okvis::Time& begin_time,
                                         const okvis::Time& end_time) const;
+
+  const okvis::ImuMeasurementDeque findWindow(
+      const okvis::Time& center_time, const okvis::Duration& half_window) const;
   const okvis::ImuMeasurementDeque& getAllImuMeasurements() const;
+
  private:
   okvis::ImuMeasurementDeque imu_meas_;
 };

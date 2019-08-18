@@ -65,6 +65,9 @@ TEST(BoundedImuDeque, PopFront) {
   int res2 = bid.pop_front(okvis::Time(6.5));
   EXPECT_EQ(res2, 4);
   checkEqual(createMeasDeque(7, 10), bid.getAllImuMeasurements());
+  int res3 = bid.pop_front(okvis::Time(12));
+  EXPECT_EQ(res3, 3);
+  checkEqual(createMeasDeque(0, 0), bid.getAllImuMeasurements());
 }
 
 TEST(BoundedImuDeque, Find) {
@@ -75,7 +78,10 @@ TEST(BoundedImuDeque, Find) {
       bid.find(okvis::Time(2.0), okvis::Time(2.0));
   okvis::ImuMeasurementDeque imu_meas2 =
       bid.find(okvis::Time(3.5), okvis::Time(6.0));
+  okvis::ImuMeasurementDeque imu_meas3 =
+      bid.find(okvis::Time(0.0), okvis::Time(11.5));
 
   checkEqual(imu_meas1, createMeasDeque(2, 3));
   checkEqual(imu_meas2, createMeasDeque(3, 7));
+  checkEqual(imu_meas3, createMeasDeque(0, 10));
 }

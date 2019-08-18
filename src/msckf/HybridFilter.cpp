@@ -36,6 +36,7 @@ namespace okvis {
 const double maxProjTolerance =
     10;  // maximum tolerable discrepancy between predicted and measured point
          // coordinates in image in pixel units
+const okvis::Duration HybridFilter::half_window_(2, 0);
 
 // Constructor if a ceres map is already available.
 HybridFilter::HybridFilter(std::shared_ptr<okvis::ceres::Map> mapPtr,
@@ -557,7 +558,7 @@ bool HybridFilter::addStates(okvis::MultiFramePtr multiFrame,
                             49 + ceres::nDistortionDim) = covTDTR;
   }
   // record the imu measurements between two consecutive states
-  mStateID2Imu[states.id] = imuMeasurements;
+  mStateID2Imu.push_back(imuMeasurements);
 
   // augment states in the propagated covariance matrix
   size_t covDimAugmented = covDim_ + 9;  //$\delta p,\delta \alpha,\delta v$
@@ -918,7 +919,7 @@ bool HybridFilter::applyMarginalizationStrategy() {
                                         .at(ImuSensorStates::SpeedAndBias)
                                         .id);
 
-      mStateID2Imu.erase(rit->first);
+      mStateID2Imu.pop_front(statesMap_.find(rit->first)->second.timestamp - half_window_);
       multiFramePtrMap_.erase(rit->first);
 
       //            std::advance(rit, 1);
@@ -1193,12 +1194,11 @@ bool HybridFilter::computeHxf(const uint64_t hpbid, const MapPoint& mp,
   SpeedAndBiases sbj;
   getSpeedAndBias(currFrameId, 0, sbj);
 
-  auto imuMeasPtr = mStateID2Imu.find(currFrameId);
-  OKVIS_ASSERT_TRUE(Exception, imuMeasPtr != mStateID2Imu.end(),
-                    "the IMU measurement does not exist");
-  const ImuMeasurementDeque& imuMeas = imuMeasPtr->second;
-
   Time stateEpoch = statesMap_.at(currFrameId).timestamp;
+  auto imuMeas = mStateID2Imu.findWindow(stateEpoch, half_window_);
+  OKVIS_ASSERT_GT(Exception, imuMeas.size(), 0,
+                  "the IMU measurement does not exist");
+
   const int camIdx = 0;
   uint32_t imageHeight = camera_rig_.getCameraGeometry(camIdx)->imageHeight();
   double kpN = obsInPixel[1] / imageHeight - 0.5;  // k per N
@@ -1487,12 +1487,11 @@ bool HybridFilter::computeHoi(
     SpeedAndBiases sbj;
     getSpeedAndBias(poseId, 0, sbj);
 
-    auto imuMeasPtr = mStateID2Imu.find(poseId);
-    OKVIS_ASSERT_TRUE(Exception, imuMeasPtr != mStateID2Imu.end(),
-                      "the IMU measurement does not exist");
-    const ImuMeasurementDeque& imuMeas = imuMeasPtr->second;
-
     Time stateEpoch = statesMap_.at(poseId).timestamp;
+    auto imuMeas = mStateID2Imu.findWindow(stateEpoch, half_window_);
+    OKVIS_ASSERT_GT(Exception, imuMeas.size(), 0,
+                    "the IMU measurement does not exist");
+
     const int camIdx = 0;
     uint32_t imageHeight = camera_rig_.getCameraGeometry(camIdx)->imageHeight();
     double kpN = obsInPixel[kale][1] / imageHeight - 0.5;  // k per N
