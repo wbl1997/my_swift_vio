@@ -48,8 +48,11 @@ const okvis::ImuMeasurementDeque BoundedImuDeque::findWindow(
   // for a few frames at the beginning, the imu meas may not cover the
   // frame readout window
   if (raw_meas.front().timeStamp + half_window > center_time) {
+    // This warning can be mostly hushed if half window is decreased near t_r/2
     LOG(WARNING) << "IMU meas padded at the lower side from "
-                 << raw_meas.front().timeStamp << " to " << center_time - half_window;
+                 << raw_meas.front().timeStamp << " to "
+                 << center_time - half_window << " with half window "
+                 << half_window;
     raw_meas.push_front(raw_meas.front());
     raw_meas.front().timeStamp = center_time - half_window;
   }

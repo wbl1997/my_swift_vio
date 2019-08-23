@@ -1453,7 +1453,7 @@ bool MSCKF2::computeHoi(const uint64_t hpbid, const MapPoint &mp,
       get_T_WS(poseId, T_WBj);
       SpeedAndBiases sbj;
       getSpeedAndBias(poseId, 0, sbj);
-      // TODO(jhuai): for a few frames at the beginning, the imu meas may not cover the frame readout window
+
       Time stateEpoch = statesMap_.at(poseId).timestamp;
       auto imuMeas = mStateID2Imu.findWindow(stateEpoch, half_window_);
       OKVIS_ASSERT_GT(Exception, imuMeas.size(), 0,

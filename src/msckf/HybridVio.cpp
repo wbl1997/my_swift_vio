@@ -821,6 +821,11 @@ void HybridVio::optimizationLoop() {
           result.onlyPublishLandmarks = false;
           result.frameIdInSource = frameIdInSource;
           result.isKeyframe = isKF;
+          for (size_t i = 0; i < parameters_.nCameraSystem.numCameras(); ++i) {
+            okvis::kinematics::Transformation T_SCA;
+            estimator_->getCameraSensorStates(frame_pairs->id(), i, T_SCA);
+            result.vector_of_T_SCi.emplace_back(T_SCA);
+          }
           estimator_->getTgTsTaEstimate(result.vTgTsTa_);
           // returned poseId by getCameraCalibrationEstimate should be
           // frame_pairs->id()
@@ -876,14 +881,14 @@ void HybridVio::optimizationLoop() {
 
       optimizationDone_ = true;
     }  // unlock mutex
-    optimizationNotification_.notify_all();
 
+    optimizationNotification_.notify_all();
     if (!parameters_.publishing.publishImuPropagatedState) {
       // adding further elements to result that do not access estimator.
       for (size_t i = 0; i < parameters_.nCameraSystem.numCameras(); ++i) {
-        okvis::kinematics::Transformation T_SCA;
-        estimator_->getCameraSensorStates(frame_pairs->id(), i, T_SCA);
-        result.vector_of_T_SCi.push_back(T_SCA);
+//        result.vector_of_T_SCi.push_back(
+//            okvis::kinematics::Transformation(
+//                *parameters_.nCameraSystem.T_SC(i)));
       }
     }
     optimizationResults_.Push(result);
