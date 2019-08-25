@@ -86,7 +86,9 @@ class MSCKF2 : public HybridFilter {
    * numKeyframes+numImuFrames.
    * @return True if successful.
    */
-  virtual bool applyMarginalizationStrategy() final;
+  virtual bool applyMarginalizationStrategy(
+      size_t numKeyframes, size_t numImuFrames,
+      okvis::MapPointVector& removedLandmarks) final;
 
   virtual void optimize(size_t numIter, size_t numThreads = 1,
                         bool verbose = false) final;

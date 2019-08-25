@@ -364,8 +364,8 @@ void testHybridFilterCircle() {
       }
       // run the optimization
       estimator->optimize(1, 1, false);
-
-      estimator->applyMarginalizationStrategy();
+      okvis::MapPointVector removedLandmarks;
+      estimator->applyMarginalizationStrategy(2, 3, removedLandmarks);
     }
 
     std::cout << okvis::timing::Timing::print();
@@ -1053,7 +1053,8 @@ void testHybridFilterSinusoid(const std::string &outputPath,
         myAccumulator(trackedFeatures);
 
         estimator->optimize(1, 1, false);
-        estimator->applyMarginalizationStrategy();
+        okvis::MapPointVector removedLandmarks;
+        estimator->applyMarginalizationStrategy(2, 3, removedLandmarks);
 
         Eigen::Vector3d v_WS_true = cst.computeGlobalLinearVelocity(*iter);
 

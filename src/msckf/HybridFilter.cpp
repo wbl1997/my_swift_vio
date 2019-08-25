@@ -681,7 +681,9 @@ bool HybridFilter::removeObservation(uint64_t landmarkId, uint64_t poseId,
 
 // Applies the dropping/marginalization strategy, i.e., state management,
 // according to Li and Mourikis RSS 12 optimization based thesis
-bool HybridFilter::applyMarginalizationStrategy() {
+bool HybridFilter::applyMarginalizationStrategy(
+    size_t /*numKeyframes*/, size_t /*numImuFrames*/,
+    okvis::MapPointVector& /*removedLandmarks*/) {
   /// remove features tracked no more, the feature can be in state or not
   size_t tempCounter = 0;
 

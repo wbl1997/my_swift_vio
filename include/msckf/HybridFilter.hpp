@@ -169,7 +169,9 @@ class HybridFilter : public VioBackendInterface {
    * numKeyframes+numImuFrames.
    * @return True if successful.
    */
-  virtual bool applyMarginalizationStrategy();
+  virtual bool applyMarginalizationStrategy(
+      size_t numKeyframes, size_t numImuFrames,
+      okvis::MapPointVector& removedLandmarks);
 
   /**
    * @brief Initialise pose from IMU measurements. For convenience as static.

@@ -793,7 +793,9 @@ void HybridVio::optimizationLoop() {
           estimator_->firstStateTimestamp() - temporal_imu_data_overlap;
 
       marginalizationTimer.start();
-      estimator_->applyMarginalizationStrategy();
+      estimator_->applyMarginalizationStrategy(
+          parameters_.optimization.numKeyframes,
+          parameters_.optimization.numImuFrames, result.transferredLandmarks);
       marginalizationTimer.stop();
       afterOptimizationTimer.start();
 
