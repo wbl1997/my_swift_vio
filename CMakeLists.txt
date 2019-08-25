@@ -185,6 +185,7 @@ list(APPEND TEST_SRC_FILES
     test/test_main.cpp
 
     test/boost/TestBoostAccumulators.cpp
+    test/boost/TestChiSquared.cpp
 
     test/eigen/TestEigenMatrixInitialization.cpp
     test/eigen/TestEigenQR.cpp

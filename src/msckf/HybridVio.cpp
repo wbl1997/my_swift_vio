@@ -19,8 +19,7 @@
 DEFINE_bool(
     use_mahalanobis, true,
     "use malalanobis gating test in optimize or a simple projection distance"
-    " threshold in computing jacobians. true by default, set false"
-    " in simulation as it may prune many valid correspondences");
+    " threshold in computing jacobians. true by default");
 
 DEFINE_int32(
     estimator_algorithm, 1,

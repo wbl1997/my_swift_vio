@@ -1259,8 +1259,6 @@ bool HybridFilter::computeHxf(const uint64_t hpbid, const MapPoint& mp,
     computeHTimer.stop();
     return false;
   } else if (!FLAGS_use_mahalanobis) {
-    // either filter outliers with this simple heuristic in here or
-    // the mahalanobis distance in optimize
     Eigen::Vector2d discrep = obsInPixel - imagePoint;
     if (std::fabs(discrep[0]) > maxProjTolerance ||
         std::fabs(discrep[1]) > maxProjTolerance) {
@@ -1552,8 +1550,6 @@ bool HybridFilter::computeHoi(
       itRoi = vRi.erase(itRoi);
       continue;
     } else if (!FLAGS_use_mahalanobis) {
-      // either filter outliers with this simple heuristic in here or
-      // the mahalanobis distance in optimize
       Eigen::Vector2d discrep = obsInPixel[kale] - imagePoint;
       if (std::fabs(discrep[0]) > maxProjTolerance ||
           std::fabs(discrep[1]) > maxProjTolerance) {
@@ -2012,13 +2008,10 @@ void HybridFilter::optimize(size_t /*numIter*/, size_t /*numThreads*/,
       if (!isValidJacobian) continue;
 
       if (FLAGS_use_mahalanobis) {
-        // the below test looks time consuming as it involves matrix
-        // inversion. alternatively, some heuristics in computeHoi is used,
-        // e.g., ignore correspondences of too large discrepancy
-        /// remove outliders, cf. Li RSS12 optimization based ... eq 6
+        // cf. Li RSS12 optimization based ... eq 6
         double gamma =
             r_oi.transpose() *
-            (H_oi * variableCov * H_oi.transpose() + R_oi).inverse() * r_oi;
+            (H_oi * variableCov * H_oi.transpose() + R_oi).ldlt().solve(r_oi);
         if (gamma > chi2_95percentile[r_oi.rows()]) continue;
       }
 
@@ -2259,13 +2252,11 @@ void HybridFilter::optimize(size_t /*numIter*/, size_t /*numThreads*/,
         R_o = Q2.transpose() * R_i * Q2;
 
         if (FLAGS_use_mahalanobis) {
-          // the below test looks time consuming as it involves matrix
-          // inversion. alternatively, some heuristics in computeHoi is used,
-          // e.g., ignore correspondences of too large discrepancy
-          /// remove outliders, cf. Li RSS12 optimization based ... eq 6
-          double gamma = z_o.transpose() *
-                         (H_o * variableCov * H_o.transpose() + R_o).inverse() *
-                         z_o;
+          // cf. Li RSS12 optimization based ... eq 6
+          double gamma =
+              z_o.transpose() *
+              (H_o * variableCov * H_o.transpose() + R_o).ldlt().solve(z_o);
+
           if (gamma > chi2_95percentile[z_o.rows()]) {
             mLandmarkID2Residualize[tempCounter].second =
                 NotInState_NotTrackedNow;

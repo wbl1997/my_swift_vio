@@ -1237,8 +1237,6 @@ bool MSCKF2::computeHoi(const uint64_t hpbid, const MapPoint &mp,
         itRoi = vRi.erase(itRoi);
         continue;
       } else if (!FLAGS_use_mahalanobis) {
-        // either filter outliers with this simple heuristic in here or
-        // the mahalanobis distance in optimize
         Eigen::Vector2d discrep = obsInPixel[kale] - imagePoint;
         if (std::fabs(discrep[0]) > maxProjTolerance ||
             std::fabs(discrep[1]) > maxProjTolerance) {
@@ -1519,8 +1517,6 @@ bool MSCKF2::computeHoi(const uint64_t hpbid, const MapPoint &mp,
         itRoi = vRi.erase(itRoi);
         continue;
       } else if (!FLAGS_use_mahalanobis) {
-        // either filter outliers with this simple heuristic in computeHoi or
-        // the mahalanobis distance in optimize
         Eigen::Vector2d discrep = obsInPixel[kale] - imagePoint;
         if (std::fabs(discrep[0]) > maxProjTolerance ||
             std::fabs(discrep[1]) > maxProjTolerance) {
@@ -1838,14 +1834,11 @@ int MSCKF2::computeStackedJacobianAndResidual(
     }
 
     if (FLAGS_use_mahalanobis) {
-      // this test looks time consuming as it involves matrix inversion.
-      // alternatively, some heuristics in computeHoi is used, e.g., ignore
-      // correspondences of too large discrepancy remove outliders, cf. Li
-      // ijrr2014 visual inertial navigation with rolling shutter cameras
+      // cf. Li ijrr2014 visual inertial navigation with rolling shutter cameras
       double gamma =
           r_oi.transpose() *
           (H_oi * variableCov * H_oi.transpose() + R_oi).ldlt().solve(r_oi);
-      // TODO(jhuai): do we use 2DOF? refer msckf vio Kumar
+
       if (gamma > chi2_95percentile[r_oi.rows()]) {
         ++culledPoints[1];
         continue;
@@ -1890,7 +1883,7 @@ int MSCKF2::computeStackedJacobianAndResidual(
     //        expandedT_H<< Eigen::MatrixXd::Zero(dimH_o[0], 42), *T_H,
     //        Eigen::MatrixXd::Zero(dimH_o[0], 9); *T_H = expandedT_H;
   } else {  // project H_o, reduce the residual dimension
-    // TODO: use SPQR instead for computing T_H, refer to MSCKF_stereo
+    // TODO(jhuai): use SPQR instead for computing T_H, refer to MSCKF_stereo
     // https://github.com/KumarRobotics/msckf_vio/blob/master/src/msckf_vio.cpp#L930-L950
     Eigen::HouseholderQR<Eigen::MatrixXd> qr(H_o);
     Eigen::MatrixXd thinQ(Eigen::MatrixXd::Identity(H_o.rows(), H_o.cols()));
