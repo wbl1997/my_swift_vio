@@ -197,6 +197,7 @@ list(APPEND TEST_SRC_FILES
     test/std/TestSizeof.cpp
     test/std/TestStdAccumulate.cpp
 
+    test/msckf/TestFeatureInitialization.cpp
     test/msckf/TestJacobian.cpp
     test/msckf/TestHybridFilter.cpp
     test/msckf/TestImuOdometry.cpp

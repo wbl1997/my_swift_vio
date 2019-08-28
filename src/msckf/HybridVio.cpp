@@ -6,6 +6,7 @@
 #include <gflags/gflags.h>
 #include <glog/logging.h>
 
+#include <msckf/FeatureTriangulation.hpp>
 #include <msckf/HybridVio.hpp>
 #include <okvis/assert_macros.hpp>
 #include <okvis/ceres/ImuError.hpp>
@@ -21,6 +22,9 @@ DEFINE_int32(
     "0 for okvis optimization, 1 for msckf, 2 for hybrid filter");
 
 DECLARE_int32(feature_tracking_method);
+
+
+msckf_vio::Feature::OptimizationConfig msckf_vio::Feature::optimization_config;
 
 /// \brief okvis Main namespace of this package.
 namespace okvis {
@@ -64,16 +68,17 @@ HybridVio::HybridVio(okvis::VioParameters &parameters)
       maxImuInputQueueSize_(2 * max_camera_input_queue_size *
                             parameters.imu.rate /
                             parameters.sensors_information.cameraRate) {
-    if (FLAGS_estimator_algorithm == 1) {
-        estimator_.reset(new okvis::MSCKF2(
-            parameters.sensors_information.imageReadoutTime));
-    } else {
-        estimator_.reset(new okvis::HybridFilter(
-            parameters.sensors_information.imageReadoutTime));
-    }
-    estimator_->resetInitialPVandStd(
+  if (FLAGS_estimator_algorithm == 1) {
+    estimator_.reset(
+        new okvis::MSCKF2(parameters.sensors_information.imageReadoutTime));
+  } else {
+    estimator_.reset(new okvis::HybridFilter(
+        parameters.sensors_information.imageReadoutTime));
+  }
+  estimator_->resetInitialPVandStd(
       InitialPVandStd(parameters.initialState),
       parameters.initialState.bUseExternalInitState);
+  msckf_vio::Feature::optimization_config.translation_threshold = -1.0;
   setBlocking(false);
   init();
 }

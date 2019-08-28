@@ -558,10 +558,6 @@ void MSCKF2::findRedundantCamStates(
       ++oldFrames;
     }
   }
-  LOG(INFO) << "recent " << closeFrames << " old "
-            << oldFrames << " rate " << trackingRate_
-            << " states " << statesMap_.size();
-  // Sort the elements in the output vector.
   sort(rm_cam_state_ids->begin(), rm_cam_state_ids->end());
   return;
 }
@@ -570,7 +566,6 @@ int MSCKF2::marginalizeRedundantFrames(size_t maxClonedStates) {
   if (statesMap_.size() < maxClonedStates) {
     return 0;
   }
-  LOG(INFO) << "marg redund " << statesMap_.rbegin()->first;
   std::vector<uint64_t> rm_cam_state_ids;
   findRedundantCamStates(&rm_cam_state_ids);
 
@@ -615,24 +610,6 @@ int MSCKF2::marginalizeRedundantFrames(size_t maxClonedStates) {
     Eigen::MatrixXd H_oi;                           //(nObsDim, dimH_o[1])
     Eigen::Matrix<double, Eigen::Dynamic, 1> r_oi;  //(nObsDim, 1)
     Eigen::MatrixXd R_oi;                           //(nObsDim, nObsDim)
-
-//    if (!feature.is_initialized) {
-//      // Check if the feature can be initialize.
-//      if (!feature.checkMotion(state_server.cam_states)) {
-//        // If the feature cannot be initialized, just remove
-//        // the observations associated with the camera states
-//        // to be removed.
-//        for (const auto &cam_id : involved_cam_state_ids)
-//          feature.observations.erase(cam_id);
-//        continue;
-//      } else {
-//        if (!feature.initializePosition(state_server.cam_states)) {
-//          for (const auto &cam_id : involved_cam_state_ids)
-//            feature.observations.erase(cam_id);
-//          continue;
-//        }
-//      }
-//    }
 
     bool isValidJacobian =
         featureJacobian(it->second, H_oi, r_oi, R_oi, &involved_cam_state_ids);

@@ -9,6 +9,7 @@
 #include <okvis/ceres/RelativePoseError.hpp>
 #include <okvis/ceres/SpeedAndBiasError.hpp>
 
+#include <msckf/FeatureTriangulation.hpp>
 #include <msckf/FilterHelper.hpp>
 #include <msckf/ImuOdometry.h>
 #include <msckf/triangulate.h>
@@ -2682,7 +2683,9 @@ void HybridFilter::gatherPoseObservForTriang(
     const MapPoint& mp,
     const std::shared_ptr<cameras::CameraBase> cameraGeometry,
     std::vector<uint64_t>* frameIds,
-    std::vector<okvis::kinematics::Transformation>* T_WSs,
+    std::vector<okvis::kinematics::Transformation,
+                Eigen::aligned_allocator<okvis::kinematics::Transformation>>*
+        T_WSs,
     std::vector<Eigen::Vector3d, Eigen::aligned_allocator<Eigen::Vector3d>>*
         obsDirections,
     std::vector<Eigen::Vector2d, Eigen::aligned_allocator<Eigen::Vector2d>>*
@@ -2754,48 +2757,96 @@ bool HybridFilter::triangulateAMapPoint(
   // z=1 in the specific camera frame, [\bar{x},\bar{y},1]
   std::vector<Eigen::Vector3d, Eigen::aligned_allocator<Eigen::Vector3d>>
       obsDirections;
-  // the SE3 transform from world to camera frame
-  std::vector<Sophus::SE3d, Eigen::aligned_allocator<Sophus::SE3d>> T_CWs;
 
-  std::vector<okvis::kinematics::Transformation> T_WSs;
+  std::vector<okvis::kinematics::Transformation,
+              Eigen::aligned_allocator<okvis::kinematics::Transformation>>
+      T_WSs;
   gatherPoseObservForTriang(mp, cameraGeometry, &frameIds, &T_WSs,
                             &obsDirections, &obsInPixel, &vR_oi);
-  if (anchorSeqId >= 0) {  // use AIDP
-    // Ca will play the role of W in T_CWs
-    okvis::kinematics::Transformation T_WCa = T_WSs.at(anchorSeqId) * T_SC0;
-    for (auto T_WS : T_WSs) {
-      okvis::kinematics::Transformation T_WCi = T_WS * T_SC0;
-      okvis::kinematics::Transformation T_CiW = T_WCi.inverse() * T_WCa;
-      T_CWs.emplace_back(Sophus::SE3d(T_CiW.q(), T_CiW.r()));
+
+  bool triangulated = false;
+  /*{
+    // the SE3 transform from world to camera frame
+    std::vector<Sophus::SE3d, Eigen::aligned_allocator<Sophus::SE3d>> T_CWs;
+    if (anchorSeqId >= 0) {  // use AIDP
+      // Ca will play the role of W in T_CWs
+      okvis::kinematics::Transformation T_WCa = T_WSs.at(anchorSeqId) * T_SC0;
+      for (auto T_WS : T_WSs) {
+        okvis::kinematics::Transformation T_WCi = T_WS * T_SC0;
+        okvis::kinematics::Transformation T_CiW = T_WCi.inverse() * T_WCa;
+        T_CWs.emplace_back(Sophus::SE3d(T_CiW.q(), T_CiW.r()));
+      }
+    } else {
+      for (auto iter = T_WSs.begin(); iter != T_WSs.end(); ++iter) {
+        okvis::kinematics::Transformation T_WCi = *iter * T_SC0;
+        okvis::kinematics::Transformation T_CiW = T_WCi.inverse();
+        T_CWs.emplace_back(Sophus::SE3d(T_CiW.q(), T_CiW.r()));
+      }
     }
-  } else {
-    for (std::vector<okvis::kinematics::Transformation>::const_iterator iter =
-             T_WSs.begin();
-         iter != T_WSs.end(); ++iter) {
-      okvis::kinematics::Transformation T_WCi = *iter * T_SC0;
-      okvis::kinematics::Transformation T_CiW = T_WCi.inverse();
-      T_CWs.emplace_back(Sophus::SE3d(T_CiW.q(), T_CiW.r()));
+    // Method 1 estimate point's world position with DLT + gauss newton
+    bool isValid;
+    bool isParallel;
+    v4Xhomog = Get_X_from_xP_lin(obsDirections, T_CWs, isValid, isParallel);
+    if (isValid && !isParallel) {
+      Eigen::Vector3d res = v4Xhomog.head<3>() / v4Xhomog[3];
+      triangulate_refine_GN(obsDirections, T_CWs, res, 5);
+      if (res.lpNorm<Eigen::Infinity>() < 1e6) {
+        v4Xhomog[3] = 1;
+        v4Xhomog.head<3>() = res;
+
+        triangulated = true;
+      } else {
+        triangulated = false;
+      }
+    } else {
+      std::cout << " cannot triangulate pure rotation or infinity points "
+                << v4Xhomog.transpose() << std::endl;
+      triangulated = false;
+    }
+  }*/
+
+  {
+    msckf_vio::CamStateServer cam_states(obsDirections.size());
+    std::vector<Eigen::Vector2d, Eigen::aligned_allocator<Eigen::Vector2d>>
+        measurements(obsDirections.size());
+    int jack = 0;
+    for (auto obs3 : obsDirections) {
+      measurements[jack] = obs3.head<2>();
+      ++jack;
+    }
+    if (anchorSeqId >= 0) {  // use AIDP
+      // Ca will play the role of W
+      okvis::kinematics::Transformation T_CaW =
+          (T_WSs.at(anchorSeqId) * T_SC0).inverse();
+      int joel = 0;
+      for (auto T_WS : T_WSs) {
+        okvis::kinematics::Transformation T_WCi = T_WS * T_SC0;
+        okvis::kinematics::Transformation T_CaCi = T_CaW * T_WCi;
+        cam_states[joel].orientation = T_CaCi.q().conjugate();
+        cam_states[joel].position = T_CaCi.r();
+        ++joel;
+      }
+    } else {
+      int joel = 0;
+      for (auto iter = T_WSs.begin(); iter != T_WSs.end(); ++iter, ++joel) {
+        okvis::kinematics::Transformation T_WCi = *iter * T_SC0;
+        cam_states[joel].orientation = T_WCi.q().conjugate();
+        cam_states[joel].position = T_WCi.r();
+      }
+    }
+
+    msckf_vio::Feature feature(measurements, cam_states);
+    if (!feature.checkMotion() || !feature.initializePosition()) {
+      triangulated = false;
+    } else {
+      v4Xhomog[3] = 1;
+      v4Xhomog.head<3>() = feature.position;
+      triangulated = true;
     }
   }
-  // Method 1 estimate point's world position with DLT + gauss newton,
-  // for simulations with ideal conditions, this method may perform better
-  //   than method 2
-  bool isValid;
-  bool isParallel;
-  v4Xhomog = Get_X_from_xP_lin(obsDirections, T_CWs, isValid, isParallel);
-  if (isValid && !isParallel) {
-    Eigen::Vector3d res = v4Xhomog.head<3>() / v4Xhomog[3];
-    triangulate_refine_GN(obsDirections, T_CWs, res, 5);
-    v4Xhomog[3] = 1;
-    v4Xhomog.head<3>() = res;
-    triangulateTimer.stop();
-    return true;
-  } else {
-    std::cout << " cannot triangulate pure rotation or infinity points "
-              << v4Xhomog.transpose() << std::endl;
-    triangulateTimer.stop();
-    return false;
-  }
+
+  triangulateTimer.stop();
+  return triangulated;
 }
 
 okvis::Time HybridFilter::firstStateTimestamp() {

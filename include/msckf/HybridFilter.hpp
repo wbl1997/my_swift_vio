@@ -669,7 +669,9 @@ public:
       const MapPoint &mp,
       const std::shared_ptr<cameras::CameraBase> cameraGeometry,
       std::vector<uint64_t> *frameIds,
-      std::vector<okvis::kinematics::Transformation> *T_WSs,
+      std::vector<okvis::kinematics::Transformation,
+                  Eigen::aligned_allocator<okvis::kinematics::Transformation>>
+          *T_WSs,
       std::vector<Eigen::Vector3d, Eigen::aligned_allocator<Eigen::Vector3d>>
           *obsDirections,
       std::vector<Eigen::Vector2d, Eigen::aligned_allocator<Eigen::Vector2d>>
@@ -683,14 +685,15 @@ public:
    * @param mp
    * @param obsInPixel
    * @param frameIds, id of frames observing this feature in the ascending order
-   * because the MapPoint.observations is an ordinary ordered map
-   * @param v4Xhomog, stores either [X,Y,Z,1] in the global frame
+   *    because the MapPoint.observations is an ordinary ordered map
+   * @param v4Xhomog, stores [X,Y,Z,1] in the global frame or the anchor frame
+   *    depending on anchorSeqId
    * @param vR_oi, the diagonal elements of the observation noise matrix, in
-   * pixels, size 2Nx1
+   *    pixels, size 2Nx1
    * @param cameraGeometry, used for point projection
    * @param T_SC0
    * @param anchorSeqId index of the anchor frame in the ordered observation map
-   *     -1 by default meaning that AIDP is not used
+   *    -1 by default meaning that AIDP is not used
    * @return true if triangulation successful
    */
   bool triangulateAMapPoint(
