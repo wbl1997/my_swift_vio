@@ -93,6 +93,21 @@ class MSCKF2 : public HybridFilter {
   virtual void optimize(size_t numIter, size_t numThreads = 1,
                         bool verbose = false) final;
 
+  bool measurementJacobianAIDP(
+      const Eigen::Vector4d& ab1rho,
+      const std::shared_ptr<okvis::cameras::CameraBase> tempCameraGeometry,
+      const Eigen::Vector2d& obs, uint64_t poseId, int camIdx,
+      uint64_t anchorId, const okvis::kinematics::Transformation& T_WBa,
+      Eigen::Matrix<double, 2, Eigen::Dynamic>* H_x,
+      Eigen::Matrix<double, 2, 3>* J_pfi, Eigen::Vector2d* residual) const;
+
+  bool measurementJacobian(
+      const Eigen::Vector4d& v4Xhomog,
+      const std::shared_ptr<okvis::cameras::CameraBase> tempCameraGeometry,
+      const Eigen::Vector2d& obs, uint64_t poseId, int camIdx,
+      Eigen::Matrix<double, 2, Eigen::Dynamic>* J_Xc,
+      Eigen::Matrix<double, 2, 9>* J_XBj, Eigen::Matrix<double, 2, 3>* J_pfi,
+      Eigen::Vector2d* residual) const;
  protected:
   // set intermediate variables which are used for computing Jacobians of
   // feature point observations
@@ -105,7 +120,7 @@ class MSCKF2 : public HybridFilter {
   uint64_t getMinValidStateID() const;
 
   /**
-   * @brief computeHoi, compute the marginalized Jacobian for a feature i's
+   * @brief compute the marginalized Jacobian for a feature i's
    * track assume the number of observations of the map points is at least two
    * @param hpbid homogeneous point parameter block id of the map point
    * @param mp mappoint
@@ -114,15 +129,32 @@ class MSCKF2 : public HybridFilter {
    * camera intrinsics, camera poses (13+9(m-1))
    * @param R_oi covariance matrix of these observations
    * r_oi H_oi and R_oi are values after marginalizing H_fi
+   * @param involved_frame_ids if not null, all the included frames must observe mp
    * @return true if succeeded in computing the residual and Jacobians
    */
-  bool computeHoi(const uint64_t hpbid, const MapPoint& mp,
+  bool featureJacobian(const MapPoint& mp,
+                  Eigen::MatrixXd& H_oi,
                   Eigen::Matrix<double, Eigen::Dynamic, 1>& r_oi,
-                  Eigen::MatrixXd& H_oi, Eigen::MatrixXd& R_oi) const;
+                  Eigen::MatrixXd& R_oi,
+                  const std::vector<uint64_t>* involved_frame_ids=nullptr) const;
 
   int computeStackedJacobianAndResidual(
       Eigen::MatrixXd* T_H, Eigen::Matrix<double, Eigen::Dynamic, 1>* r_q,
       Eigen::MatrixXd* R_q) const;
+
+  void findRedundantCamStates(
+      std::vector<uint64_t>* rm_cam_state_ids);
+
+  // param: max number of cloned frame vector states
+  // return number of marginalized frames
+  int marginalizeRedundantFrames(size_t maxClonedStates);
+
+
+  // minimum number of culled frames in each prune frame state
+  // step if cloned states size hit maxClonedStates_
+  // should be at least 3 for the monocular case,
+  // see Sun 2017 Robust stereo appendix D
+  static const int minCulledFrames_ = 3;
 };
 
 }  // namespace okvis

@@ -40,7 +40,7 @@
 #include <feature_tracker/TrailManager.h>
 
 DECLARE_bool(use_mahalanobis);
-DECLARE_bool(estimator_algorithm);
+DECLARE_int32(estimator_algorithm);
 
 // Get a subset of the recorded IMU measurements from source imuMeasurements_.
 okvis::ImuMeasurementDeque getImuMeasurments(

@@ -16,11 +16,6 @@
 #include <okvis/ceres/CameraTimeParamBlock.hpp>
 #include <okvis/ceres/ShapeMatrixParamBlock.hpp>
 
-DEFINE_bool(
-    use_mahalanobis, true,
-    "use malalanobis gating test in optimize or a simple projection distance"
-    " threshold in computing jacobians. true by default");
-
 DEFINE_int32(
     estimator_algorithm, 1,
     "0 for okvis optimization, 1 for msckf, 2 for hybrid filter");
@@ -793,6 +788,11 @@ void HybridVio::optimizationLoop() {
           estimator_->firstStateTimestamp() - temporal_imu_data_overlap;
 
       marginalizationTimer.start();
+      estimator_->setKeyframeRedundancyThresholds(
+          parameters_.optimization.translationThreshold,
+          parameters_.optimization.rotationThreshold,
+          parameters_.optimization.trackingRateThreshold,
+          parameters_.optimization.minTrackLength);
       estimator_->applyMarginalizationStrategy(
           parameters_.optimization.numKeyframes,
           parameters_.optimization.numImuFrames, result.transferredLandmarks);

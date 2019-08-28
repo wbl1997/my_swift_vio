@@ -172,7 +172,7 @@ msckf_ws/devel/lib/msckf/msckf_node $HOME/docker_documents/msckf_ws/src/msckf/co
   --start_index=18800 \
   --finish_index=28900 \
   --max_inc_tol=10.0 \
-  --dump_output_option=0 \ 
+  --dump_output_option=0 \
   --feature_tracking_method=0 \
   --backend_solver=1
 
