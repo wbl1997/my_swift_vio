@@ -99,11 +99,11 @@ void HybridVio::init() {
 
   // s.t. last_timestamp_ - overlap >= 0 (since okvis::time(-0.02)
   // returns big number)
-  lastOptimizedStateTimestamp_ = okvis::Time(0.0) + temporal_imu_data_overlap;
-
+  lastOptimizedStateTimestamp_ = okvis::Time(0.0) + HybridFilter::half_window_;
+  lastOptimizedTimeDelay_ = okvis::Duration(parameters_.imu.td0);
   // s.t. last_timestamp_ - overlap >= 0 (since okvis::time(-0.02)
   // returns big number)
-  lastAddedStateTimestamp_ = okvis::Time(0.0) + temporal_imu_data_overlap;
+  lastAddedStateTimestamp_ = okvis::Time(0.0) + HybridFilter::half_window_;
 
   estimator_->addImu(parameters_.imu);
   for (size_t i = 0; i < numCameras_; ++i) {
@@ -369,6 +369,7 @@ void HybridVio::frameConsumerLoop(size_t cameraIndex) {
     okvis::kinematics::Transformation T_WS;
     okvis::Time lastTimestamp;
     okvis::SpeedAndBiases speedAndBiases;
+    okvis::Duration lastTimeDelay;
     // copy last state variables
     {
       waitForStateVariablesMutexTimer.start();
@@ -377,12 +378,13 @@ void HybridVio::frameConsumerLoop(size_t cameraIndex) {
       T_WS = lastOptimized_T_WS_;
       speedAndBiases = lastOptimizedSpeedAndBiases_;
       lastTimestamp = lastOptimizedStateTimestamp_;
+      lastTimeDelay = lastOptimizedTimeDelay_;
     }
 
     // -- get relevant imu messages for new state
     okvis::Time imuDataEndTime =
         multiFrame->timestamp() + temporal_imu_data_overlap;
-    okvis::Time imuDataBeginTime = lastTimestamp - temporal_imu_data_overlap;
+    okvis::Time imuDataBeginTime = lastTimestamp - HybridFilter::half_window_;
 
     OKVIS_ASSERT_TRUE_DBG(Exception, imuDataBeginTime < imuDataEndTime,
                           "imu data end time is smaller than begin time.");
@@ -428,8 +430,7 @@ void HybridVio::frameConsumerLoop(size_t cameraIndex) {
         lastOptimizedSpeedAndBiases_.segment<3>(3) = imu_params_.g0;
         lastOptimizedSpeedAndBiases_.segment<3>(6) = imu_params_.a0;
         lastOptimizedStateTimestamp_ = multiFrame->timestamp();
-        //        printf("lastOptimizedStateTimestamp_ set to %ld "
-        //               "for the first time\n", lastOptimizedStateTimestamp_);
+        lastOptimizedTimeDelay_ = okvis::Duration(parameters_.imu.td0);
       }
       OKVIS_ASSERT_TRUE_DBG(
           Exception, success,
@@ -442,8 +443,8 @@ void HybridVio::frameConsumerLoop(size_t cameraIndex) {
       // get old T_WS
       propagationTimer.start();
       okvis::ceres::ImuError::propagation(imuData, parameters_.imu, T_WS,
-                                          speedAndBiases, lastTimestamp,
-                                          multiFrame->timestamp());
+                                          speedAndBiases, lastTimestamp + lastTimeDelay,
+                                          multiFrame->timestamp() + lastTimeDelay);
       propagationTimer.stop();
     }
     okvis::kinematics::Transformation T_WC =
@@ -504,16 +505,12 @@ void HybridVio::matchingLoop() {
     // -- get relevant imu messages for new state
     okvis::Time imuDataEndTime = frame->timestamp() + temporal_imu_data_overlap;
     okvis::Time imuDataBeginTime =
-        lastAddedStateTimestamp_ - temporal_imu_data_overlap;
+        lastAddedStateTimestamp_ - HybridFilter::half_window_;
     if (imuDataBeginTime.toSec() == 0.0) {  // first state not yet added
-      imuDataBeginTime = frame->timestamp() - temporal_imu_data_overlap;
+      imuDataBeginTime = frame->timestamp() - HybridFilter::half_window_;
     }
-    // at maximum Duration(.) sec of data is allowed, 1sec is
-    // a conservative number
+    // at maximum Duration(.) sec of data is allowed
     if (imuDataEndTime - imuDataBeginTime > Duration(8)) {
-      std::cout << imuDataEndTime << " " << imuDataBeginTime << " "
-                << frame->timestamp() << " " << temporal_imu_data_overlap << " "
-                << lastAddedStateTimestamp_ << std::endl;
       LOG(WARNING) << "Warn: Too long interval between two frames "
                    << lastAddedStateTimestamp_.toSec() << " and "
                    << frame->timestamp().toSec();
@@ -814,6 +811,7 @@ void HybridVio::optimizationLoop() {
         estimator_->get_T_WS(frame_pairs->id(), lastOptimized_T_WS_);
         estimator_->getSpeedAndBias(frame_pairs->id(), 0,
                                    lastOptimizedSpeedAndBiases_);
+        estimator_->getTimeDelay(frame_pairs->id(), 0, &lastOptimizedTimeDelay_);
         lastOptimizedStateTimestamp_ = frame_pairs->timestamp();
 
         int frameIdInSource = -1;

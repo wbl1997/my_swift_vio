@@ -276,6 +276,8 @@ class HybridFilter : public VioBackendInterface {
   bool getSpeedAndBias(uint64_t poseId, uint64_t imuIdx,
                        okvis::SpeedAndBiases &speedAndBias) const;
 
+  bool getTimeDelay(uint64_t poseId, int camIdx, okvis::Duration* td) const;
+
   /**
    * @brief Get camera states for a given pose ID.
    * @warning This accesses the optimization graph, so not very fast.

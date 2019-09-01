@@ -2515,6 +2515,17 @@ bool HybridFilter::getSpeedAndBias(uint64_t poseId, uint64_t imuIdx,
   return true;
 }
 
+bool HybridFilter::getTimeDelay(uint64_t poseId, int camIdx,
+                                okvis::Duration* td) const {
+  double tdd;
+  if (!getSensorStateEstimateAs<ceres::CameraTimeParamBlock>(
+          poseId, camIdx, SensorStates::Camera, CameraSensorStates::TD, tdd)) {
+    return false;
+  }
+  *td = okvis::Duration(tdd);
+  return true;
+}
+
 // Get camera states for a given pose ID.
 bool HybridFilter::getCameraSensorStates(
     uint64_t poseId, size_t cameraIdx,

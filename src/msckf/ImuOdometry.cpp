@@ -32,8 +32,9 @@ int IMUOdometry::propagation(
 
   // sanity check:
   if (imuMeasurements.front().timeStamp > time) {
-    LOG(WARNING) << "IMU front meas timestamp is greater than start integration time "
-              << imuMeasurements.front().timeStamp << " " << time << std::endl;
+    LOG(WARNING)
+        << "IMU front meas timestamp is greater than start integration time "
+        << imuMeasurements.front().timeStamp << " " << time;
     okvis::Time nowTime = time;
   }
 
@@ -541,7 +542,11 @@ int IMUOdometry::propagation_original(
 
   // sanity check:
 
-  assert(imuMeasurements.front().timeStamp <= time);
+  if (imuMeasurements.front().timeStamp > time) {
+    LOG(WARNING)
+        << "IMU front meas timestamp is greater than start integration time "
+        << imuMeasurements.front().timeStamp << " " << time;
+  }
   if (!(imuMeasurements.back().timeStamp >= t_end))
     return -1;  // nothing to do...
 
@@ -947,7 +952,11 @@ int IMUOdometry::propagationBackward(
   okvis::Time time = t_start;
 
   // sanity check:
-  assert(imuMeasurements.front().timeStamp <= t_end);
+  if (imuMeasurements.front().timeStamp > t_end) {
+    LOG(WARNING) << "IMU front meas timestamp is greater than end integration "
+                    "time in backward mode"
+                 << imuMeasurements.front().timeStamp << " " << t_end;
+  }
   if (!(imuMeasurements.back().timeStamp >= time))
     return -1;  // nothing to do...
 
@@ -1308,7 +1317,11 @@ int IMUOdometry::propagation_leutenegger_corrected(
   okvis::Time end = t_end;
 
   // sanity check:
-  assert(imuMeasurements.front().timeStamp <= time);
+  if (imuMeasurements.front().timeStamp > time) {
+    LOG(WARNING)
+        << "IMU front meas timestamp is greater than start integration time "
+        << imuMeasurements.front().timeStamp << " " << time;
+  }
   if (!(imuMeasurements.back().timeStamp >= end))
     return -1;  // nothing to do...
 
