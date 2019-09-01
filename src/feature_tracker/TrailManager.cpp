@@ -241,7 +241,7 @@ int TrailManager::advance2(
     const std::vector<Eigen::Vector3d,
                       Eigen::aligned_allocator<Eigen::Vector3d>>&
         mapPointPositions,
-    uint64_t mfIdB, const cv::Mat currentImage) {
+    uint64_t mfIdB) {
   int nGoodTrails = 0;
   int nTrackedFeatures = 0;
   // build a map of mappoint ids for accelerating searching
@@ -291,21 +291,6 @@ int TrailManager::advance2(
   assert(counter == mapPointIds.size());
   mFeatureTrailList.insert(mFeatureTrailList.end(), tempTrailers.begin(),
                            tempTrailers.end());
-
-  // added by huai for debug
-  //    cv::namedWindow( "Display window", cv::WINDOW_AUTOSIZE );
-  // CAUTION: do not draw on pyramid[0], ruining the data
-  //    cv::Mat image= currentImage.clone();
-  //    for (std::list<FeatureTrail>::const_iterator it =
-  //    mFeatureTrailList.begin();
-  //        it!=mFeatureTrailList.end();++it){
-  //        cv::line(image, it->fInitPose, it->fCurrPose, CV_RGB(0,0,0));
-  //        cv::circle( image, it->fCurrPose, 3, cv::Scalar(255,0,0), -1, 8);
-  //    }
-  //    //CVDRGB2OpenCVRGB(mimFrameRGB, image);
-  //    cv::imshow( "Display window", image );
-  //    cv::waitKey(30);
-
   myAccumulator(nTrackedFeatures);
   ++mFrameCounter;
   return nGoodTrails;

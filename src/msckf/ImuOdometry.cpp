@@ -32,7 +32,7 @@ int IMUOdometry::propagation(
 
   // sanity check:
   if (imuMeasurements.front().timeStamp > time) {
-    std::cout << "front timestamp and start integration time "
+    LOG(WARNING) << "IMU front meas timestamp is greater than start integration time "
               << imuMeasurements.front().timeStamp << " " << time << std::endl;
     okvis::Time nowTime = time;
   }

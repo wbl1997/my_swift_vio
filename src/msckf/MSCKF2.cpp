@@ -209,12 +209,10 @@ bool MSCKF2::addStates(okvis::MultiFramePtr multiFrame,
         F_tot.transpose();
 
     if (numUsedImuMeasurements < 2) {
-      std::cout << "numUsedImuMeasurements=" << numUsedImuMeasurements
+      LOG(WARNING) << "numUsedImuMeasurements=" << numUsedImuMeasurements
                 << " correctedStateTime " << correctedStateTime
                 << " lastFrameTimestamp " << startTime << " tdEstimate "
                 << tdEstimate << std::endl;
-      //            OKVIS_ASSERT_TRUE(Exception, numUsedImuMeasurements > 1,
-      //                              "propagation failed");
     }
   }
 
@@ -469,11 +467,9 @@ bool MSCKF2::addStates(okvis::MultiFramePtr multiFrame,
       double translationVariance = translationStdev * translationStdev;
 
       OKVIS_ASSERT_TRUE(Exception,
-                        translationVariance > 1.0e-16 &&
                             extrinsicsEstimationParametersVec_.at(i)
                                     .sigma_absolute_orientation < 1e-16,
-                        "sigma absolute translation should be positive and "
-                        "sigma absolute rotation should be 0");
+                        "sigma absolute rotation should be 0 for the Li's model without R_BC");
 
       covPBinC = Eigen::Matrix3d::Identity() *
                  translationVariance;  // note in covariance PBinC is different

@@ -1,20 +1,28 @@
-function plotMSCKF2Result()
+function plotMSCKF2Result(msckf_csv, export_fig_path, voicebox_path, output_dir, ...
+    cmp_data_file, gt_file, avg_since_start, avg_trim_end)
 close all;
-export_fig_path = input('path of export_fig:', 's');
+if ~exist('export_fig_path','var')
+    export_fig_path = input('path of export_fig:', 's');
+end
 if isempty(export_fig_path)
     export_fig_path = '/media/jhuai/Seagate/jhuai/export_fig/';
 end
-voicebox_path = input('path of voicebox:', 's');
+if ~exist('voicebox_path','var')
+    voicebox_path = input('path of voicebox:', 's');
+end
 if isempty(voicebox_path)
     voicebox_path = '/media/jhuai/Seagate/jhuai/doctoral_work/ekfmonoslam/voicebox';
 end
 addpath(export_fig_path);
+addpath(voicebox_path);
 
-filename = input('msckf2_csv:', 's');
+filename = msckf_csv;
 if isempty(filename)
     return
 end
-output_dir = input('output_dir, if empty, set to dir of the csv:', 's');
+if ~exist('output_dir','var')
+    output_dir = input('output_dir, if empty, set to dir of the csv:', 's');
+end
 if isempty(output_dir)
     [filepath, ~, ~] = fileparts(filename);
     output_dir = filepath;
@@ -33,11 +41,15 @@ disp('The nominal fxy cxy is set to ');
 disp(nominal_intrinsics);
 
 sec_to_nanos = 1e9;
-% eg., 'Seagate/temp/parkinglot/opt_states.txt';
-cmp_data_file = input('okvis_classic:', 's'); 
+if ~exist('cmp_data_file','var')
+    % eg., 'Seagate/temp/parkinglot/opt_states.txt';
+    cmp_data_file = input('okvis_classic:', 's'); 
+end
+if ~exist('gt_file','var')
+    % ground truth file must have the same number of rows as output data
+    gt_file = input('Ground truth csv:', 's');
+end
 
-% ground truth file must have the same number of rows as output data
-gt_file = input('Ground truth csv:', 's');
 if (gt_file)
     gt = csvread(gt_file);
     index= find(abs(gt(:,1) - startTime)<10000);
@@ -248,8 +260,18 @@ end
 export_fig(outputfig);
 
 intermediatePlotter(data, output_dir);
+if exist('avg_since_start','var')
+    if exist('avg_trim_end','var')
+        averageMsckf2VariableEstimates(original_data, ...
+            [output_dir, '/avg_estimates.txt'], avg_since_start, avg_trim_end);
+    else
+        averageMsckf2VariableEstimates(original_data, ...
+            [output_dir, '/avg_estimates.txt'], avg_since_start);
+    end
+else
+    averageMsckf2VariableEstimates(original_data, ...
+            [output_dir, '/avg_estimates.txt']);
+end
 
-averageMsckf2VariableEstimates(original_data, ...
-    [output_dir, '/avg_estimates.txt']);
 end
 

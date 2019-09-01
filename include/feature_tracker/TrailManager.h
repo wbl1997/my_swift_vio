@@ -55,7 +55,6 @@ class TrailManager {
    * @param keypoints
    * @param mapPointIds
    * @param mapPointPositions
-   * @param currentImage
    * @return
    */
   int advance2(const std::vector<cv::KeyPoint>& keypoints,
@@ -63,7 +62,7 @@ class TrailManager {
                const std::vector<Eigen::Vector3d,
                                  Eigen::aligned_allocator<Eigen::Vector3d>>&
                    mapPointPositions,
-               uint64_t mfIdB, const cv::Mat currentImage);
+               uint64_t mfIdB);
 
   /**
    * @brief updateEstimatorObservations2 works with external feature

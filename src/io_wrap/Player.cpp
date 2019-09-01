@@ -43,18 +43,18 @@ Player::Player(okvis::VioInterface *vioInterfacePtr,
 
 void Player::Run() {
   ros::Rate rate(vioParameters_.sensors_information.cameraRate);
-  std::cout << "camera frame rate "
-            << vioParameters_.sensors_information.cameraRate << std::endl;
+  LOG(INFO) << "camera frame rate "
+            << vioParameters_.sensors_information.cameraRate;
   // + advance to retrieve a little more imu data so as to avoid waiting
   // in processing frames which causes false warning of delayed frames.
   const double advance = 0.5;
   cv::Mat frame;
   double frameTime;
   int frameCounter(0);
+  int progressReportInterval = 300;  // in number of frames
   if (!mFG->is_open()) {
-    std::cout << "Frame grabber is not opened properly. "
-                 "Make sure its input files are OK"
-              << std::endl;
+    LOG(WARNING) << "Frame grabber is not opened properly. Make sure its input "
+                    "files are OK";
     return;
   }
   while (mFG->grabFrame(frame, frameTime) && frameTime > 0) {
@@ -66,8 +66,10 @@ void Player::Run() {
     }
     okvis::Time t(frameTime);
     t -= okvis::Duration(vioParameters_.sensors_information.imageDelay);
-    std::cout << "read in frame at " << std::setprecision(12) << t.toSec()
-              << " id " << mFG->getCurrentId() << std::endl;
+    if (frameCounter % progressReportInterval == 0) {
+      LOG(INFO) << "read in frame at " << std::setprecision(12) << t.toSec()
+                << " id " << mFG->getCurrentId();
+    }
     vioInterface_->addImage(t, 0, filtered, NULL, mFG->getCurrentId());
 
     // add corresponding imu data
@@ -91,9 +93,6 @@ void Player::Run() {
     imuObservations.pop_back();  // remove the first entry which was the last in
                                  // the previous observations
 
-    //        std::cout <<" start and finish timestamp "
-    //        <<std::setprecision(12)<< imuObservations.front()[0] <<" "<<
-    //        imuObservations.back()[0]<<std::endl;
     for (const Eigen::Matrix<double, 7, 1> &obs : imuObservations) {
       vioInterface_->addImuMeasurement(okvis::Time(obs[0]), obs.segment<3>(1),
                                        obs.segment<3>(4));
@@ -101,7 +100,7 @@ void Player::Run() {
     ++frameCounter;
     rate.sleep();
   }
-  std::cout << "frame grabber finishes " << std::endl;
+  LOG(INFO) << "frame grabber finishes.";
   mbFinished.store(true);
 }
 

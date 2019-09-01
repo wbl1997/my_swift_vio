@@ -78,7 +78,8 @@ HybridVio::HybridVio(okvis::VioParameters &parameters)
   estimator_->resetInitialPVandStd(
       InitialPVandStd(parameters.initialState),
       parameters.initialState.bUseExternalInitState);
-  msckf_vio::Feature::optimization_config.translation_threshold = -1.0;
+  msckf_vio::Feature::optimization_config.translation_threshold =
+      parameters.optimization.triangulationTranslationThreshold;
   setBlocking(false);
   init();
 }
@@ -943,12 +944,13 @@ void HybridVio::publisherLoop() {
 void HybridVio::saveStatistics(const std::string &filename) const {
   std::ofstream stream(filename, std::ios_base::app);
   if (!stream.is_open()) {
-    std::cout << "error in opening " << filename << std::endl;
+    LOG(WARNING) << "error in opening " << filename;
     return;
   }
   estimator_->printTrackLengthHistogram(stream);
   frontend_.printNumFeatureDistribution(stream);
-  if (stream.is_open()) stream.close();
+  if (stream.is_open())
+    stream.close();
 }
 
 }  // namespace okvis

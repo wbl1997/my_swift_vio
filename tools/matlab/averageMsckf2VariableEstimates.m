@@ -1,6 +1,7 @@
-function averageMsckf2VariableEstimates(msckf2_data, log_file)
+function averageMsckf2VariableEstimates(msckf2_data, log_file, ...
+    avg_since_start, avg_trim_end)
 % The msckf2 result has a format described in Msckf2Constants.m
-if nargin < 2
+if ~exist('log_file','var')
     fileID = 1;
 else
     fileID = fopen(log_file, 'w');    
@@ -9,10 +10,14 @@ startTime = msckf2_data(1, 1);
 endTime = msckf2_data(end, 1);
 sec_to_nanos = 1e9;
 sticky_time_range = 1e9; % nanosec
-avg_since_start = input(['To compute average of estimated parameters,', ...
-    ' specify num of secs since start:']);
-avg_trim_end = input(['To compute average of estimated parameters,', ...
-    ' specify num of secs to trim from the end:']);
+if ~exist('avg_since_start','var')
+    avg_since_start = input(['To compute average of estimated parameters,', ...
+        ' specify num of secs since start:']);
+end
+if ~exist('avg_trim_end','var')
+    avg_trim_end = input(['To compute average of estimated parameters,', ...
+        ' specify num of secs to trim from the end:']);
+end
 
 endIndex = find(abs(endTime - avg_trim_end*sec_to_nanos - msckf2_data(:,1)) <...
     sticky_time_range, 1);

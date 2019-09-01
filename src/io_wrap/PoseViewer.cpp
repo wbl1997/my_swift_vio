@@ -100,7 +100,6 @@ void PoseViewer::drawPath() {
     }
     double rel_height = (_heights[i] - _min_z + _heights[i + 1] - _min_z) *
                         0.5 / (_max_z - _min_z);
-    rel_height = 1.0;  // huai hack
     cv::line(_image, p0, p1,
              rel_height * cv::Scalar(255, 0, 0) +
                  (1.0 - rel_height) * cv::Scalar(0, 0, 255),

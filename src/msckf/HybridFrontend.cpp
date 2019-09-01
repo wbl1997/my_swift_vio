@@ -560,8 +560,7 @@ int HybridFrontend::matchToLastFrame(
     for (size_t im = 0; im < params.nCameraSystem.numCameras(); ++im) {
       // match 2D-2D for initialization of new (mono-)correspondences
       matches2d2d = trailManager_.advance2(
-          keypoints, mapPointIds, mapPointPositions, currentFrameId,
-          currentImage);  // update feature tracks
+          keypoints, mapPointIds, mapPointPositions, currentFrameId);  // update feature tracks
       retCtr += matches2d2d;
 
       frameB->resetKeypoints(im, keypoints);

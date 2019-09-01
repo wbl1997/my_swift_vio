@@ -163,6 +163,7 @@ TEST(MSCKF2, MeasurementJacobian) {
   bool result = estimator.measurementJacobianAIDP(
       ab1rho, tempCameraGeometry, obs, poseId, camIdx, anchorId, T_WBa, &H_x,
       &J_pfi, &residual);
+  EXPECT_TRUE(result);
   std::cout << "H_x\n" << H_x << std::endl;
   std::cout << "J_pfi\n" << J_pfi << std::endl;
   std::cout << "residual\n" << residual << std::endl;
