@@ -203,6 +203,16 @@ In this case, the program will exit once the Ctrl+C is entered in the terminal t
 Use the rviz.rviz configuration in the okvis_ros/config/ directory to get the pose / 
 landmark display.
 
+### TUM VI dataset
+
+```
+$HOME/docker_documents/msckf_ws/src/msckf/config/config_tum_vi_50_20_msckf.yaml \
+ --output_dir=$HOME/Seagate/data/TUM-VI/postprocessed/ \
+ --use_AIDP=true --max_inc_tol=10.0 --dump_output_option=0 \
+ --feature_tracking_method=0 --backend_solver=1 --load_input_option=0
+
+```
+
 ## Outputs and frames
 
 In terms of coordinate frames and notation, 
