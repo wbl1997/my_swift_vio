@@ -1,5 +1,8 @@
 #include "feature_tracker/TrailManager.h"
 #include <okvis/IdProvider.hpp>
+#include <okvis/cameras/PinholeCamera.hpp>
+#include <okvis/cameras/RadialTangentialDistortion.hpp>
+
 namespace feature_tracker {
 
 TrailManager::TrailManager(const std::string& orbTrackOutput)

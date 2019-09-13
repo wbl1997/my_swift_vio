@@ -3,6 +3,9 @@
 
 #include <msckf/MSCKF2.hpp>
 #include <okvis/IdProvider.hpp>
+#include <okvis/cameras/PinholeCamera.hpp>
+#include <okvis/cameras/FovDistortion.hpp>
+#include <okvis/cameras/RadialTangentialDistortion.hpp>
 
 std::shared_ptr<okvis::MultiFrame> createMultiFrame(
     okvis::Time timestamp,
@@ -35,7 +38,7 @@ okvis::ImuMeasurementDeque createImuMeasurements(okvis::Time t0) {
   return imuMeasurements;
 }
 
-TEST(MSCKF2, MeasurementJacobian) {
+void computeFeatureMeasJacobian(okvis::cameras::NCameraSystem::DistortionType distortionId) {
   double trNoisy = 0.033;
   std::shared_ptr<okvis::ceres::Map> mapPtr(new okvis::ceres::Map);
   okvis::MSCKF2 estimator(mapPtr, trNoisy);
@@ -43,12 +46,18 @@ TEST(MSCKF2, MeasurementJacobian) {
   okvis::Time t0(5, 0);
   okvis::ImuMeasurementDeque imuMeasurements = createImuMeasurements(t0);
 
-  std::shared_ptr<okvis::cameras::CameraBase> tempCameraGeometry(
-      new okvis::cameras::PinholeCamera<
-          okvis::cameras::RadialTangentialDistortion>(
-          752, 480, 350, 360, 378, 238,
-          okvis::cameras::RadialTangentialDistortion(0.00, 0.00, 0.000,
-                                                     0.000)));
+  std::shared_ptr<okvis::cameras::CameraBase> tempCameraGeometry;
+  if (distortionId == okvis::cameras::NCameraSystem::DistortionType::FOV) {
+    tempCameraGeometry.reset(
+        new okvis::cameras::PinholeCamera<okvis::cameras::FovDistortion>(
+            752, 480, 350, 360, 378, 238, okvis::cameras::FovDistortion(0.9)));
+  } else if (distortionId ==
+             okvis::cameras::NCameraSystem::DistortionType::RadialTangential) {
+    tempCameraGeometry.reset(new okvis::cameras::PinholeCamera<
+                             okvis::cameras::RadialTangentialDistortion>(
+        752, 480, 350, 360, 378, 238,
+        okvis::cameras::RadialTangentialDistortion(0.10, 0.00, 0.000, 0.000)));
+  }
 
   std::shared_ptr<okvis::cameras::NCameraSystem> cameraSystem(
       new okvis::cameras::NCameraSystem);
@@ -56,9 +65,9 @@ TEST(MSCKF2, MeasurementJacobian) {
   matT_SC0 << 1, 0, 0, 0, 0, 0, 1, 0, 0, -1, 0, 0, 0, 0, 0, 1;
   std::shared_ptr<const okvis::kinematics::Transformation> T_SC_0(
       new okvis::kinematics::Transformation(matT_SC0));
+
   cameraSystem->addCamera(
-      T_SC_0, tempCameraGeometry,
-      okvis::cameras::NCameraSystem::DistortionType::RadialTangential);
+      T_SC_0, tempCameraGeometry, distortionId, "FXY_CXY", "P_CS");
 
   // add sensors
   // some parameters on how to do the online estimation:
@@ -116,7 +125,6 @@ TEST(MSCKF2, MeasurementJacobian) {
   R_WS << 1, 0, 0, 0, 1, 0, 0, 0, 1;
   Eigen::Quaterniond q_WS = Eigen::Quaterniond(R_WS);
 
-
   okvis::InitialPVandStd pvstd;
   pvstd.p_WS = p_WS;
   pvstd.q_WS = Eigen::Quaterniond(q_WS);
@@ -142,7 +150,7 @@ TEST(MSCKF2, MeasurementJacobian) {
   }
   int stateMapSize = estimator.statesMap_.size();
   int featureVariableDimen = estimator.cameraParamsMinimalDimen() +
-                             estimator.clonedStateMinimalDimen() * (stateMapSize - 1);
+                             estimator.kClonedStateMinimalDimen * (stateMapSize - 1);
   Eigen::Matrix<double, 2, Eigen::Dynamic> H_x(2, featureVariableDimen);
   // $\frac{\partial [z_u, z_v]^T}{\partial [\alpha, \beta, \rho]}$
   Eigen::Matrix<double, 2, 3> J_pfi;
@@ -156,15 +164,24 @@ TEST(MSCKF2, MeasurementJacobian) {
   uint64_t poseId = estimator.statesMap_.begin()->first;
   const int camIdx = 0;
   uint64_t anchorId = estimator.statesMap_.rbegin()->first;
-  std::cout << "poseId " << poseId << " anchor " << anchorId << std::endl;
+  std::cout << "poseId " << poseId << " anchorId " << anchorId << std::endl;
   okvis::kinematics::Transformation T_WBa(Eigen::Vector3d(0, 0, 1),
                                           Eigen::Quaterniond(1, 0, 0, 0));
-
   bool result = estimator.measurementJacobianAIDP(
       ab1rho, tempCameraGeometry, obs, poseId, camIdx, anchorId, T_WBa, &H_x,
       &J_pfi, &residual);
-  EXPECT_TRUE(result);
   std::cout << "H_x\n" << H_x << std::endl;
   std::cout << "J_pfi\n" << J_pfi << std::endl;
   std::cout << "residual\n" << residual << std::endl;
+  EXPECT_TRUE(result);
+}
+
+
+TEST(MSCKF2, MeasurementJacobian) {
+    computeFeatureMeasJacobian(okvis::cameras::NCameraSystem::DistortionType::RadialTangential);
+    try {
+      computeFeatureMeasJacobian(okvis::cameras::NCameraSystem::DistortionType::FOV);
+    } catch (...) {
+      std::cout << "Error occurred!\n";
+    }
 }

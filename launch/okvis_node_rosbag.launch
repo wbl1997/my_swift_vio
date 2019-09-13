@@ -1,0 +1,28 @@
+<launch>
+  <arg name="bag_file" default="MH_03_medium.bag"/>
+  <arg name="image_topic" default="/cam0/image_raw"/>
+  <arg name="imu_topic" default="/imu0"/>
+  <arg name="dump_output_option" default="3"/>
+  <arg name="load_input_option" default="0"/>
+  <arg name="output_dir" default=""/>
+  <arg name="config_filename" default="$(find msckf)/config/config_fpga_p2_euroc.yaml" />
+  <arg name="start_into_bag" default="0"/>
+  <node name="okvis_node" pkg="msckf" type="okvis_node" output="screen" 
+      args="$(arg config_filename) --dump_output_option=$(arg dump_output_option) 
+      --load_input_option=$(arg load_input_option)
+      --output_dir=$(arg output_dir) --use_AIDP=true
+      --feature_tracking_method=0 --backend_solver=1
+      --max_inc_tol=10.0">
+    
+    <remap from="/camera1" to="/cam1/image_raw" />
+    <remap from="/calibration0" to="/cam0/calibration" />
+    <remap from="/calibration1" to="/cam1/calibration" />
+  </node>
+
+  <node pkg="rviz" type="rviz" name="rviz" args="-d $(find msckf)/config/rviz.rviz" output="log">
+  </node>
+
+  <node pkg="rosbag" type="play" name="player" args="-s $(arg start_into_bag) $(arg bag_file) 
+     $(arg image_topic):=/camera0 $(arg imu_topic):=/imu" output="log" required="true">
+  </node>
+</launch>

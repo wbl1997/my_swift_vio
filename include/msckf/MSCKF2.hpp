@@ -22,10 +22,6 @@
 #include <okvis/ceres/ReprojectionError.hpp>
 #include <okvis/ceres/SpeedAndBiasParameterBlock.hpp>
 
-//#include <okvis/ceres/ImuError.hpp>
-#include <okvis/cameras/PinholeCamera.hpp>
-#include <okvis/cameras/RadialTangentialDistortion.hpp>
-
 #include <okvis/timing/Timer.hpp>
 #include "msckf/InitialPVandStd.hpp"
 #include "vio/CsvReader.h"
@@ -108,13 +104,6 @@ class MSCKF2 : public HybridFilter {
       Eigen::Matrix<double, 2, Eigen::Dynamic>* J_Xc,
       Eigen::Matrix<double, 2, 9>* J_XBj, Eigen::Matrix<double, 2, 3>* J_pfi,
       Eigen::Vector2d* residual) const;
- protected:
-  // set intermediate variables which are used for computing Jacobians of
-  // feature point observations
-  virtual void retrieveEstimatesOfConstants() final;
-
-  virtual void updateStates(
-      const Eigen::Matrix<double, Eigen::Dynamic, 1>& deltaX) final;
 
  private:
   uint64_t getMinValidStateID() const;

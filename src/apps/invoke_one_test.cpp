@@ -11,6 +11,7 @@ int main(int argc, char **argv) {
     return 0;
   }
   FLAGS_use_AIDP = true;
+  FLAGS_estimator_algorithm = 1;
   testHybridFilterSinusoid(argv[1], std::atoi(argv[2]));
 
   return 0;

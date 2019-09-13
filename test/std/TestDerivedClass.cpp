@@ -24,7 +24,7 @@ class Derived : public Base {
   std::vector<int> vals2;
 
  public:
-  Derived() : Base("derived", {6, 7, 8, 9}), vals2{10, 11, 12, 13, 14} {}
+  Derived() : Base("derived", {0, 6, 7, 8, 9}), vals2{10, 11, 12, 13, 14} {}
   int valAt(int index) const { return vals[index + 1]; }
   int valAt2(int index) const { return vals2[index]; }
   void setValAt(int index, int val) { vals[index + 1] = val; }
@@ -65,11 +65,12 @@ TEST(StandardC, DerivedClass) {
   EXPECT_EQ(b.valAt(4), 5);
 
   foo.get(d);
-  foo.set(d);
+  foo.set(d); // will use the base::set
   d.print();
   EXPECT_EQ(d.valAt(0), 6);
+  EXPECT_EQ(d.valAt(1), 100);
   EXPECT_EQ(d.valAt(2), 8);
-  EXPECT_EQ(d.valAt(3), 100);
+  EXPECT_EQ(d.valAt(3), 9);
   EXPECT_EQ(d.valAt2(0), 10);
   EXPECT_EQ(d.valAt2(4), 14);
 }

@@ -8,9 +8,11 @@ The Hybrid filter referring to a hybrid of MSCKF and EKF-SLAM is not yet fully i
 
 This is the Jianzhu Huai's implementation of the [1] and [2] with detailed derivation in [3]. It is developed based on the OKVIS library.
 
-[1] Li, M., Yu, H., Zheng, X., & Mourikis, A. I. (2014, May). High-fidelity sensor modeling and self-calibration in vision-aided inertial navigation. In 2014 IEEE International Conference on Robotics and Automation (ICRA) (pp. 409-416). IEEE.
+[1] Li, M., Yu, H., Zheng, X., & Mourikis, A. I. (2014, May). High-fidelity sensor modeling and self-calibration in vision-aided inertial navigation.
+In 2014 IEEE International Conference on Robotics and Automation (ICRA) (pp. 409-416). IEEE.
 
-[2] Li, M., & Mourikis, A. I. (2013, July). Optimization-based estimator design for vision-aided inertial navigation. In Proc. of the Robotics: Science and Systems Conference (pp. 241-248).
+[2] Li, M., & Mourikis, A. I. (2013, July). Optimization-based estimator design for vision-aided inertial navigation.
+In Proc. of the Robotics: Science and Systems Conference (pp. 241-248).
 
 [3] Michael Andrew Shelley. Monocular Visual Inertial Odometry on a Mobile Device. Master thesis, Technical University of Munich, 2014.
 
@@ -57,7 +59,8 @@ git clone https://github.com/JzHuai0108/vio_common.git
 
 ## Building the project
 
-If you have installed okvis_ros in the catkin workspace, then you may need to disable that package by renaming its package.xml file in order to avoid confusing catkin.
+If you have installed okvis_ros in the catkin workspace, then you may need to disable that package 
+by renaming its package.xml file in order to avoid confusing catkin.
 
 From the catkin workspace root, type 
 ```
@@ -165,18 +168,12 @@ Example running cases
 
 ### Reading measurements from a video and an IMU csv file
 ```
-msckf_ws/devel/lib/msckf/msckf_node $HOME/docker_documents/msckf_ws/src/msckf/config/config_parkinglot_jisun_s6.yaml \
-  --output_dir=/media/$USER/Seagate/temp/parkinglot/ --use_AIDP=true \
-  --video_file="/media/$USER/Seagate/data/west_campus_parking_lot/Jisun/20151111_120342.mp4" \
-  --imu_file="/media/$USER/Seagate/data/west_campus_parking_lot/Jisun/mystream_11_11_12_3_13.csv" \
-  --start_index=18800 \
-  --finish_index=28900 \
-  --max_inc_tol=10.0 \
-  --dump_output_option=0 \
-  --feature_tracking_method=0 \
-  --backend_solver=1
-
-# 16500, 22500
+msckf_ws/devel/lib/msckf/msckf_node $HOME/docker_documents/msckf_ws/src/msckf/config/config_parkinglot_jisun_s6.yaml 
+ --output_dir=/media/$USER/Seagate/temp/parkinglot/ 
+ --video_file="/media/$USER/Seagate/data/spin-lab/west_campus_parking_lot/Jisun/20151111_120342.mp4" 
+ --imu_file="/media/$USER/Seagate/data/spin-lab/west_campus_parking_lot/Jisun/mystream_11_11_12_3_13.csv" 
+ --use_AIDP=true  --start_index=18800 --finish_index=28900 --max_inc_tol=10.0 
+ --dump_output_option=0 --feature_tracking_method=0 --backend_solver=1
 ```
 The running program will exit once the sequence finishes.
 
@@ -191,14 +188,17 @@ The running program will exit once the sequence finishes.
 2. Run the node
 
 ```
-rosrun msckf okvis_node $HOME/docker_documents/msckf_ws/src/msckf/config/config_fpga_p2_euroc_dissertation.yaml --dump_output_option=0 --load_input_option=0 \
-  --output_dir=$HOME/Desktop/temp  --use_AIDP=true
+rosrun msckf okvis_node $HOME/docker_documents/msckf_ws/src/msckf/config/config_fpga_p2_euroc_dissertation.yaml 
+ --dump_output_option=0 --load_input_option=0 --output_dir=$HOME/Desktop/temp  
+ --use_AIDP=true --feature_tracking_method=0 --backend_solver=1
+
 # use start to skip the static segment
 rosbag play --pause --start=45.0 --rate=1.0 /media/$USER/Seagate/data/euroc/MH_01_easy.bag /cam0/image_raw:=/camera0 /imu0:=/imu
 
 rosrun rviz rviz -d $HOME/docker_documents/msckf_ws/src/msckf/config/rviz.rviz
 ```
-In this case, the program will exit once the Ctrl+C is entered in the terminal that runs the msckf_node. Note the program will not exit if Ctrl+C is entered in the terminal of roscore.
+In this case, the program will exit once the Ctrl+C is entered in the terminal that runs the msckf_node.
+Note the program will not exit if Ctrl+C is entered in the terminal of roscore.
 
 Use the rviz.rviz configuration in the okvis_ros/config/ directory to get the pose / 
 landmark display.

@@ -70,21 +70,6 @@ bool HybridFilter::getSensorStateEstimateAs(
         uint64_t poseId, int sensorIdx, int sensorType, int stateType,
         typename PARAMETER_BLOCK_T::estimate_t & state) const
 {
-    PARAMETER_BLOCK_T stateParameterBlock;
-    if (!getSensorStateParameterBlockAs(poseId, sensorIdx, sensorType, stateType,
-                                        stateParameterBlock)) {
-        return false;
-    }
-    state = stateParameterBlock.estimate();
-    return true;
-}
-
-
-template<class PARAMETER_BLOCK_T>
-bool HybridFilter::getSensorStateParameterBlockAs(
-        uint64_t poseId, int sensorIdx, int sensorType, int stateType,
-        PARAMETER_BLOCK_T & stateParameterBlock) const
-{
     // convert base class pointer with various levels of checking
     std::shared_ptr<ceres::ParameterBlock> parameterBlockPtr;
     if (!getSensorStateParameterBlockPtr(poseId, sensorIdx, sensorType, stateType,
@@ -101,14 +86,13 @@ bool HybridFilter::getSensorStateParameterBlockAs(
                         <<parameterBlockPtr->typeInfo())
                 return false;
     }
-    stateParameterBlock = *derivedParameterBlockPtr;
+    state = derivedParameterBlockPtr->estimate();
 #else
-    stateParameterBlock = *std::static_pointer_cast<PARAMETER_BLOCK_T>(
-                parameterBlockPtr);
+    state = std::static_pointer_cast<PARAMETER_BLOCK_T>(
+                parameterBlockPtr)->estimate();
 #endif
     return true;
 }
-
 
 template<class PARAMETER_BLOCK_T>
 bool HybridFilter::setGlobalStateEstimateAs(

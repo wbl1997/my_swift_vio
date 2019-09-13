@@ -138,8 +138,8 @@ title('$\mathbf{b}_a$', 'Interpreter', 'Latex');
 ylabel('m/sec^2', 'FontSize', 18);
 set(gca,'FontSize',18);
 saveas(gcf,[outputPath, '\Error ba'],'epsc');
-
-intermediatePlotter(data);
+msckf_index_server = Msckf2Constants(27, 3, 4, 4);
+intermediatePlotter(data, msckf_index_server);
 
 figNumber = figNumber + 5;
 figure(figNumber);

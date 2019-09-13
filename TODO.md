@@ -99,5 +99,14 @@ are exposed to user settings, employed by the Algorithm to manage sensor models
 Functional class level: the actual IMU/Camera model, IMU bias model, IMU bias + TgTsTa model, IMU bias + Tg Ts SM model, Camera projection + distortion model
 are exposed to user by documentation
 
-use model id and parameter vector and noise vector to indicate the sensor model, a sensor model may encode relations like fx = fy. Need to synthesize the patterns to organize related parameters, eg, use a model to interface with the camera intrinsics and camera-IMU extrinsics, and another to deal with the IMU intrinsics. Refer to colmap for an implementation example where template are used to handle different camera models.
+Use a underlying trajectory parameterization to serve poses, and underlying variable parameterization to serve values, sort of like Kalibr
+Create factors with Jacobians that can be used for either filtering or optimization
+
+35. A mysterious issue
+I0911 23:19:01.549983   955 HybridFrontend.cpp:128] Initialized!
+QObject::~QObject: Timers cannot be stopped from another thread
+terminate called after throwing an instance of 'boost::exception_detail::clone_impl<boost::exception_detail::error_info_injector<boost::lock_error> >'
+  what():  boost: mutex lock failed in pthread_mutex_lock: Invalid argument
+
+The root cause for this issue has nothing to do with the report. It is caused by a seemingly innocuous exit(1) in the codebase.
 

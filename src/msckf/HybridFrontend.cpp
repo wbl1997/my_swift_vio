@@ -20,6 +20,7 @@
 // cameras and distortions
 #include <okvis/cameras/EquidistantDistortion.hpp>
 #include <okvis/cameras/PinholeCamera.hpp>
+#include <okvis/cameras/FovDistortion.hpp>
 #include <okvis/cameras/RadialTangentialDistortion.hpp>
 #include <okvis/cameras/RadialTangentialDistortion8.hpp>
 
@@ -157,6 +158,13 @@ bool HybridFrontend::dataAssociationAndInitialization(
 
           break;
         }
+        case okvis::cameras::NCameraSystem::FOV: {
+          matchToLastFrame<
+              VioFrameMatchingAlgorithm<okvis::cameras::PinholeCamera<
+                  okvis::cameras::FovDistortion> > >(
+              estimator, params, framesInOut->id(), false);
+          break;
+        }
         default:
           OKVIS_THROW(Exception, "Unsupported distortion type.")
           break;
@@ -200,6 +208,12 @@ bool HybridFrontend::dataAssociationAndInitialization(
                 okvis::cameras::RadialTangentialDistortion8> > >(
             estimator, params, framesInOut->id(), false);
 
+        break;
+      }
+      case okvis::cameras::NCameraSystem::FOV: {
+        matchToLastFrame<VioFrameMatchingAlgorithm<
+            okvis::cameras::PinholeCamera<okvis::cameras::FovDistortion> > >(
+            estimator, params, framesInOut->id(), false);
         break;
       }
       default:
@@ -477,8 +491,7 @@ int HybridFrontend::matchToLastFrame(
 //    // already done
 //    return 0;
 //  }
-#define MATCH_3D2D
-#ifdef MATCH_3D2D
+
     for (size_t im = 0; im < params.nCameraSystem.numCameras(); ++im) {
       MATCHING_ALGORITHM matchingAlgorithm(
           estimator, MATCHING_ALGORITHM::Match3D2D, briskMatchingThreshold_,
@@ -494,7 +507,7 @@ int HybridFrontend::matchToLastFrame(
     inliers3d2d =
         runRansac3d2d(estimator, params.nCameraSystem,
                       estimator.multiFrame(currentFrameId), removeOutliers);
-#endif
+
 
     for (size_t im = 0; im < params.nCameraSystem.numCameras(); ++im) {
       MATCHING_ALGORITHM matchingAlgorithm(
@@ -867,30 +880,32 @@ int HybridFrontend::runRansac2d2d(
 // settings changed or at startup.
 void HybridFrontend::initialiseBriskFeatureDetectors() {
   for (auto it = featureDetectorMutexes_.begin();
-       it != featureDetectorMutexes_.end(); ++it) {
+      it != featureDetectorMutexes_.end(); ++it) {
     (*it)->lock();
   }
   featureDetectors_.clear();
   descriptorExtractors_.clear();
   for (size_t i = 0; i < numCameras_; ++i) {
-    featureDetectors_.push_back(std::shared_ptr<cv::FeatureDetector>(
+    featureDetectors_.push_back(
+        std::shared_ptr<cv::FeatureDetector>(
 #ifdef __ARM_NEON__
-        new cv::GridAdaptedFeatureDetector(
+            new cv::GridAdaptedFeatureDetector( 
             new cv::FastFeatureDetector(briskDetectionThreshold_),
-            briskDetectionMaximumKeypoints_, 7, 4)));
-    // from config file, except the 7x4...
+                briskDetectionMaximumKeypoints_, 7, 4 ))); // from config file, except the 7x4...
 #else
-        new brisk::ScaleSpaceFeatureDetector<brisk::HarrisScoreCalculator>(
-            briskDetectionThreshold_, briskDetectionOctaves_,
-            briskDetectionAbsoluteThreshold_,
-            briskDetectionMaximumKeypoints_)));
+            new brisk::ScaleSpaceFeatureDetector<brisk::HarrisScoreCalculator>(
+                briskDetectionThreshold_, briskDetectionOctaves_, 
+                briskDetectionAbsoluteThreshold_,
+                briskDetectionMaximumKeypoints_)));
 #endif
-    descriptorExtractors_.push_back(std::shared_ptr<cv::DescriptorExtractor>(
-        new brisk::BriskDescriptorExtractor(briskDescriptionRotationInvariance_,
-                                            briskDescriptionScaleInvariance_)));
+    descriptorExtractors_.push_back(
+        std::shared_ptr<cv::DescriptorExtractor>(
+            new brisk::BriskDescriptorExtractor(
+                briskDescriptionRotationInvariance_,
+                briskDescriptionScaleInvariance_)));
   }
   for (auto it = featureDetectorMutexes_.begin();
-       it != featureDetectorMutexes_.end(); ++it) {
+      it != featureDetectorMutexes_.end(); ++it) {
     (*it)->unlock();
   }
 }

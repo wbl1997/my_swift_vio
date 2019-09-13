@@ -5,6 +5,7 @@
 
 // cameras and distortions
 #include <okvis/cameras/EquidistantDistortion.hpp>
+#include <okvis/cameras/FovDistortion.hpp>
 #include <okvis/cameras/PinholeCamera.hpp>
 #include <okvis/cameras/RadialTangentialDistortion.hpp>
 #include <okvis/cameras/RadialTangentialDistortion8.hpp>
@@ -93,6 +94,17 @@ opengv::absolute_pose::HybridFrameNoncentralAbsoluteAdapter::
           fu = frame
                    ->geometryAs<okvis::cameras::PinholeCamera<
                        okvis::cameras::EquidistantDistortion> >(im)
+                   ->focalLengthU();
+          break;
+        }
+        case okvis::cameras::NCameraSystem::FOV: {
+          frame
+              ->geometryAs<okvis::cameras::PinholeCamera<
+                  okvis::cameras::FovDistortion> >(im)
+              ->backProject(keypoint, &bearing);
+          fu = frame
+                   ->geometryAs<okvis::cameras::PinholeCamera<
+                       okvis::cameras::FovDistortion> >(im)
                    ->focalLengthU();
           break;
         }

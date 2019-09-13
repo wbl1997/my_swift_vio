@@ -16,6 +16,7 @@
 #include <okvis/assert_macros.hpp>
 #include <okvis/ceres/HomogeneousPointParameterBlock.hpp>
 #include <okvis/ceres/ImuError.hpp>
+#include <okvis/ceres/CameraTimeParamBlock.hpp>
 #include <okvis/ceres/PoseError.hpp>
 #include <okvis/ceres/PoseParameterBlock.hpp>
 #include <okvis/ceres/RelativePoseError.hpp>
@@ -24,10 +25,7 @@
 #include <okvis/ceres/SpeedAndBiasParameterBlock.hpp>
 
 #include <vio/Sample.h>
-#include <okvis/ceres/CameraDistortionParamBlock.hpp>
-#include <okvis/ceres/CameraIntrinsicParamBlock.hpp>
-#include <okvis/ceres/CameraTimeParamBlock.hpp>
-#include <okvis/ceres/ShapeMatrixParamBlock.hpp>
+#include <okvis/ceres/EuclideanParamBlock.hpp>
 
 #include "msckf/ImuOdometry.h"
 #include "msckf/ImuSimulator.h"
@@ -406,8 +404,8 @@ void testHybridFilterCircle() {
     const int nDistortionCoeffDim =
         okvis::cameras::RadialTangentialDistortion::NumDistortionIntrinsics;
     Eigen::VectorXd distIntrinsic = intrinsics.tail<nDistortionCoeffDim>();
-    Eigen::Matrix<double, nDistortionCoeffDim, 1> cameraDistortion;
-    estimator->getSensorStateEstimateAs<okvis::ceres::CameraDistortionParamBlock>(
+    Eigen::Matrix<double, Eigen::Dynamic, 1> cameraDistortion;
+    estimator->getSensorStateEstimateAs<okvis::ceres::EuclideanParamBlock>(
             multiFrameIds.back(), 0, okvis::HybridFilter::SensorStates::Camera,
             okvis::HybridFilter::CameraSensorStates::Distortion,
             cameraDistortion);
@@ -591,8 +589,8 @@ void compute_errors(
   Eigen::VectorXd distIntrinsic_true =
       intrinsics_true.tail<nDistortionCoeffDim>();
 
-  Eigen::Matrix<double, 4, 1> cameraIntrinsics_est;
-  estimator->getSensorStateEstimateAs<okvis::ceres::CameraIntrinsicParamBlock>(
+  Eigen::Matrix<double, Eigen::Dynamic, 1> cameraIntrinsics_est;
+  estimator->getSensorStateEstimateAs<okvis::ceres::EuclideanParamBlock>(
       currFrameId, 0, okvis::HybridFilter::SensorStates::Camera,
       okvis::HybridFilter::CameraSensorStates::Intrinsic, cameraIntrinsics_est);
   rmsError->segment<2>(45) =
@@ -601,12 +599,12 @@ void compute_errors(
       (cameraIntrinsics_est.tail<2>() - intrinsics_true.segment<2>(2))
           .cwiseAbs2();
 
-  Eigen::Matrix<double, nDistortionCoeffDim, 1> cameraDistortion_est;
-  estimator->getSensorStateEstimateAs<okvis::ceres::CameraDistortionParamBlock>(
+  Eigen::Matrix<double, Eigen::Dynamic, 1> cameraDistortion_est(nDistortionCoeffDim);
+  estimator->getSensorStateEstimateAs<okvis::ceres::EuclideanParamBlock>(
       currFrameId, 0, okvis::HybridFilter::SensorStates::Camera,
       okvis::HybridFilter::CameraSensorStates::Distortion,
       cameraDistortion_est);
-  rmsError->segment<4>(49) =
+  rmsError->segment(49, nDistortionCoeffDim) =
       (cameraDistortion_est - distIntrinsic_true).cwiseAbs2();
 
   double td_est(0.0), tr_est(0.0);
@@ -1001,6 +999,9 @@ void testHybridFilterSinusoid(const std::string &outputPath,
           }
           estimator->resetInitialPVandStd(pvstd, true);
           estimator->addStates(mf, imuSegment, true);
+          OKVIS_ASSERT_EQ(Exception, estimator->covariance_.rows(), 57,
+                          "Initial cov with one cloned state should be 57 for "
+                          "fixed projection intrinsics and extrinsics");
         } else {
           mf->resetCameraSystemAndFrames(*cameraSystem1);  // dummy
           estimator->addStates(mf, imuSegment, true);

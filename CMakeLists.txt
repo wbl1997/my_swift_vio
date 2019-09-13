@@ -97,12 +97,7 @@ LIST(APPEND SOURCEFILES
     src/io_wrap/RosParametersReader.cpp
     src/io_wrap/PoseViewer.cpp
 
-
-    src/okvis/ceres/CameraIntrinsicParamBlock.cpp
-    src/okvis/ceres/CameraDistortionParamBlock.cpp
     src/okvis/ceres/CameraTimeParamBlock.cpp
-    src/okvis/ceres/ShapeMatrixParamBlock.cpp
-    src/okvis/ceres/CameraIntrinsicError.cpp
 
     src/msckf/BoundedImuDeque.cpp
     src/msckf/FilterHelper.cpp
@@ -174,7 +169,7 @@ target_link_libraries(${PROJECT_NAME}
 # now the actual applications
 # a wrapper to invoke a specific test
 add_executable(invoke_one_test src/apps/invoke_one_test.cpp )
-target_link_libraries(invoke_one_test ${PROJECT_NAME} )
+target_link_libraries(invoke_one_test ${PROJECT_NAME})
 
 add_executable(okvis_node src/apps/okvis_node.cpp)
 target_link_libraries(okvis_node ${PROJECT_NAME})
@@ -198,7 +193,8 @@ list(APPEND TEST_SRC_FILES
     test/std/TestStdAccumulate.cpp
 
     test/msckf/TestFeatureInitialization.cpp
-    test/msckf/TestJacobian.cpp
+    test/msckf/TestPointObsJacobian.cpp
+    test/msckf/TestExtrinsicJacobian.cpp
     test/msckf/TestHybridFilter.cpp
     test/msckf/TestImuOdometry.cpp
     test/msckf/TestTriangulate.cpp

@@ -7,6 +7,7 @@
 
 // cameras and distortions
 #include <okvis/cameras/EquidistantDistortion.hpp>
+#include <okvis/cameras/FovDistortion.hpp>
 #include <okvis/cameras/PinholeCamera.hpp>
 #include <okvis/cameras/RadialTangentialDistortion.hpp>
 #include <okvis/cameras/RadialTangentialDistortion8.hpp>
@@ -498,5 +499,8 @@ template class VioFrameMatchingAlgorithm<
 
 template class VioFrameMatchingAlgorithm<okvis::cameras::PinholeCamera<
     okvis::cameras::RadialTangentialDistortion8> >;
+
+template class VioFrameMatchingAlgorithm<
+    okvis::cameras::PinholeCamera<okvis::cameras::FovDistortion> >;
 
 }  // namespace okvis

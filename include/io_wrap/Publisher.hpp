@@ -100,10 +100,10 @@ class Publisher
 
   /// \brief Set an odometry output CSV file.
   /// \param csvFile The file
-  bool setCsvFile(std::fstream& csvFile);
+  bool setCsvFile(std::fstream& csvFile, const std::string& headerLine);
   /// \brief Set an odometry output CSV file.
   /// \param csvFileName The filename of a new file
-  bool setCsvFile(const std::string& csvFileName);
+  bool setCsvFile(const std::string& csvFileName, const std::string& headerLine="");
 
   /// \brief              Set a CVS file where the landmarks will be saved to.
   /// \param csvFile      The file
@@ -253,9 +253,9 @@ class Publisher
       const int frameIdInSource,
       const std::vector<okvis::kinematics::Transformation,
           Eigen::aligned_allocator<okvis::kinematics::Transformation> > & extrinsics,
-      const Eigen::Matrix<double, 27, 1>& vTgsa,
-      const Eigen::Matrix<double, 10, 1>& vfckptdr,
-      const Eigen::Matrix<double, 55, 1>& vVariance);
+      const Eigen::Matrix<double, Eigen::Dynamic, 1>& vTgsa,
+      const Eigen::Matrix<double, Eigen::Dynamic, 1>& vfckptdr,
+      const Eigen::Matrix<double, Eigen::Dynamic, 1>& vVariance);
   /**
    * @brief Set and write landmarks to file.
    * @remark This can be registered with the VioInterface.
@@ -275,13 +275,17 @@ class Publisher
   void publishImages();
   /// @brief Publish the last set path.
   void publishPath();
-
+  void composeHeaderLine(const std::string& imu_model,
+                         const std::string& cam0_proj_opt_rep,
+                         const std::string& cam0_extrinsic_opt_rep,
+                         const std::string& cam0_distortion_rep,
+                         std::string* header_line);
   /// @}
 
  private:
 
   /// @brief Write CSV header.
-  bool writeCsvDescription();
+  bool writeCsvDescription(const std::string& headerLine);
   /// @brief Write CSV header for landmarks file.
   bool writeLandmarksCsvDescription();
 

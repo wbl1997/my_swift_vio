@@ -81,16 +81,16 @@ TEST(FeatureInitializeTest, sphereDistribution) {
     measurements[i] = Vector2d(u, v);
   }
 
-  for (int i = 0; i < 6; ++i) {
-    cout << "pose " << i << ":" << endl;
-    cout << "orientation: " << endl;
-    cout << cam_poses[i].linear() << endl;
-    cout << "translation: "  << endl;
-    cout << cam_poses[i].translation().transpose() << endl;
-    cout << "measurement: " << endl;
-    cout << measurements[i].transpose() << endl;
-    cout << endl;
-  }
+//  for (int i = 0; i < 6; ++i) {
+//    cout << "pose " << i << ":" << endl;
+//    cout << "orientation: " << endl;
+//    cout << cam_poses[i].linear() << endl;
+//    cout << "translation: "  << endl;
+//    cout << cam_poses[i].translation().transpose() << endl;
+//    cout << "measurement: " << endl;
+//    cout << measurements[i].transpose() << endl;
+//    cout << endl;
+//  }
 
   // Initialize a feature object.
   Feature feature_object(measurements, cam_states);

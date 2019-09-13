@@ -53,6 +53,10 @@
 #include <sensor_msgs/image_encodings.h>
 
 #include <okvis/FrameTypedefs.hpp>
+#include <msckf/CameraRig.hpp>
+#include <msckf/ExtrinsicModels.hpp>
+#include <msckf/ImuRig.hpp>
+#include <msckf/ProjParamOptModels.hpp>
 
 DEFINE_string(datafile_separator, ",",
               "the separator used for a ASCII output file");
@@ -152,11 +156,20 @@ void Publisher::setNodeHandle(ros::NodeHandle &nh) {
 }
 
 // Write CSV header.
-bool Publisher::writeCsvDescription() {
+bool Publisher::writeCsvDescription(const std::string& headerLine) {
   if (!csvFile_) return false;
   if (!csvFile_->good()) return false;
+  *csvFile_ << headerLine << std::endl;
+  return true;
+}
 
-  *csvFile_ << "%timestamp" << FLAGS_datafile_separator << "frameIdInSource"
+void Publisher::composeHeaderLine(const std::string &imu_model,
+                                  const std::string &cam0_proj_opt_rep,
+                                  const std::string &cam0_extrinsic_opt_rep,
+                                  const std::string &cam0_distortion_rep,
+                                  std::string *header_line) {
+  std::stringstream stream;
+  stream << "%timestamp" << FLAGS_datafile_separator << "frameIdInSource"
             << FLAGS_datafile_separator << "p_WS_W_x"
             << FLAGS_datafile_separator << "p_WS_W_y"
             << FLAGS_datafile_separator << "p_WS_W_z"
@@ -164,52 +177,38 @@ bool Publisher::writeCsvDescription() {
             << "q_WS_y" << FLAGS_datafile_separator << "q_WS_z"
             << FLAGS_datafile_separator << "q_WS_w" << FLAGS_datafile_separator
             << "v_WS_W_x" << FLAGS_datafile_separator << "v_WS_W_y"
-            << FLAGS_datafile_separator << "v_WS_W_z"
-            << FLAGS_datafile_separator << "b_g_x[rad/s]"
-            << FLAGS_datafile_separator << "b_g_y" << FLAGS_datafile_separator
-            << "b_g_z" << FLAGS_datafile_separator << "b_a_x[m/s^2]"
-            << FLAGS_datafile_separator << "b_a_y" << FLAGS_datafile_separator
-            << "b_a_z";
+            << FLAGS_datafile_separator << "v_WS_W_z";
+  std::string imu_param_format;
+  ImuModelToFormatString(ImuModelNameToId(imu_model), FLAGS_datafile_separator,
+                       &imu_param_format);
+  std::string cam_proj_intrinsic_format;
+  ProjectionOptToParamsInfo(ProjectionOptNameToId(cam0_proj_opt_rep),
+                            FLAGS_datafile_separator,
+                            &cam_proj_intrinsic_format);
+  std::string cam_extrinsic_format;
+  ExtrinsicModelToParamsInfo(ExtrinsicModelNameToId(cam0_extrinsic_opt_rep),
+                             FLAGS_datafile_separator, &cam_extrinsic_format);
+  std::string cam_distortion_format;
+  okvis::cameras::DistortionNameToParamsInfo(cam0_distortion_rep, FLAGS_datafile_separator,
+                                             &cam_distortion_format);
+
   if (result_option_ == FULL_STATE_WITH_ALL_CALIBRATION) {
-    *csvFile_ << FLAGS_datafile_separator << "Tg_1" << FLAGS_datafile_separator
-              << "Tg_2" << FLAGS_datafile_separator << "Tg_3"
-              << FLAGS_datafile_separator << "Tg_4" << FLAGS_datafile_separator
-              << "Tg_5" << FLAGS_datafile_separator << "Tg_6"
-              << FLAGS_datafile_separator << "Tg_7" << FLAGS_datafile_separator
-              << "Tg_8" << FLAGS_datafile_separator << "Tg_9"
-              << FLAGS_datafile_separator << "Ts_1" << FLAGS_datafile_separator
-              << "Ts_2" << FLAGS_datafile_separator << "Ts_3"
-              << FLAGS_datafile_separator << "Ts_4" << FLAGS_datafile_separator
-              << "Ts_5" << FLAGS_datafile_separator << "Ts_6"
-              << FLAGS_datafile_separator << "Ts_7" << FLAGS_datafile_separator
-              << "Ts_8" << FLAGS_datafile_separator << "Ts_9"
-              << FLAGS_datafile_separator << "Ta_1" << FLAGS_datafile_separator
-              << "Ta_2" << FLAGS_datafile_separator << "Ta_3"
-              << FLAGS_datafile_separator << "Ta_4" << FLAGS_datafile_separator
-              << "Ta_5" << FLAGS_datafile_separator << "Ta_6"
-              << FLAGS_datafile_separator << "Ta_7" << FLAGS_datafile_separator
-              << "Ta_8" << FLAGS_datafile_separator << "Ta_9"
-              << FLAGS_datafile_separator << "p_SC_S_x[m]"
-              << FLAGS_datafile_separator << "p_SC_S_y"
-              << FLAGS_datafile_separator << "p_SC_S_z"
-              << FLAGS_datafile_separator << "fx[pixel]"
-              << FLAGS_datafile_separator << "fy" << FLAGS_datafile_separator
-              << "cx" << FLAGS_datafile_separator << "cy"
-              << FLAGS_datafile_separator << "k1" << FLAGS_datafile_separator
-              << "k2" << FLAGS_datafile_separator << "p1"
-              << FLAGS_datafile_separator << "p2" << FLAGS_datafile_separator
-              << "td[s]" << FLAGS_datafile_separator << "tr[s]";
+    stream << FLAGS_datafile_separator << imu_param_format;
+    stream << FLAGS_datafile_separator << cam_extrinsic_format;
+    stream << FLAGS_datafile_separator << cam_proj_intrinsic_format;
+    stream << FLAGS_datafile_separator << cam_distortion_format;
+    stream << FLAGS_datafile_separator << "td[s]" << FLAGS_datafile_separator
+              << "tr[s]";
   } else if (result_option_ == FULL_STATE_WITH_EXTRINSICS) {
-    *csvFile_ << FLAGS_datafile_separator << "p_SC_S_x[m]"
-              << FLAGS_datafile_separator << "p_SC_S_y"
-              << FLAGS_datafile_separator << "p_SC_S_z"
-              << FLAGS_datafile_separator << "q_SC_x"
-              << FLAGS_datafile_separator << "q_SC_y"
-              << FLAGS_datafile_separator << "q_SC_z"
-              << FLAGS_datafile_separator << "q_SC_w";
+    stream << FLAGS_datafile_separator << imu_param_format;
+    stream << FLAGS_datafile_separator << cam_extrinsic_format;
+  } else {
+    std::string imu_param_format;
+    ImuModelToFormatString(ImuModelNameToId("BG_BA"), FLAGS_datafile_separator,
+                         &imu_param_format);
+    stream << FLAGS_datafile_separator << imu_param_format;
   }
-  *csvFile_ << std::endl;
-  return true;
+  *header_line = stream.str();
 }
 
 // Write CSV header for landmarks file.
@@ -227,18 +226,18 @@ bool Publisher::writeLandmarksCsvDescription() {
 }
 
 // Set an odometry output CSV file.
-bool Publisher::setCsvFile(std::fstream &csvFile) {
+bool Publisher::setCsvFile(std::fstream &csvFile, const std::string& headerLine) {
   if (csvFile_) {
     csvFile_->close();
   }
   csvFile_.reset(&csvFile);
-  writeCsvDescription();
+  writeCsvDescription(headerLine);
   return csvFile_->good();
 }
 // Set an odometry output CSV file.
-bool Publisher::setCsvFile(const std::string &csvFileName) {
+bool Publisher::setCsvFile(const std::string &csvFileName, const std::string& headerLine) {
   csvFile_.reset(new std::fstream(csvFileName.c_str(), std::ios_base::out));
-  writeCsvDescription();
+  writeCsvDescription(headerLine);
   return csvFile_->good();
 }
 
@@ -643,9 +642,9 @@ void Publisher::csvSaveFullStateWithAllCalibrationAsCallback(
         okvis::kinematics::Transformation,
         Eigen::aligned_allocator<okvis::kinematics::Transformation>>
         &extrinsics,
-    const Eigen::Matrix<double, 27, 1> &vTgsa,
-    const Eigen::Matrix<double, 10, 1> &vfckptdr,
-    const Eigen::Matrix<double, 55, 1> &vVariance) {
+    const Eigen::Matrix<double, Eigen::Dynamic, 1> &vTgsa,
+    const Eigen::Matrix<double, Eigen::Dynamic, 1> &vfckptdr,
+    const Eigen::Matrix<double, Eigen::Dynamic, 1> &vVariance) {
   setTime(t);
   setOdometry(T_WS, speedAndBiases,
               omega_S);  // TODO(sleuten): provide setters for this hack
@@ -673,7 +672,7 @@ void Publisher::csvSaveFullStateWithAllCalibrationAsCallback(
                 << FLAGS_datafile_separator << speedAndBiases[7]
                 << FLAGS_datafile_separator << speedAndBiases[8];
 
-      for (size_t jack = 0; jack < 27; ++jack)
+      for (int jack = 0; jack < vTgsa.size(); ++jack)
         *csvFile_ << FLAGS_datafile_separator << vTgsa[jack];
 
       for (size_t i = 0; i < extrinsics.size(); ++i) {
@@ -683,11 +682,10 @@ void Publisher::csvSaveFullStateWithAllCalibrationAsCallback(
                   << FLAGS_datafile_separator << p_SCi[2];
       }
 
-      for (size_t jack = 0; jack < 10; ++jack)
+      for (int jack = 0; jack < vfckptdr.size(); ++jack)
         *csvFile_ << FLAGS_datafile_separator << vfckptdr[jack];
 
-      // std dev
-      for (size_t jack = 0; jack < 55; ++jack)
+      for (int jack = 0; jack < vVariance.size(); ++jack)
         *csvFile_ << FLAGS_datafile_separator << std::sqrt(vVariance[jack]);
 
       *csvFile_ << std::endl;

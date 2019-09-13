@@ -1,5 +1,9 @@
 function plotMSCKF2Result(msckf_csv, export_fig_path, voicebox_path, output_dir, ...
     cmp_data_file, gt_file, avg_since_start, avg_trim_end)
+if nargin < 1
+    disp(['Usage:plotMSCKF2Result msckf_csv ...']);
+    return;
+end
 close all;
 if ~exist('export_fig_path','var')
     export_fig_path = input('path of export_fig:', 's');
@@ -29,14 +33,49 @@ if isempty(output_dir)
     disp(['output_dir is set to ', output_dir]);
 end
 
+if ~exist('misalignment_dim','var')
+    misalignment_dim_str = input('dim of IMU misalignment:', 's');
+end
+if isempty(misalignment_dim_str)
+    misalignment_dim = 27;
+else
+    misalignment_dim = str2double(misalignment_dim_str);
+end
+if ~exist('extrinsic_dim','var')
+    extrinsic_dim_str = input('dim of camera extrinsics:', 's');
+end
+if isempty(extrinsic_dim_str)
+    extrinsic_dim = 3;
+else
+    extrinsic_dim = str2double(extrinsic_dim_str);
+end
+if ~exist('project_intrinsic_dim','var')
+    project_intrinsic_dim_str = input('dim of camera projection intrinsics:', 's');
+end
+if isempty(project_intrinsic_dim_str)
+    project_intrinsic_dim = 4;
+else
+    project_intrinsic_dim = str2double(project_intrinsic_dim_str);
+end
+if ~exist('distort_intrinsic_dim','var')
+    distort_intrinsic_dim_str = input('dim of camera distortion intrinsics:', 's');
+end
+if isempty(distort_intrinsic_dim_str)
+    distort_intrinsic_dim = 4;
+else
+    distort_intrinsic_dim = str2double(distort_intrinsic_dim_str);
+end
+msckf_index_server = Msckf2Constants(misalignment_dim, extrinsic_dim, ...
+    project_intrinsic_dim, distort_intrinsic_dim);
+
 fontsize = 18;
 msckf_estimates = dlmread(filename, ',', 1, 0);
-% data = convert_imu_intrinsic_param(msckf_estimates, voicebox_path);
 data = msckf_estimates;
 original_data = data;
 startTime = data(1, 1);
 endTime = data(end, 1);
-nominal_intrinsics = data(1, Msckf2Constants.fxy_cxy);
+
+nominal_intrinsics = data(1, msckf_index_server.fxy_cxy);
 disp('The nominal fxy cxy is set to ');
 disp(nominal_intrinsics);
 
@@ -102,12 +141,12 @@ else
 end
 
 figure;
-plot3(data(:, Msckf2Constants.r(1)), data(:, Msckf2Constants.r(2)), ...
-    data(:, Msckf2Constants.r(3)), '-b'); hold on;
-plot3(data(1, Msckf2Constants.r(1)), data(1, Msckf2Constants.r(2)), ...
-    data(1, Msckf2Constants.r(3)), '-or');
-plot3(data(end, Msckf2Constants.r(1)), data(end, Msckf2Constants.r(2)), ...
-    data(end, Msckf2Constants.r(3)), '-sr');
+plot3(data(:, msckf_index_server.r(1)), data(:, msckf_index_server.r(2)), ...
+    data(:, msckf_index_server.r(3)), '-b'); hold on;
+plot3(data(1, msckf_index_server.r(1)), data(1, msckf_index_server.r(2)), ...
+    data(1, msckf_index_server.r(3)), '-or');
+plot3(data(end, msckf_index_server.r(1)), data(end, msckf_index_server.r(2)), ...
+    data(end, msckf_index_server.r(3)), '-sr');
 legend_list = {'msckf2', 'start', 'finish'};
 
 if(~isempty(gt))
@@ -170,10 +209,10 @@ if(~isempty(gt))
 end
 
 figure;
-plot(data(:,1), data(:, Msckf2Constants.q(1)), '-r');
+plot(data(:,1), data(:, msckf_index_server.q(1)), '-r');
 hold on;
-plot(data(:,1), data(:, Msckf2Constants.q(2)), '-g');
-plot(data(:,1), data(:, Msckf2Constants.q(3)), '-b');
+plot(data(:,1), data(:, msckf_index_server.q(2)), '-g');
+plot(data(:,1), data(:, msckf_index_server.q(3)), '-b');
 
 if(~isempty(gt))
     plot(gt(:,1), gt(:,6), '--r');
@@ -190,7 +229,7 @@ end
 export_fig(outputfig);
 
 figure;
-draw_ekf_triplet_with_std(data, Msckf2Constants.v, Msckf2Constants.v_std);
+draw_ekf_triplet_with_std(data, msckf_index_server.v, msckf_index_server.v_std);
 ylabel('v_{GB}[m/s]');
 outputfig = [output_dir, '/v_GB.eps'];
 if exist(outputfig, 'file')==2
@@ -199,7 +238,7 @@ end
 export_fig(outputfig);
 
 figure;
-draw_ekf_triplet_with_std(data, Msckf2Constants.b_g, Msckf2Constants.b_g_std, 180/pi);
+draw_ekf_triplet_with_std(data, msckf_index_server.b_g, msckf_index_server.b_g_std, 180/pi);
 ylabel(['b_g[' char(176) '/s]']);
 outputfig = [output_dir, '/b_g.eps'];
 if exist(outputfig, 'file')==2
@@ -208,7 +247,7 @@ end
 export_fig(outputfig);
 
 figure;
-draw_ekf_triplet_with_std(data, Msckf2Constants.b_a, Msckf2Constants.b_a_std, 1.0);
+draw_ekf_triplet_with_std(data, msckf_index_server.b_a, msckf_index_server.b_a_std, 1.0);
 ylabel('b_a[m/s^2]');
 outputfig = [output_dir, '/b_a.eps'];
 if exist(outputfig, 'file')==2
@@ -217,7 +256,7 @@ end
 export_fig(outputfig);
 
 figure;
-draw_ekf_triplet_with_std(data, Msckf2Constants.p_BC, Msckf2Constants.p_BC_std, 100.0);
+draw_ekf_triplet_with_std(data, msckf_index_server.p_BC, msckf_index_server.p_BC_std, 100.0);
 ylabel('p_{BC}[cm]');
 outputfig = [output_dir, '/p_BC.eps'];
 if exist(outputfig, 'file')==2
@@ -226,10 +265,10 @@ end
 export_fig(outputfig);
 
 figure;
-data(:, Msckf2Constants.fxy_cxy) = data(:, Msckf2Constants.fxy_cxy) - ...
+data(:, msckf_index_server.fxy_cxy) = data(:, msckf_index_server.fxy_cxy) - ...
     repmat(nominal_intrinsics, size(data, 1), 1);
-draw_ekf_triplet_with_std(data, Msckf2Constants.fxy_cxy, ...
-    Msckf2Constants.fxy_cxy_std);
+draw_ekf_triplet_with_std(data, msckf_index_server.fxy_cxy, ...
+    msckf_index_server.fxy_cxy_std);
 legend('f_x','f_y','c_x','c_y','3\sigma_f_x', '3\sigma_f_y','3\sigma_c_x','3\sigma_c_y');
 ylabel('deviation from nominal values ($f_x$, $f_y$), ($c_x$, $c_y$)[px]', 'Interpreter', 'Latex');
 outputfig = [output_dir, '/fxy_cxy.eps'];
@@ -239,7 +278,7 @@ end
 export_fig(outputfig);
 
 figure;
-draw_ekf_triplet_with_std(data, Msckf2Constants.k1_k2, Msckf2Constants.k1_k2_std);
+draw_ekf_triplet_with_std(data, msckf_index_server.k1_k2, msckf_index_server.k1_k2_std);
 ylabel('k_1 and k_2[1]');
 legend('k_1','k_2', '3\sigma_{k_1}', '3\sigma_{k_2}');
 outputfig = [output_dir, '/k1_k2.eps'];
@@ -250,7 +289,7 @@ export_fig(outputfig);
 
 figure;
 p1p2Scale = 1e2;
-draw_ekf_triplet_with_std(data, Msckf2Constants.p1_p2, Msckf2Constants.p1_p2_std, p1p2Scale);
+draw_ekf_triplet_with_std(data, msckf_index_server.p1_p2, msckf_index_server.p1_p2_std, p1p2Scale);
 ylabel('p_1 and p_2[0.01]');
 legend('p_1','p_2', '3\sigma_{p_1}', '3\sigma_{p_2}');
 outputfig = [output_dir, '/p1_p2.eps'];
@@ -259,17 +298,17 @@ if exist(outputfig, 'file')==2
 end
 export_fig(outputfig);
 
-intermediatePlotter(data, output_dir);
+intermediatePlotter(data, msckf_index_server, output_dir);
 if exist('avg_since_start','var')
     if exist('avg_trim_end','var')
-        averageMsckf2VariableEstimates(original_data, ...
+        averageMsckf2VariableEstimates(original_data, msckf_index_server, ...
             [output_dir, '/avg_estimates.txt'], avg_since_start, avg_trim_end);
     else
-        averageMsckf2VariableEstimates(original_data, ...
+        averageMsckf2VariableEstimates(original_data, msckf_index_server, ...
             [output_dir, '/avg_estimates.txt'], avg_since_start);
     end
 else
-    averageMsckf2VariableEstimates(original_data, ...
+    averageMsckf2VariableEstimates(original_data, msckf_index_server, ...
             [output_dir, '/avg_estimates.txt']);
 end
 

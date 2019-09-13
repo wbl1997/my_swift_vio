@@ -7,6 +7,8 @@ cameras:
            0.0, 0.0, 0.0, 1.0],
         image_dimension: [752, 480],
         distortion_coefficients: [-0.28340811217, 0.0739590738929, 0.000193595028569, 1.76187114545e-05],
+        projection_opt_mode: FXY_CXY,
+        extrinsic_opt_mode: P_CS,
         distortion_type: radialtangential,
         focal_length: [458.654880721, 457.296696463],
         principal_point: [367.215803962, 248.37534061]}

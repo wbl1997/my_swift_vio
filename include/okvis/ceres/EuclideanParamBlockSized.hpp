@@ -1,57 +1,62 @@
 
 /**
- * @file ShapeMatrixParamBlock.hpp
- * @brief Header file for the ShapeMatrixParamBlock class.
+ * @file EuclideanParamBlockSized.hpp
+ * @brief Header file for the EuclideanParamBlockSized class.
  * @author Jianzhu Huai
  */
 
-#ifndef INCLUDE_OKVIS_CERES_SHAPEMATRIXPARAMBLOCK_HPP_
-#define INCLUDE_OKVIS_CERES_SHAPEMATRIXPARAMBLOCK_HPP_
+#ifndef INCLUDE_OKVIS_CERES_EUCLIDEANPARAMBLOCKSIZED_HPP_
+#define INCLUDE_OKVIS_CERES_EUCLIDEANPARAMBLOCKSIZED_HPP_
 
-#include <okvis/ceres/ParameterBlockSized.hpp>
-//#include <okvis/kinematics/Transformation.hpp>
 #include <Eigen/Core>
 #include <okvis/Time.hpp>
+#include <okvis/ceres/ParameterBlockSized.hpp>
 
 /// \brief okvis Main namespace of this package.
 namespace okvis {
 /// \brief ceres Namespace for ceres-related functionality implemented in okvis.
 namespace ceres {
-const int nShapeMatrixDim = 9, nShapeMatrixMinDim = 9;
-typedef Eigen::Matrix<double, nShapeMatrixDim, 1>
-    ShapeMatrixVector;  // Tg, Ts, or Ta
 
-/// \brief Wraps the parameter block for shape matrix's elements' estimate
-class ShapeMatrixParamBlock
-    : public ParameterBlockSized<nShapeMatrixDim, nShapeMatrixMinDim,
-                                 ShapeMatrixVector> {
+/// \brief Wraps the parameter block for camera intrinsics estimate
+template <int Dim>
+class EuclideanParamBlockSized
+    : public ParameterBlockSized<Dim, Dim, Eigen::Matrix<double, Dim, 1>> {
  public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
   /// \brief The base class type.
-  typedef ParameterBlockSized<nShapeMatrixDim, nShapeMatrixMinDim,
-                              ShapeMatrixVector>
-      base_t;
+  typedef ParameterBlockSized<Dim, Dim, Eigen::Matrix<double, Dim, 1>> base_t;
 
   /// \brief The estimate type (9D vector).
-  typedef ShapeMatrixVector estimate_t;
+  typedef Eigen::Matrix<double, Dim, 1> estimate_t;
 
   /// \brief Default constructor (assumes not fixed).
-  ShapeMatrixParamBlock();
+  EuclideanParamBlockSized() : base_t::ParameterBlockSized() {
+    ParameterBlock::setFixed(false);
+  }
 
   /// \brief Constructor with estimate and time.
-  /// @param[in] shapeMatrixVector The fx,fy,cx,cy estimate.
+  /// @param[in] intrinsicParams The fx,fy,cx,cy estimate.
   /// @param[in] id The (unique) ID of this block.
   /// @param[in] timestamp The timestamp of this state.
-  ShapeMatrixParamBlock(const ShapeMatrixVector& shapeMatrixVector, uint64_t id,
-                        const okvis::Time& timestamp);
+  EuclideanParamBlockSized(const Eigen::Matrix<double, Dim, 1>& intrinsicParams,
+                           uint64_t id, const okvis::Time& timestamp) {
+    setEstimate(intrinsicParams);
+    ParameterBlock::setId(id);
+    setTimestamp(timestamp);
+    ParameterBlock::setFixed(false);
+  }
 
   /// \brief Trivial destructor.
-  virtual ~ShapeMatrixParamBlock();
+  virtual ~EuclideanParamBlockSized() {}
 
   // setters
   /// @brief Set estimate of this parameter block.
-  /// @param[in] shapeMatrixVector The estimate to set this to.
-  virtual void setEstimate(const ShapeMatrixVector& shapeMatrixVector);
+  /// @param[in] intrinsicParams The estimate to set this to.
+  virtual void setEstimate(
+      const Eigen::Matrix<double, Dim, 1>& intrinsicParams) {
+    for (int i = 0; i < base_t::Dimension; ++i)
+      base_t::parameters_[i] = intrinsicParams[i];
+  }
 
   /// \brief Set the time.
   /// @param[in] timestamp The timestamp of this state.
@@ -60,7 +65,12 @@ class ShapeMatrixParamBlock
   // getters
   /// @brief Get estimate.
   /// \return The estimate.
-  virtual ShapeMatrixVector estimate() const;
+  virtual Eigen::Matrix<double, Dim, 1> estimate() const {
+    Eigen::Matrix<double, Dim, 1> intrinsicParams;
+    for (int i = 0; i < base_t::Dimension; ++i)
+      intrinsicParams[i] = base_t::parameters_[i];
+    return intrinsicParams;
+  }
 
   /// \brief Get the time.
   /// \return The timestamp of this state.
@@ -76,11 +86,9 @@ class ShapeMatrixParamBlock
   /// @param[out] x0_plus_Delta Perturbed x.
   virtual void plus(const double* x0, const double* Delta_Chi,
                     double* x0_plus_Delta) const {
-    Eigen::Map<const Eigen::Matrix<double, nShapeMatrixDim, 1> > x0_(x0);
-    Eigen::Map<const Eigen::Matrix<double, nShapeMatrixDim, 1> > Delta_Chi_(
-        Delta_Chi);
-    Eigen::Map<Eigen::Matrix<double, nShapeMatrixDim, 1> > x0_plus_Delta_(
-        x0_plus_Delta);
+    Eigen::Map<const Eigen::Matrix<double, Dim, 1>> x0_(x0);
+    Eigen::Map<const Eigen::Matrix<double, Dim, 1>> Delta_Chi_(Delta_Chi);
+    Eigen::Map<Eigen::Matrix<double, Dim, 1>> x0_plus_Delta_(x0_plus_Delta);
     x0_plus_Delta_ = x0_ + Delta_Chi_;
   }
 
@@ -89,9 +97,8 @@ class ShapeMatrixParamBlock
   /// @param[out] jacobian The Jacobian.
   virtual void plusJacobian(const double* /*unused: x*/,
                             double* jacobian) const {
-    Eigen::Map<Eigen::Matrix<double, nShapeMatrixMinDim, nShapeMatrixMinDim,
-                             Eigen::RowMajor> >
-        identity(jacobian);
+    Eigen::Map<Eigen::Matrix<double, Dim, Dim, Eigen::RowMajor>> identity(
+        jacobian);
     identity.setIdentity();
   }
 
@@ -104,10 +111,9 @@ class ShapeMatrixParamBlock
   /// \return True on success.
   virtual void minus(const double* x0, const double* x0_plus_Delta,
                      double* Delta_Chi) const {
-    Eigen::Map<const Eigen::Matrix<double, nShapeMatrixDim, 1> > x0_(x0);
-    Eigen::Map<Eigen::Matrix<double, nShapeMatrixDim, 1> > Delta_Chi_(
-        Delta_Chi);
-    Eigen::Map<const Eigen::Matrix<double, nShapeMatrixDim, 1> > x0_plus_Delta_(
+    Eigen::Map<const Eigen::Matrix<double, Dim, 1>> x0_(x0);
+    Eigen::Map<Eigen::Matrix<double, Dim, 1>> Delta_Chi_(Delta_Chi);
+    Eigen::Map<const Eigen::Matrix<double, Dim, 1>> x0_plus_Delta_(
         x0_plus_Delta);
     Delta_Chi_ = x0_plus_Delta_ - x0_;
   }
@@ -119,14 +125,13 @@ class ShapeMatrixParamBlock
   /// \return True on success.
   virtual void liftJacobian(const double* /*unused: x*/,
                             double* jacobian) const {
-    Eigen::Map<Eigen::Matrix<double, nShapeMatrixMinDim, nShapeMatrixDim,
-                             Eigen::RowMajor> >
-        identity(jacobian);
+    Eigen::Map<Eigen::Matrix<double, Dim, Dim, Eigen::RowMajor>> identity(
+        jacobian);
     identity.setIdentity();
   }
 
   /// @brief Return parameter block type as string
-  virtual std::string typeInfo() const { return "ShapeMatrixParamBlock"; }
+  virtual std::string typeInfo() const { return "EuclideanParamBlockSized"; }
 
  private:
   okvis::Time timestamp_;  ///< Time of this state.
@@ -135,4 +140,4 @@ class ShapeMatrixParamBlock
 }  // namespace ceres
 }  // namespace okvis
 
-#endif /* INCLUDE_OKVIS_CERES_SHAPEMATRIXPARAMBLOCK_HPP_ */
+#endif /* INCLUDE_OKVIS_CERES_EUCLIDEANPARAMBLOCKSIZED_HPP_ */

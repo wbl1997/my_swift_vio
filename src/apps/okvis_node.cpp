@@ -148,7 +148,7 @@ int main(int argc, char **argv) {
 
   std::string path = FLAGS_output_dir;
   path = okvis::removeTrailingSlash(path);
-
+  int camIdx = 0;
   if (FLAGS_dump_output_option == 0) {
     okvis_estimator->setFullStateCallback(
         std::bind(&okvis::Publisher::publishFullStateAsCallback, &publisher,
@@ -158,7 +158,13 @@ int main(int argc, char **argv) {
         &okvis::Publisher::publishLandmarksAsCallback, &publisher,
         std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
   } else {
-    publisher.setCsvFile(path + "/msckf_estimates.csv");
+    std::string headerLine;
+    publisher.composeHeaderLine(parameters.imu.model_type,
+                      parameters.nCameraSystem.projOptRep(camIdx),
+                      parameters.nCameraSystem.extrinsicOptRep(camIdx),
+                      parameters.nCameraSystem.cameraGeometry(camIdx)->distortionType(),
+                      &headerLine);
+    publisher.setCsvFile(path + "/msckf_estimates.csv", headerLine);
     if (FLAGS_dump_output_option == 1) {
       // save estimates of evolving states: position, velocity, attitude, bg, ba
       okvis_estimator->setFullStateCallback(std::bind(

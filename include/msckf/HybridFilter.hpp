@@ -21,22 +21,24 @@
 #include <okvis/ceres/PoseParameterBlock.hpp>
 #include <okvis/ceres/ReprojectionError.hpp>
 #include <okvis/ceres/SpeedAndBiasParameterBlock.hpp>
+#include <okvis/ceres/EuclideanParamBlockSized.hpp>
 
-//#include <okvis/ceres/ImuError.hpp>
+#include <msckf/ImuOdometry.h>
 #include <msckf/CameraRig.hpp>
-#include <okvis/cameras/PinholeCamera.hpp>
-#include <okvis/cameras/RadialTangentialDistortion.hpp>
-
 #include <okvis/timing/Timer.hpp>
 
 #include <vio/CsvReader.h>
 #include <vio/ImuErrorModel.h>
 
-#include "msckf/InitialPVandStd.hpp"
 #include "msckf/BoundedImuDeque.hpp"
+#include "msckf/InitialPVandStd.hpp"
 
 /// \brief okvis Main namespace of this package.
 namespace okvis {
+
+namespace ceres {
+typedef EuclideanParamBlockSized<9> ShapeMatrixParamBlock;
+}
 
 //! The estimator class
 /*!
@@ -171,7 +173,7 @@ class HybridFilter : public VioBackendInterface {
    */
   virtual bool applyMarginalizationStrategy(
       size_t numKeyframes, size_t numImuFrames,
-      okvis::MapPointVector& removedLandmarks);
+      okvis::MapPointVector &removedLandmarks);
 
   /**
    * @brief Initialise pose from IMU measurements. For convenience as static.
@@ -276,7 +278,7 @@ class HybridFilter : public VioBackendInterface {
   bool getSpeedAndBias(uint64_t poseId, uint64_t imuIdx,
                        okvis::SpeedAndBiases &speedAndBias) const;
 
-  bool getTimeDelay(uint64_t poseId, int camIdx, okvis::Duration* td) const;
+  bool getTimeDelay(uint64_t poseId, int camIdx, okvis::Duration *td) const;
 
   /**
    * @brief Get camera states for a given pose ID.
@@ -516,10 +518,7 @@ class HybridFilter : public VioBackendInterface {
   bool getSensorStateParameterBlockPtr(
       uint64_t poseId, int sensorIdx, int sensorType, int stateType,
       std::shared_ptr<ceres::ParameterBlock> &stateParameterBlockPtr) const;
-  template <class PARAMETER_BLOCK_T>
-  bool getSensorStateParameterBlockAs(
-      uint64_t poseId, int sensorIdx, int sensorType, int stateType,
-      PARAMETER_BLOCK_T &stateParameterBlock) const;
+
   template <class PARAMETER_BLOCK_T>
   bool getSensorStateEstimateAs(
       uint64_t poseId, int sensorIdx, int sensorType, int stateType,
@@ -658,13 +657,14 @@ class HybridFilter : public VioBackendInterface {
                        ///< here.
 
  protected:
-  // set intermediate variables which are used for computing Jacobians of
-  // feature point observations
-  virtual void retrieveEstimatesOfConstants();
-  virtual void updateStates(
-      const Eigen::Matrix<double, Eigen::Dynamic, 1> &deltaX);
+  // set latest estimates to intermediate variables for the assumed constant
+  // states which are commonly used in computing Jacobians of all feature
+  // observations
+  void retrieveEstimatesOfConstants();
 
-public:
+  void updateStates(const Eigen::Matrix<double, Eigen::Dynamic, 1> &deltaX);
+
+ public:
   okvis::Time firstStateTimestamp();
 
   void gatherPoseObservForTriang(
@@ -706,7 +706,7 @@ public:
       std::vector<double> &vR_oi,
       const std::shared_ptr<okvis::cameras::CameraBase> cameraGeometry,
       const okvis::kinematics::Transformation &T_SC0,
-      int anchorSeqId=-1) const;
+      int anchorSeqId = -1) const;
   /**
    * @brief computeHxf, compute the residual and Jacobians for a SLAM feature i
    * observed in current frame
@@ -743,18 +743,13 @@ public:
    * otherwise, H_oi is of size 2nx(13+9(m-1)-3)
    * @return true if succeeded in computing the residual and Jacobians
    */
-  bool featureJacobian(const MapPoint &mp,
-                  Eigen::MatrixXd &H_oi,
-                  Eigen::Matrix<double, Eigen::Dynamic, 1> &r_oi,
-                  Eigen::MatrixXd &R_oi,
-                  Eigen::Vector4d &ab1rho,
-                  Eigen::Matrix<double, Eigen::Dynamic, 3> *pH_fi =
-                      (Eigen::Matrix<double, Eigen::Dynamic, 3> *)(NULL)) const;
+  bool featureJacobian(
+      const MapPoint &mp, Eigen::MatrixXd &H_oi,
+      Eigen::Matrix<double, Eigen::Dynamic, 1> &r_oi, Eigen::MatrixXd &R_oi,
+      Eigen::Vector4d &ab1rho,
+      Eigen::Matrix<double, Eigen::Dynamic, 3> *pH_fi =
+          (Eigen::Matrix<double, Eigen::Dynamic, 3> *)(NULL)) const;
 
-  /// OBSOLETE: check states by comparing current estimates with the ground
-  /// truth. To use this function, make sure the ground truth is linked
-  /// correctly This function can be called in the optimizationLoop
-  void checkStates();
 
   /// print out the most recent state vector and the stds of its elements. This
   /// function can be called in the optimizationLoop, but a better way to save
@@ -774,34 +769,41 @@ public:
 
   size_t numObservations(uint64_t landmarkId);
   /**
-   * @brief getCameraCalibrationEstimate, get the latest estimate of camera
+   * @brief getCameraCalibrationEstimate get the latest estimate of camera
    * calibration parameters
    * @param vfckptdr
    * @return the last pose id
    */
-  uint64_t getCameraCalibrationEstimate(Eigen::Matrix<double, 10, 1> &vfckptdr);
+  uint64_t getCameraCalibrationEstimate(Eigen::Matrix<double, Eigen::Dynamic, 1> &vfckptdr);
   /**
    * @brief getTgTsTaEstimate, get the lastest estimate of Tg Ts Ta with entries
    * in row major order
    * @param vTGTSTA
    * @return the last pose id
    */
-  uint64_t getTgTsTaEstimate(Eigen::Matrix<double, 27, 1> &vTGTSTA);
+  uint64_t getTgTsTaEstimate(Eigen::Matrix<double, Eigen::Dynamic, 1> &vTGTSTA);
 
   /**
-   * @brief get variance for evolving states(p_GB, q_GB, v_GB, bg, ba), Tg Ts
-   * Ta, p_CB, fxy, cxy, k1, k2, p1, p2, td, tr
+   * @brief get variance for nav, imu, camera extrinsic, intrinsic, td, tr
    * @param variances
    */
-  void getVariance(Eigen::Matrix<double, 55, 1> &variances);
+  void getVariance(Eigen::Matrix<double, Eigen::Dynamic, 1> &variances) const;
 
   bool getFrameId(uint64_t poseId, int &frameIdInSource, bool &isKF) const;
 
-  void setKeyframeRedundancyThresholds(
-      double dist, double angle, double trackingRate, size_t minTrackLength);
+  void setKeyframeRedundancyThresholds(double dist, double angle,
+                                       double trackingRate,
+                                       size_t minTrackLength);
 
   // will remove state parameter blocks and all of their related residuals
   okvis::Time removeState(uint64_t stateId);
+
+  void initCovariance(int camIdx = 0);
+
+  // currently only support one camera
+  void initCameraParamCovariance(int camIdx = 0);
+
+  void addCovForClonedStates();
 
   // camera parameters and all cloned states including the last inserted
   // and all landmarks.
@@ -809,30 +811,28 @@ public:
   // \pi_{B_i}(=[p_{B_i}^G, q_{B_i}^G, v_{B_i}^G]), l_i
   inline int cameraParamPoseAndLandmarkMinimalDimen() const {
     return cameraParamsMinimalDimen() +
-      9 * (statesMap_.size()) + 3 * mInCovLmIds.size();
+           kClonedStateMinimalDimen * statesMap_.size() +
+           3 * mInCovLmIds.size();
   }
 
   inline int cameraParamsMinimalDimen() const {
-    // 4 + distortion + 3 + 2
-    // p_B^C, f_x, f_y, c_x, c_y, k_1, k_2, p_1, p_2, [k_3], t_d, t_r
-    return 9 + cameras::RadialTangentialDistortion::NumDistortionIntrinsics;
+    const int camIdx = 0;
+    return camera_rig_.getCameraParamsMininalDimen(camIdx);
   }
 
   inline int startIndexOfClonedStates() const {
-    // 15 + 27 + 4 + distortion + 3 + 2
-    return 42 + 9 + cameras::RadialTangentialDistortion::NumDistortionIntrinsics;
+    const int camIdx = 0;
+    return ceres::ode::OdoErrorStateDim +
+           camera_rig_.getCameraParamsMininalDimen(camIdx);
   }
 
   inline int startIndexOfCameraParams() const {
-      // 15 + 27
-    return 42;
+    return ceres::ode::OdoErrorStateDim;
   }
 
-  inline int clonedStateMinimalDimen() const {
-    // error state: \delta p, \alpha for q, \delta v
-    // state: \pi_{B_i}(=[p_{B_i}^G, q_{B_i}^G, v_{B_i}^G])
-    return 9;
-  }
+  // error state: \delta p, \alpha for q, \delta v
+  // state: \pi_{B_i}(=[p_{B_i}^G, q_{B_i}^G, v_{B_i}^G])
+  static const int kClonedStateMinimalDimen = 9;
 
   Eigen::MatrixXd
       covariance_;  ///< covariance of the error vector of all states, error is
@@ -846,7 +846,6 @@ public:
   // map from state ID to segments of imu measurements, the imu measurements
   // covers the last state and current state of the id and extends on both sides
   okvis::BoundedImuDeque mStateID2Imu;
-
 
   std::map<uint64_t, int>
       mStateID2CovID_;  // maps state id to the ordered cloned states in the
@@ -875,9 +874,9 @@ public:
   okvis::timing::Timer updateCovarianceTimer;
   okvis::timing::Timer updateLandmarksTimer;
 
-  std::deque<uint64_t>
-      mInCovLmIds;  // for each point in the state vector/covariance,
-  // its landmark id which points to the parameter block,
+  // for each point in the state vector/covariance,
+  // its landmark id which points to the parameter block
+  std::deque<uint64_t> mInCovLmIds;
 
   InitialPVandStd pvstd_;
   bool useExternalInitialPose_;  // do we use external pose for initialization
@@ -909,14 +908,15 @@ public:
   static const okvis::Duration half_window_;
 };
 
-struct IsObservedInFrame
-{
+struct IsObservedInFrame {
   IsObservedInFrame(uint64_t x) : frameId(x) {}
-  bool operator()(const std::pair<okvis::KeypointIdentifier, uint64_t>& v) const {
+  bool operator()(
+      const std::pair<okvis::KeypointIdentifier, uint64_t> &v) const {
     return v.first.frameId == frameId;
   }
-private:
-  uint64_t frameId;     ///< Multiframe ID.
+
+ private:
+  uint64_t frameId;  ///< Multiframe ID.
 };
 }  // namespace okvis
 
