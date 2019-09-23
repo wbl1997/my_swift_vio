@@ -174,8 +174,7 @@ void Player::RunWithSavedTracks() {
       }
     }
 
-    std::cout << "read in frame at " << std::setprecision(12) << t.toSec()
-              << std::endl;
+    LOG(INFO) << "read in frame at " << std::setprecision(12) << t.toSec();
 
     // add corresponding imu data
     if (frameCounter == 0) {

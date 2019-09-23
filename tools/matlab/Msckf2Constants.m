@@ -57,7 +57,6 @@ classdef Msckf2Constants
                 obj.fxy_cxy = param_index + [0, 0, 0, 0];
             case 3
                 obj.fxy_cxy = param_index + [0, 0, 1, 2];
-            case 4
             otherwise
                 obj.fxy_cxy = param_index + (0:3);
         end
@@ -67,7 +66,6 @@ classdef Msckf2Constants
             case 1
                 obj.k1_k2 = param_index + [0, 0];
                 obj.p1_p2 = param_index + [0, 0];
-            case 4
             otherwise
                 obj.k1_k2 = param_index + (0:1);
                 obj.p1_p2 = param_index + (2:3);
@@ -97,7 +95,6 @@ classdef Msckf2Constants
                 obj.fxy_cxy_std = param_index + [0, 0, 0, 0];
             case 3
                 obj.fxy_cxy_std = param_index + [0, 0, 1, 2];
-            case 4
             otherwise
                 obj.fxy_cxy_std = param_index + (0:project_intrinsic_dim-1);
         end
@@ -106,7 +103,6 @@ classdef Msckf2Constants
             case 1
                 obj.k1_k2_std = param_index + [0, 0];
                 obj.p1_p2_std = param_index + [0, 0];
-            case 4
             otherwise
                 obj.k1_k2_std = param_index + (0:1);
                 obj.p1_p2_std = param_index + (2:3);

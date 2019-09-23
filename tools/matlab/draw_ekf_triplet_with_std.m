@@ -4,8 +4,8 @@ function draw_ekf_triplet_with_std(data, triple_index, ...
 if nargin < 4
     scalar = 1.0;
 end
-dimen = triple_index(end) - triple_index(1) + 1;
-    
+dimen = length(triple_index);
+
 line_styles = {'-r', '-g', '-b', '-k', '.k', '.b', '-c', '-m', '-y'};
 std_line_styles = {'--r', '--g', '--b', '--k', '-.k', '-.b', ...
     '--c', '--m', '--y'};
