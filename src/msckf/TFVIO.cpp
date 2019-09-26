@@ -1,4 +1,4 @@
-#include <msckf/MSCKF2.hpp>
+#include <msckf/TFVIO.hpp>
 
 #include <glog/logging.h>
 
@@ -24,34 +24,31 @@
 #include "vio/ImuErrorModel.h"
 #include "vio/Sample.h"
 
-DEFINE_bool(use_AIDP, false,
-            "use anchored inverse depth parameterization for a feature point?"
-            " Preliminary result shows AIDP worsen the result slightly");
+DECLARE_bool(use_AIDP);
 
 DECLARE_bool(use_mahalanobis);
 DECLARE_bool(use_first_estimate);
 DECLARE_bool(use_RK4);
 
-DECLARE_double(max_proj_tolerance);
 
-DEFINE_bool(use_IEKF, false,
-            "use iterated EKF in optimization, empirically IEKF cost at"
-            "least twice as much time as EKF");
+DECLARE_bool(use_IEKF);
+
+DECLARE_double(max_proj_tolerance);
 
 /// \brief okvis Main namespace of this package.
 namespace okvis {
 
-MSCKF2::MSCKF2(std::shared_ptr<okvis::ceres::Map> mapPtr,
+TFVIO::TFVIO(std::shared_ptr<okvis::ceres::Map> mapPtr,
                const double readoutTime)
     : HybridFilter(mapPtr, readoutTime) {}
 
 // The default constructor.
-MSCKF2::MSCKF2(const double readoutTime) : HybridFilter(readoutTime) {}
+TFVIO::TFVIO(const double readoutTime) : HybridFilter(readoutTime) {}
 
-MSCKF2::~MSCKF2() {}
+TFVIO::~TFVIO() {}
 
 // TODO(jhuai): merge with the superclass implementation
-bool MSCKF2::addStates(okvis::MultiFramePtr multiFrame,
+bool TFVIO::addStates(okvis::MultiFramePtr multiFrame,
                        const okvis::ImuMeasurementDeque &imuMeasurements,
                        bool asKeyframe) {
   // note: this is before matching...
@@ -179,7 +176,7 @@ bool MSCKF2::addStates(okvis::MultiFramePtr multiFrame,
             vTgTsTa, startTime, correctedStateTime, &Pkm1, &F_tot);
       } else {
         // method 2, i.e., adapt the imuError::propagation function of okvis by
-        // the msckf2 derivation in Michael Andrew Shelley
+        // the TFVIO derivation in Michael Andrew Shelley
         Eigen::Vector3d tempV_WS = speedAndBias.head<3>();
         IMUErrorModel<double> tempIEM(speedAndBias.tail<6>(), vTgTsTa);
         numUsedImuMeasurements = IMUOdometry::propagation(
@@ -432,7 +429,7 @@ bool MSCKF2::addStates(okvis::MultiFramePtr multiFrame,
   return true;
 }
 
-void MSCKF2::findRedundantCamStates(
+void TFVIO::findRedundantCamStates(
     std::vector<uint64_t>* rm_cam_state_ids) {
   // Move the iterator to the key position.
   auto key_cam_state_iter = statesMap_.end();
@@ -479,7 +476,7 @@ void MSCKF2::findRedundantCamStates(
   return;
 }
 
-int MSCKF2::marginalizeRedundantFrames(size_t maxClonedStates) {
+int TFVIO::marginalizeRedundantFrames(size_t maxClonedStates) {
   if (statesMap_.size() < maxClonedStates) {
     return 0;
   }
@@ -624,7 +621,7 @@ int MSCKF2::marginalizeRedundantFrames(size_t maxClonedStates) {
 
 // Applies the dropping/marginalization strategy according to Michael A.
 // Shelley's MS thesis
-bool MSCKF2::applyMarginalizationStrategy(
+bool TFVIO::applyMarginalizationStrategy(
     size_t numKeyframes, size_t numImuFrames,
     okvis::MapPointVector& /*removedLandmarks*/) {
   std::vector<uint64_t> removeFrames;
@@ -684,7 +681,7 @@ bool MSCKF2::applyMarginalizationStrategy(
   return true;
 }
 
-bool MSCKF2::measurementJacobianAIDP(
+bool TFVIO::measurementJacobianAIDP(
     const Eigen::Vector4d& ab1rho,
     const std::shared_ptr<okvis::cameras::CameraBase> tempCameraGeometry,
     const Eigen::Vector2d& obs,
@@ -875,7 +872,7 @@ bool MSCKF2::measurementJacobianAIDP(
   return true;
 }
 
-bool MSCKF2::measurementJacobian(
+bool TFVIO::measurementJacobian(
     const Eigen::Vector4d& v4Xhomog,
     const std::shared_ptr<okvis::cameras::CameraBase> tempCameraGeometry,
     const Eigen::Vector2d& obs,
@@ -1018,7 +1015,7 @@ bool MSCKF2::measurementJacobian(
 
 // assume the rolling shutter camera reads data row by row, and rows are
 //     aligned with the width of a frame
-bool MSCKF2::featureJacobian(const MapPoint &mp, Eigen::MatrixXd &H_oi,
+bool TFVIO::featureJacobian(const MapPoint &mp, Eigen::MatrixXd &H_oi,
                         Eigen::Matrix<double, Eigen::Dynamic, 1> &r_oi,
                         Eigen::MatrixXd &R_oi,
                         const std::vector<uint64_t>* involvedFrameIds) const {
@@ -1276,7 +1273,7 @@ bool MSCKF2::featureJacobian(const MapPoint &mp, Eigen::MatrixXd &H_oi,
   }
 }
 
-int MSCKF2::computeStackedJacobianAndResidual(
+int TFVIO::computeStackedJacobianAndResidual(
     Eigen::MatrixXd *T_H, Eigen::Matrix<double, Eigen::Dynamic, 1> *r_q,
     Eigen::MatrixXd *R_q) const {
   // compute and stack Jacobians and Residuals for landmarks observed no more
@@ -1333,7 +1330,7 @@ int MSCKF2::computeStackedJacobianAndResidual(
   return dimH_o[0];
 }
 
-uint64_t MSCKF2::getMinValidStateID() const {
+uint64_t TFVIO::getMinValidStateID() const {
   uint64_t min_state_id = statesMap_.rbegin()->first;
   for (auto it = landmarksMap_.begin(); it != landmarksMap_.end();
        ++it) {
@@ -1350,7 +1347,7 @@ uint64_t MSCKF2::getMinValidStateID() const {
   return min_state_id;
 }
 
-void MSCKF2::optimize(size_t /*numIter*/, size_t /*numThreads*/, bool verbose) {
+void TFVIO::optimize(size_t /*numIter*/, size_t /*numThreads*/, bool verbose) {
   uint64_t currFrameId = currentFrameId();
   OKVIS_ASSERT_EQ(
       Exception,

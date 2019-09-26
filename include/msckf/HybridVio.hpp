@@ -26,7 +26,7 @@
 #include <../test/MockVioFrontendInterface.hpp>
 #else
 #include <msckf/HybridFrontend.hpp>
-#include <msckf/MSCKF2.hpp>
+#include <msckf/HybridFilter.hpp>
 #endif
 
 /// \brief okvis Main namespace of this package.

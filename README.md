@@ -173,7 +173,7 @@ msckf_ws/devel/lib/msckf/msckf_node $HOME/docker_documents/msckf_ws/src/msckf/co
  --video_file="/media/$USER/Seagate/data/spin-lab/west_campus_parking_lot/Jisun/20151111_120342.mp4" 
  --imu_file="/media/$USER/Seagate/data/spin-lab/west_campus_parking_lot/Jisun/mystream_11_11_12_3_13.csv" 
  --use_AIDP=true  --start_index=18800 --finish_index=28900 --max_inc_tol=10.0 
- --dump_output_option=0 --feature_tracking_method=0 --backend_solver=1
+ --dump_output_option=0 --feature_tracking_method=0 --estimator_algorithm=1
 ```
 The running program will exit once the sequence finishes.
 
@@ -189,8 +189,8 @@ The running program will exit once the sequence finishes.
 
 ```
 rosrun msckf okvis_node $HOME/docker_documents/msckf_ws/src/msckf/config/config_fpga_p2_euroc_dissertation.yaml 
- --dump_output_option=0 --load_input_option=0 --output_dir=$HOME/Desktop/temp  
- --use_AIDP=true --feature_tracking_method=0 --backend_solver=1
+ --dump_output_option=0 --load_input_option=0 --output_dir=$HOME/Desktop/temp 
+ --use_AIDP=true --feature_tracking_method=0 --estimator_algorithm=1
 
 # use start to skip the static segment
 rosbag play --pause --start=45.0 --rate=1.0 /media/$USER/Seagate/data/euroc/MH_01_easy.bag /cam0/image_raw:=/camera0 /imu0:=/imu
@@ -209,7 +209,7 @@ landmark display.
 $HOME/docker_documents/msckf_ws/src/msckf/config/config_tum_vi_50_20_msckf.yaml \
  --output_dir=$HOME/Seagate/data/TUM-VI/postprocessed/ \
  --use_AIDP=true --max_inc_tol=10.0 --dump_output_option=0 \
- --feature_tracking_method=0 --backend_solver=1 --load_input_option=0
+ --feature_tracking_method=0 --estimator_algorithm=1 --load_input_option=0
 
 ```
 

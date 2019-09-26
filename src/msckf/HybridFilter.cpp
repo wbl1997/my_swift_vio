@@ -28,11 +28,14 @@ DEFINE_bool(use_RK4, false,
 
 DECLARE_bool(use_mahalanobis);
 DECLARE_bool(use_first_estimate);
+
+DEFINE_double(max_proj_tolerance, 7,
+              "maximum tolerable discrepancy between predicted and measured "
+              "point coordinates in image in pixel units");
+
 /// \brief okvis Main namespace of this package.
 namespace okvis {
-const double maxProjTolerance =
-    10;  // maximum tolerable discrepancy between predicted and measured point
-         // coordinates in image in pixel units
+
 const okvis::Duration HybridFilter::half_window_(2, 0);
 
 // Constructor if a ceres map is already available.
@@ -1225,8 +1228,8 @@ bool HybridFilter::computeHxf(const uint64_t hpbid, const MapPoint& mp,
     return false;
   } else if (!FLAGS_use_mahalanobis) {
     Eigen::Vector2d discrep = obsInPixel - imagePoint;
-    if (std::fabs(discrep[0]) > maxProjTolerance ||
-        std::fabs(discrep[1]) > maxProjTolerance) {
+    if (std::fabs(discrep[0]) > FLAGS_max_proj_tolerance ||
+        std::fabs(discrep[1]) > FLAGS_max_proj_tolerance) {
       computeHTimer.stop();
       return false;
     }
@@ -1515,8 +1518,8 @@ bool HybridFilter::featureJacobian(
       continue;
     } else if (!FLAGS_use_mahalanobis) {
       Eigen::Vector2d discrep = obsInPixel[kale] - imagePoint;
-      if (std::fabs(discrep[0]) > maxProjTolerance ||
-          std::fabs(discrep[1]) > maxProjTolerance) {
+      if (std::fabs(discrep[0]) > FLAGS_max_proj_tolerance ||
+          std::fabs(discrep[1]) > FLAGS_max_proj_tolerance) {
         itFrameIds = frameIds.erase(itFrameIds);
         itRoi = vRi.erase(itRoi);
         itRoi = vRi.erase(itRoi);

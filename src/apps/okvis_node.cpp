@@ -62,8 +62,7 @@ DEFINE_int32(start_index, 0, "index of the first frame to be processed");
 
 DEFINE_int32(finish_index, 0, "index of the last frame to be processed");
 
-DEFINE_int32(backend_solver, 0,
-             "backend algorithm, 0 okvis, 1 msckf, 2 hybrid filter");
+DECLARE_int32(estimator_algorithm);
 
 bool setInputParameters(okvis::InputData *input) {
   input->videoFile = FLAGS_video_file;
@@ -136,14 +135,18 @@ int main(int argc, char **argv) {
 
   std::shared_ptr<okvis::VioInterface> okvis_estimator;
   // http://eigen.tuxfamily.org/bz/show_bug.cgi?id=1049
-  switch (FLAGS_backend_solver) {
+  switch (FLAGS_estimator_algorithm) {
     case 0:
       okvis_estimator.reset(new okvis::ThreadedKFVio(parameters));
       break;
     case 1:
     case 2:
+    case 3:
       okvis_estimator.reset(new okvis::HybridVio(parameters));
       break;
+    default:
+      LOG(ERROR) << "Estimator not implemented!";
+      return 1;
   }
 
   std::string path = FLAGS_output_dir;

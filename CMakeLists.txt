@@ -114,6 +114,7 @@ LIST(APPEND SOURCEFILES
     src/msckf/PreconditionedEkfUpdater.cpp
     src/msckf/HybridFilter.cpp
     src/msckf/MSCKF2.cpp
+    src/msckf/TFVIO.cpp
 
     src/feature_tracker/TrackResultReader.cpp
     src/feature_tracker/TrailManager.cpp

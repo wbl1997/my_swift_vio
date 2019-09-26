@@ -1,3 +1,5 @@
+#include <msckf/HybridVio.hpp>
+
 #include <algorithm>
 #include <map>
 #include <memory>
@@ -7,13 +9,16 @@
 #include <glog/logging.h>
 
 #include <msckf/FeatureTriangulation.hpp>
-#include <msckf/HybridVio.hpp>
+#include <msckf/MSCKF2.hpp>
+#include <msckf/TFVIO.hpp>
+
 #include <okvis/assert_macros.hpp>
 #include <okvis/ceres/ImuError.hpp>
 
 DEFINE_int32(
     estimator_algorithm, 1,
-    "0 for okvis optimization, 1 for msckf, 2 for hybrid filter");
+    "0 for okvis optimization paired with ThreadedKFVio\n, "
+    "1 for msckf, 2 for tf-vio, 3 for hybrid filter, 1, 2, and 3 are paired with HybridVio.");
 
 DECLARE_int32(feature_tracking_method);
 
@@ -61,12 +66,20 @@ HybridVio::HybridVio(okvis::VioParameters &parameters)
       maxImuInputQueueSize_(2 * max_camera_input_queue_size *
                             parameters.imu.rate /
                             parameters.sensors_information.cameraRate) {
-  if (FLAGS_estimator_algorithm == 1) {
-    estimator_.reset(
-        new okvis::MSCKF2(parameters.sensors_information.imageReadoutTime));
-  } else {
-    estimator_.reset(new okvis::HybridFilter(
-        parameters.sensors_information.imageReadoutTime));
+  switch (FLAGS_estimator_algorithm) {
+    case 1:
+      estimator_.reset(
+          new okvis::MSCKF2(parameters.sensors_information.imageReadoutTime));
+      break;
+    case 2:
+      estimator_.reset(new okvis::TFVIO(
+          parameters.sensors_information.imageReadoutTime));
+      break;
+    default:
+      LOG(WARNING) << "There are bugs inside the present HybridFilter!";
+      estimator_.reset(new okvis::HybridFilter(
+          parameters.sensors_information.imageReadoutTime));
+      break;
   }
   estimator_->resetInitialPVandStd(
       InitialPVandStd(parameters.initialState),

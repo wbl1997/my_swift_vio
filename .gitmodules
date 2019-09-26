@@ -1,9 +1,6 @@
 [submodule "okvis"]
 	path = okvis
 	url = https://github.com/JzHuai0108/okvis.git
-[submodule "tools/linter"]
-	path = tools/linter
-	url = https://github.com/JzHuai0108/linter.git
 [submodule "sophus"]
 	path = sophus
 	url = https://github.com/stevenlovegrove/Sophus.git
