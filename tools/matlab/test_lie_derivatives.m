@@ -43,11 +43,6 @@ assume(theta, 'clear');
 assume(theta, 'real');
 end
 
-function res=skew(inp_vr)
-res=[0 			-inp_vr(3)	inp_vr(2); ...
-    inp_vr(3)	0			-inp_vr(1);...
-    -inp_vr(2)	inp_vr(1)	0];
-end
 
 function f = rho_pC(R, t, theta, ab1rho)
 Rbar = (eye(3) + skew(theta)) * R;

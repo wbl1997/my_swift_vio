@@ -286,6 +286,15 @@ To perform a calibration yourself, we recommend the following:
 * Code review: please create a pull request for all changes proposed. The pull 
   request will be reviewed by an admin before merging.
 
+* Static program analysis
+linter
+```
+git clone https://github.com/JzHuai0108/linter.git
+git fetch origin
+git checkout -b feature/onespacecppcomment
+```
+Then follow the instructions in linter README.md to init linter git hooks for the msckf repo.
+
 ## Support
 
 The developpers will be happy to assist you or to consider bug reports / feature 
