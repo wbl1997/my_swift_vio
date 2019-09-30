@@ -678,7 +678,8 @@ class HybridFilter : public VioBackendInterface {
           *obsDirections,
       std::vector<Eigen::Vector2d, Eigen::aligned_allocator<Eigen::Vector2d>>
           *obsInPixel,
-      std::vector<double> *vR_oi) const;
+      std::vector<double> *vR_oi,
+      bool headtail=false) const;
 
   /**
    * @brief triangulateAMapPoint, does not support rays which arise from static

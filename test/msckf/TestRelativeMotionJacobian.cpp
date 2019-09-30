@@ -49,6 +49,23 @@ TEST(RelativeMotionJacobian, de_ddelta_BC) {
   std::cout << "dtheta_ddelta_BC analytic:\n"
             << dtheta_ddelta_BC_anal << "\n";
 
+  Eigen::Matrix3d dp_dt_CB_anal, dp_dt_CB;
+  rmj.dp_dt_CB(&dp_dt_CB_anal);
+  for (int i = 0; i < 3; ++i) {
+      delta.setZero();
+      delta(i) = eps;
+      okvis::kinematics::Transformation T_CB_bar = T_BC.inverse();
+      T_CB_bar.oplus(delta);
+      okvis::RelativeMotionJacobian rmj_bar(T_CB_bar.inverse(), T_GBj, T_GBk);
+      okvis::kinematics::Transformation T_CjCk_bar = rmj_bar.evaluate();
+      Eigen::Matrix<double, 6, 1> delta = okvis::ominus(T_CjCk_bar, T_CjCk) / eps;
+      dp_dt_CB.col(i) = delta.head<3>();
+  }
+
+  EXPECT_LT((dp_dt_CB - dp_dt_CB_anal).lpNorm<Eigen::Infinity>(), eps);
+  std::cout << "dp_dt_CB numeric:\n" << dp_dt_CB << "\n";
+  std::cout << "dp_dt_CB analytic:\n"
+            << dp_dt_CB_anal << "\n";
 }
 
 TEST(RelativeMotionJacobian, de_ddelta_GBj) {

@@ -156,7 +156,7 @@ bool FilterHelper::gatingTest(
     if (gamma < chi2_95percentile[r.rows()]) {
       return true;
     } else {
-        return false;
+      return false;
     }
   } else {
       return true;

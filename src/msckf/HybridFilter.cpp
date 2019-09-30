@@ -2687,13 +2687,20 @@ void HybridFilter::gatherPoseObservForTriang(
         obsDirections,
     std::vector<Eigen::Vector2d, Eigen::aligned_allocator<Eigen::Vector2d>>*
         obsInPixel,
-    std::vector<double>* vR_oi) const {
+    std::vector<double>* vR_oi, bool headtail) const {
   frameIds->clear();
   T_WSs->clear();
   obsDirections->clear();
   obsInPixel->clear();
   vR_oi->clear();
-  for (auto itObs = mp.observations.begin(), iteObs = mp.observations.end();
+  const std::map<okvis::KeypointIdentifier, uint64_t>& observations = mp.observations;
+  std::map<okvis::KeypointIdentifier, uint64_t> headTailObs;
+  if (headtail) {
+      headTailObs[observations.begin()->first] = observations.begin()->second;
+      headTailObs[observations.rbegin()->first] = observations.rbegin()->second;
+      const_cast<std::map<okvis::KeypointIdentifier, uint64_t>&>(observations) = headTailObs;
+  }
+  for (auto itObs = observations.begin(), iteObs = observations.end();
        itObs != iteObs; ++itObs) {
     uint64_t poseId = itObs->first.frameId;
     Eigen::Vector2d measurement;

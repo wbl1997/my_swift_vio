@@ -141,7 +141,8 @@ class MSCKF2 : public HybridFilter {
 
   // minimum number of culled frames in each prune frame state
   // step if cloned states size hit maxClonedStates_
-  // should be at least 3 for the monocular case,
+  // should be at least 3 for the monocular case so that
+  // the marginalized observations can contribute innovation to the states,
   // see Sun 2017 Robust stereo appendix D
   static const int minCulledFrames_ = 3;
 };
