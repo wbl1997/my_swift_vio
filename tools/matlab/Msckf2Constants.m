@@ -53,6 +53,8 @@ classdef Msckf2Constants
         obj.p_BC = param_index + (0:2);
         param_index = param_index + extrinsic_dim;
         switch project_intrinsic_dim
+            case 0
+                obj.fxy_cxy = [];
             case 1
                 obj.fxy_cxy = param_index + [0, 0, 0, 0];
             case 3
@@ -91,6 +93,8 @@ classdef Msckf2Constants
         obj.p_BC_std = param_index + (0:2);
         param_index = param_index + extrinsic_dim;
         switch project_intrinsic_dim
+            case 0
+                obj.fxy_cxy_std = [];
             case 1
                 obj.fxy_cxy_std = param_index + [0, 0, 0, 0];
             case 3

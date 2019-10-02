@@ -105,7 +105,8 @@ class TFVIO : public HybridFilter {
       const MapPoint& mp,
       Eigen::Matrix<double, 1, Eigen::Dynamic>* Hi,
       double* ri,
-      double* Ri) const;
+      double* Ri,
+      bool lastObs) const;
 
   int computeStackedJacobianAndResidual(
       Eigen::MatrixXd* T_H, Eigen::Matrix<double, Eigen::Dynamic, 1>* r_q,

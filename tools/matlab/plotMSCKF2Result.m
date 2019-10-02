@@ -1,5 +1,7 @@
 function plotMSCKF2Result(msckf_csv, export_fig_path, voicebox_path, output_dir, ...
-    cmp_data_file, gt_file, avg_since_start, avg_trim_end)
+    cmp_data_file, gt_file, avg_since_start, avg_trim_end, ...
+    misalignment_dim, extrinsic_dim, project_intrinsic_dim, ...
+    distort_intrinsic_dim)
 if nargin < 1
     disp(['Usage:plotMSCKF2Result msckf_csv ...']);
     return;
@@ -35,35 +37,38 @@ end
 
 if ~exist('misalignment_dim','var')
     misalignment_dim_str = input('dim of IMU misalignment:', 's');
-end
 if isempty(misalignment_dim_str)
     misalignment_dim = 27;
 else
     misalignment_dim = str2double(misalignment_dim_str);
 end
+end
 if ~exist('extrinsic_dim','var')
     extrinsic_dim_str = input('dim of camera extrinsics:', 's');
-end
 if isempty(extrinsic_dim_str)
     extrinsic_dim = 3;
 else
     extrinsic_dim = str2double(extrinsic_dim_str);
 end
+end
+
 if ~exist('project_intrinsic_dim','var')
     project_intrinsic_dim_str = input('dim of camera projection intrinsics:', 's');
-end
+
 if isempty(project_intrinsic_dim_str)
     project_intrinsic_dim = 4;
 else
     project_intrinsic_dim = str2double(project_intrinsic_dim_str);
 end
+end
+
 if ~exist('distort_intrinsic_dim','var')
     distort_intrinsic_dim_str = input('dim of camera distortion intrinsics:', 's');
-end
 if isempty(distort_intrinsic_dim_str)
     distort_intrinsic_dim = 4;
 else
     distort_intrinsic_dim = str2double(distort_intrinsic_dim_str);
+end
 end
 msckf_index_server = Msckf2Constants(misalignment_dim, extrinsic_dim, ...
     project_intrinsic_dim, distort_intrinsic_dim);

@@ -40,6 +40,12 @@ namespace ceres {
 typedef EuclideanParamBlockSized<9> ShapeMatrixParamBlock;
 }
 
+enum RetrieveObsSeqType {
+    ENTIRE_TRACK=0,
+    LATEST_TWO,
+    HEAD_TAIL,
+};
+
 //! The estimator class
 /*!
  The estimator class. This does all the backend work.
@@ -679,7 +685,7 @@ class HybridFilter : public VioBackendInterface {
       std::vector<Eigen::Vector2d, Eigen::aligned_allocator<Eigen::Vector2d>>
           *obsInPixel,
       std::vector<double> *vR_oi,
-      bool headtail=false) const;
+      RetrieveObsSeqType seqType=ENTIRE_TRACK) const;
 
   /**
    * @brief triangulateAMapPoint, does not support rays which arise from static

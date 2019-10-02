@@ -2687,18 +2687,35 @@ void HybridFilter::gatherPoseObservForTriang(
         obsDirections,
     std::vector<Eigen::Vector2d, Eigen::aligned_allocator<Eigen::Vector2d>>*
         obsInPixel,
-    std::vector<double>* vR_oi, bool headtail) const {
+    std::vector<double>* vR_oi,
+    RetrieveObsSeqType seqType) const {
   frameIds->clear();
   T_WSs->clear();
   obsDirections->clear();
   obsInPixel->clear();
   vR_oi->clear();
-  const std::map<okvis::KeypointIdentifier, uint64_t>& observations = mp.observations;
-  std::map<okvis::KeypointIdentifier, uint64_t> headTailObs;
-  if (headtail) {
-      headTailObs[observations.begin()->first] = observations.begin()->second;
-      headTailObs[observations.rbegin()->first] = observations.rbegin()->second;
-      const_cast<std::map<okvis::KeypointIdentifier, uint64_t>&>(observations) = headTailObs;
+  const std::map<okvis::KeypointIdentifier, uint64_t>& observations =
+      mp.observations;
+  std::map<okvis::KeypointIdentifier, uint64_t> obsPair;
+  std::map<okvis::KeypointIdentifier, uint64_t>::const_reverse_iterator riter =
+      mp.observations.rbegin();
+  std::map<okvis::KeypointIdentifier, uint64_t>::const_reverse_iterator
+      second_riter = ++mp.observations.rbegin();
+
+  switch (seqType) {
+  case HEAD_TAIL:
+      obsPair[observations.begin()->first] = observations.begin()->second;
+      obsPair[riter->first] = riter->second;
+      const_cast<std::map<okvis::KeypointIdentifier, uint64_t>&>(observations) = obsPair;
+      break;
+  case LATEST_TWO:
+      obsPair[riter->first] = riter->second;
+      obsPair[second_riter->first] = second_riter->second;
+      const_cast<std::map<okvis::KeypointIdentifier, uint64_t>&>(observations) = obsPair;
+      break;
+  case ENTIRE_TRACK:
+  default:
+      break;
   }
   for (auto itObs = observations.begin(), iteObs = observations.end();
        itObs != iteObs; ++itObs) {

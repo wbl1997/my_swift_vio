@@ -32,11 +32,11 @@ DECLARE_bool(use_mahalanobis);
 DECLARE_bool(use_first_estimate);
 DECLARE_bool(use_RK4);
 
-
 DECLARE_bool(use_IEKF);
 
 DECLARE_double(max_proj_tolerance);
-
+DEFINE_double(pixel_noise_scale_factor, 1.0, 
+    "Enlarge the original noise std by this scale factor");
 /// \brief okvis Main namespace of this package.
 namespace okvis {
 
@@ -492,7 +492,7 @@ bool TFVIO::applyMarginalizationStrategy(
 
 bool TFVIO::epipolarConstraintWithJacobian(
     const MapPoint& mp, Eigen::Matrix<double, 1, Eigen::Dynamic>* Hi,
-    double* ri, double* Ri) const {
+    double* ri, double* Ri, bool lastObs) const {
   const int camIdx = 0;
   std::shared_ptr<okvis::cameras::CameraBase> tempCameraGeometry =
       camera_rig_.getCameraGeometry(camIdx);
@@ -510,9 +510,10 @@ bool TFVIO::epipolarConstraintWithJacobian(
   std::vector<okvis::kinematics::Transformation,
               Eigen::aligned_allocator<okvis::kinematics::Transformation>>
       T_WSs;
+  RetrieveObsSeqType seqType = lastObs ? HEAD_TAIL : LATEST_TWO;
   gatherPoseObservForTriang(mp, tempCameraGeometry, &frameIds, &T_WSs,
                             &obsDirections, &obsInPixel, &imagePointNoiseStd,
-                            true);
+                            seqType);
   // camera related Jacobians and covariance
   std::vector<
       Eigen::Matrix<double, 3, Eigen::Dynamic>,
@@ -755,7 +756,8 @@ bool TFVIO::epipolarConstraintWithJacobian(
   Eigen::Matrix<double, 1, 1> Ri_eigen =
       de_dfj[0] * cov_fj[0] * de_dfj[0].transpose() +
       de_dfj[1] * cov_fj[1] * de_dfj[1].transpose();
-  *Ri = Ri_eigen[0] * 4;
+  *Ri = Ri_eigen[0] * FLAGS_pixel_noise_scale_factor * 
+      FLAGS_pixel_noise_scale_factor;
   return true;
 }
 
@@ -799,7 +801,8 @@ int TFVIO::computeStackedJacobianAndResidual(
   std::vector<Eigen::MatrixXd, Eigen::aligned_allocator<Eigen::MatrixXd>> vR;
 
   for (auto it = landmarksMap_.begin(); it != landmarksMap_.end(); ++it) {
-    if (it->second.residualizeCase != NotToAdd_TrackedNow) {
+    ResidualizeCase rc = it->second.residualizeCase;
+    if (rc != NotToAdd_TrackedNow) {
       continue;
     }
 
@@ -807,7 +810,8 @@ int TFVIO::computeStackedJacobianAndResidual(
     Eigen::Matrix<double, 1, 1> ri;
     Eigen::Matrix<double, 1, 1> Ri;
     bool isValidJacobian =
-        epipolarConstraintWithJacobian(it->second, &Hi, ri.data(), Ri.data());
+        epipolarConstraintWithJacobian(it->second, &Hi, ri.data(), Ri.data(),
+                                       true);
     if (!isValidJacobian) {
       continue;
     }
