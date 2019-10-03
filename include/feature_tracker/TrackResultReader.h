@@ -23,8 +23,7 @@ class TrackResultReader {
       const double timeStamp, std::vector<cv::KeyPoint>& keypoints,
       std::vector<size_t>& mapPointIds,
       std::vector<Eigen::Vector3d, Eigen::aligned_allocator<Eigen::Vector3d>>&
-          mapPointPositions,
-      const size_t frameId);
+          mapPointPositions);
 
   double currentTime;
   size_t currentFrameId;

@@ -5,7 +5,6 @@ using namespace std;
 typedef unsigned char uchar;
 TEST(StandardC, BinaryOperators)
 {
-    uchar a= 0x00;
     uchar b= 0x01;
     uchar c= 0x02;
     uchar d= b|c;

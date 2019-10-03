@@ -21,8 +21,7 @@ bool TrackResultReader::getNextFrame(
     const double timeStamp, std::vector<cv::KeyPoint>& keypoints,
     std::vector<size_t>& mapPointIds,
     std::vector<Eigen::Vector3d, Eigen::aligned_allocator<Eigen::Vector3d>>&
-        mapPointPositions,
-    const size_t frameId) {
+        mapPointPositions) {
   const double epsilonTime = 1e-5;
   Eigen::Matrix<double, 7, 1> tq_wc;
   if (timeStamp - currentTime > epsilonTime) {
@@ -32,7 +31,6 @@ bool TrackResultReader::getNextFrame(
                               trackingStatus, tq_wc);
 
       if (std::fabs(currentTime - timeStamp) < epsilonTime) {
-        //   assert(frameId == currentFrameId);
         assert(trackingStatus);
         break;
       } else if (currentTime - timeStamp >= epsilonTime) {

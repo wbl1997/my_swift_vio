@@ -89,24 +89,55 @@ class TFVIO : public HybridFilter {
   virtual void optimize(size_t numIter, size_t numThreads = 1,
                         bool verbose = false) final;
 
+  /**
+   * @brief measurementJacobian
+   * @param tempCameraGeometry
+   * @param frameId2
+   * @param T_WS2
+   * @param obsDirection2
+   * @param obsInPixel2
+   * @param imagePointNoiseStd2
+   * @param camIdx
+   * @param H_xjk has the proper size upon calling this func
+   * @param H_fjk is an empty vector upon calling this func
+   * @param cov_fjk is an empty vector upon entering this func
+   * @param residual
+   * @return
+   */
+  bool measurementJacobian(
+      const std::shared_ptr<okvis::cameras::CameraBase> tempCameraGeometry,
+      const std::vector<uint64_t>& frameId2,
+      const std::vector<
+          okvis::kinematics::Transformation,
+          Eigen::aligned_allocator<okvis::kinematics::Transformation>>& T_WS2,
+      const std::vector<Eigen::Vector3d,
+                        Eigen::aligned_allocator<Eigen::Vector3d>>&
+          obsDirection2,
+      const std::vector<Eigen::Vector2d,
+                        Eigen::aligned_allocator<Eigen::Vector2d>>& obsInPixel2,
+      const std::vector<double>& imagePointNoiseStd2, int camIdx,
+      Eigen::Matrix<double, 1, Eigen::Dynamic>* H_xjk,
+      std::vector<Eigen::Matrix<double, 1, 3>,
+                  Eigen::aligned_allocator<Eigen::Matrix<double, 1, 3>>>* H_fjk,
+      std::vector<Eigen::Matrix3d, Eigen::aligned_allocator<Eigen::Matrix3d>>*
+          cov_fjk,
+      double* residual) const;
 
  private:
   uint64_t getMinValidStateID() const;
 
   /**
-   * @brief epipolarConstraintWithJacobian
-   * @param mp MapPoint from which the head and tail observations are retrieved
+   * @brief featureJacobian
+   * @param mp MapPoint from which all observations are retrieved
    * @param Hi de_dX
    * @param ri residual 0 - \hat{e}
    * @param Ri cov(\hat{e})
    * @return true if Jacobian is computed successfully
    */
-  bool epipolarConstraintWithJacobian(
-      const MapPoint& mp,
-      Eigen::Matrix<double, 1, Eigen::Dynamic>* Hi,
-      double* ri,
-      double* Ri,
-      bool lastObs) const;
+  bool featureJacobian(const MapPoint& mp,
+                       Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic>* Hi,
+                       Eigen::Matrix<double, Eigen::Dynamic, 1>* ri,
+                       Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic>* Ri) const;
 
   int computeStackedJacobianAndResidual(
       Eigen::MatrixXd* T_H, Eigen::Matrix<double, Eigen::Dynamic, 1>* r_q,
@@ -129,6 +160,11 @@ void obsDirectionJacobian(
     double pixelNoiseStd,
     Eigen::Matrix<double, 3, Eigen::Dynamic>* dfj_dXcam,
     Eigen::Matrix3d* cov_fj);
+
+// forward [0, 1], [0, 2], ..., [0, n-1]
+// backward [n-1, n-2], [n-1, n-3], ..., [n-1, 2]
+std::vector<std::pair<int, int>> getFramePairs(int numFeatures);
+
 }  // namespace okvis
 
 #endif /* INCLUDE_OKVIS_TFVIO_HPP_ */

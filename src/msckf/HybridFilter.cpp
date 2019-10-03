@@ -1338,7 +1338,7 @@ bool HybridFilter::featureJacobian(
   std::vector<Eigen::Vector2d, Eigen::aligned_allocator<Eigen::Vector2d>>
       obsInPixel;                  // all observations for this feature point
   std::vector<uint64_t> frameIds;  // id of frames observing this feature point
-  std::vector<double> vRi;         // std noise in pixels
+  std::vector<double> vSigmai;         // std noise in pixels
   Eigen::Vector4d v4Xhomog;        // triangulated point position in the global
                                    // frame expressed in [X,Y,Z,W],
   // representing either an ordinary point or a ray, e.g., a point at infinity
@@ -1348,7 +1348,7 @@ bool HybridFilter::featureJacobian(
   int projOptModelId = camera_rig_.getProjectionOptMode(camIdx);
   int extrinsicModelId = camera_rig_.getExtrinsicOptMode(camIdx);
   bool bSucceeded =
-      triangulateAMapPoint(mp, obsInPixel, frameIds, v4Xhomog, vRi,
+      triangulateAMapPoint(mp, obsInPixel, frameIds, v4Xhomog, vSigmai,
                            tempCameraGeometry, T_SC0_);
 
   if (!bSucceeded) {
@@ -1444,7 +1444,7 @@ bool HybridFilter::featureJacobian(
   size_t numPoses = frameIds.size();
   size_t numValidObs = 0;
   auto itFrameIds = frameIds.begin();
-  auto itRoi = vRi.begin();
+  auto itRoi = vSigmai.begin();
   // compute Jacobians for a measurement in image j of the current feature i
   for (size_t kale = 0; kale < numPoses; ++kale) {
     uint64_t poseId = *itFrameIds;
@@ -1513,16 +1513,16 @@ bool HybridFilter::featureJacobian(
                    << T_CA.coeffs().transpose();
 
       itFrameIds = frameIds.erase(itFrameIds);
-      itRoi = vRi.erase(itRoi);
-      itRoi = vRi.erase(itRoi);
+      itRoi = vSigmai.erase(itRoi);
+      itRoi = vSigmai.erase(itRoi);
       continue;
     } else if (!FLAGS_use_mahalanobis) {
       Eigen::Vector2d discrep = obsInPixel[kale] - imagePoint;
       if (std::fabs(discrep[0]) > FLAGS_max_proj_tolerance ||
           std::fabs(discrep[1]) > FLAGS_max_proj_tolerance) {
         itFrameIds = frameIds.erase(itFrameIds);
-        itRoi = vRi.erase(itRoi);
-        itRoi = vRi.erase(itRoi);
+        itRoi = vSigmai.erase(itRoi);
+        itRoi = vSigmai.erase(itRoi);
         continue;
       }
     }
@@ -1636,8 +1636,8 @@ bool HybridFilter::featureJacobian(
     H_xi.block(saga2, 0, 2, numCamPoseStates) = vJ_X[saga];
     H_fi.block<2, 3>(saga2, 0) = vJ_pfi[saga];
     ri.segment<2>(saga2) = vri[saga];
-    Ri(saga2, saga2) = vRi[saga2] * vRi[saga2];
-    Ri(saga2 + 1, saga2 + 1) = vRi[saga2 + 1] * vRi[saga2 + 1];
+    Ri(saga2, saga2) = vSigmai[saga2] * vSigmai[saga2];
+    Ri(saga2 + 1, saga2 + 1) = vSigmai[saga2 + 1] * vSigmai[saga2 + 1];
   }
 
   if (pH_fi)  // this point is to be included in the states
@@ -2687,13 +2687,13 @@ void HybridFilter::gatherPoseObservForTriang(
         obsDirections,
     std::vector<Eigen::Vector2d, Eigen::aligned_allocator<Eigen::Vector2d>>*
         obsInPixel,
-    std::vector<double>* vR_oi,
+    std::vector<double>* imageNoiseStd,
     RetrieveObsSeqType seqType) const {
   frameIds->clear();
   T_WSs->clear();
   obsDirections->clear();
   obsInPixel->clear();
-  vR_oi->clear();
+  imageNoiseStd->clear();
   const std::map<okvis::KeypointIdentifier, uint64_t>& observations =
       mp.observations;
   std::map<okvis::KeypointIdentifier, uint64_t> obsPair;
@@ -2732,8 +2732,8 @@ void HybridFilter::gatherPoseObservForTriang(
     multiFramePtr->getKeypointSize(itObs->first.cameraIndex,
                                    itObs->first.keypointIndex, kpSize);
     // image pixel noise follows that in addObservation function
-    vR_oi->push_back(kpSize / 8);
-    vR_oi->push_back(kpSize / 8);
+    imageNoiseStd->push_back(kpSize / 8);
+    imageNoiseStd->push_back(kpSize / 8);
 
     // use the latest estimates for camera intrinsic parameters
     Eigen::Vector3d backProjectionDirection;
@@ -2753,7 +2753,7 @@ bool HybridFilter::triangulateAMapPoint(
     std::vector<Eigen::Vector2d, Eigen::aligned_allocator<Eigen::Vector2d>>&
         obsInPixel,
     std::vector<uint64_t>& frameIds, Eigen::Vector4d& v4Xhomog,
-    std::vector<double>& vR_oi,
+    std::vector<double>& imageNoiseStd,
     const std::shared_ptr<cameras::CameraBase> cameraGeometry,
     const kinematics::Transformation& T_SC0,
     int anchorSeqId) const {
@@ -2768,7 +2768,7 @@ bool HybridFilter::triangulateAMapPoint(
               Eigen::aligned_allocator<okvis::kinematics::Transformation>>
       T_WSs;
   gatherPoseObservForTriang(mp, cameraGeometry, &frameIds, &T_WSs,
-                            &obsDirections, &obsInPixel, &vR_oi);
+                            &obsDirections, &obsInPixel, &imageNoiseStd);
 
   bool triangulated = false;
   /*{

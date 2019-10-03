@@ -10,15 +10,15 @@
 #include <okvis/ceres/RelativePoseError.hpp>
 #include <okvis/ceres/SpeedAndBiasError.hpp>
 
-#include <okvis/ceres/EuclideanParamBlock.hpp>
 #include <okvis/ceres/CameraTimeParamBlock.hpp>
+#include <okvis/ceres/EuclideanParamBlock.hpp>
 
-#include <msckf/EpipolarJacobian.hpp>
-#include <msckf/RelativeMotionJacobian.hpp>
-#include <msckf/FilterHelper.hpp>
 #include <msckf/ImuOdometry.h>
 #include <msckf/PreconditionedEkfUpdater.h>
 #include <msckf/triangulate.h>
+#include <msckf/EpipolarJacobian.hpp>
+#include <msckf/FilterHelper.hpp>
+#include <msckf/RelativeMotionJacobian.hpp>
 #include <msckf/triangulateFast.hpp>
 
 // the following #include's are only for testing
@@ -35,13 +35,13 @@ DECLARE_bool(use_RK4);
 DECLARE_bool(use_IEKF);
 
 DECLARE_double(max_proj_tolerance);
-DEFINE_double(pixel_noise_scale_factor, 1.0, 
-    "Enlarge the original noise std by this scale factor");
+DEFINE_double(pixel_noise_scale_factor, 3.0,
+              "Enlarge the original noise std by this scale factor");
 /// \brief okvis Main namespace of this package.
 namespace okvis {
 
 TFVIO::TFVIO(std::shared_ptr<okvis::ceres::Map> mapPtr,
-               const double readoutTime)
+             const double readoutTime)
     : HybridFilter(mapPtr, readoutTime) {}
 
 // The default constructor.
@@ -51,8 +51,8 @@ TFVIO::~TFVIO() {}
 
 // TODO(jhuai): merge with the superclass implementation
 bool TFVIO::addStates(okvis::MultiFramePtr multiFrame,
-                       const okvis::ImuMeasurementDeque &imuMeasurements,
-                       bool asKeyframe) {
+                      const okvis::ImuMeasurementDeque& imuMeasurements,
+                      bool asKeyframe) {
   // note: this is before matching...
   okvis::kinematics::Transformation T_WS;
   okvis::SpeedAndBiases speedAndBias;
@@ -206,9 +206,9 @@ bool TFVIO::addStates(okvis::MultiFramePtr multiFrame,
 
     if (numUsedImuMeasurements < 2) {
       LOG(WARNING) << "numUsedImuMeasurements=" << numUsedImuMeasurements
-                << " correctedStateTime " << correctedStateTime
-                << " lastFrameTimestamp " << startTime << " tdEstimate "
-                << tdEstimate << std::endl;
+                   << " correctedStateTime " << correctedStateTime
+                   << " lastFrameTimestamp " << startTime << " tdEstimate "
+                   << tdEstimate << std::endl;
     }
   }
 
@@ -325,8 +325,8 @@ bool TFVIO::addStates(okvis::MultiFramePtr multiFrame,
       const int distortionDim = camera_rig_.getDistortionDimen(i);
       std::shared_ptr<okvis::ceres::EuclideanParamBlock>
           distortionParamBlockPtr(new okvis::ceres::EuclideanParamBlock(
-              allIntrinsics.tail(distortionDim), id,
-              correctedStateTime, distortionDim));
+              allIntrinsics.tail(distortionDim), id, correctedStateTime,
+              distortionDim));
       mapPtr_->addParameterBlock(distortionParamBlockPtr,
                                  ceres::Map::Parameterization::Trivial);
       cameraInfos.at(CameraSensorStates::Distortion).id = id;
@@ -421,8 +421,8 @@ bool TFVIO::addStates(okvis::MultiFramePtr multiFrame,
   // depending on whether or not this is the very beginning, we will add priors
   // or relative terms to the last state:
   if (statesMap_.size() == 1) {
-      const int camIdx = 0;
-      initCovariance(camIdx);
+    const int camIdx = 0;
+    initCovariance(camIdx);
   }
   // record the imu measurements between two consecutive states
   mStateID2Imu.push_back(imuMeasurements);
@@ -448,9 +448,7 @@ bool TFVIO::applyMarginalizationStrategy(
   // remove features tracked no more
   for (PointMap::iterator pit = landmarksMap_.begin();
        pit != landmarksMap_.end();) {
-    if (pit->second.residualizeCase ==
-        NotInState_NotTrackedNow) {
-
+    if (pit->second.residualizeCase == NotInState_NotTrackedNow) {
       ceres::Map::ResidualBlockCollection residuals =
           mapPtr_->residuals(pit->first);
       ++mTrackLengthAccumulator[residuals.size()];
@@ -490,30 +488,23 @@ bool TFVIO::applyMarginalizationStrategy(
   return true;
 }
 
-bool TFVIO::epipolarConstraintWithJacobian(
-    const MapPoint& mp, Eigen::Matrix<double, 1, Eigen::Dynamic>* Hi,
-    double* ri, double* Ri, bool lastObs) const {
-  const int camIdx = 0;
-  std::shared_ptr<okvis::cameras::CameraBase> tempCameraGeometry =
-      camera_rig_.getCameraGeometry(camIdx);
-  // head and tail observations for this feature point
-  std::vector<Eigen::Vector2d, Eigen::aligned_allocator<Eigen::Vector2d>>
-      obsInPixel;
-  // id of head and tail frames observing this feature point
-  std::vector<uint64_t> frameIds;
-  std::vector<double> imagePointNoiseStd;  // std noise in pixels
-
-  // each entry is undistorted coordinates in image plane at
-  // z=1 in the specific camera frame, [\bar{x},\bar{y},1]
-  std::vector<Eigen::Vector3d, Eigen::aligned_allocator<Eigen::Vector3d>>
-      obsDirections;
-  std::vector<okvis::kinematics::Transformation,
-              Eigen::aligned_allocator<okvis::kinematics::Transformation>>
-      T_WSs;
-  RetrieveObsSeqType seqType = lastObs ? HEAD_TAIL : LATEST_TWO;
-  gatherPoseObservForTriang(mp, tempCameraGeometry, &frameIds, &T_WSs,
-                            &obsDirections, &obsInPixel, &imagePointNoiseStd,
-                            seqType);
+bool TFVIO::measurementJacobian(
+    const std::shared_ptr<okvis::cameras::CameraBase> tempCameraGeometry,
+    const std::vector<uint64_t>& frameIds,
+    const std::vector<
+        okvis::kinematics::Transformation,
+        Eigen::aligned_allocator<okvis::kinematics::Transformation>>& T_WSs,
+    const std::vector<Eigen::Vector3d,
+                      Eigen::aligned_allocator<Eigen::Vector3d>>& obsDirections,
+    const std::vector<Eigen::Vector2d,
+                      Eigen::aligned_allocator<Eigen::Vector2d>>& obsInPixel2,
+    const std::vector<double>& imagePointNoiseStd2, int camIdx,
+    Eigen::Matrix<double, 1, Eigen::Dynamic>* H_xjk,
+    std::vector<Eigen::Matrix<double, 1, 3>,
+                Eigen::aligned_allocator<Eigen::Matrix<double, 1, 3>>>* H_fjk,
+    std::vector<Eigen::Matrix3d, Eigen::aligned_allocator<Eigen::Matrix3d>>*
+        cov_fjk,
+    double* residual) const {
   // camera related Jacobians and covariance
   std::vector<
       Eigen::Matrix<double, 3, Eigen::Dynamic>,
@@ -523,7 +514,7 @@ bool TFVIO::epipolarConstraintWithJacobian(
       cov_fj(2);
   int projOptModelId = camera_rig_.getProjectionOptMode(camIdx);
   for (int j = 0; j < 2; ++j) {
-    double pixelNoiseStd = imagePointNoiseStd[2 * j];
+    double pixelNoiseStd = imagePointNoiseStd2[j * 2];
     obsDirectionJacobian(obsDirections[j], tempCameraGeometry, projOptModelId,
                          pixelNoiseStd, &dfj_dXcam[j], &cov_fj[j]);
   }
@@ -533,7 +524,7 @@ bool TFVIO::epipolarConstraintWithJacobian(
   int extrinsicModelId = camera_rig_.getExtrinsicOptMode(camIdx);
   std::vector<okvis::kinematics::Transformation,
               Eigen::aligned_allocator<okvis::kinematics::Transformation>>
-      T_WBtij, lP_T_WBtij; // lp is short for linearization point
+      T_WBtij, lP_T_WBtij;  // lp is short for linearization point
   std::vector<Eigen::Vector3d, Eigen::aligned_allocator<Eigen::Vector3d>>
       v_WBtij, lP_v_WBtij;
   std::vector<Eigen::Vector3d, Eigen::aligned_allocator<Eigen::Vector3d>>
@@ -556,7 +547,7 @@ bool TFVIO::epipolarConstraintWithJacobian(
     OKVIS_ASSERT_GT(Exception, imuMeas.size(), 0,
                     "the IMU measurement does not exist");
 
-    double kpN = obsInPixel[j][1] / imageHeight - 0.5;  // k per N
+    double kpN = obsInPixel2[j][1] / imageHeight - 0.5;  // k per N
     dtij_dtr[j] = kpN;
     Duration featureTime = Duration(tdLatestEstimate + trLatestEstimate * kpN) -
                            statesMap_.at(poseId).tdAtCreation;
@@ -603,9 +594,9 @@ bool TFVIO::epipolarConstraintWithJacobian(
     if (FLAGS_use_first_estimate) {
       Eigen::Matrix<double, 6, 1> posVelFirstEstimate =
           statesMap_.at(poseId).linearizationPoint;
-      lP_T_WB = kinematics::Transformation(posVelFirstEstimate.head<3>(),
-                                           T_WBj.q());
-      lP_v = posVelFirstEstimate.tail<3>();     
+      lP_T_WB =
+          kinematics::Transformation(posVelFirstEstimate.head<3>(), T_WBj.q());
+      lP_v = posVelFirstEstimate.tail<3>();
       if (featureTime >= Duration()) {
         IMUOdometry::propagation(imuMeas, imuParametersVec_.at(0), lP_T_WB,
                                  lP_v, iem, stateEpoch,
@@ -628,7 +619,7 @@ bool TFVIO::epipolarConstraintWithJacobian(
       (lP_T_WBtij[0] * T_SC0_).inverse() * (lP_T_WBtij[1] * T_SC0_);
   EpipolarJacobian epj(T_Ctij_Ctik.q(), T_Ctij_Ctik.r(), obsDirections[0],
                        obsDirections[1]);
-  *ri = -epj.evaluate();  // observation is 0
+  *residual = -epj.evaluate();  // observation is 0
 
   // compute Jacobians for camera parameters
   EpipolarJacobian epj_lp(lP_T_Ctij_Ctik.q(), lP_T_Ctij_Ctik.r(),
@@ -723,49 +714,156 @@ bool TFVIO::epipolarConstraintWithJacobian(
   }
 
   // assemble the Jacobians
-  int featureVariableDimen = cameraParamsMinimalDimen() +
-                             kClonedStateMinimalDimen * (statesMap_.size());
-  Hi->resize(1, featureVariableDimen);
-  Hi->setZero();
+  H_xjk->setZero();
   const int minExtrinsicDim = camera_rig_.getMinimalExtrinsicDimen(camIdx);
   const int minProjDim = camera_rig_.getMinimalProjectionDimen(camIdx);
   const int minDistortDim = camera_rig_.getDistortionDimen(camIdx);
   if (minExtrinsicDim > 0) {
-    Hi->topLeftCorner(1, minExtrinsicDim) = de_dExtrinsic;
+    H_xjk->topLeftCorner(1, minExtrinsicDim) = de_dExtrinsic;
   }
-  Hi->block(0, minExtrinsicDim, 1, minProjDim + minDistortDim) = de_dxcam;
+  H_xjk->block(0, minExtrinsicDim, 1, minProjDim + minDistortDim) = de_dxcam;
   int startIndex = minExtrinsicDim + minProjDim + minDistortDim;
-  (*Hi)(startIndex) = de_dtd;
+  (*H_xjk)(startIndex) = de_dtd;
   startIndex += 1;
-  (*Hi)(startIndex) = de_dtr;
+  (*H_xjk)(startIndex) = de_dtr;
 
   const int minCamParamDim = cameraParamsMinimalDimen();
+  double scale_factor2 =
+      FLAGS_pixel_noise_scale_factor * FLAGS_pixel_noise_scale_factor;
   for (int j = 0; j < 2; ++j) {
     uint64_t poseId = frameIds[j];
     std::map<uint64_t, int>::const_iterator poseid_iter =
         mStateID2CovID_.find(poseId);
     int covid = poseid_iter->second;
     int startIndex = minCamParamDim + 9 * covid;
-    Hi->block<1, 3>(0, startIndex) = de_dp_GBtj[j];
-    Hi->block<1, 3>(0, startIndex + 3) = de_dtheta_GBtj[j];
-    Hi->block<1, 3>(0, startIndex + 6) = de_dv_GBtj[j];
+    H_xjk->block<1, 3>(0, startIndex) = de_dp_GBtj[j];
+    H_xjk->block<1, 3>(0, startIndex + 3) = de_dtheta_GBtj[j];
+    H_xjk->block<1, 3>(0, startIndex + 6) = de_dv_GBtj[j];
+    H_fjk->emplace_back(de_dfj[j]);
+
+    // TODO(jhuai): account for the IMU noise
+    cov_fjk->emplace_back(cov_fj[j] * scale_factor2);
   }
 
-  // compute covariance
-  // TODO(jhuai): account for the IMU noise
-  Eigen::Matrix<double, 1, 1> Ri_eigen =
-      de_dfj[0] * cov_fj[0] * de_dfj[0].transpose() +
-      de_dfj[1] * cov_fj[1] * de_dfj[1].transpose();
-  *Ri = Ri_eigen[0] * FLAGS_pixel_noise_scale_factor * 
-      FLAGS_pixel_noise_scale_factor;
   return true;
+}
+
+bool TFVIO::featureJacobian(
+    const MapPoint& mp,
+    Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic>* Hi,
+    Eigen::Matrix<double, Eigen::Dynamic, 1>* ri,
+    Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic>* Ri) const {
+  const int camIdx = 0;
+  std::shared_ptr<okvis::cameras::CameraBase> tempCameraGeometry =
+      camera_rig_.getCameraGeometry(camIdx);
+  // head and tail observations for this feature point
+  std::vector<Eigen::Vector2d, Eigen::aligned_allocator<Eigen::Vector2d>>
+      obsInPixels;
+  // id of head and tail frames observing this feature point
+  std::vector<uint64_t> frameIds;
+  std::vector<double> imagePointNoiseStds;  // std noise in pixels
+
+  // each entry is undistorted coordinates in image plane at
+  // z=1 in the specific camera frame, [\bar{x},\bar{y},1]
+  std::vector<Eigen::Vector3d, Eigen::aligned_allocator<Eigen::Vector3d>>
+      obsDirections;
+  std::vector<okvis::kinematics::Transformation,
+              Eigen::aligned_allocator<okvis::kinematics::Transformation>>
+      T_WSs;
+  gatherPoseObservForTriang(mp, tempCameraGeometry, &frameIds, &T_WSs,
+                            &obsDirections, &obsInPixels, &imagePointNoiseStds,
+                            ENTIRE_TRACK);
+
+  const int numFeatures = frameIds.size();
+  std::vector<std::pair<int, int>> featurePairs = getFramePairs(numFeatures);
+  const int numConstraints = featurePairs.size();
+  int featureVariableDimen = cameraParamsMinimalDimen() +
+                             kClonedStateMinimalDimen * (statesMap_.size());
+  Hi->resize(numConstraints, featureVariableDimen);
+  ri->resize(numConstraints, 1);
+
+  Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> H_fi(numConstraints,
+                                                             3 * numFeatures);
+  H_fi.setZero();
+  Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> cov_fi(3 * numFeatures,
+                                                               3 * numFeatures);
+  cov_fi.setZero();
+
+  for (int count = 0; count < numConstraints; ++count) {
+    const std::pair<int, int>& feature_pair = featurePairs[count];
+    std::vector<uint64_t> frameId2;
+    std::vector<okvis::kinematics::Transformation,
+                Eigen::aligned_allocator<okvis::kinematics::Transformation>>
+        T_WS2;
+    std::vector<Eigen::Vector3d, Eigen::aligned_allocator<Eigen::Vector3d>>
+        obsDirection2;
+    std::vector<Eigen::Vector2d, Eigen::aligned_allocator<Eigen::Vector2d>>
+        obsInPixel2;
+    std::vector<double> imagePointNoiseStd2;
+    std::vector<int> index_vec{feature_pair.first, feature_pair.second};
+    for (auto index : index_vec) {
+      frameId2.emplace_back(frameIds[index]);
+      T_WS2.emplace_back(T_WSs[index]);
+      obsDirection2.emplace_back(obsDirections[index]);
+      obsInPixel2.emplace_back(obsInPixels[index]);
+      imagePointNoiseStd2.emplace_back(imagePointNoiseStds[2 * index]);
+      imagePointNoiseStd2.emplace_back(imagePointNoiseStds[2 * index + 1]);
+    }
+    Eigen::Matrix<double, 1, Eigen::Dynamic> H_xjk(1, featureVariableDimen);
+    std::vector<Eigen::Matrix<double, 1, 3>,
+                Eigen::aligned_allocator<Eigen::Matrix<double, 1, 3>>>
+        H_fjk;
+    std::vector<Eigen::Matrix3d, Eigen::aligned_allocator<Eigen::Matrix3d>>
+        cov_fjk;
+    double rjk;
+    measurementJacobian(tempCameraGeometry, frameId2, T_WS2, obsDirection2,
+                        obsInPixel2, imagePointNoiseStd2, camIdx, &H_xjk, &H_fjk,
+                        &cov_fjk, &rjk);
+    Hi->row(count) = H_xjk;
+    (*ri)(count) = rjk;
+    for (int j = 0; j < 2; ++j) {
+      int index = index_vec[j];
+      H_fi.block<1, 3>(count, index * 3) = H_fjk[j];
+      cov_fi.block<3, 3>(index * 3, index * 3) = cov_fjk[j];
+    }
+  }
+  Ri->resize(numConstraints, numConstraints);
+  *Ri = H_fi * cov_fi * H_fi.transpose();
+  return true;
+}
+
+std::vector<std::pair<int, int>> getFramePairs(int numFeatures) {
+  std::vector<std::pair<int, int>> framePairs;
+  framePairs.reserve(2 * numFeatures - 3);
+  // scheme 1 works
+//  for (int j = 0; j < numFeatures - 1; ++j) {
+//    framePairs.emplace_back(0, j + 1);
+//  }
+  // scheme 2 works
+//  for (int j = 0; j < numFeatures - 1; ++j) {
+//    framePairs.emplace_back(numFeatures - 1, j);
+//  }
+  // scheme 3 works best
+  int halfFeatures = numFeatures / 2;
+  for (int j = 0; j < halfFeatures; ++j) {
+      framePairs.emplace_back(j, halfFeatures + j);
+  }
+  for (int j = 0; j < halfFeatures - 1; ++j) {
+      framePairs.emplace_back(j, halfFeatures + j + 1);
+  }
+  // Surprisingly, more constraints degrades accuracy.
+//  for (int j = 0; j < halfFeatures - 1; ++j) {
+//      if (j != halfFeatures - j - 1) {
+//          framePairs.emplace_back(j, halfFeatures + j - 1);
+//      }
+//  }
+  return framePairs;
 }
 
 void obsDirectionJacobian(
     const Eigen::Vector3d& obsDirection,
     const std::shared_ptr<okvis::cameras::CameraBase> cameraGeometry,
-    int projOptModelId,
-    double pixelNoiseStd,
+    int projOptModelId, double pixelNoiseStd,
     Eigen::Matrix<double, 3, Eigen::Dynamic>* dfj_dXcam,
     Eigen::Matrix3d* cov_fj) {
   const Eigen::Vector3d& fj = obsDirection;
@@ -778,22 +876,24 @@ void obsDirectionJacobian(
   Eigen::Matrix2d df12_dz = dz_df12.inverse();
   int cols = intrinsicsJacobian.cols();
   dfj_dXcam->resize(3, cols);
-  dfj_dXcam->topLeftCorner(2, cols) = - df12_dz * intrinsicsJacobian;
+  dfj_dXcam->topLeftCorner(2, cols) = -df12_dz * intrinsicsJacobian;
   dfj_dXcam->row(2).setZero();
   cov_fj->setZero();
-  cov_fj->topLeftCorner<2, 2>() = df12_dz * Eigen::Matrix2d::Identity() * df12_dz.transpose() *
-            pixelNoiseStd * pixelNoiseStd;
+  cov_fj->topLeftCorner<2, 2>() = df12_dz * Eigen::Matrix2d::Identity() *
+                                  df12_dz.transpose() * pixelNoiseStd *
+                                  pixelNoiseStd;
 }
 
 int TFVIO::computeStackedJacobianAndResidual(
-    Eigen::MatrixXd *T_H, Eigen::Matrix<double, Eigen::Dynamic, 1> *r_q,
-    Eigen::MatrixXd *R_q) const {
-  // compute and stack Jacobians and Residuals for landmarks observed in current frame
+    Eigen::MatrixXd* T_H, Eigen::Matrix<double, Eigen::Dynamic, 1>* r_q,
+    Eigen::MatrixXd* R_q) const {
+  // compute and stack Jacobians and Residuals for landmarks observed in current
+  // frame
   const int camParamStartIndex = startIndexOfCameraParams();
   int featureVariableDimen = covariance_.rows() - camParamStartIndex;
   int dimH[2] = {0, featureVariableDimen};
-  const Eigen::MatrixXd variableCov =
-      covariance_.block(camParamStartIndex, camParamStartIndex, dimH[1], dimH[1]);
+  const Eigen::MatrixXd variableCov = covariance_.block(
+      camParamStartIndex, camParamStartIndex, dimH[1], dimH[1]);
 
   // containers of Jacobians of measurements
   std::vector<Eigen::MatrixXd, Eigen::aligned_allocator<Eigen::MatrixXd>> vr;
@@ -802,27 +902,28 @@ int TFVIO::computeStackedJacobianAndResidual(
 
   for (auto it = landmarksMap_.begin(); it != landmarksMap_.end(); ++it) {
     ResidualizeCase rc = it->second.residualizeCase;
-    if (rc != NotToAdd_TrackedNow) {
+    const size_t nNumObs = it->second.observations.size();
+    if (rc != NotInState_NotTrackedNow ||
+        nNumObs < minTrackLength_) {
       continue;
     }
 
-    Eigen::Matrix<double, 1, Eigen::Dynamic> Hi(1, dimH[1]);
-    Eigen::Matrix<double, 1, 1> ri;
-    Eigen::Matrix<double, 1, 1> Ri;
+    Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> Hi;
+    Eigen::Matrix<double, Eigen::Dynamic, 1> ri;
+    Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> Ri;
     bool isValidJacobian =
-        epipolarConstraintWithJacobian(it->second, &Hi, ri.data(), Ri.data(),
-                                       true);
+        featureJacobian(it->second, &Hi, &ri, &Ri);
     if (!isValidJacobian) {
       continue;
     }
 
     if (!FilterHelper::gatingTest(Hi, ri, Ri, variableCov)) {
-        continue;
+      continue;
     }
     vr.push_back(ri);
     vR.push_back(Ri);
     vH.push_back(Hi);
-    ++dimH[0];
+    dimH[0] += Hi.rows();
   }
   if (dimH[0] == 0) {
     return 0;
@@ -837,10 +938,8 @@ int TFVIO::computeStackedJacobianAndResidual(
 
 uint64_t TFVIO::getMinValidStateID() const {
   uint64_t min_state_id = statesMap_.rbegin()->first;
-  for (auto it = landmarksMap_.begin(); it != landmarksMap_.end();
-       ++it) {
-    if (it->second.residualizeCase == NotInState_NotTrackedNow)
-      continue;
+  for (auto it = landmarksMap_.begin(); it != landmarksMap_.end(); ++it) {
+    if (it->second.residualizeCase == NotInState_NotTrackedNow) continue;
 
     auto itObs = it->second.observations.begin();
     if (itObs->first.frameId <
@@ -854,18 +953,18 @@ uint64_t TFVIO::getMinValidStateID() const {
 
 void TFVIO::optimize(size_t /*numIter*/, size_t /*numThreads*/, bool verbose) {
   uint64_t currFrameId = currentFrameId();
-  OKVIS_ASSERT_EQ(
-      Exception,
-      covariance_.rows() - startIndexOfClonedStates(),
-      (int)(kClonedStateMinimalDimen * statesMap_.size()), "Inconsistent covDim and number of states");
+  OKVIS_ASSERT_EQ(Exception, covariance_.rows() - startIndexOfClonedStates(),
+                  (int)(kClonedStateMinimalDimen * statesMap_.size()),
+                  "Inconsistent covDim and number of states");
   retrieveEstimatesOfConstants();
 
   // mark tracks of features that are not tracked in current frame
   int numTracked = 0;
   int featureVariableDimen = cameraParamsMinimalDimen() +
-      kClonedStateMinimalDimen * (statesMap_.size());
+                             kClonedStateMinimalDimen * statesMap_.size();
 
-  for (okvis::PointMap::iterator it = landmarksMap_.begin(); it != landmarksMap_.end(); ++it) {
+  for (okvis::PointMap::iterator it = landmarksMap_.begin();
+       it != landmarksMap_.end(); ++it) {
     ResidualizeCase toResidualize = NotInState_NotTrackedNow;
     for (auto itObs = it->second.observations.rbegin(),
               iteObs = it->second.observations.rend();
@@ -879,7 +978,7 @@ void TFVIO::optimize(size_t /*numIter*/, size_t /*numThreads*/, bool verbose) {
     it->second.residualizeCase = toResidualize;
   }
   trackingRate_ = static_cast<double>(numTracked) /
-      static_cast<double>(landmarksMap_.size());
+                  static_cast<double>(landmarksMap_.size());
 
   if (FLAGS_use_IEKF) {
     // c.f., Faraz Mirzaei, a Kalman filter based algorithm for IMU-Camera
@@ -953,11 +1052,8 @@ void TFVIO::optimize(size_t /*numIter*/, size_t /*numThreads*/, bool verbose) {
     updateLandmarksTimer.start();
     retrieveEstimatesOfConstants();  // do this because states are just updated
     minValidStateID = statesMap_.rbegin()->first;
-    for (auto it = landmarksMap_.begin(); it != landmarksMap_.end();
-         ++it) {
-      if (it->second.residualizeCase ==
-          NotInState_NotTrackedNow)
-        continue;
+    for (auto it = landmarksMap_.begin(); it != landmarksMap_.end(); ++it) {
+      if (it->second.residualizeCase == NotInState_NotTrackedNow) continue;
       // this happens with a just inserted landmark without triangulation.
       if (it->second.observations.size() < 2) continue;
 

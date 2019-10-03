@@ -413,7 +413,7 @@ int HybridFrontend::matchToLastFrame(
     const okvis::VioParameters& params, const uint64_t currentFrameId,
     bool usePoseUncertainty, bool removeOutliers) {
   int retCtr = 0;
-  int matches3d2d(0), inliers3d2d(0), matches2d2d(0), inliers2d2d(0);
+  int matches3d2d(0), inliers3d2d(0), matches2d2d(0);
 
   if (FLAGS_feature_tracking_method == 1) {
     cv::Size winSize(21, 21);
@@ -525,8 +525,7 @@ int HybridFrontend::matchToLastFrame(
     // remove outliers
     bool rotationOnly = false;
     if (!isInitialized_)
-      inliers2d2d =
-          runRansac2d2d(estimator, params, currentFrameId, lastFrameId, false,
+      runRansac2d2d(estimator, params, currentFrameId, lastFrameId, false,
                         removeOutliers, &rotationOnly);
   } else {  // load saved tracking result by an external module
     std::shared_ptr<okvis::MultiFrame> frameB =
@@ -553,8 +552,7 @@ int HybridFrontend::matchToLastFrame(
 
     // if mapPointIds == 0, it means non correspondence
     trailManager_.pTracker->getNextFrame(currentTime.toSec(), keypoints,
-                                         mapPointIds, mapPointPositions,
-                                         currentFrameId);
+                                         mapPointIds, mapPointPositions);
     std::cout << "#kp, #mp " << keypoints.size() << " " << mapPointIds.size()
               << std::endl;
     if (mapPointIds.empty()) {

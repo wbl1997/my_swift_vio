@@ -684,7 +684,7 @@ class HybridFilter : public VioBackendInterface {
           *obsDirections,
       std::vector<Eigen::Vector2d, Eigen::aligned_allocator<Eigen::Vector2d>>
           *obsInPixel,
-      std::vector<double> *vR_oi,
+      std::vector<double> *vSigmai,
       RetrieveObsSeqType seqType=ENTIRE_TRACK) const;
 
   /**
@@ -697,7 +697,7 @@ class HybridFilter : public VioBackendInterface {
    *    because the MapPoint.observations is an ordinary ordered map
    * @param v4Xhomog, stores [X,Y,Z,1] in the global frame or the anchor frame
    *    depending on anchorSeqId
-   * @param vR_oi, the diagonal elements of the observation noise matrix, in
+   * @param vSigmai, the diagonal elements of the observation noise matrix, in
    *    pixels, size 2Nx1
    * @param cameraGeometry, used for point projection
    * @param T_SC0
@@ -710,7 +710,7 @@ class HybridFilter : public VioBackendInterface {
       std::vector<Eigen::Vector2d, Eigen::aligned_allocator<Eigen::Vector2d>>
           &obsInPixel,
       std::vector<uint64_t> &frameIds, Eigen::Vector4d &v4Xhomog,
-      std::vector<double> &vR_oi,
+      std::vector<double> &vSigmai,
       const std::shared_ptr<okvis::cameras::CameraBase> cameraGeometry,
       const okvis::kinematics::Transformation &T_SC0,
       int anchorSeqId = -1) const;

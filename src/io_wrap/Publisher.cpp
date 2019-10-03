@@ -477,7 +477,7 @@ void Publisher::setPoints(const okvis::MapPointVector &pointsMatched,
     pointsTransferred_.points.back().x = point[0] / point[3];
     pointsTransferred_.points.back().y = point[1] / point[3];
     pointsTransferred_.points.back().z = point[2] / point[3];
-    float intensity =
+    /*float intensity =*/
         std::min(parameters_.publishing.maxLandmarkQuality,
                  static_cast<float>(pointsTransferred[i].quality)) /
         parameters_.publishing.maxLandmarkQuality;
