@@ -37,6 +37,8 @@ DECLARE_bool(use_IEKF);
 DECLARE_double(max_proj_tolerance);
 DEFINE_double(pixel_noise_scale_factor, 3.0,
               "Enlarge the original noise std by this scale factor");
+DEFINE_bool(head_tail, false, "Use head tail in an incremental manner or"
+                             " the entire track at the end");
 /// \brief okvis Main namespace of this package.
 namespace okvis {
 
@@ -770,9 +772,10 @@ bool TFVIO::featureJacobian(
   std::vector<okvis::kinematics::Transformation,
               Eigen::aligned_allocator<okvis::kinematics::Transformation>>
       T_WSs;
+  RetrieveObsSeqType seqType = FLAGS_head_tail ? HEAD_TAIL : ENTIRE_TRACK;
   gatherPoseObservForTriang(mp, tempCameraGeometry, &frameIds, &T_WSs,
                             &obsDirections, &obsInPixels, &imagePointNoiseStds,
-                            ENTIRE_TRACK);
+                            seqType);
 
   const int numFeatures = frameIds.size();
   std::vector<std::pair<int, int>> featurePairs = getFramePairs(numFeatures);
@@ -903,9 +906,14 @@ int TFVIO::computeStackedJacobianAndResidual(
   for (auto it = landmarksMap_.begin(); it != landmarksMap_.end(); ++it) {
     ResidualizeCase rc = it->second.residualizeCase;
     const size_t nNumObs = it->second.observations.size();
-    if (rc != NotInState_NotTrackedNow ||
-        nNumObs < minTrackLength_) {
-      continue;
+    if (!FLAGS_head_tail) {
+      if (rc != NotInState_NotTrackedNow || nNumObs < minTrackLength_) {
+        continue;
+      }
+    } else {
+      if (rc != NotToAdd_TrackedNow || nNumObs < minTrackLength_) {
+        continue;
+      }
     }
 
     Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> Hi;
