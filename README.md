@@ -3,18 +3,19 @@ README                        {#mainpage}
 
 Welcome to msckf/Hybrid Filter.
 
-The msckf has been fully implemented with the so-called first estimate Jacobian technique.
-The Hybrid filter referring to a hybrid of MSCKF and EKF-SLAM is not yet fully implemented.
+The msckf [1][2] has been fully implemented with the so-called first estimate Jacobian technique [2].
+Its derivation can be found in [1] and [4].
 
-This is the Jianzhu Huai's implementation of the [1] and [2] with detailed derivation in [3]. It is developed based on the OKVIS library.
+The Hybrid filter [3] referring to a hybrid of MSCKF and EKF-SLAM is not yet fully implemented.
+The filters are developed based on the OKVIS library.
 
-[1] Li, M., Yu, H., Zheng, X., & Mourikis, A. I. (2014, May). High-fidelity sensor modeling and self-calibration in vision-aided inertial navigation.
-In 2014 IEEE International Conference on Robotics and Automation (ICRA) (pp. 409-416). IEEE.
+[1] J. Huai, “Collaborative SLAM with crowdsourced data,” Ph.D., The Ohio State University, Columbus OH, 2017.
 
-[2] Li, M., & Mourikis, A. I. (2013, July). Optimization-based estimator design for vision-aided inertial navigation.
-In Proc. of the Robotics: Science and Systems Conference (pp. 241-248).
+[2] M. Li, H. Yu, X. Zheng, and A. I. Mourikis, “High-fidelity sensor modeling and self-calibration in vision-aided inertial navigation,” in 2014 IEEE International Conference on Robotics and Automation (ICRA), Hong Kong, China, 2014, pp. 409–416.
 
-[3] Michael Andrew Shelley. Monocular Visual Inertial Odometry on a Mobile Device. Master thesis, Technical University of Munich, 2014.
+[3] M. Li and A. I. Mourikis, “Optimization-based estimator design for vision-aided inertial navigation,” in Robotics: Science and Systems, 2013, pp. 241–248.
+
+[4] M. Shelley, “Monocular Visual Inertial Odometry on a Mobile Device,” Master, Technical University of Munich, Germany, 2014.
 
 Note that the codebase that you are provided here is free of charge and without 
 any warranty. This is bleeding edge research software.
@@ -31,45 +32,48 @@ This is a catkin package that wraps the pure CMake project.
 
 You will need to install the following dependencies,
 
-* ROS (currently supported: hydro, indigo and jade). Read the instructions in 
-  http://wiki.ros.org/indigo/Installation/Ubuntu. You will need the additional 
-  package pcl-ros as (assuming indigo)
+* ROS (currently supported: hydro, kinetic and jade). Read the instructions in 
+  http://wiki.ros.org/kinetic/Installation/Ubuntu. You will need the additional 
+  package pcl-ros as (assuming kinetic)
 
-        sudo apt-get install ros-indigo-pcl-ros
+```
+sudo apt-get install ros-kinetic-pcl-ros
+```
 
 * google-glog + gflags,
 
-        sudo apt-get install libgoogle-glog-dev
-   
+```
+sudo apt-get install libgoogle-glog-dev
+```
+
 * The following should get installed through ROS anyway:
 
-        sudo apt-get install libatlas-base-dev libeigen3-dev libsuitesparse-dev 
-        sudo apt-get install libopencv-dev libboost-dev libboost-filesystem-dev
-
-then clone the repository from github into your catkin workspace:
-
-    git clone --recursive https://github.com/JzHuai0108/msckf.git
-
-Also vio_common
 ```
-cd workspace/src
+sudo apt-get install libatlas-base-dev libeigen3-dev libsuitesparse-dev 
+sudo apt-get install libopencv-dev libboost-dev libboost-filesystem-dev
+```
+* vio_common
+
+```
+cd msckf_ws/src
 git clone https://github.com/JzHuai0108/vio_common.git
-# then open CMakeLists.txt of vio_common, on line 9, SET(USE_ROS True)
 ```
 
-## Building the project
+then clone the repository from github into your catkin workspace (assuming msckf_ws):
 
-If you have installed okvis_ros in the catkin workspace, then you may need to disable that package 
-by renaming its package.xml file in order to avoid confusing catkin.
-
-From the catkin workspace root, type 
 ```
-cd workspace/
-catkin_make -DUSE_ROS=ON -DBUILD_TESTS=ON --pkg vio_common msckf
+cd msckf_ws/src
+git clone --recursive https://JzHuai0108@bitbucket.org/JzHuai0108/msckf2.git
 ```
-You will find a demo application in devel/lib/msckf/msckf_node. It can process datasets in the ASL/ETH format.
 
-### Configure linter
+## Build the project
+
+```
+cd msckf_ws/
+catkin_make -DUSE_ROS=ON -DBUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Release --pkg vio_common msckf
+```
+
+## Configure linter for making contributions
 
 If you are going to contribute to the project, please configure linter as follows.
 The below instructions were tested on Ubuntu 16.04.
@@ -84,9 +88,14 @@ bash
 cd ../..
 init_linter_git_hooks
 ```
-### Run gtests
 
-Both gtest and gmock are required.
+## Run gtests
+
+* Both gtest and gmock are required. 
+They can be installed with the below instructions. 
+More info about installation can be found [here](https://www.eriksmistad.no/getting-started-with-google-test-on-ubuntu/).
+
+
 ```
 sudo apt-get install libgtest-dev google-mock
 cd /usr/src/gtest
@@ -101,32 +110,31 @@ sudo make
 # copy or symlink libgmock.a and libgmock_main.a to your /usr/lib folder
 sudo cp *.a /usr/lib
 ```
-Ref: https://www.eriksmistad.no/getting-started-with-google-test-on-ubuntu/
 
-To run all tests,
+* To run all tests,
 ```
-# catkin_make run_tests
+# catkin_make run_tests # or
 rosrun msckf msckf_test
 ```
 
-To run a selected tests
+* To run selected tests, e.g.,
 ```
 rosrun msckf msckf_test --gtest_filter="*Eigen*"
-
 ```
 
 ## Debug the project with QtCreator
 
-Follow the below steps exactly, otherwise mysterious errors like missing generate_config file.
+Follow the below steps exactly, otherwise mysterious errors like missing generate_config file arise.
 
 Even following the below instructions, the qtcreator still will create binaries and
 file structures different from that generated by running catkin_make.
 
-### Build msckf with catkin_make
+### First, build msckf with catkin_make
 
 To prepare the workspace file structure, 
 clean build and devel dirs under the workspace, 
-then build the project
+then build the project with the below instructions.
+
 ```
 cd msckf_ws/devel
 rm -rf ./*
@@ -135,9 +143,9 @@ rm -rf ./*
 catkin_make -DUSE_ROS=ON --pkg vio_common msckf
 ```
 
-### Build msckf with QtCreator
+### Second, build msckf with QtCreator
 
-To begin with, open qtcreator, suppose msckf_ws is the workspace dir,
+To begin with, open QtCreator, assuming msckf_ws is the workspace dir,
 
 ```
 source msckf_ws/devel/setup.zsh
@@ -153,23 +161,64 @@ source /opt/ros/kinetic/setup.zsh
 /opt/Qt/Tools/QtCreator/bin/qtcreator
 ```
 
-Then, open msckf_ws/src/msckf/CMakeLists.txt in QtCreator,
-uncomment SET(CATKIN_DEVEL_PREFIX /persist/msckf_ws/devel) in CMakeLists.txt
-
-For the first time, configure the DEFAULT output path for the project in QtCreator as msckf_ws/build/msckf. 
+Then, open msckf_ws/src/msckf/CMakeLists.txt in QtCreator. For the first time, configure the DEFAULT output path for the project in QtCreator as msckf_ws/build/msckf. 
 QtCreator may not find cmake files for libraries like roscpp, 
 set the path like /opt/ros/kinetic/share/roscpp/cmake. Doing similar changes for other not found ros libraries.
 
-To enable debug mode, in the Build option panel, set CMake Build Type to Debug
+To enable debug mode, in the Build option panel, set CMake Build Type to Debug.
 
-To start debugging, add commandline arguments in the Run option panel, then press the Run icon
+To start debugging, add commandline arguments in the Run option panel, then press the Run icon.
 
-Example running cases
+## Example running cases
 
-### Reading measurements from a video and an IMU csv file
+### Parameter description
+
+Parameters through command line
+|  Command line arguments | Description | Default |
+|---|---|---|
+|  estimator_algorithm | 0 OKVIS, 1 MSCKF, 2 triangulation-free (TF) VIO | 1 |
+|  load_input_option |  0 subscribe to rostopics, 1 load video and IMU csv |  1 |
+| dump_output_option | 0 publish to rostopics, 1 save nav states to csv, 3 save nav states and calibration parameters to csv. 0 and others do not work simultaneously | 3 |
+| use_AIDP | true, anchored inverse depth parameterization; false, Euclidean. AIDP is preferred. | true |
+| feature_tracking_method | 0 BRISK brute force in OKVIS with 3d2d RANSAC, 1 KLT. KLT is very experimental. | 0 |
+| use_IEKF | true iterated EKF, false EKF. For filters only | false |
+| max_inc_tol | the maximum infinity norm of the filter correction. 10.0 for outdoors, 2.0 for indoors, though its value should be insensitive | 2.0 |
+| head_tail | Use the fixed head and receding tail observations or the entire feature track to compose two-view constraints in TF_VIO | false |
+| pixel_noise_scale_factor | Scale up the image observation noise std for TF_VIO. 3 is recommended for the two-view constraint scheme based on an entire feature track, 4-5 is recommended for the two-view head_tail constraint scheme | 3 |
+
+Parameters through config yaml
+
+Remark: set sigma_{param} to zero to disable estimating "param" in filtering methods.
+
+| Configuration parameters | Description | Default |
+|---|---|---|
+| extrinsic_opt_mode | For MSCKF and TF_VIO. "P_CS", estimate camera extrinsic translation, used with IMU TgTsTa 27 dim model [2]; "P_SC_R_SC", estimate camera extrinsics, used with say IMU BgBa model; "", fixed camera extrinsics | "" |
+| projection_opt_mode | For MSCKF and TF_VIO. "FXY_CXY", estimate fx fy cx cy; "FX_CXY", estimate fx=fy, cx, cy; "FX", estimate fx=fy; "", camera projection intrinsic parameters are fixed | "" |
+| down_scale | divide up the configured image width, image height, fx, fy, cx, cy by this divisor | 1 |
+| distortion_type | "radialtangential", "equidistant", "radialtangential8", "fov" | REQUIRED |
+| camera_rate | For processing data loaded from a video and an IMU csv, it determines the play speed. For debug mode, half of the normal camera rate is recommended, e.g., 15 Hz | 30 for Release, 15 for Debug |
+| image_readout_time | time to read out an entire frame, i.e., the rolling shutter skew. 0 for global shutter, ~0.030 for rolling shutter | 0 |
+| sigma_absolute_translation | The standard deviation [m] of the camera extrinsics translation. With OKVIS, e.g. 1.0e-10 for online-calib; With MSCKF or TF_VIO, 5e-2 for online extrinsic translation calib, 0 to fix the translation. |  0 |
+| sigma_absolute_orientation | The standard deviation [rad] of the camera extrinsics orientation. With OKVIS, e.g. 1.0e-3 for online-calib; With MSCKF or TF_VIO and extrinsic_opt_mode is "P_SC_R_SC", 5e-2 for online extrinsic orientation calib, 0 to fix the extrinsic orientation | 0 |
+| sigma_c_relative_translation | For OKVIS only, the std. dev. [m] of the cam. extr. transl. change between frames, e.g. 1.0e-6 for adaptive online calib (not less for numerics) | 0 |
+| sigma_c_relative_orientation | For OKVIS only, the std. dev. [rad] of the cam. extr. orient. change between frames, e.g. 1.0e-6 for adaptive online calib (not less for numerics) | 0 |
+| timestamp_tolerance | stereo frame out-of-sync tolerance [s] | 0.2/camera_rate, e.g., 0.005 |
+| sigma_focal_length | For MSCKF and TF_VIO only, set to say 5.0 to estimate focal lengths, set to 0 to fix them | 0.0 |
+| sigma_principal_point | For MSCKF and TF_VIO only, set to say 5.0 to estimate cx, cy, set to 0 to fix them | 0.0 |
+| sigma_distortion | For MSCKF and TF_VIO only, set to nonzeros to estimate distortion parameters, set to 0s to fix them. Adapt to distortion types, e.g., [0.01, 0.003, 0.0, 0.0] for "radialtangential", e.g., [0.01] for "fov" | [0.0] * k |
+| imageDelay | Only used for loading data from a video and an IMU csv, image frame time in the video clock - imageDelay = frame time in the IMU clock | 0.0 |
+| sigma_td | For MSCKF and TF_VIO only, set to say 5e-3 sec to estimate time delay between the camera and IMU, set to 0 to fix the delay as imageDelay | 0.0 |
+| sigma_tr | For MSCKF and TF_VIO only, set to say 5e-3 sec to estimate the rolling shutter readout time, set to 0 to fix the readout time as image_readout_time | 0.0 |
+| sigma_TGElement | For MSCKF and TF_VIO only, set to say 5e-3 to estimate the Tg matrix for gyros, set to 0 to fix the matrix as Identity | 0 |
+| sigma_TSElement | For MSCKF and TF_VIO only, set to say 1e-3 to estimate the gravity sensitivity Ts matrix for gyros, set to 0 to fix the matrix as Zero | 0 |
+| sigma_TAElement | For MSCKF and TF_VIO only, set to say 5e-3 to estimate the Ta matrix for accelerometers, set to 0 to fix the matrix as Identity | 0 |
+| numKeyframes | For OKVIS, number of keyframes in optimisation window | 5 |
+| numImuFrames | For OKVIS, number of average frames in optimisation window, 3 recommended; For MSCKF and TF_VIO, numKeyframes + numImuFrames is the maximum allowed cloned states in the entire state vector, 30 recommended for their sum. | 2 |
+
+### Process measurements from a video and an IMU csv
 ```
-msckf_ws/devel/lib/msckf/msckf_node $HOME/docker_documents/msckf_ws/src/msckf/config/config_parkinglot_jisun_s6.yaml 
- --output_dir=/media/$USER/Seagate/temp/parkinglot/ 
+msckf_ws/devel/lib/msckf/okvis_node $HOME/docker_documents/msckf_ws/src/msckf/config/config_parkinglot_jisun_s6.yaml 
+ --output_dir=/media/$USER/Seagate/temp/parkinglot/
  --video_file="/media/$USER/Seagate/data/spin-lab/west_campus_parking_lot/Jisun/20151111_120342.mp4" 
  --imu_file="/media/$USER/Seagate/data/spin-lab/west_campus_parking_lot/Jisun/mystream_11_11_12_3_13.csv" 
  --use_AIDP=true  --start_index=18800 --finish_index=28900 --max_inc_tol=10.0 
@@ -177,10 +226,10 @@ msckf_ws/devel/lib/msckf/msckf_node $HOME/docker_documents/msckf_ws/src/msckf/co
 ```
 The running program will exit once the sequence finishes.
 
-### Measurements from rostopics
+### Process measurements from rostopics
 
-1. Download a dataset of your choice from 
-   http://projects.asl.ethz.ch/datasets/doku.php?id=kmavvisualinertialdatasets. 
+1. Download a dataset of your choice from [here](
+   http://projects.asl.ethz.ch/datasets/doku.php?id=kmavvisualinertialdatasets). 
    Assuming you downloaded MH_01_easy/. 
    You will find a corresponding calibration / estimator configuration in the 
    okvis/config folder.
@@ -192,18 +241,15 @@ rosrun msckf okvis_node $HOME/docker_documents/msckf_ws/src/msckf/config/config_
  --dump_output_option=0 --load_input_option=0 --output_dir=$HOME/Desktop/temp 
  --use_AIDP=true --feature_tracking_method=0 --estimator_algorithm=1
 
-# use start to skip the static segment
-rosbag play --pause --start=45.0 --rate=1.0 /media/$USER/Seagate/data/euroc/MH_01_easy.bag /cam0/image_raw:=/camera0 /imu0:=/imu
+rosbag play --pause --start=5.0 --rate=1.0 /media/$USER/Seagate/data/euroc/MH_01_easy.bag /cam0/image_raw:=/camera0 /imu0:=/imu
 
 rosrun rviz rviz -d $HOME/docker_documents/msckf_ws/src/msckf/config/rviz.rviz
 ```
+
 In this case, the program will exit once the Ctrl+C is entered in the terminal that runs the msckf_node.
 Note the program will not exit if Ctrl+C is entered in the terminal of roscore.
 
-Use the rviz.rviz configuration in the okvis_ros/config/ directory to get the pose / 
-landmark display.
-
-### TUM VI dataset
+### Process the TUM VI dataset
 
 ```
 $HOME/docker_documents/msckf_ws/src/msckf/config/config_tum_vi_50_20_msckf.yaml \
@@ -221,6 +267,8 @@ In terms of coordinate frames and notation,
 * C\_i denotes the i-th camera frame, 
 * S denotes the IMU sensor frame,
 * B denotes a (user-specified) body frame.
+
+For MSCKF and TF_VIO, S and B are used interchangeably.
 
 The output of the okvis library is the pose T\_WS as a position r\_WS and quaternion 
 q\_WS, followed by the velocity in World frame v\_W and gyro biases (b_g) as well as 
@@ -257,7 +305,7 @@ To perform a calibration yourself, we recommend the following:
 
 * Get Kalibr by following the instructions here 
   https://github.com/ethz-asl/kalibr/wiki/installation . If you decide to build from 
-	source and you run ROS indigo checkout pull request 3:
+	source and you run ROS kinetic checkout pull request 3:
 
     git fetch origin pull/3/head:request3
     git checkout request3

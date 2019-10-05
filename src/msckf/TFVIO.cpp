@@ -35,10 +35,19 @@ DECLARE_bool(use_RK4);
 DECLARE_bool(use_IEKF);
 
 DECLARE_double(max_proj_tolerance);
-DEFINE_double(pixel_noise_scale_factor, 3.0,
-              "Enlarge the original noise std by this scale factor");
-DEFINE_bool(head_tail, false, "Use head tail in an incremental manner or"
-                             " the entire track at the end");
+
+DEFINE_bool(
+    head_tail, false,
+    "If true, use the fixed head observation and "
+    "the receding tail observation of a landmark to "
+    "form one two-view constraint in one filter update step; "
+    "or else the entire feature track of a landmark is used to "
+    "compose two-view constraints which are used in one filter update step "
+    "as the landmark disappears");
+DEFINE_double(
+    pixel_noise_scale_factor, 3.0,
+    "Enlarge the image observation noise std by this scale factor.");
+
 /// \brief okvis Main namespace of this package.
 namespace okvis {
 

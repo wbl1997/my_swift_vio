@@ -591,7 +591,7 @@ class HybridFilter : public VioBackendInterface {
   /// here t_{j_0} is the raw timestamp of image j,
   /// t_{d_j} is the current estimated time offset between the visual and
   /// inertial data, after correcting the initial time offset
-  /// imageDelay.Therefore, t_{d_j} is set 0 at the beginning t_j is the
+  /// imageDelay. Therefore, t_{d_j} is set 0 at the beginning t_j is the
   /// timestamp of the state, remains constant after initialization t_{f_i} =
   /// t_j - t_{d_j} + t_d + (v-N/2)t_r/N here t_d and t_r are the true time
   /// offset and image readout time t_{f_i} is the time feature i is observed
