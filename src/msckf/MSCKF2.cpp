@@ -188,6 +188,12 @@ bool MSCKF2::addStates(okvis::MultiFramePtr multiFrame,
         speedAndBias.head<3>() = tempV_WS;
       }
     }
+    if (numUsedImuMeasurements < 2) {
+      LOG(WARNING) << "numUsedImuMeasurements=" << numUsedImuMeasurements
+                << " correctedStateTime " << correctedStateTime
+                << " lastFrameTimestamp " << startTime << " tdEstimate "
+                << tdEstimate << std::endl;
+    }
 
     covariance_.topLeftCorner(ceres::ode::OdoErrorStateDim,
                               ceres::ode::OdoErrorStateDim) = Pkm1;
@@ -204,13 +210,6 @@ bool MSCKF2::addStates(okvis::MultiFramePtr multiFrame,
                           covDim - ceres::ode::OdoErrorStateDim,
                           ceres::ode::OdoErrorStateDim) *
         F_tot.transpose();
-
-    if (numUsedImuMeasurements < 2) {
-      LOG(WARNING) << "numUsedImuMeasurements=" << numUsedImuMeasurements
-                << " correctedStateTime " << correctedStateTime
-                << " lastFrameTimestamp " << startTime << " tdEstimate "
-                << tdEstimate << std::endl;
-    }
   }
 
   // create a states object:
@@ -622,8 +621,7 @@ int MSCKF2::marginalizeRedundantFrames(size_t maxClonedStates) {
   return rm_cam_state_ids.size();
 }
 
-// Applies the dropping/marginalization strategy according to Michael A.
-// Shelley's MS thesis
+
 bool MSCKF2::applyMarginalizationStrategy(
     size_t numKeyframes, size_t numImuFrames,
     okvis::MapPointVector& /*removedLandmarks*/) {

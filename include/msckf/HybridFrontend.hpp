@@ -107,10 +107,14 @@ class HybridFrontend {
   /// @{
 
   /// @brief Get the number of octaves of the BRISK detector.
-  size_t getBriskDetectionOctaves() const { return briskDetectionOctaves_; }
+  size_t getBriskDetectionOctaves() const {
+    return briskDetectionOctaves_;
+  }
 
   /// @brief Get the detection threshold of the BRISK detector.
-  double getBriskDetectionThreshold() const { return briskDetectionThreshold_; }
+  double getBriskDetectionThreshold() const {
+    return briskDetectionThreshold_;
+  }
 
   /// @brief Get the absolute threshold of the BRISK detector.
   double getBriskDetectionAbsoluteThreshold() const {
@@ -141,7 +145,9 @@ class HybridFrontend {
   /// @{
 
   /// @brief Get the matching threshold.
-  double getBriskMatchingThreshold() const { return briskMatchingThreshold_; }
+  double getBriskMatchingThreshold() const {
+    return briskMatchingThreshold_;
+  }
 
   /// @brief Get the area overlap threshold under which a new keyframe is
   /// inserted.
@@ -155,9 +161,10 @@ class HybridFrontend {
     return keyframeInsertionMatchingRatioThreshold_;
   }
 
-  /// @brief Returns true if the initialization has been completed (RANSAC with
-  /// actual translation)
-  bool isInitialized() { return isInitialized_; }
+  /// @brief Returns true if the initialization has been completed (RANSAC with actual translation)
+  bool isInitialized() {
+    return isInitialized_;
+  }
 
   /// @}
   /// @name Setters related to the BRISK detector
@@ -351,6 +358,7 @@ class HybridFrontend {
   int matchToLastFrame(
       okvis::HybridFilter& estimator,
       const okvis::VioParameters& params, const uint64_t currentFrameId,
+      bool& rotationOnly,
       bool usePoseUncertainty = true, bool removeOutliers = true);
 
   /**
@@ -401,7 +409,7 @@ class HybridFrontend {
       okvis::HybridFilter& estimator,
       const okvis::VioParameters& params, uint64_t currentFrameId,
       uint64_t olderFrameId, bool initializePose, bool removeOutliers,
-      bool* rotationOnly);
+      bool& rotationOnly);
 
   /// (re)instantiates feature detectors and descriptor extractors. Used after
   /// settings changed or at startup.

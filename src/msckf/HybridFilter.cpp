@@ -1194,13 +1194,13 @@ bool HybridFilter::computeHxf(const uint64_t hpbid, const MapPoint& mp,
     }
   } else {
     Eigen::Vector3d tempV_WS = sb.head<3>();
-    int numUsedImuMeasurements = -1;
+
     if (featureTime >= Duration()) {
-      numUsedImuMeasurements = IMUOdometry::propagation(
+      IMUOdometry::propagation(
           imuMeas, imuParametersVec_.at(0), T_WB, tempV_WS, iem, stateEpoch,
           stateEpoch + featureTime);
     } else {
-      numUsedImuMeasurements = IMUOdometry::propagationBackward(
+      IMUOdometry::propagationBackward(
           imuMeas, imuParametersVec_.at(0), T_WB, tempV_WS, iem, stateEpoch,
           stateEpoch + featureTime);
     }
@@ -1483,13 +1483,13 @@ bool HybridFilter::featureJacobian(
       }
     } else {
       Eigen::Vector3d tempV_WS = sb.head<3>();
-      int numUsedImuMeasurements = -1;
+
       if (featureTime >= Duration()) {
-        numUsedImuMeasurements = IMUOdometry::propagation(
+        IMUOdometry::propagation(
             imuMeas, imuParametersVec_.at(0), T_WB, tempV_WS, iem, stateEpoch,
             stateEpoch + featureTime);
       } else {
-        numUsedImuMeasurements = IMUOdometry::propagationBackward(
+        IMUOdometry::propagationBackward(
             imuMeas, imuParametersVec_.at(0), T_WB, tempV_WS, iem, stateEpoch,
             stateEpoch + featureTime);
       }
