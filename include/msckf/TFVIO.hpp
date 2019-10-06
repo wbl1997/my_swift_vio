@@ -161,10 +161,6 @@ void obsDirectionJacobian(
     Eigen::Matrix<double, 3, Eigen::Dynamic>* dfj_dXcam,
     Eigen::Matrix3d* cov_fj);
 
-// forward [0, 1], [0, 2], ..., [0, n-1]
-// backward [n-1, n-2], [n-1, n-3], ..., [n-1, 2]
-std::vector<std::pair<int, int>> getFramePairs(int numFeatures);
-
 }  // namespace okvis
 
 #endif /* INCLUDE_OKVIS_TFVIO_HPP_ */

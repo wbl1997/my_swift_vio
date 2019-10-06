@@ -20,6 +20,7 @@
 #include <msckf/FilterHelper.hpp>
 #include <msckf/RelativeMotionJacobian.hpp>
 #include <msckf/triangulateFast.hpp>
+#include <msckf/TwoViewPair.hpp>
 
 // the following #include's are only for testing
 #include <okvis/timing/Timer.hpp>
@@ -787,7 +788,8 @@ bool TFVIO::featureJacobian(
                             seqType);
 
   const int numFeatures = frameIds.size();
-  std::vector<std::pair<int, int>> featurePairs = getFramePairs(numFeatures);
+  std::vector<std::pair<int, int>> featurePairs =
+      TwoViewPair::getFramePairs(numFeatures, TwoViewPair::MAX_GAP_EVEN_CHANCE);
   const int numConstraints = featurePairs.size();
   int featureVariableDimen = cameraParamsMinimalDimen() +
                              kClonedStateMinimalDimen * (statesMap_.size());
@@ -844,33 +846,6 @@ bool TFVIO::featureJacobian(
   return true;
 }
 
-std::vector<std::pair<int, int>> getFramePairs(int numFeatures) {
-  std::vector<std::pair<int, int>> framePairs;
-  framePairs.reserve(2 * numFeatures - 3);
-  // scheme 1 works
-//  for (int j = 0; j < numFeatures - 1; ++j) {
-//    framePairs.emplace_back(0, j + 1);
-//  }
-  // scheme 2 works
-//  for (int j = 0; j < numFeatures - 1; ++j) {
-//    framePairs.emplace_back(numFeatures - 1, j);
-//  }
-  // scheme 3 works best
-  int halfFeatures = numFeatures / 2;
-  for (int j = 0; j < halfFeatures; ++j) {
-      framePairs.emplace_back(j, halfFeatures + j);
-  }
-  for (int j = 0; j < halfFeatures - 1; ++j) {
-      framePairs.emplace_back(j, halfFeatures + j + 1);
-  }
-  // Surprisingly, more constraints degrades accuracy.
-//  for (int j = 0; j < halfFeatures - 1; ++j) {
-//      if (j != halfFeatures - j - 1) {
-//          framePairs.emplace_back(j, halfFeatures + j - 1);
-//      }
-//  }
-  return framePairs;
-}
 
 void obsDirectionJacobian(
     const Eigen::Vector3d& obsDirection,

@@ -114,6 +114,7 @@ LIST(APPEND SOURCEFILES
     src/msckf/PreconditionedEkfUpdater.cpp
     src/msckf/HybridFilter.cpp
     src/msckf/MSCKF2.cpp
+    src/msckf/TwoViewPair.cpp
     src/msckf/TFVIO.cpp
 
     src/feature_tracker/TrackResultReader.cpp
@@ -202,6 +203,7 @@ list(APPEND TEST_SRC_FILES
     test/msckf/TestBoundedImuDeque.cpp
     test/msckf/TestRelativeMotionJacobian.cpp
     test/msckf/TestEpipolarJacobian.cpp
+    test/msckf/TestTwoViewPair.cpp
     test/io_wrap/TestVioDatasetPlayer.cpp
     )
 
