@@ -763,9 +763,9 @@ class HybridFilter : public VioBackendInterface {
   /// results is use the publisher loop
   bool print(const std::string) const;
 
-  bool print(std::ostream &mDebug) const;
+  bool print(std::ostream &stream) const;
 
-  void printTrackLengthHistogram(std::ostream &mDebug) const;
+  void printTrackLengthHistogram(std::ostream &stream) const;
 
   /// reset initial condition
   inline void resetInitialPVandStd(const InitialPVandStd &rhs,

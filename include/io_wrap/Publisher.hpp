@@ -64,6 +64,7 @@
 #include <okvis/Parameters.hpp>
 #include <okvis/FrameTypedefs.hpp>
 #include <okvis/Time.hpp>
+#include <io_wrap/StreamHelper.hpp>
 
 /// \brief okvis Main namespace of this package.
 namespace okvis {
@@ -75,10 +76,6 @@ class Publisher
 {
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
  public:
-  enum DUMP_RESULT_OPTION {
-      FULL_STATE=0,
-      FULL_STATE_WITH_EXTRINSICS,
-      FULL_STATE_WITH_ALL_CALIBRATION};
   /// \brief Default constructor.
   explicit Publisher(const DUMP_RESULT_OPTION dro=FULL_STATE);
   ~Publisher();
@@ -275,11 +272,7 @@ class Publisher
   void publishImages();
   /// @brief Publish the last set path.
   void publishPath();
-  void composeHeaderLine(const std::string& imu_model,
-                         const std::string& cam0_proj_opt_rep,
-                         const std::string& cam0_extrinsic_opt_rep,
-                         const std::string& cam0_distortion_rep,
-                         std::string* header_line);
+
   /// @}
 
  private:

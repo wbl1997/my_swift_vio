@@ -24,7 +24,7 @@
 #include "vio/ImuErrorModel.h"
 #include "vio/Sample.h"
 
-DEFINE_bool(use_AIDP, false,
+DEFINE_bool(use_AIDP, true,
             "use anchored inverse depth parameterization for a feature point?"
             " Preliminary result shows AIDP worsen the result slightly");
 
@@ -267,6 +267,11 @@ bool MSCKF2::addStates(okvis::MultiFramePtr multiFrame,
               .at(i)
               .at(CameraSensorStates::T_SCi)
               .id;
+      cameraInfos.at(CameraSensorStates::Intrinsic).exists =
+          lastElementIterator->second.sensors.at(SensorStates::Camera)
+              .at(i)
+              .at(CameraSensorStates::Intrinsic)
+              .exists;
       cameraInfos.at(CameraSensorStates::Intrinsic).id =
           lastElementIterator->second.sensors.at(SensorStates::Camera)
               .at(i)
@@ -320,6 +325,9 @@ bool MSCKF2::addStates(okvis::MultiFramePtr multiFrame,
         mapPtr_->addParameterBlock(intrinsicParamBlockPtr,
                                    ceres::Map::Parameterization::Trivial);
         cameraInfos.at(CameraSensorStates::Intrinsic).id = id;
+      } else {
+        cameraInfos.at(CameraSensorStates::Intrinsic).exists = false;
+        cameraInfos.at(CameraSensorStates::Intrinsic).id = 0u;
       }
       id = IdProvider::instance().newId();
       const int distortionDim = camera_rig_.getDistortionDimen(i);

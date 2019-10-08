@@ -142,7 +142,7 @@ void computeFeatureMeasJacobian(okvis::cameras::NCameraSystem::DistortionType di
         lastKFTime = estimator.statesMap_.rbegin()->second.timestamp;
     }
     okvis::ImuMeasurementDeque imuSegment =
-        okvis::getImuMeasurments(lastKFTime, currentKFTime, imuMeasurements, nullptr);
+        okvis::getImuMeasurements(lastKFTime, currentKFTime, imuMeasurements, nullptr);
 
     std::shared_ptr<okvis::MultiFrame> mf =
         createMultiFrame(currentKFTime, cameraSystem);

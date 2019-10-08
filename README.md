@@ -70,7 +70,10 @@ git clone --recursive https://JzHuai0108@bitbucket.org/JzHuai0108/msckf2.git
 
 ```
 cd msckf_ws/
-catkin_make -DUSE_ROS=ON -DBUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Release --pkg vio_common msckf
+if [[ "x$(nproc)" = "x1" ]] ; then export USE_PROC=1 ;
+else export USE_PROC=$(($(nproc)/2)) ; 
+fi
+catkin_make -DUSE_ROS=ON -DBUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Release -j$USE_PROC --pkg vio_common msckf
 ```
 
 ## Configure linter for making contributions

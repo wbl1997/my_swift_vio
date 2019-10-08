@@ -96,7 +96,7 @@ LIST(APPEND SOURCEFILES
     src/io_wrap/Publisher.cpp
     src/io_wrap/RosParametersReader.cpp
     src/io_wrap/PoseViewer.cpp
-
+    src/io_wrap/StreamHelper.cpp
     src/okvis/ceres/CameraTimeParamBlock.cpp
 
     src/msckf/BoundedImuDeque.cpp
@@ -171,7 +171,7 @@ target_link_libraries(${PROJECT_NAME}
 # now the actual applications
 # a wrapper to invoke a specific test
 add_executable(invoke_one_test src/apps/invoke_one_test.cpp )
-target_link_libraries(invoke_one_test ${PROJECT_NAME})
+target_link_libraries(invoke_one_test ${PROJECT_NAME} gtest pthread)
 
 add_executable(okvis_node src/apps/okvis_node.cpp)
 target_link_libraries(okvis_node ${PROJECT_NAME})

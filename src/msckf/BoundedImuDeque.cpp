@@ -37,13 +37,13 @@ int BoundedImuDeque::pop_front(const okvis::Time& eraseUntil) {
 
 const okvis::ImuMeasurementDeque BoundedImuDeque::find(
     const okvis::Time& begin_time, const okvis::Time& end_time) const {
-  return getImuMeasurments(begin_time, end_time, this->imu_meas_, nullptr);
+  return getImuMeasurements(begin_time, end_time, this->imu_meas_, nullptr);
 }
 
 const okvis::ImuMeasurementDeque BoundedImuDeque::findWindow(
     const okvis::Time& center_time, const okvis::Duration& half_window) const {
   okvis::ImuMeasurementDeque raw_meas =
-          getImuMeasurments(center_time - half_window, center_time + half_window,
+          getImuMeasurements(center_time - half_window, center_time + half_window,
                             this->imu_meas_, nullptr);
   // for a few frames at the beginning, the imu meas may not cover the
   // frame readout window
@@ -66,7 +66,7 @@ const okvis::ImuMeasurementDeque& BoundedImuDeque::getAllImuMeasurements()
 
 // Get a subset of the recorded IMU measurements.
 // std::lower_bound for deque O(log N)
-okvis::ImuMeasurementDeque getImuMeasurments(
+okvis::ImuMeasurementDeque getImuMeasurements(
     const okvis::Time& imuDataBeginTime, const okvis::Time& imuDataEndTime,
     const okvis::ImuMeasurementDeque& imuMeasurements_,
     std::mutex* imuMeasurements_mutex_) {

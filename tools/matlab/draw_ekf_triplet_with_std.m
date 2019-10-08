@@ -4,17 +4,10 @@ function draw_ekf_triplet_with_std(data, triple_index, ...
 if nargin < 4
     scalar = 1.0;
 end
+draw_data_columns(data, triple_index, scalar);
 dimen = length(triple_index);
-
-line_styles = {'-r', '-g', '-b', '-k', '.k', '.b', '-c', '-m', '-y'};
 std_line_styles = {'--r', '--g', '--b', '--k', '-.k', '-.b', ...
     '--c', '--m', '--y'};
-
-plot(data(:,1), data(:, triple_index(1))*scalar, line_styles{1}); hold on;
-for i=2:dimen
-    plot(data(:,1), data(:, triple_index(i))*scalar, line_styles{i});
-end
-
 for i=1:dimen
     plot(data(:,1), (3*data(:, triple_std_index(i)) + ...
         data(:, triple_index(i)))*scalar, std_line_styles{i});

@@ -21,6 +21,8 @@
 #include <okvis/ceres/EuclideanParamBlock.hpp>
 #include <okvis/timing/Timer.hpp>
 
+#include <io_wrap/StreamHelper.hpp>
+
 DEFINE_bool(use_RK4, false,
             "use 4th order runge-kutta or the trapezoidal "
             "rule for integrating IMU data and computing"
@@ -320,6 +322,11 @@ bool HybridFilter::addStates(okvis::MultiFramePtr multiFrame,
               .at(i)
               .at(CameraSensorStates::T_SCi)
               .id;
+      cameraInfos.at(CameraSensorStates::Intrinsic).exists =
+          lastElementIterator->second.sensors.at(SensorStates::Camera)
+              .at(i)
+              .at(CameraSensorStates::Intrinsic)
+              .exists;
       cameraInfos.at(CameraSensorStates::Intrinsic).id =
           lastElementIterator->second.sensors.at(SensorStates::Camera)
               .at(i)
@@ -359,8 +366,8 @@ bool HybridFilter::addStates(okvis::MultiFramePtr multiFrame,
       Eigen::VectorXd allIntrinsics;
       camera_rig_.getCameraGeometry(i)->getIntrinsics(allIntrinsics);
       id = IdProvider::instance().newId();
-      int projectionDim = camera_rig_.getMinimalProjectionDimen(i);
       int projOptModelId = camera_rig_.getProjectionOptMode(i);
+      const int projectionDim = camera_rig_.getMinimalProjectionDimen(i);
       if (projectionDim > 0) {
         Eigen::VectorXd projIntrinsics;
         ProjectionOptGlobalToLocal(projOptModelId, allIntrinsics, &projIntrinsics);
@@ -371,6 +378,9 @@ bool HybridFilter::addStates(okvis::MultiFramePtr multiFrame,
         mapPtr_->addParameterBlock(projectionParamBlockPtr,
                                    ceres::Map::Parameterization::Trivial);
         cameraInfos.at(CameraSensorStates::Intrinsic).id = id;
+      } else {
+        cameraInfos.at(CameraSensorStates::Intrinsic).exists = false;
+        cameraInfos.at(CameraSensorStates::Intrinsic).id = 0u;
       }
 
       id = IdProvider::instance().newId();
@@ -1541,13 +1551,13 @@ bool HybridFilter::featureJacobian(
       lP_sb.head<3>() = posVelFirstEstimate.tail<3>();
 
       Eigen::Vector3d tempV_WS = lP_sb.head<3>();
-      int numUsedImuMeasurements = -1;
+
       if (featureTime >= Duration()) {
-        numUsedImuMeasurements = IMUOdometry::propagation(
+        IMUOdometry::propagation(
             imuMeas, imuParametersVec_.at(0), lP_T_WB, tempV_WS, iem,
             stateEpoch, stateEpoch + featureTime);
       } else {
-        numUsedImuMeasurements = IMUOdometry::propagationBackward(
+        IMUOdometry::propagationBackward(
             imuMeas, imuParametersVec_.at(0), lP_T_WB, tempV_WS, iem,
             stateEpoch, stateEpoch + featureTime);
       }
@@ -2865,10 +2875,15 @@ bool HybridFilter::print(const std::string debugFile) const {
   static std::ofstream stream;  // the stream corresponding to the debugFile
   if (!stream.is_open()) {
     stream.open(debugFile, std::ofstream::out);
-    stream << "%state timestamp, frameIdInSource, T_WS(xyz, xyzw), v_WS, bg, "
-              "ba, Tg, Ts, Ta, "
-              "p_CB, fx, fy, cx, cy, k1, k2, p1, p2, td, tr, and their stds"
-           << std::endl;
+    std::string header = "";
+    StreamHelper::composeHeaderLine(
+        imuParametersVec_[0].model_type,
+        camera_rig_.getProjectionOptMode(0),
+        camera_rig_.getExtrinsicOptMode(0),
+        camera_rig_.getCameraGeometry(0)->distortionType(),
+        FULL_STATE_WITH_ALL_CALIBRATION,
+        &header);
+    stream << header << std::endl;
   }
   return print(stream);
 }
@@ -2942,17 +2957,19 @@ bool HybridFilter::print(std::ostream& stream) const {
   kinematics::Transformation T_SC0 = extrinsicParamBlockPtr->estimate();
   stream << " " << T_SC0.inverse().r().transpose().format(SpaceInitFmt);
 
-  uint64_t intrinsicId = stateInQuestion.sensors.at(SensorStates::Camera)
-                             .at(camIdx)
-                             .at(CameraSensorStates::Intrinsic)
-                             .id;
-  std::shared_ptr<ceres::EuclideanParamBlock> intrinsicParamBlockPtr =
-      std::static_pointer_cast<ceres::EuclideanParamBlock>(
-          mapPtr_->parameterBlockPtr(intrinsicId));
-  Eigen::VectorXd cameraIntrinsics =
-      intrinsicParamBlockPtr->estimate();
-  stream << " " << cameraIntrinsics.transpose().format(SpaceInitFmt);
-
+  const int minProjectionDim = camera_rig_.getMinimalProjectionDimen(camIdx);
+  if (minProjectionDim > 0) {
+    uint64_t intrinsicId = stateInQuestion.sensors.at(SensorStates::Camera)
+                               .at(camIdx)
+                               .at(CameraSensorStates::Intrinsic)
+                               .id;
+    std::shared_ptr<ceres::EuclideanParamBlock> intrinsicParamBlockPtr =
+        std::static_pointer_cast<ceres::EuclideanParamBlock>(
+            mapPtr_->parameterBlockPtr(intrinsicId));
+    Eigen::VectorXd cameraIntrinsics =
+        intrinsicParamBlockPtr->estimate();
+    stream << " " << cameraIntrinsics.transpose().format(SpaceInitFmt);
+  }
   uint64_t distortionId = stateInQuestion.sensors.at(SensorStates::Camera)
                               .at(camIdx)
                               .at(CameraSensorStates::Distortion)

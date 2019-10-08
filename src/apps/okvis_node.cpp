@@ -24,6 +24,7 @@
 
 #include <okvis/ThreadedKFVio.hpp>
 
+#include <io_wrap/StreamHelper.hpp>
 #include <io_wrap/Player.hpp>
 #include <io_wrap/Publisher.hpp>
 #include <io_wrap/RosParametersReader.hpp>
@@ -87,7 +88,7 @@ int main(int argc, char **argv) {
   ros::NodeHandle nh("okvis_node");
   okvis::Publisher publisher(
       nh,
-      okvis::Publisher::DUMP_RESULT_OPTION::FULL_STATE_WITH_ALL_CALIBRATION);
+      okvis::FULL_STATE_WITH_ALL_CALIBRATION);
 
   std::string configFilename;
   if (argc >= 2) {
@@ -162,10 +163,11 @@ int main(int argc, char **argv) {
         std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
   } else {
     std::string headerLine;
-    publisher.composeHeaderLine(parameters.imu.model_type,
+    okvis::StreamHelper::composeHeaderLine(parameters.imu.model_type,
                       parameters.nCameraSystem.projOptRep(camIdx),
                       parameters.nCameraSystem.extrinsicOptRep(camIdx),
                       parameters.nCameraSystem.cameraGeometry(camIdx)->distortionType(),
+                      okvis::FULL_STATE_WITH_ALL_CALIBRATION,
                       &headerLine);
     publisher.setCsvFile(path + "/msckf_estimates.csv", headerLine);
     if (FLAGS_dump_output_option == 1) {

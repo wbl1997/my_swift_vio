@@ -28,7 +28,7 @@ class BoundedImuDeque {
 };
 
 // Get a subset of the recorded IMU measurements.
-okvis::ImuMeasurementDeque getImuMeasurments(
+okvis::ImuMeasurementDeque getImuMeasurements(
     const okvis::Time& imuDataBeginTime, const okvis::Time& imuDataEndTime,
     const okvis::ImuMeasurementDeque& imuMeasurements_,
     std::mutex* imuMeasurements_mutex_ = nullptr);

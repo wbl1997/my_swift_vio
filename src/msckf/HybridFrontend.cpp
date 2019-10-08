@@ -592,7 +592,8 @@ int HybridFrontend::matchToLastFrame(
     // remove outliers
     rotationOnly = false;
     bool initializePose = false;
-    if (!isInitialized_)
+    bool always_on_2dransac = false;
+    if (always_on_2dransac || !isInitialized_)
       runRansac2d2d(estimator, params, currentFrameId, lastFrameId, initializePose,
                     removeOutliers, rotationOnly);
   }
@@ -819,7 +820,11 @@ int HybridFrontend::runRansac2d2d(
 
     // failure?
     if (!rotation_only_success && !rel_pose_success) {
+      LOG(INFO) << "2D-2D RANSAC failed";
       continue;
+    } else {
+      LOG(INFO) << "2D-2D RANSAC "
+                << (rel_pose_success ? "rel pose" : "rot only");
     }
 
     // otherwise: kick out outliers!
