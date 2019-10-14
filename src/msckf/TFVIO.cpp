@@ -791,13 +791,14 @@ bool TFVIO::featureJacobian(
               Eigen::aligned_allocator<okvis::kinematics::Transformation>>
       T_WSs;
   RetrieveObsSeqType seqType = FLAGS_head_tail ? HEAD_TAIL : ENTIRE_TRACK;
-  gatherPoseObservForTriang(mp, tempCameraGeometry, &frameIds, &T_WSs,
+  size_t numFeatures = gatherPoseObservForTriang(mp, tempCameraGeometry, &frameIds, &T_WSs,
                             &obsDirections, &obsInPixels, &imagePointNoiseStds,
                             seqType);
-
-  const int numFeatures = frameIds.size();
+  if (numFeatures < 2) { // A two view constraint requires at least two obs
+      return false;
+  }
   std::vector<std::pair<int, int>> featurePairs =
-      TwoViewPair::getFramePairs(numFeatures, TwoViewPair::MAX_GAP_EVEN_CHANCE);
+      TwoViewPair::getFramePairs(numFeatures, TwoViewPair::FIXED_MIDDLE);
   const int numConstraints = featurePairs.size();
   int featureVariableDimen = cameraParamsMinimalDimen() +
                              kClonedStateMinimalDimen * (statesMap_.size());
@@ -911,8 +912,7 @@ int TFVIO::computeStackedJacobianAndResidual(
     Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> Hi;
     Eigen::Matrix<double, Eigen::Dynamic, 1> ri;
     Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> Ri;
-    bool isValidJacobian =
-        featureJacobian(it->second, &Hi, &ri, &Ri);
+    bool isValidJacobian = featureJacobian(it->second, &Hi, &ri, &Ri);
     if (!isValidJacobian) {
       continue;
     }

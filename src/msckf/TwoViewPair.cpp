@@ -42,6 +42,14 @@ std::vector<std::pair<int, int>> TwoViewPair::getFramePairs(
         framePairs.emplace_back(numFeatures - 1, j);
       }
       break;
+    case FIXED_MIDDLE:
+      for (j = 0; j < halfFeatures; ++j) {
+        framePairs.emplace_back(j, halfFeatures);
+      }
+      for (j = halfFeatures + 1; j < numFeatures; ++j) {
+        framePairs.emplace_back(j, halfFeatures);
+      }
+      break;
     case MAX_GAP_EVEN_CHANCE:
     default:
       if (numFeatures < pairs_lut.size()) {

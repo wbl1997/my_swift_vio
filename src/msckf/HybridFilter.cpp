@@ -821,17 +821,17 @@ bool HybridFilter::applyMarginalizationStrategy(
 
   // actual covariance update for reparameterized features
   int tempCounter = 0;
-  Eigen::MatrixXd featureJacobian = Eigen::MatrixXd::Identity(
+  Eigen::MatrixXd featureJacMat = Eigen::MatrixXd::Identity(
       covDim,
       covDim);  // Jacobian of all the new states w.r.t the old states
   for (auto it = vJacobian.begin(); it != vJacobian.end();
        ++it, ++tempCounter) {
-    featureJacobian.block(numNavImuCamPoseStates + vCovPtId[tempCounter] * 3, 0,
+    featureJacMat.block(numNavImuCamPoseStates + vCovPtId[tempCounter] * 3, 0,
                           3, covDim) = vJacobian[tempCounter];
   }
   if (vJacobian.size()) {
     covariance_ =
-        (featureJacobian * covariance_).eval() * featureJacobian.transpose();
+        (featureJacMat * covariance_).eval() * featureJacMat.transpose();
   }
 
   // actual covariance decimation for features in state and not tracked now
@@ -1260,13 +1260,12 @@ bool HybridFilter::computeHxf(const uint64_t hpbid, const MapPoint& mp,
     lP_sb.head<3>() = posVelFirstEstimate.tail<3>();
 
     Eigen::Vector3d tempV_WS = lP_sb.head<3>();
-    int numUsedImuMeasurements = -1;
     if (featureTime >= Duration()) {
-      numUsedImuMeasurements = IMUOdometry::propagation(
+      IMUOdometry::propagation(
           imuMeas, imuParametersVec_.at(0), lP_T_WB, tempV_WS, iem, stateEpoch,
           stateEpoch + featureTime);
     } else {
-      numUsedImuMeasurements = IMUOdometry::propagationBackward(
+      IMUOdometry::propagationBackward(
           imuMeas, imuParametersVec_.at(0), lP_T_WB, tempV_WS, iem, stateEpoch,
           stateEpoch + featureTime);
     }
@@ -2686,7 +2685,7 @@ bool HybridFilter::getSensorStateParameterBlockPtr(
   return true;
 }
 
-void HybridFilter::gatherPoseObservForTriang(
+size_t HybridFilter::gatherPoseObservForTriang(
     const MapPoint& mp,
     const std::shared_ptr<cameras::CameraBase> cameraGeometry,
     std::vector<uint64_t>* frameIds,
@@ -2735,6 +2734,14 @@ void HybridFilter::gatherPoseObservForTriang(
         multiFramePtrMap_.at(itObs->first.frameId);
     multiFramePtr->getKeypoint(itObs->first.cameraIndex,
                                itObs->first.keypointIndex, measurement);
+    // use the latest estimates for camera intrinsic parameters
+    Eigen::Vector3d backProjectionDirection;
+    bool validDirection = cameraGeometry->backProject(measurement, &backProjectionDirection);
+    if (!validDirection) {
+        continue;
+    }
+    // each observation is in image plane z=1, (\bar{x}, \bar{y}, 1)
+    obsDirections->push_back(backProjectionDirection);
 
     obsInPixel->push_back(measurement);
 
@@ -2745,17 +2752,12 @@ void HybridFilter::gatherPoseObservForTriang(
     imageNoiseStd->push_back(kpSize / 8);
     imageNoiseStd->push_back(kpSize / 8);
 
-    // use the latest estimates for camera intrinsic parameters
-    Eigen::Vector3d backProjectionDirection;
-    cameraGeometry->backProject(measurement, &backProjectionDirection);
-    // each observation is in image plane z=1, (\bar{x}, \bar{y}, 1)
-    obsDirections->push_back(backProjectionDirection);
-
     okvis::kinematics::Transformation T_WS;
     get_T_WS(poseId, T_WS);
     T_WSs->push_back(T_WS);
     frameIds->push_back(poseId);
   }
+  return frameIds->size();
 }
 
 bool HybridFilter::triangulateAMapPoint(
@@ -2777,10 +2779,14 @@ bool HybridFilter::triangulateAMapPoint(
   std::vector<okvis::kinematics::Transformation,
               Eigen::aligned_allocator<okvis::kinematics::Transformation>>
       T_WSs;
-  gatherPoseObservForTriang(mp, cameraGeometry, &frameIds, &T_WSs,
+  size_t numObs = gatherPoseObservForTriang(mp, cameraGeometry, &frameIds, &T_WSs,
                             &obsDirections, &obsInPixel, &imageNoiseStd);
-
   bool triangulated = false;
+  if (numObs < minTrackLength_) {
+      triangulateTimer.stop();
+      return triangulated;
+  }
+
   /*{
     // the SE3 transform from world to camera frame
     std::vector<Sophus::SE3d, Eigen::aligned_allocator<Sophus::SE3d>> T_CWs;

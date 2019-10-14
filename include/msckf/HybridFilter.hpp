@@ -673,7 +673,7 @@ class HybridFilter : public VioBackendInterface {
  public:
   okvis::Time firstStateTimestamp();
 
-  void gatherPoseObservForTriang(
+  size_t gatherPoseObservForTriang(
       const MapPoint &mp,
       const std::shared_ptr<cameras::CameraBase> cameraGeometry,
       std::vector<uint64_t> *frameIds,
