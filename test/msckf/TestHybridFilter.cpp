@@ -453,28 +453,28 @@ void create_landmark_grid(
       lmIds->push_back(okvis::IdProvider::instance().newId());
     }
   }
-  // top
-  z = zLimit;
-  for (y = -xyLimit; y <= xyLimit; y += xyzIncrement) {
-    for (x = -xyLimit; x <= xyLimit; x += xyzIncrement) {
-      homogeneousPoints->push_back(
-          Eigen::Vector4d(x + vio::gauss_rand(0, offsetNoiseMag),
-                          y + vio::gauss_rand(0, offsetNoiseMag),
-                          z + vio::gauss_rand(0, offsetNoiseMag), 1));
-      lmIds->push_back(okvis::IdProvider::instance().newId());
-    }
-  }
-  // bottom
-  z = -zLimit;
-  for (y = -xyLimit; y <= xyLimit; y += xyzIncrement) {
-    for (x = -xyLimit; x <= xyLimit; x += xyzIncrement) {
-      homogeneousPoints->push_back(
-          Eigen::Vector4d(x + vio::gauss_rand(0, offsetNoiseMag),
-                          y + vio::gauss_rand(0, offsetNoiseMag),
-                          z + vio::gauss_rand(0, offsetNoiseMag), 1));
-      lmIds->push_back(okvis::IdProvider::instance().newId());
-    }
-  }
+//  // top
+//  z = zLimit;
+//  for (y = -xyLimit; y <= xyLimit; y += xyzIncrement) {
+//    for (x = -xyLimit; x <= xyLimit; x += xyzIncrement) {
+//      homogeneousPoints->push_back(
+//          Eigen::Vector4d(x + vio::gauss_rand(0, offsetNoiseMag),
+//                          y + vio::gauss_rand(0, offsetNoiseMag),
+//                          z + vio::gauss_rand(0, offsetNoiseMag), 1));
+//      lmIds->push_back(okvis::IdProvider::instance().newId());
+//    }
+//  }
+//  // bottom
+//  z = -zLimit;
+//  for (y = -xyLimit; y <= xyLimit; y += xyzIncrement) {
+//    for (x = -xyLimit; x <= xyLimit; x += xyzIncrement) {
+//      homogeneousPoints->push_back(
+//          Eigen::Vector4d(x + vio::gauss_rand(0, offsetNoiseMag),
+//                          y + vio::gauss_rand(0, offsetNoiseMag),
+//                          z + vio::gauss_rand(0, offsetNoiseMag), 1));
+//      lmIds->push_back(okvis::IdProvider::instance().newId());
+//    }
+//  }
 
   // save these points into file
   if (pointFile.size()) {
