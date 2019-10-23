@@ -19,6 +19,7 @@ void StreamHelper::composeHeaderLine(const std::string &imu_model,
                     ExtrinsicModelNameToId(cam0_extrinsic_opt_rep),
                     cam0_distortion_rep, result_option, header_line);
 }
+
 void StreamHelper::composeHeaderLine(const std::string &imu_model,
                                      const int &cam0_proj_opt_mode,
                                      const int &cam0_extrinsic_opt_mode,
@@ -50,8 +51,10 @@ void StreamHelper::composeHeaderLine(const std::string &imu_model,
   if (result_option == FULL_STATE_WITH_ALL_CALIBRATION) {
     stream << FLAGS_datafile_separator << imu_param_format;
     stream << FLAGS_datafile_separator << cam_extrinsic_format;
-    stream << FLAGS_datafile_separator << cam_proj_intrinsic_format;
-    stream << FLAGS_datafile_separator << cam_distortion_format;
+    stream << (cam_extrinsic_format.empty() ? "" : FLAGS_datafile_separator)
+           << cam_proj_intrinsic_format;
+    stream << (cam_proj_intrinsic_format.empty() ? "" : FLAGS_datafile_separator)
+           << cam_distortion_format;
     stream << FLAGS_datafile_separator << "td[s]" << FLAGS_datafile_separator
            << "tr[s]";
   } else if (result_option == FULL_STATE_WITH_EXTRINSICS) {

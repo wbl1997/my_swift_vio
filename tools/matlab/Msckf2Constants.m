@@ -50,8 +50,14 @@ classdef Msckf2Constants
         obj.T_a_diag = [37, 41, 45];
         param_index = 46;
         
-        obj.p_BC = param_index + (0:2);
+        switch extrinsic_dim
+            case 0
+                obj.p_BC = [];
+            otherwise
+                obj.p_BC = param_index + (0:2);
+        end
         param_index = param_index + extrinsic_dim;
+        
         switch project_intrinsic_dim
             case 0
                 obj.fxy_cxy = [];
@@ -89,9 +95,14 @@ classdef Msckf2Constants
         obj.T_a_std = param_index + (18:26);
         
         param_index = param_index + misalignment_dim;
-        
-        obj.p_BC_std = param_index + (0:2);
+        switch extrinsic_dim
+            case 0
+                obj.p_BC_std = [];
+            otherwise
+                obj.p_BC_std = param_index + (0:2);
+        end        
         param_index = param_index + extrinsic_dim;
+        
         switch project_intrinsic_dim
             case 0
                 obj.fxy_cxy_std = [];

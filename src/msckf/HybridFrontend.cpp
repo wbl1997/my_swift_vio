@@ -224,10 +224,13 @@ bool HybridFrontend::dataAssociationAndInitialization(
     }
     matchToLastFrameTimer.stop();
     if (!isInitialized_) {
-      if (!rotationOnly) {
+//      if (!rotationOnly) {
+        // TODO(jhuai): should check the motion and then initialize the filter
+        // before adding states for filters like MSCKF which severely
+        // complicates states management
         isInitialized_ = true;
         LOG(INFO) << "Frontend initialized by resetting poses during pure rotation!";
-      }
+//      }
     }
 
     if (num3dMatches <= requiredMatches) {

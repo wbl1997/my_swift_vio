@@ -74,7 +74,7 @@ if [[ "x$(nproc)" = "x1" ]] ; then export USE_PROC=1 ;
 else export USE_PROC=$(($(nproc)/2)) ; 
 fi
 
-catkin config --cmake-args -DUSE_ROS=ON -DBUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Release
+catkin config --cmake-args -DUSE_ROS=ON -DBUILD_TESTS=ON
 catkin build vio_common msckf -DUSE_ROS=ON -DBUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Release -j$USE_PROC
 ```
 TODO(jhuai): the progress percentage in building msckf jumps back and forth with catkin build.
@@ -173,7 +173,15 @@ source /opt/ros/kinetic/setup.zsh
 /opt/Qt/Tools/QtCreator/bin/qtcreator
 ```
 
-Then, open msckf_ws/src/msckf/CMakeLists.txt in QtCreator. For the first time, configure the DEFAULT output path for the project in QtCreator as msckf_ws/build/msckf. 
+Then, open msckf_ws/src/msckf/CMakeLists.txt in QtCreator. 
+For the first time, configure the DEFAULT output path for the project in QtCreator 
+as msckf_ws/build/msckf.
+For subsequent times, you may encounter a dialog warning that 
+"the CMakeCache.txt file or the project configuration has changed",
+and two options are given, "Overwrite Changes in CMake" and 
+"Apply Changes to Project" with the former being the default one. 
+To avoid building the project anew with every project opening later on,
+the overwrite option is recommended.
 QtCreator may not find cmake files for libraries like roscpp, 
 set the path like /opt/ros/kinetic/share/roscpp/cmake. Doing similar changes for other not found ros libraries.
 

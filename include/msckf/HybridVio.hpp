@@ -254,6 +254,9 @@ class HybridVio : public VioInterface {
     std::vector<okvis::kinematics::Transformation,
                 Eigen::aligned_allocator<okvis::kinematics::Transformation>>
         vector_of_T_SCi;
+    /// the optimized parameters of T_SCi
+    std::vector<Eigen::VectorXd, Eigen::aligned_allocator<Eigen::VectorXd>>
+        opt_T_SCi_coeffs;
     okvis::MapPointVector
         landmarksVector;  ///< Vector containing the current landmarks.
     okvis::MapPointVector

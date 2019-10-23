@@ -248,8 +248,8 @@ class Publisher
       const Eigen::Matrix<double, 9, 1> & speedAndBiases,
       const Eigen::Matrix<double, 3, 1> & omega_S,
       const int frameIdInSource,
-      const std::vector<okvis::kinematics::Transformation,
-          Eigen::aligned_allocator<okvis::kinematics::Transformation> > & extrinsics,
+      const std::vector<Eigen::VectorXd,
+          Eigen::aligned_allocator<Eigen::VectorXd>> & extrinsics,
       const Eigen::Matrix<double, Eigen::Dynamic, 1>& vTgsa,
       const Eigen::Matrix<double, Eigen::Dynamic, 1>& vfckptdr,
       const Eigen::Matrix<double, Eigen::Dynamic, 1>& vVariance);

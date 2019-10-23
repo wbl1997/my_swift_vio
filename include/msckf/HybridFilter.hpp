@@ -298,6 +298,9 @@ class HybridFilter : public VioBackendInterface {
   bool getCameraSensorStates(uint64_t poseId, size_t cameraIdx,
                              okvis::kinematics::Transformation &T_SCi) const;
 
+
+  int getCameraExtrinsicOptType(size_t cameraIdx) const;
+
   /// @brief Get the number of states/frames in the estimator.
   /// \return The number of frames.
   size_t numFrames() const { return statesMap_.size(); }

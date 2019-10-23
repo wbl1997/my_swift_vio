@@ -261,6 +261,7 @@ end
 export_fig(outputfig);
 
 figure;
+if ~isempty(msckf_index_server.p_BC)
 draw_ekf_triplet_with_std(data, msckf_index_server.p_BC, msckf_index_server.p_BC_std, 100.0);
 ylabel('p_{BC}[cm]');
 outputfig = [output_dir, '/p_BC.eps'];
@@ -268,8 +269,10 @@ if exist(outputfig, 'file')==2
   delete(outputfig);
 end
 export_fig(outputfig);
+end
 
 figure;
+if ~isempty(msckf_index_server.fxy_cxy)
 data(:, msckf_index_server.fxy_cxy) = data(:, msckf_index_server.fxy_cxy) - ...
     repmat(nominal_intrinsics, size(data, 1), 1);
 draw_ekf_triplet_with_std(data, msckf_index_server.fxy_cxy, ...
@@ -281,6 +284,7 @@ if exist(outputfig, 'file')==2
   delete(outputfig);
 end
 export_fig(outputfig);
+end
 
 figure;
 draw_ekf_triplet_with_std(data, msckf_index_server.k1_k2, msckf_index_server.k1_k2_std);

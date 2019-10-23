@@ -52,7 +52,7 @@ std::vector<std::pair<int, int>> TwoViewPair::getFramePairs(
       break;
     case MAX_GAP_EVEN_CHANCE:
     default:
-      if (numFeatures < pairs_lut.size()) {
+      if (numFeatures < static_cast<int>(pairs_lut.size())) {
         framePairs = pairs_lut[numFeatures];
       } else {
         // more constraints does not mean better results

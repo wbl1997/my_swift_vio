@@ -8,6 +8,7 @@
 #include <gflags/gflags.h>
 #include <glog/logging.h>
 
+#include <msckf/ExtrinsicModels.hpp>
 #include <msckf/FeatureTriangulation.hpp>
 #include <msckf/MSCKF2.hpp>
 #include <msckf/TFVIO.hpp>
@@ -769,6 +770,14 @@ void HybridVio::optimizationLoop() {
         } else {
           result.onlyPublishLandmarks = true;
         }
+        for (size_t i = 0; i < parameters_.nCameraSystem.numCameras(); ++i) {
+          int extrinsic_opt_type = estimator_->getCameraExtrinsicOptType(i);
+          Eigen::VectorXd optimized_coeffs;
+          ExtrinsicModelToParamValues(extrinsic_opt_type,
+                                      result.vector_of_T_SCi[i],
+                                      &optimized_coeffs);
+          result.opt_T_SCi_coeffs.emplace_back(optimized_coeffs);
+        }
         estimator_->getLandmarks(result.landmarksVector);
 
         repropagationNeeded_ = true;
@@ -855,7 +864,7 @@ void HybridVio::publisherLoop() {
       else if (fullStateCallbackWithAllCalibration_)
         fullStateCallbackWithAllCalibration_(
             result.stamp, result.T_WS, result.speedAndBiases, result.omega_S,
-            result.frameIdInSource, result.vector_of_T_SCi, result.vTgTsTa_,
+            result.frameIdInSource, result.opt_T_SCi_coeffs, result.vTgTsTa_,
             result.vfckptdr_, result.vVariance_);
     }
     if (landmarksCallback_ && !result.landmarksVector.empty())

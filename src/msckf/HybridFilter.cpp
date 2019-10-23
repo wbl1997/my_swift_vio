@@ -2530,6 +2530,10 @@ bool HybridFilter::getCameraSensorStates(
       T_SCi);
 }
 
+int HybridFilter::getCameraExtrinsicOptType(size_t cameraIdx) const {
+  return camera_rig_.getExtrinsicOptMode(cameraIdx);
+}
+
 // Get the ID of the current keyframe.
 uint64_t HybridFilter::currentKeyframeId() const {
   for (std::map<uint64_t, States>::const_reverse_iterator rit =
@@ -2961,7 +2965,11 @@ bool HybridFilter::print(std::ostream& stream) const {
       std::static_pointer_cast<ceres::PoseParameterBlock>(
           mapPtr_->parameterBlockPtr(extrinsicId));
   kinematics::Transformation T_SC0 = extrinsicParamBlockPtr->estimate();
-  stream << " " << T_SC0.inverse().r().transpose().format(SpaceInitFmt);
+  std::string extrinsicValues;
+  ExtrinsicModelToParamsValueString(
+        camera_rig_.getExtrinsicOptMode(camIdx),
+        T_SC0, " ", &extrinsicValues);
+  stream << " " << extrinsicValues;
 
   const int minProjectionDim = camera_rig_.getMinimalProjectionDimen(camIdx);
   if (minProjectionDim > 0) {

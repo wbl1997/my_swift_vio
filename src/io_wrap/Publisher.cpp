@@ -590,9 +590,8 @@ void Publisher::csvSaveFullStateWithAllCalibrationAsCallback(
     const Eigen::Matrix<double, 9, 1> &speedAndBiases,
     const Eigen::Matrix<double, 3, 1> &omega_S, const int frameIdInSource,
     const std::vector<
-        okvis::kinematics::Transformation,
-        Eigen::aligned_allocator<okvis::kinematics::Transformation>>
-        &extrinsics,
+        Eigen::VectorXd,
+        Eigen::aligned_allocator<Eigen::VectorXd>>& extrinsics,
     const Eigen::Matrix<double, Eigen::Dynamic, 1> &vTgsa,
     const Eigen::Matrix<double, Eigen::Dynamic, 1> &vfckptdr,
     const Eigen::Matrix<double, Eigen::Dynamic, 1> &vVariance) {
@@ -627,10 +626,11 @@ void Publisher::csvSaveFullStateWithAllCalibrationAsCallback(
         *csvFile_ << FLAGS_datafile_separator << vTgsa[jack];
 
       for (size_t i = 0; i < extrinsics.size(); ++i) {
-        Eigen::Vector3d p_SCi = extrinsics[i].r();
-        *csvFile_ << FLAGS_datafile_separator << p_SCi[0]
-                  << FLAGS_datafile_separator << p_SCi[1]
-                  << FLAGS_datafile_separator << p_SCi[2];
+        int n = extrinsics[i].size();
+        const Eigen::VectorXd& T_SC_coeffs = extrinsics[i];
+        for (int jack = 0; jack < n; ++jack) {
+          *csvFile_ << FLAGS_datafile_separator << T_SC_coeffs[jack];
+        }
       }
 
       for (int jack = 0; jack < vfckptdr.size(); ++jack)
