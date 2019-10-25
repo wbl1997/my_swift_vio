@@ -204,7 +204,7 @@ Parameters through command line
 | use_IEKF | true iterated EKF, false EKF. For filters only | false |
 | max_inc_tol | the maximum infinity norm of the filter correction. 10.0 for outdoors, 2.0 for indoors, though its value should be insensitive | 2.0 |
 | head_tail | Use the fixed head and receding tail observations or the entire feature track to compose two-view constraints in TF_VIO | false |
-| pixel_noise_scale_factor | Scale up the image observation noise std for TF_VIO. 3 is recommended for the two-view constraint scheme based on an entire feature track, 5 is recommended for the two-view head_tail constraint scheme | 3 |
+| image_noise_cov_multiplier | Scale up the image observation noise cov for TF_VIO. 9 is recommended for the two-view constraint scheme based on an entire feature track, 25 is recommended for the two-view head_tail constraint scheme | 9 |
 
 Parameters through config yaml
 

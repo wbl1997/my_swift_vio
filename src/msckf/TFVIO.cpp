@@ -46,8 +46,8 @@ DEFINE_bool(
     "compose two-view constraints which are used in one filter update step "
     "as the landmark disappears");
 DEFINE_double(
-    pixel_noise_scale_factor, 3.0,
-    "Enlarge the image observation noise std by this scale factor.");
+    image_noise_cov_multiplier, 9.0,
+    "Enlarge the image observation noise covariance by this multiplier.");
 
 /// \brief okvis Main namespace of this package.
 namespace okvis {
@@ -748,8 +748,6 @@ bool TFVIO::measurementJacobian(
   (*H_xjk)(startIndex) = de_dtr;
 
   const int minCamParamDim = cameraParamsMinimalDimen();
-  double scale_factor2 =
-      FLAGS_pixel_noise_scale_factor * FLAGS_pixel_noise_scale_factor;
   for (int j = 0; j < 2; ++j) {
     uint64_t poseId = frameIds[j];
     std::map<uint64_t, int>::const_iterator poseid_iter =
@@ -762,7 +760,7 @@ bool TFVIO::measurementJacobian(
     H_fjk->emplace_back(de_dfj[j]);
 
     // TODO(jhuai): account for the IMU noise
-    cov_fjk->emplace_back(cov_fj[j] * scale_factor2);
+    cov_fjk->emplace_back(cov_fj[j]);
   }
 
   return true;
@@ -797,6 +795,14 @@ bool TFVIO::featureJacobian(
   if (numFeatures < 2) { // A two view constraint requires at least two obs
       return false;
   }
+
+  // enlarge cov of the head obs to counteract the noise reduction 
+  // due to correlation in head_tail scheme
+  size_t trackLength = mp.observations.size();
+  double headObsCovModifier[2] = {1.0, 1.0};
+  headObsCovModifier[0] = FLAGS_head_tail ?
+      (static_cast<double>(trackLength - minTrackLength_ + 2u)) : 1.0;
+
   std::vector<std::pair<int, int>> featurePairs =
       TwoViewPair::getFramePairs(numFeatures, TwoViewPair::FIXED_MIDDLE);
   const int numConstraints = featurePairs.size();
@@ -847,7 +853,8 @@ bool TFVIO::featureJacobian(
     for (int j = 0; j < 2; ++j) {
       int index = index_vec[j];
       H_fi.block<1, 3>(count, index * 3) = H_fjk[j];
-      cov_fi.block<3, 3>(index * 3, index * 3) = cov_fjk[j];
+      cov_fi.block<3, 3>(index * 3, index * 3) =
+          cov_fjk[j] * FLAGS_image_noise_cov_multiplier * headObsCovModifier[j];
     }
   }
   Ri->resize(numConstraints, numConstraints);
