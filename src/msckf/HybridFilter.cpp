@@ -3041,8 +3041,7 @@ size_t HybridFilter::numObservations(uint64_t landmarkId) {
 }
 
 void HybridFilter::printTrackLengthHistogram(std::ostream& stream) const {
-  stream << std::endl
-         << "track length histogram in one test with bins 0,1,2..."
+  stream << "Track length histogram in one test with bins 0,1,2..."
          << std::endl;
   size_t bin = 0;
   for (auto it = mTrackLengthAccumulator.begin();
