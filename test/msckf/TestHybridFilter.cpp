@@ -411,6 +411,156 @@ class CameraSystemCreator {
 
 const std::string CameraSystemCreator::distortName_ = "RadialTangentialDistortion";
 
+/**
+ * @brief compute_errors
+ * @param estimator
+ * @param T_WS
+ * @param v_WS_true
+ * @param ref_measurement
+ * @param ref_camera_geometry
+ * @param normalizedError nees in position, nees in orientation, nees in pose
+ * @param rmsError rmse in xyz, \alpha, v_WS, bg, ba, Tg, Ts, Ta, p_CB,
+ *  (fx, fy), (cx, cy), k1, k2, p1, p2, td, tr
+ */
+void compute_errors(
+    const okvis::HybridFilter *estimator,
+    const okvis::kinematics::Transformation &T_WS,
+    const Eigen::Vector3d &v_WS_true,
+    const okvis::ImuSensorReadings &ref_measurement,
+    const std::shared_ptr<const okvis::cameras::CameraBase> ref_camera_geometry,
+    Eigen::Vector3d *normalizedError,
+    Eigen::Matrix<double, 15 + 27 + 13, 1> *rmsError) {
+  okvis::kinematics::Transformation T_WS_est;
+  uint64_t currFrameId = estimator->currentFrameId();
+  estimator->get_T_WS(currFrameId, T_WS_est);
+  Eigen::Vector3d delta = T_WS.r() - T_WS_est.r();
+  Eigen::Vector3d alpha = vio::unskew3d(T_WS.C() * T_WS_est.C().transpose() -
+                                        Eigen::Matrix3d::Identity());
+  Eigen::Matrix<double, 6, 1> deltaPose;
+  deltaPose << delta, alpha;
+
+  (*normalizedError)[0] =
+      delta.transpose() *
+      estimator->covariance_.topLeftCorner<3, 3>().inverse() * delta;
+  (*normalizedError)[1] = alpha.transpose() *
+                          estimator->covariance_.block<3, 3>(3, 3).inverse() *
+                          alpha;
+  Eigen::Matrix<double, 6, 1> tempPoseError =
+      estimator->covariance_.topLeftCorner<6, 6>().ldlt().solve(deltaPose);
+  (*normalizedError)[2] = deltaPose.transpose() * tempPoseError;
+
+  Eigen::Matrix<double, 9, 1> eye;
+  eye << 1, 0, 0, 0, 1, 0, 0, 0, 1;
+  rmsError->head<3>() = delta.cwiseAbs2();
+  rmsError->segment<3>(3) = alpha.cwiseAbs2();
+  okvis::SpeedAndBias speedAndBias_est;
+  estimator->getSpeedAndBias(currFrameId, 0, speedAndBias_est);
+  Eigen::Vector3d deltaV = speedAndBias_est.head<3>() - v_WS_true;
+  rmsError->segment<3>(6) = deltaV.cwiseAbs2();
+  rmsError->segment<3>(9) =
+      (speedAndBias_est.segment<3>(3) - ref_measurement.gyroscopes).cwiseAbs2();
+  rmsError->segment<3>(12) =
+      (speedAndBias_est.tail<3>() - ref_measurement.accelerometers).cwiseAbs2();
+
+  Eigen::Matrix<double, 9, 1> Tg_est;
+  estimator->getSensorStateEstimateAs<okvis::ceres::ShapeMatrixParamBlock>(
+      currFrameId, 0, okvis::HybridFilter::SensorStates::Imu,
+      okvis::HybridFilter::ImuSensorStates::TG, Tg_est);
+
+  rmsError->segment<9>(15) = (Tg_est - eye).cwiseAbs2();
+
+  Eigen::Matrix<double, 9, 1> Ts_est;
+  estimator->getSensorStateEstimateAs<okvis::ceres::ShapeMatrixParamBlock>(
+      currFrameId, 0, okvis::HybridFilter::SensorStates::Imu,
+      okvis::HybridFilter::ImuSensorStates::TS, Ts_est);
+  rmsError->segment<9>(24) = Ts_est.cwiseAbs2();
+
+  Eigen::Matrix<double, 9, 1> Ta_est;
+  estimator->getSensorStateEstimateAs<okvis::ceres::ShapeMatrixParamBlock>(
+      currFrameId, 0, okvis::HybridFilter::SensorStates::Imu,
+      okvis::HybridFilter::ImuSensorStates::TA, Ta_est);
+  rmsError->segment<9>(33) = (Ta_est - eye).cwiseAbs2();
+
+  Eigen::Matrix<double, 3, 1> p_CB_est;
+  okvis::kinematics::Transformation T_SC_est;
+  estimator->getSensorStateEstimateAs<okvis::ceres::PoseParameterBlock>(
+      currFrameId, 0, okvis::HybridFilter::SensorStates::Camera,
+      okvis::HybridFilter::CameraSensorStates::T_SCi, T_SC_est);
+  p_CB_est = T_SC_est.inverse().r();
+  rmsError->segment<3>(42) = p_CB_est.cwiseAbs2();
+
+  Eigen::VectorXd intrinsics_true;
+  ref_camera_geometry->getIntrinsics(intrinsics_true);
+  const int nDistortionCoeffDim =
+      okvis::cameras::RadialTangentialDistortion::NumDistortionIntrinsics;
+  Eigen::VectorXd distIntrinsic_true =
+      intrinsics_true.tail<nDistortionCoeffDim>();
+
+  Eigen::Matrix<double, Eigen::Dynamic, 1> cameraIntrinsics_est;
+  estimator->getSensorStateEstimateAs<okvis::ceres::EuclideanParamBlock>(
+      currFrameId, 0, okvis::HybridFilter::SensorStates::Camera,
+      okvis::HybridFilter::CameraSensorStates::Intrinsic, cameraIntrinsics_est);
+  rmsError->segment<2>(45) =
+      (cameraIntrinsics_est.head<2>() - intrinsics_true.head<2>()).cwiseAbs2();
+  rmsError->segment<2>(47) =
+      (cameraIntrinsics_est.tail<2>() - intrinsics_true.segment<2>(2))
+          .cwiseAbs2();
+
+  Eigen::Matrix<double, Eigen::Dynamic, 1> cameraDistortion_est(nDistortionCoeffDim);
+  estimator->getSensorStateEstimateAs<okvis::ceres::EuclideanParamBlock>(
+      currFrameId, 0, okvis::HybridFilter::SensorStates::Camera,
+      okvis::HybridFilter::CameraSensorStates::Distortion,
+      cameraDistortion_est);
+  rmsError->segment(49, nDistortionCoeffDim) =
+      (cameraDistortion_est - distIntrinsic_true).cwiseAbs2();
+
+  double td_est(0.0), tr_est(0.0);
+  estimator->getSensorStateEstimateAs<okvis::ceres::CameraTimeParamBlock>(
+      currFrameId, 0, okvis::HybridFilter::SensorStates::Camera,
+      okvis::HybridFilter::CameraSensorStates::TD, td_est);
+  (*rmsError)[53] = td_est * td_est;
+
+  estimator->getSensorStateEstimateAs<okvis::ceres::CameraTimeParamBlock>(
+      currFrameId, 0, okvis::HybridFilter::SensorStates::Camera,
+      okvis::HybridFilter::CameraSensorStates::TR, tr_est);
+  (*rmsError)[54] = tr_est * tr_est;
+}
+
+void check_tail_mse(
+    const Eigen::Matrix<double, 55, 1>& mse_tail) {
+  int index = 0;
+  EXPECT_LT(mse_tail.head<3>().norm(), std::pow(0.3, 2)) << "Position MSE";
+  index = 3;
+  EXPECT_LT(mse_tail.segment<3>(index).norm(), std::pow(0.08, 2)) << "Orientation MSE";
+  index += 3;
+  EXPECT_LT(mse_tail.segment<3>(index).norm(), std::pow(0.1, 2)) << "Velocity MSE";
+  index += 3;
+  EXPECT_LT(mse_tail.segment<3>(index).norm(), std::pow(0.001, 2)) << "Gyro bias MSE";
+  index += 3;
+  EXPECT_LT(mse_tail.segment<3>(index).norm(), std::pow(0.01, 2)) << "Accelerometer bias MSE";
+  index += 3;
+  EXPECT_LT(mse_tail.segment<9>(index).norm(), std::pow(1e-3, 2)) << "Tg MSE";
+  index += 9;
+  EXPECT_LT(mse_tail.segment<9>(index).norm(), std::pow(1e-3, 2)) << "Ts MSE";
+  index += 9;
+  EXPECT_LT(mse_tail.segment<9>(index).norm(), std::pow(5e-3, 2)) << "Ta MSE";
+  index += 9;
+  EXPECT_LT(mse_tail.segment<3>(index).norm(), std::pow(0.01, 2)) << "p_CS MSE";
+  index += 3;
+  EXPECT_LT(mse_tail.segment<4>(index).norm(), std::pow(1, 2)) << "fxy cxy MSE";
+  index += 4;
+  EXPECT_LT(mse_tail.segment<4>(index).norm(), std::pow(0.002, 2)) << "k1 k2 p1 p2 MSE";
+  index += 4;
+  EXPECT_LT(mse_tail.segment<2>(index).norm(), std::pow(1e-3, 2)) << "td tr MSE";
+  index += 2;
+}
+
+void check_tail_nees(const Eigen::Vector3d &nees_tail) {
+  EXPECT_LT(nees_tail[0], 8) << "Position NEES";
+  EXPECT_LT(nees_tail[1], 5) << "Orientation NEES";
+  EXPECT_LT(nees_tail[2], 10) << "Pose NEES";
+}
+
 void testHybridFilterCircle() {
   // if commented out, make unit tests deterministic...
   // srand((unsigned int) time(0));
@@ -665,157 +815,6 @@ void testHybridFilterCircle() {
     EXPECT_LT((T_WS.r() - T_WS_est.r()).norm(), 1e-1)
         << "translation not close enough";
   }
-}
-
-
-/**
- * @brief compute_errors
- * @param estimator
- * @param T_WS
- * @param v_WS_true
- * @param ref_measurement
- * @param ref_camera_geometry
- * @param normalizedError nees in position, nees in orientation, nees in pose
- * @param rmsError rmse in xyz, \alpha, v_WS, bg, ba, Tg, Ts, Ta, p_CB,
- *  (fx, fy), (cx, cy), k1, k2, p1, p2, td, tr
- */
-void compute_errors(
-    const okvis::HybridFilter *estimator,
-    const okvis::kinematics::Transformation &T_WS,
-    const Eigen::Vector3d &v_WS_true,
-    const okvis::ImuSensorReadings &ref_measurement,
-    const std::shared_ptr<const okvis::cameras::CameraBase> ref_camera_geometry,
-    Eigen::Vector3d *normalizedError,
-    Eigen::Matrix<double, 15 + 27 + 13, 1> *rmsError) {
-  okvis::kinematics::Transformation T_WS_est;
-  uint64_t currFrameId = estimator->currentFrameId();
-  estimator->get_T_WS(currFrameId, T_WS_est);
-  Eigen::Vector3d delta = T_WS.r() - T_WS_est.r();
-  Eigen::Vector3d alpha = vio::unskew3d(T_WS.C() * T_WS_est.C().transpose() -
-                                        Eigen::Matrix3d::Identity());
-  Eigen::Matrix<double, 6, 1> deltaPose;
-  deltaPose << delta, alpha;
-
-  (*normalizedError)[0] =
-      delta.transpose() *
-      estimator->covariance_.topLeftCorner<3, 3>().inverse() * delta;
-  (*normalizedError)[1] = alpha.transpose() *
-                          estimator->covariance_.block<3, 3>(3, 3).inverse() *
-                          alpha;
-  Eigen::Matrix<double, 6, 1> tempPoseError =
-      estimator->covariance_.topLeftCorner<6, 6>().ldlt().solve(deltaPose);
-  (*normalizedError)[2] = deltaPose.transpose() * tempPoseError;
-
-  Eigen::Matrix<double, 9, 1> eye;
-  eye << 1, 0, 0, 0, 1, 0, 0, 0, 1;
-  rmsError->head<3>() = delta.cwiseAbs2();
-  rmsError->segment<3>(3) = alpha.cwiseAbs2();
-  okvis::SpeedAndBias speedAndBias_est;
-  estimator->getSpeedAndBias(currFrameId, 0, speedAndBias_est);
-  Eigen::Vector3d deltaV = speedAndBias_est.head<3>() - v_WS_true;
-  rmsError->segment<3>(6) = deltaV.cwiseAbs2();
-  rmsError->segment<3>(9) =
-      (speedAndBias_est.segment<3>(3) - ref_measurement.gyroscopes).cwiseAbs2();
-  rmsError->segment<3>(12) =
-      (speedAndBias_est.tail<3>() - ref_measurement.accelerometers).cwiseAbs2();
-
-  Eigen::Matrix<double, 9, 1> Tg_est;
-  estimator->getSensorStateEstimateAs<okvis::ceres::ShapeMatrixParamBlock>(
-      currFrameId, 0, okvis::HybridFilter::SensorStates::Imu,
-      okvis::HybridFilter::ImuSensorStates::TG, Tg_est);
-
-  rmsError->segment<9>(15) = (Tg_est - eye).cwiseAbs2();
-
-  Eigen::Matrix<double, 9, 1> Ts_est;
-  estimator->getSensorStateEstimateAs<okvis::ceres::ShapeMatrixParamBlock>(
-      currFrameId, 0, okvis::HybridFilter::SensorStates::Imu,
-      okvis::HybridFilter::ImuSensorStates::TS, Ts_est);
-  rmsError->segment<9>(24) = Ts_est.cwiseAbs2();
-
-  Eigen::Matrix<double, 9, 1> Ta_est;
-  estimator->getSensorStateEstimateAs<okvis::ceres::ShapeMatrixParamBlock>(
-      currFrameId, 0, okvis::HybridFilter::SensorStates::Imu,
-      okvis::HybridFilter::ImuSensorStates::TA, Ta_est);
-  rmsError->segment<9>(33) = (Ta_est - eye).cwiseAbs2();
-
-  Eigen::Matrix<double, 3, 1> p_CB_est;
-  okvis::kinematics::Transformation T_SC_est;
-  estimator->getSensorStateEstimateAs<okvis::ceres::PoseParameterBlock>(
-      currFrameId, 0, okvis::HybridFilter::SensorStates::Camera,
-      okvis::HybridFilter::CameraSensorStates::T_SCi, T_SC_est);
-  p_CB_est = T_SC_est.inverse().r();
-  rmsError->segment<3>(42) = p_CB_est.cwiseAbs2();
-
-  Eigen::VectorXd intrinsics_true;
-  ref_camera_geometry->getIntrinsics(intrinsics_true);
-  const int nDistortionCoeffDim =
-      okvis::cameras::RadialTangentialDistortion::NumDistortionIntrinsics;
-  Eigen::VectorXd distIntrinsic_true =
-      intrinsics_true.tail<nDistortionCoeffDim>();
-
-  Eigen::Matrix<double, Eigen::Dynamic, 1> cameraIntrinsics_est;
-  estimator->getSensorStateEstimateAs<okvis::ceres::EuclideanParamBlock>(
-      currFrameId, 0, okvis::HybridFilter::SensorStates::Camera,
-      okvis::HybridFilter::CameraSensorStates::Intrinsic, cameraIntrinsics_est);
-  rmsError->segment<2>(45) =
-      (cameraIntrinsics_est.head<2>() - intrinsics_true.head<2>()).cwiseAbs2();
-  rmsError->segment<2>(47) =
-      (cameraIntrinsics_est.tail<2>() - intrinsics_true.segment<2>(2))
-          .cwiseAbs2();
-
-  Eigen::Matrix<double, Eigen::Dynamic, 1> cameraDistortion_est(nDistortionCoeffDim);
-  estimator->getSensorStateEstimateAs<okvis::ceres::EuclideanParamBlock>(
-      currFrameId, 0, okvis::HybridFilter::SensorStates::Camera,
-      okvis::HybridFilter::CameraSensorStates::Distortion,
-      cameraDistortion_est);
-  rmsError->segment(49, nDistortionCoeffDim) =
-      (cameraDistortion_est - distIntrinsic_true).cwiseAbs2();
-
-  double td_est(0.0), tr_est(0.0);
-  estimator->getSensorStateEstimateAs<okvis::ceres::CameraTimeParamBlock>(
-      currFrameId, 0, okvis::HybridFilter::SensorStates::Camera,
-      okvis::HybridFilter::CameraSensorStates::TD, td_est);
-  (*rmsError)[53] = td_est * td_est;
-
-  estimator->getSensorStateEstimateAs<okvis::ceres::CameraTimeParamBlock>(
-      currFrameId, 0, okvis::HybridFilter::SensorStates::Camera,
-      okvis::HybridFilter::CameraSensorStates::TR, tr_est);
-  (*rmsError)[54] = tr_est * tr_est;
-}
-
-void check_tail_mse(
-    const Eigen::Matrix<double, 55, 1>& mse_tail) {
-  int index = 0;
-  EXPECT_LT(mse_tail.head<3>().norm(), std::pow(0.3, 2)) << "Position MSE";
-  index = 3;
-  EXPECT_LT(mse_tail.segment<3>(index).norm(), std::pow(0.08, 2)) << "Orientation MSE";
-  index += 3;
-  EXPECT_LT(mse_tail.segment<3>(index).norm(), std::pow(0.1, 2)) << "Velocity MSE";
-  index += 3;
-  EXPECT_LT(mse_tail.segment<3>(index).norm(), std::pow(0.001, 2)) << "Gyro bias MSE";
-  index += 3;
-  EXPECT_LT(mse_tail.segment<3>(index).norm(), std::pow(0.01, 2)) << "Accelerometer bias MSE";
-  index += 3;
-  EXPECT_LT(mse_tail.segment<9>(index).norm(), std::pow(1e-3, 2)) << "Tg MSE";
-  index += 9;
-  EXPECT_LT(mse_tail.segment<9>(index).norm(), std::pow(1e-3, 2)) << "Ts MSE";
-  index += 9;
-  EXPECT_LT(mse_tail.segment<9>(index).norm(), std::pow(5e-3, 2)) << "Ta MSE";
-  index += 9;
-  EXPECT_LT(mse_tail.segment<3>(index).norm(), std::pow(0.01, 2)) << "p_CS MSE";
-  index += 3;
-  EXPECT_LT(mse_tail.segment<4>(index).norm(), std::pow(1, 2)) << "fxy cxy MSE";
-  index += 4;
-  EXPECT_LT(mse_tail.segment<4>(index).norm(), std::pow(0.002, 2)) << "k1 k2 p1 p2 MSE";
-  index += 4;
-  EXPECT_LT(mse_tail.segment<2>(index).norm(), std::pow(1e-3, 2)) << "td tr MSE";
-  index += 2;
-}
-
-void check_tail_nees(const Eigen::Vector3d &nees_tail) {
-  EXPECT_LT(nees_tail[0], 8) << "Position NEES";
-  EXPECT_LT(nees_tail[1], 5) << "Orientation NEES";
-  EXPECT_LT(nees_tail[2], 10) << "Pose NEES";
 }
 
 // Note the std for noises used in covariance propagation should be slightly
