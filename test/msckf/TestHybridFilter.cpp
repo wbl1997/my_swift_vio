@@ -274,6 +274,143 @@ void outputFeatureHistogram(const std::string& featureHistFile,
       << "Total of densities: " << total << " should be 1.";
 }
 
+class CameraSystemCreator {
+ public:
+  CameraSystemCreator(const int cameraModelId,
+                      const std::string projIntrinsicRep,
+                      const std::string extrinsicRep)
+      : cameraModelId_(cameraModelId),
+        projIntrinsicRep_(projIntrinsicRep),
+        extrinsicRep_(extrinsicRep) {}
+
+  void createDummyCameraSystem(
+      std::shared_ptr<okvis::cameras::CameraBase>* cameraGeometry,
+      std::shared_ptr<okvis::cameras::NCameraSystem>* cameraSystem) {
+    Eigen::Matrix<double, 4, 4> matT_SC0 = create_T_SC(cameraModelId_, camIdx_);
+    std::shared_ptr<const okvis::kinematics::Transformation> T_SC_0(
+        new okvis::kinematics::Transformation(matT_SC0));
+    cameraGeometry->reset(new okvis::cameras::PinholeCamera<
+                          okvis::cameras::RadialTangentialDistortion>(
+        0, 0, 0, 0, 0, 0,
+        okvis::cameras::RadialTangentialDistortion(0.00, 0.00, 0.000, 0.000)));
+    cameraSystem->reset(new okvis::cameras::NCameraSystem);
+    (*cameraSystem)
+        ->addCamera(
+            T_SC_0, *cameraGeometry,
+            okvis::cameras::NCameraSystem::DistortionType::RadialTangential,
+            projIntrinsicRep_, extrinsicRep_);
+  }
+
+  void createNominalCameraSystem(
+      std::shared_ptr<okvis::cameras::CameraBase>* cameraGeometry,
+      std::shared_ptr<okvis::cameras::NCameraSystem>* cameraSystem) {
+    Eigen::Matrix<double, 4, 4> matT_SC0 = create_T_SC(cameraModelId_, camIdx_);
+    std::shared_ptr<const okvis::kinematics::Transformation> T_SC_0(
+        new okvis::kinematics::Transformation(matT_SC0));
+
+    *cameraGeometry = createCameraGeometry(cameraModelId_);
+
+    cameraSystem->reset(new okvis::cameras::NCameraSystem);
+    (*cameraSystem)
+        ->addCamera(
+            T_SC_0, *cameraGeometry,
+            okvis::cameras::NCameraSystem::DistortionType::RadialTangential,
+            projIntrinsicRep_, extrinsicRep_);
+  }
+
+  void createNoisyCameraSystem(
+      std::shared_ptr<okvis::cameras::CameraBase>* cameraGeometry,
+      std::shared_ptr<okvis::cameras::NCameraSystem>* cameraSystem,
+      const okvis::ExtrinsicsEstimationParameters& cameraNoiseParams) {
+    Eigen::Matrix<double, 4, 1> fcNoise = vio::Sample::gaussian(1, 4);
+    fcNoise.head<2>() *= cameraNoiseParams.sigma_focal_length;
+    fcNoise.tail<2>() *= cameraNoiseParams.sigma_principal_point;
+    Eigen::Matrix<double, 4, 1> kpNoise = vio::Sample::gaussian(1, 4);
+    for (int jack = 0; jack < 4; ++jack) {
+      kpNoise[jack] *= cameraNoiseParams.sigma_distortion[jack];
+    }
+    Eigen::Vector3d p_CBNoise;
+    for (int jack = 0; jack < 3; ++jack) {
+      p_CBNoise[jack] =
+          vio::gauss_rand(0, cameraNoiseParams.sigma_absolute_translation);
+    }
+
+    okvis::kinematics::Transformation ref_T_SC(create_T_SC(cameraModelId_, 0));
+    std::shared_ptr<const okvis::kinematics::Transformation> T_SC_noisy(
+        new okvis::kinematics::Transformation(
+            ref_T_SC.r() - ref_T_SC.C() * p_CBNoise, ref_T_SC.q()));
+    std::shared_ptr<const okvis::cameras::CameraBase> refCameraGeometry =
+        createCameraGeometry(cameraModelId_);
+    Eigen::VectorXd projDistortIntrinsics;
+    refCameraGeometry->getIntrinsics(projDistortIntrinsics);
+    cameraGeometry->reset(new okvis::cameras::PinholeCamera<
+                          okvis::cameras::RadialTangentialDistortion>(
+        refCameraGeometry->imageWidth(), refCameraGeometry->imageHeight(),
+        projDistortIntrinsics[0] + fcNoise[0],
+        projDistortIntrinsics[1] + fcNoise[1],
+        projDistortIntrinsics[2] + fcNoise[2],
+        projDistortIntrinsics[3] + fcNoise[3],
+        okvis::cameras::RadialTangentialDistortion(kpNoise[0], kpNoise[1],
+                                                   kpNoise[2], kpNoise[3])));
+    cameraSystem->reset(new okvis::cameras::NCameraSystem);
+    (*cameraSystem)
+        ->addCamera(
+            T_SC_noisy, *cameraGeometry,
+            okvis::cameras::NCameraSystem::DistortionType::RadialTangential,
+            projIntrinsicRep_, extrinsicRep_);
+  }
+
+ private:
+  Eigen::Matrix<double, 4, 4> create_T_SC(const int caseId,
+                                          const int /*camIdx*/) {
+    Eigen::Matrix<double, 4, 4> matT_SC0;
+    switch (caseId) {
+      case 1:
+        matT_SC0 << 1, 0, 0, 0, 0, 0, 1, 0, 0, -1, 0, 0, 0, 0, 0, 1;
+        break;
+      case 0:
+      default:
+        matT_SC0 << 0, 0, 1, 0, -1, 0, 0, 0, 0, -1, 0, 0, 0, 0, 0, 1;
+        break;
+    }
+    return matT_SC0;
+  }
+
+  std::shared_ptr<okvis::cameras::CameraBase> createCameraGeometry(
+      const int caseId) {
+    std::shared_ptr<okvis::cameras::CameraBase> cameraGeometry;
+    switch (caseId) {
+      case 1:
+        cameraGeometry.reset(new okvis::cameras::PinholeCamera<
+                             okvis::cameras::RadialTangentialDistortion>(
+            640, 480, 350, 350, 322, 238,
+            okvis::cameras::RadialTangentialDistortion(0, 0, 0, 0)));
+        break;
+
+      case 0:
+      default:
+        cameraGeometry.reset(new okvis::cameras::PinholeCamera<
+                             okvis::cameras::RadialTangentialDistortion>(
+            752, 480, 350, 360, 378, 238,
+            okvis::cameras::RadialTangentialDistortion(0.00, 0.00, 0.000,
+                                                       0.000)));
+        break;
+    }
+    return cameraGeometry;
+  }
+
+  static const okvis::cameras::NCameraSystem::DistortionType distortType_ =
+      okvis::cameras::NCameraSystem::DistortionType::RadialTangential;
+  static const std::string distortName_;
+  static const int camIdx_ = 0;
+
+  const int cameraModelId_;
+  const std::string projIntrinsicRep_;
+  const std::string extrinsicRep_;
+};
+
+const std::string CameraSystemCreator::distortName_ = "RadialTangentialDistortion";
+
 void testHybridFilterCircle() {
   // if commented out, make unit tests deterministic...
   // srand((unsigned int) time(0));
@@ -285,7 +422,6 @@ void testHybridFilterCircle() {
       TestSetting(true, true, true, true)};  // noisy data, vins integration
   // different cases
   for (size_t c = 3; c < sizeof(cases) / sizeof(cases[0]); ++c) {
-    OKVIS_DEFINE_EXCEPTION(Exception, std::runtime_error);
     const double DURATION = 30.0;      // 10 seconds motion
     // set the imu parameters
     okvis::ImuParameters imuParameters;
@@ -328,31 +464,16 @@ void testHybridFilterCircle() {
     // create the map
     std::shared_ptr<okvis::ceres::Map> mapPtr(new okvis::ceres::Map);
 
-    // camera extrinsics:
-    Eigen::Matrix<double, 4, 4> matT_SC0;
-    matT_SC0 << 1, 0, 0, 0, 0, 0, 1, 0, 0, -1, 0, 0, 0, 0, 0, 1;
-    std::shared_ptr<const okvis::kinematics::Transformation> T_SC_0(
-        new okvis::kinematics::Transformation(matT_SC0));
-
-    // some parameters on how to do the online estimation:
     okvis::ExtrinsicsEstimationParameters extrinsicsEstimationParameters;
     initCameraNoiseParams(&extrinsicsEstimationParameters, 2e-2);
 
-    // set up camera with intrinsics
-    std::shared_ptr<okvis::cameras::CameraBase> cameraGeometry0(
-        new okvis::cameras::PinholeCamera<
-            okvis::cameras::RadialTangentialDistortion>(
-            640, 480, 350, 350, 322, 238,
-            okvis::cameras::RadialTangentialDistortion(0, 0, 0, 0)));
+    CameraSystemCreator csc(1, "FXY_CXY", "P_CS");
+    std::shared_ptr<okvis::cameras::CameraBase> cameraGeometry0;
+    std::shared_ptr<okvis::cameras::NCameraSystem> cameraSystem;
+    csc.createNominalCameraSystem(&cameraGeometry0, &cameraSystem);
 
-    // create a 1-camera system:
-    std::shared_ptr<okvis::cameras::NCameraSystem> cameraSystem(
-        new okvis::cameras::NCameraSystem);
-    cameraSystem->addCamera(
-        T_SC_0, cameraGeometry0,
-        okvis::cameras::NCameraSystem::DistortionType::RadialTangential,
-        "FXY_CXY",
-        "P_CS");
+    Eigen::VectorXd intrinsics;
+    cameraGeometry0->getIntrinsics(intrinsics);
 
     // create an Estimator
     std::shared_ptr<okvis::HybridFilter> estimator;
@@ -366,8 +487,7 @@ void testHybridFilterCircle() {
     std::vector<Eigen::Vector4d, Eigen::aligned_allocator<Eigen::Vector4d>>
         homogeneousPoints;
     std::vector<uint64_t> lmIds;
-    create_landmark_grid(
-        &homogeneousPoints, &lmIds, "");
+    create_landmark_grid(&homogeneousPoints, &lmIds, "");
 
     // add sensors
     estimator->addCamera(extrinsicsEstimationParameters);
@@ -522,9 +642,6 @@ void testHybridFilterCircle() {
     LOG(INFO) << "speed and bias estimated ";
     LOG(INFO) << speedAndBias_est.transpose();
 
-    Eigen::VectorXd intrinsics;
-    cameraGeometry0->getIntrinsics(intrinsics);
-
     LOG(INFO) << "corrent radial tangential distortion " << std::endl
               << intrinsics.transpose();
     const int nDistortionCoeffDim =
@@ -541,13 +658,12 @@ void testHybridFilterCircle() {
 
     estimator->get_T_WS(multiFrameIds.back(), T_WS_est);
     estimator->getSpeedAndBias(multiFrameIds.back(), 0, speedAndBias_est);
-    OKVIS_ASSERT_LT(Exception, (speedAndBias_est - speedAndBias).norm(), 0.04,
-                    "speed and biases not close enough");
-    OKVIS_ASSERT_LT(Exception,
-                    2 * (T_WS.q() * T_WS_est.q().inverse()).vec().norm(), 8e-2,
-                    "quaternions not close enough");
-    OKVIS_ASSERT_LT(Exception, (T_WS.r() - T_WS_est.r()).norm(), 1e-1,
-                    "translation not close enough");
+    EXPECT_LT((speedAndBias_est - speedAndBias).norm(), 0.04)
+        << "speed and biases not close enough";
+    EXPECT_LT(2 * (T_WS.q() * T_WS_est.q().inverse()).vec().norm(), 8e-2)
+        << "quaternions not close enough";
+    EXPECT_LT((T_WS.r() - T_WS_est.r()).norm(), 1e-1)
+        << "translation not close enough";
   }
 }
 
@@ -670,7 +786,7 @@ void compute_errors(
 void check_tail_mse(
     const Eigen::Matrix<double, 55, 1>& mse_tail) {
   int index = 0;
-  EXPECT_LT(mse_tail.head<3>().norm(), std::pow(0.2, 2)) << "Position MSE";
+  EXPECT_LT(mse_tail.head<3>().norm(), std::pow(0.3, 2)) << "Position MSE";
   index = 3;
   EXPECT_LT(mse_tail.segment<3>(index).norm(), std::pow(0.08, 2)) << "Orientation MSE";
   index += 3;
@@ -753,7 +869,7 @@ void testHybridFilterSinusoid(const std::string &outputPath,
     srand((unsigned int)time(0)); // comment out to make tests deterministic
     TestSetting cases[] = {
         TestSetting(true, true, true, true)};  // noisy data, vins integration
-    OKVIS_DEFINE_EXCEPTION(Exception, std::runtime_error);
+
     size_t c = 0;
     LOG(INFO) << "Run " << run << " " << cases[c].print();
 
@@ -780,22 +896,23 @@ void testHybridFilterSinusoid(const std::string &outputPath,
     std::string trackStatFile = outputPath + "/sinusoid_" + estimator_label +
                                 "_trackstat_" + ss.str() + ".txt";
 
-    const double pCB_ba_Ta_std[] = {2e-2, 2e-2, 5e-3};
+    double pCB_std =2e-2;
+    double ba_std = 2e-2;
+    double Ta_std = 5e-3;
 
     okvis::ExtrinsicsEstimationParameters extrinsicsEstimationParameters;
-    initCameraNoiseParams(&extrinsicsEstimationParameters, pCB_ba_Ta_std[0]);
+    initCameraNoiseParams(&extrinsicsEstimationParameters, pCB_std);
 
     // set the imu parameters
     okvis::ImuParameters imuParameters;
     initImuNoiseParams(
-        &imuParameters, cases[c].addPriorNoise, 5e-3, pCB_ba_Ta_std[1], pCB_ba_Ta_std[2],
+        &imuParameters, cases[c].addPriorNoise, 5e-3, ba_std, Ta_std,
         extrinsicsEstimationParameters.sigma_td);
 
     okvis::InitialPVandStd pvstd;
     pvstd.std_p_WS = Eigen::Vector3d(1e-8, 1e-8, 1e-8);
     pvstd.std_q_WS = Eigen::Vector3d(1e-8, 1e-8, 1e-8);
     pvstd.std_v_WS = Eigen::Vector3d(5e-2, 5e-2, 5e-2);
-
 
     // imu frame has z point up
     // camera frame has z point forward along the motion
@@ -809,8 +926,7 @@ void testHybridFilterSinusoid(const std::string &outputPath,
                                       Eigen::Vector3d(0, 0, -imuParameters.g));
     cst.getTruePoses(tStart, tEnd, qs2w);
     cst.getSampleTimes(tStart, tEnd, times);
-    OKVIS_ASSERT_EQ(Exception, qs2w.size(), times.size(),
-                    "timestamps and true poses should have the same size!");
+    ASSERT_EQ(qs2w.size(), times.size()) << "timestamps and true poses should have the same size!";
     okvis::ImuMeasurementDeque imuMeasurements;
     cst.getTrueInertialMeasurements(tStart - okvis::Duration(1),
                                     tEnd + okvis::Duration(1), imuMeasurements);
@@ -826,7 +942,7 @@ void testHybridFilterSinusoid(const std::string &outputPath,
         trueBiases[i].measurement.accelerometers.setZero();
       }
     }
-    // remove the padding part of trueBiases
+    // remove the padding part of trueBiases to prepare for computing bias rmse
     auto tempIter = trueBiases.begin();
     for (; tempIter != trueBiases.end(); ++tempIter) {
       if (fabs((tempIter->timeStamp - times.front()).toSec()) < 1e-8) break;
@@ -835,90 +951,26 @@ void testHybridFilterSinusoid(const std::string &outputPath,
     // create the map
     std::shared_ptr<okvis::ceres::Map> mapPtr(new okvis::ceres::Map);
 
-    // camera extrinsics:
-    Eigen::Matrix<double, 4, 4> matT_SC0;
-    matT_SC0 << 0, 0, 1, 0, -1, 0, 0, 0, 0, -1, 0, 0, 0, 0, 0, 1;
-    std::shared_ptr<const okvis::kinematics::Transformation> T_SC_0(
-        new okvis::kinematics::Transformation(matT_SC0));
+    CameraSystemCreator csc(0, "FXY_CXY", "P_CS");
+    // reference camera system
+    std::shared_ptr<okvis::cameras::CameraBase> cameraGeometry0;
+    std::shared_ptr<okvis::cameras::NCameraSystem> cameraSystem0;
+    csc.createNominalCameraSystem(&cameraGeometry0, &cameraSystem0);
 
-    // set up camera with intrinsics
-    // true camera
-    std::shared_ptr<const okvis::cameras::CameraBase> cameraGeometry0(
-        new okvis::cameras::PinholeCamera<
-            okvis::cameras::RadialTangentialDistortion>(
-            752, 480, 350, 360, 378, 238,
-            okvis::cameras::RadialTangentialDistortion(0.00, 0.00, 0.000,
-                                                       0.000)));
+    // dummy camera to keep camera info secret from the estimator
+    std::shared_ptr<okvis::cameras::CameraBase> cameraGeometry1;
+    std::shared_ptr<okvis::cameras::NCameraSystem> cameraSystem1;
+    csc.createDummyCameraSystem(&cameraGeometry1, &cameraSystem1);
 
-    // true camera system:
-    std::shared_ptr<okvis::cameras::NCameraSystem> cameraSystem0(
-        new okvis::cameras::NCameraSystem);
-    cameraSystem0->addCamera(
-        T_SC_0, cameraGeometry0,
-        okvis::cameras::NCameraSystem::DistortionType::RadialTangential,
-        "FXY_CXY",
-        "P_CS");
-
-    // dummy camera only contains w, h
-    std::shared_ptr<const okvis::cameras::CameraBase> cameraGeometry1(
-        new okvis::cameras::PinholeCamera<
-            okvis::cameras::RadialTangentialDistortion>(
-            752, 480, 0, 0, 0, 0,
-            okvis::cameras::RadialTangentialDistortion(0.00, 0.00, 0.000,
-                                                       0.000)));
-    std::shared_ptr<okvis::cameras::NCameraSystem> cameraSystem1(
-        new okvis::cameras::NCameraSystem);
-    // dummy camera system
-    cameraSystem1->addCamera(
-        T_SC_0, cameraGeometry1,
-        okvis::cameras::NCameraSystem::DistortionType::RadialTangential,
-        "FXY_CXY",
-        "P_CS");
-
-    // noisy camera
-    Eigen::Matrix<double, 4, 1> fcNoise = vio::Sample::gaussian(1, 4);
-    fcNoise.head<2>() *= extrinsicsEstimationParameters.sigma_focal_length;
-    fcNoise.tail<2>() *= extrinsicsEstimationParameters.sigma_principal_point;
-    Eigen::Matrix<double, 4, 1> kpNoise = vio::Sample::gaussian(1, 4);
-    kpNoise[0] *= extrinsicsEstimationParameters.sigma_distortion[0];
-    kpNoise[1] *= extrinsicsEstimationParameters.sigma_distortion[1];
-    kpNoise[2] *= extrinsicsEstimationParameters.sigma_distortion[2];
-    kpNoise[3] *= extrinsicsEstimationParameters.sigma_distortion[3];
-    Eigen::Vector3d p_CBNoise;
-    p_CBNoise[0] = vio::gauss_rand(
-        0, extrinsicsEstimationParameters.sigma_absolute_translation);
-    p_CBNoise[1] = vio::gauss_rand(
-        0, extrinsicsEstimationParameters.sigma_absolute_translation);
-    p_CBNoise[2] = vio::gauss_rand(
-        0, extrinsicsEstimationParameters.sigma_absolute_translation);
-
-    okvis::kinematics::Transformation tempT_SC(matT_SC0);
-    std::shared_ptr<const okvis::kinematics::Transformation> T_SC_2(
-        new okvis::kinematics::Transformation(
-            tempT_SC.r() - tempT_SC.C() * p_CBNoise, tempT_SC.q()));
-
-    std::shared_ptr<const okvis::cameras::CameraBase> cameraGeometry2(
-        new okvis::cameras::PinholeCamera<
-            okvis::cameras::RadialTangentialDistortion>(
-            752, 480, 350 + fcNoise[0], 360 + fcNoise[1], 378 + fcNoise[2],
-            238 + fcNoise[3],
-            okvis::cameras::RadialTangentialDistortion(
-                kpNoise[0], kpNoise[1], kpNoise[2], kpNoise[3])));
     // camera system used for initilizing the estimator
-    std::shared_ptr<okvis::cameras::NCameraSystem> cameraSystem2(
-        new okvis::cameras::NCameraSystem);
-    if (cases[c].addPriorNoise)
-      cameraSystem2->addCamera(
-          T_SC_2, cameraGeometry2,
-          okvis::cameras::NCameraSystem::DistortionType::RadialTangential,
-          "FXY_CXY",
-          "P_CS");
-    else
-      cameraSystem2->addCamera(
-          T_SC_0, cameraGeometry0,
-          okvis::cameras::NCameraSystem::DistortionType::RadialTangential,
-          "FXY_CXY",
-          "P_CS");
+    std::shared_ptr<okvis::cameras::CameraBase> cameraGeometry2;
+    std::shared_ptr<okvis::cameras::NCameraSystem> cameraSystem2;
+    if (cases[c].addPriorNoise) {
+      csc.createNoisyCameraSystem(&cameraGeometry2, &cameraSystem2,
+                                  extrinsicsEstimationParameters);
+    } else {
+      csc.createNominalCameraSystem(&cameraGeometry2, &cameraSystem2);
+    }
 
     std::ofstream debugStream;  // record state history of a trial
     if (!debugStream.is_open()) {
@@ -1000,17 +1052,17 @@ void testHybridFilterSinusoid(const std::string &outputPath,
           pvstd.v_WS = v_WS;
 
           if (cases[c].addPriorNoise) {
-            // Eigen::Vector3d::Random() return -1, 1 random values
             //                p_WS += 0.1*Eigen::Vector3d::Random();
             v_WS += vio::Sample::gaussian(1, 3).cwiseProduct(pvstd.std_v_WS);
           }
           estimator->resetInitialPVandStd(pvstd, true);
           estimator->addStates(mf, imuSegment, true);
-          OKVIS_ASSERT_EQ(Exception, estimator->covariance_.rows(), 64,
-                          "Initial cov with one cloned state should be 64 for "
-                          "FXY_CXY projection intrinsics and P_CS extrinsics");
+          ASSERT_EQ(estimator->covariance_.rows(), 64)
+              << "Initial cov with one cloned state should be 64 for "
+                 "FXY_CXY projection intrinsics and P_CS extrinsics";
         } else {
-          mf->resetCameraSystemAndFrames(*cameraSystem1);  // dummy
+          // use the dummy because the estimator should no longer use info of the cameraSystem
+          mf->resetCameraSystemAndFrames(*cameraSystem1);
           estimator->addStates(mf, imuSegment, true);
           ++k;
         }
@@ -1040,8 +1092,9 @@ void testHybridFilterSinusoid(const std::string &outputPath,
                 mf->resetKeypoints(i, keypoints);
                 size_t numObs = estimator->numObservations(lmIds[j]);
                 if (numObs == 0) {
-                  Eigen::Vector4d unknown = Eigen::Vector4d::Zero();
+                    // use dummy values to keep info secret from the estimator
 //                  estimator->addLandmark(lmIds[j], homogeneousPoints[j]);
+                  Eigen::Vector4d unknown = Eigen::Vector4d::Zero();
                   estimator->addLandmark(lmIds[j], unknown);
                   estimator->addObservation<okvis::cameras::PinholeCamera<
                       okvis::cameras::RadialTangentialDistortion>>(
@@ -1081,6 +1134,8 @@ void testHybridFilterSinusoid(const std::string &outputPath,
         if (bVerbose) {
           Eigen::VectorXd allIntrinsics;
           cameraGeometry0->getIntrinsics(allIntrinsics);
+          std::shared_ptr<const okvis::kinematics::Transformation> T_SC_0
+              = cameraSystem0->T_SC(0);
           Eigen::IOFormat SpaceInitFmt(Eigen::StreamPrecision,
                                        Eigen::DontAlignCols, " ", " ", "", "",
                                        "", "");
@@ -1168,4 +1223,18 @@ void testHybridFilterSinusoid(const std::string &outputPath,
   for (auto it = rmseSum.begin(); it != rmseSum.end(); ++it)
     rmseStream << it->first << " " << it->second.transpose() << std::endl;
   rmseStream.close();
+}
+
+TEST(FILTER, MSCKF) {
+  int32_t old_algorithm = FLAGS_estimator_algorithm;
+  FLAGS_estimator_algorithm = 1;
+  testHybridFilterSinusoid("", 5);
+  FLAGS_estimator_algorithm = old_algorithm;
+}
+
+TEST(FILTER, PAVIO) {
+  int32_t old_algorithm = FLAGS_estimator_algorithm;
+  FLAGS_estimator_algorithm = 2;
+  testHybridFilterSinusoid("", 5);
+  FLAGS_estimator_algorithm = old_algorithm;
 }
