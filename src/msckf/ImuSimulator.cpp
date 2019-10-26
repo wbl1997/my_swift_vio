@@ -84,7 +84,6 @@ void CircularSinusoidalTrajectory::getSampleTimes(
 Eigen::Vector3d CircularSinusoidalTrajectory::computeGlobalAngularRate(
     const okvis::Time time) {
   double dTime = time.toSec();
-  //    double thetaZ = maxThetaZ*sin(wz*dTime);
   double thetaZDot = maxThetaZ * cos(wz * dTime) * wz;
 
   double thetaXY = wxy * dTime;
@@ -129,7 +128,6 @@ Eigen::Vector3d CircularSinusoidalTrajectory::computeGlobalLinearVelocity(
   double cwzt = cos(wz * dTime);
   double thetaZ = maxThetaZ * swzt;
   double thetaZDot = maxThetaZ * cwzt * wz;
-  //  double thetaZDDot = -maxThetaZ * swzt * wz * wz;
 
   double sThetaZ = sin(thetaZ);
   double cThetaZ = cos(thetaZ);
@@ -269,7 +267,6 @@ CircularSinusoidalTrajectory2::computeGlobalPose(const okvis::Time time) {
 
 CircularSinusoidalTrajectory3::CircularSinusoidalTrajectory3()
     : CircularSinusoidalTrajectory() {
-  //    wxy = 2;
   rxy = 37 / 19;
 }
 
@@ -277,13 +274,11 @@ CircularSinusoidalTrajectory3::CircularSinusoidalTrajectory3(
     double imuFreq, Eigen::Vector3d ginw)
     : CircularSinusoidalTrajectory(imuFreq, ginw) {
   rxy = 37 / 19;
-  //    wxy = 2;
 }
 
 Eigen::Vector3d CircularSinusoidalTrajectory3::computeGlobalAngularRate(
     const okvis::Time time) {
   double dTime = time.toSec();
-  //    double thetaZ = maxThetaZ*sin(wz*dTime);
   double thetaZDot = maxThetaZ * cos(wz * dTime) * wz;
 
   double thetaXY = M_PI * (1.0 - cos(wxy * dTime));

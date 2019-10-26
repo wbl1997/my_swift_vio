@@ -169,10 +169,6 @@ target_link_libraries(${PROJECT_NAME}
 )
 
 # now the actual applications
-# a wrapper to invoke a specific test
-add_executable(invoke_one_test src/apps/invoke_one_test.cpp )
-target_link_libraries(invoke_one_test ${PROJECT_NAME} gtest pthread)
-
 add_executable(okvis_node src/apps/okvis_node.cpp)
 target_link_libraries(okvis_node ${PROJECT_NAME})
 
@@ -188,11 +184,7 @@ list(APPEND TEST_SRC_FILES
     test/eigen/TestEigenMatrixInitialization.cpp
     test/eigen/TestEigenQR.cpp
 
-    test/std/TestBinaryOperators.cpp
-    test/std/TestDerivedClass.cpp
-    test/std/TestMapKeyOrder.cpp
-    test/std/TestSizeof.cpp
-    test/std/TestStdAccumulate.cpp
+    test/io_wrap/TestVioDatasetPlayer.cpp
 
     test/msckf/TestFeatureInitialization.cpp
     test/msckf/TestPointObsJacobian.cpp
@@ -204,7 +196,15 @@ list(APPEND TEST_SRC_FILES
     test/msckf/TestRelativeMotionJacobian.cpp
     test/msckf/TestEpipolarJacobian.cpp
     test/msckf/TestTwoViewPair.cpp
-    test/io_wrap/TestVioDatasetPlayer.cpp
+
+    test/opencv/TestOpenCVDistortion.cpp
+
+    test/std/TestBinaryOperators.cpp
+    test/std/TestDequeIterator.cpp
+    test/std/TestDerivedClass.cpp
+    test/std/TestMapKeyOrder.cpp
+    test/std/TestSizeof.cpp
+    test/std/TestStdAccumulate.cpp
     )
 
 #QtCreator may not create the allTests target

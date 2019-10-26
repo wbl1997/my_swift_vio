@@ -212,7 +212,7 @@ class CircularSinusoidalTrajectory {
       const okvis::Time time);
 };
 
-// make the radius changes
+// Yarn torus
 class CircularSinusoidalTrajectory2 : public CircularSinusoidalTrajectory {
  protected:
   const double wr;    // angular rate that the radius changes
@@ -231,7 +231,7 @@ class CircularSinusoidalTrajectory2 : public CircularSinusoidalTrajectory {
       const okvis::Time time);
 };
 
-// make the radius changes
+// Yarn ball
 class CircularSinusoidalTrajectory3 : public CircularSinusoidalTrajectory {
  protected:
  public:

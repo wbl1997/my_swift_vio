@@ -3,6 +3,7 @@
 #include <memory>
 #include <vector>
 
+#include <glog/logging.h>
 #include <gtest/gtest.h>
 
 #include "opencv2/imgproc/imgproc.hpp"
@@ -23,10 +24,6 @@ std::vector<cv::Point3f> Generate3DPoints(int npts) {
     z = rng.uniform(1, 15);
     points.push_back(cv::Point3f(x, y, z));
   }
-  //    for(unsigned int i = 0; i < points.size(); ++i)
-  //    {
-  //        std::cout << points[i] << std::endl;
-  //    }
   return points;
 }
 
@@ -34,7 +31,7 @@ std::vector<cv::Point3f> Generate3DPoints(int npts) {
 //   tangential distortion model which agrees with okvis,
 // camera calibration toolbox in matlab, but it does not agree with the
 //   checkerboard calibration procedure in opencv
-void testOpenCVDistortion() {
+TEST(OpenCV, Distortion) {
   const size_t NUM_POINTS = 100;
 
   // instantiate all possible versions of test cameras
@@ -46,7 +43,7 @@ void testOpenCVDistortion() {
   // opencv camera
   Eigen::VectorXd allIntrinsics;
   cameras[0]->getIntrinsics(allIntrinsics);
-  std::cout << "all intrinsics " << allIntrinsics.transpose() << std::endl;
+  LOG(INFO) << "all intrinsics " << allIntrinsics.transpose();
   double K1[9] = {allIntrinsics[0],
                   0,
                   allIntrinsics[2],
@@ -57,13 +54,13 @@ void testOpenCVDistortion() {
                   0,
                   1};
   cv::Mat cameraMatrix(3, 3, cv::DataType<double>::type, K1);
-  std::cout << "Initial cameraMatrix: " << cameraMatrix << std::endl;
+  LOG(INFO) << "Initial cameraMatrix: " << cameraMatrix;
   cv::Mat distCoeffs(4, 1, cv::DataType<double>::type);
   distCoeffs.at<double>(0) = allIntrinsics[4];
   distCoeffs.at<double>(1) = allIntrinsics[5];
   distCoeffs.at<double>(2) = allIntrinsics[6];
   distCoeffs.at<double>(3) = allIntrinsics[7];
-  std::cout << "distCoeffs: " << distCoeffs << std::endl;
+  LOG(INFO) << "distCoeffs: " << distCoeffs;
 
   // left image
   cv::Mat rvec(3, 1, CV_64F);
@@ -76,7 +73,7 @@ void testOpenCVDistortion() {
   tvec.at<double>(2) = 0;
 
   for (size_t c = 0; c < cameras.size(); ++c) {
-    // std::cout << "Testing " << cameras.at(c)->type() << std::endl;
+    // LOG(INFO) << "Testing " << cameras.at(c)->type();
     // try quite a lot of points:
     for (size_t i = 0; i < NUM_POINTS; ++i) {
       // create a random point in the field of view:
@@ -84,7 +81,8 @@ void testOpenCVDistortion() {
 
       // backProject
       Eigen::Vector3d ray;
-      assert(cameras.at(c)->backProject(imagePoint, &ray));
+      ASSERT_TRUE(cameras.at(c)->backProject(imagePoint, &ray))
+          << "Failed to back project a image point";
 
       // randomise distance
       ray.normalize();
@@ -95,11 +93,15 @@ void testOpenCVDistortion() {
       Eigen::Vector2d imagePoint2;
       Eigen::Matrix<double, 2, 3> J;
       Eigen::Matrix2Xd J_intrinsics;
-      assert(cameras.at(c)->project(ray, &imagePoint2, &J, &J_intrinsics) ==
-             okvis::cameras::CameraBase::ProjectionStatus::Successful);
+      ASSERT_EQ(cameras.at(c)->project(ray, &imagePoint2, &J, &J_intrinsics),
+                okvis::cameras::CameraBase::ProjectionStatus::Successful)
+          << "Failed to reproject a ray into the image plane";
 
       // check they are the same
-      assert((imagePoint2 - imagePoint).norm() < 0.01);
+      EXPECT_LT((imagePoint2 - imagePoint).norm(), 0.01)
+          << "Original image point differs much from the reprojected one\n"
+          << "Original:" << imagePoint.transpose()
+          << " and reprojected:" << imagePoint2.transpose();
 
       // check point Jacobian vs. NumDiff
       const double dp = 1.0e-7;
@@ -117,7 +119,9 @@ void testOpenCVDistortion() {
         cameras.at(c)->project(point_m, &imagePoint_m);
         J_numDiff.col(d) = (imagePoint_p - imagePoint_m) / (2 * dp);
       }
-      assert((J_numDiff - J).norm() < 0.0001);
+      EXPECT_LT((J_numDiff - J).norm(), 1e-4)
+          << "Numeric point Jacobian differs much from the analytic one.\n"
+          << "Numeric\n" << J_numDiff << "\nAnalytic\n" << J << "\n";
 
       // check intrinsics Jacobian
       const int numIntrinsics = cameras.at(c)->noIntrinsicsParameters();
@@ -140,11 +144,12 @@ void testOpenCVDistortion() {
                                                      &imagePoint_m);
         J_numDiff_intrinsics.col(d) = (imagePoint_p - imagePoint_m) / (2 * dp);
       }
-      /*std::cout<<J_numDiff_intrinsics<<std::endl;
-std::cout<<"----------------"<<std::endl;
-std::cout<<J_intrinsics<<std::endl;
-std::cout<<"================"<<std::endl;*/
-      assert((J_numDiff_intrinsics - J_intrinsics).norm() < 0.0001);
+
+      EXPECT_LT((J_numDiff_intrinsics - J_intrinsics).norm(), 1e-4)
+          << "Numeric intrinsic Jacobian differs much from analytic one.\n"
+          << "Numeric\n"
+          << J_numDiff_intrinsics << "\nAnalytic\n"
+          << J_intrinsics;
 
       std::vector<cv::Point3f> objectPoints(
           1, cv::Point3f(ray[0], ray[1], ray[2]));
@@ -152,11 +157,10 @@ std::cout<<"================"<<std::endl;*/
       cv::projectPoints(objectPoints, rvec, tvec, cameraMatrix, distCoeffs,
                         imagePoints);
       Eigen::Vector2d imagePointCV(imagePoints[0].x, imagePoints[0].y);
-      std::cout << "opencv image point " << imagePointCV << std::endl;
-      std::cout << "okvis image point " << imagePoint << std::endl;
-      std::cout << "norm of diff " << (imagePointCV - imagePoint).norm()
-                << std::endl;
-      assert((imagePointCV - imagePoint).norm() < 1e-4);
+      EXPECT_LT((imagePointCV - imagePoint).norm(), 1e-4)
+          << "Original point and reprojected point differ much.\n"
+          << "Original point " << imagePoint.transpose()
+          << " and reprojected point " << imagePointCV;
 
       cv::Mat obs(1, 2, CV_32F);
       obs.at<float>(0, 0) = imagePoints[0].x;
@@ -167,12 +171,10 @@ std::cout<<"================"<<std::endl;*/
                           cv::Mat());
       Eigen::Vector2d objectPointEigen(objectPoint.at<float>(0),
                                        objectPoint.at<float>(1));
-      std::cout << "undistorted point " << objectPointEigen.transpose()
-                << " and origin mappoint " << normalizedPoint.transpose()
-                << std::endl;
-      std::cout << "undistorted and original point diff "
-                << (normalizedPoint - objectPointEigen).norm() << std::endl;
-      assert((normalizedPoint - objectPointEigen).norm() < 1e-3);
+      EXPECT_LT((normalizedPoint - objectPointEigen).norm(), 9e-3)
+          << "Undistorted and original point differ too much.\n"
+          << "undistorted point " << objectPointEigen.transpose()
+          << " and origin mappoint " << normalizedPoint.transpose();
     }
   }
 }

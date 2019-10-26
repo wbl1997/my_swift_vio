@@ -125,7 +125,10 @@ void addImuNoise(const okvis::ImuParameters& imuParameters,
                  std::ofstream* inertialStream) {
   // multiply the accelerometer and gyro scope noise root PSD by this
   // reduction factor in generating noise to account for linearization
-  // uncertainty in optimization
+  // uncertainty in optimization.
+  // As a result, the std for noises used in covariance propagation is slightly
+  // larger than the std used in sampling noises. This is necessary
+  // because the process model involves many approximations other than these noise terms.
   double imuNoiseFactor = 0.5;
   CHECK_GT(imuMeasurements->size(), 0u) << "Should provide imu measurements to add noise";
   *trueBiases = (*imuMeasurements);
@@ -535,17 +538,17 @@ void check_tail_mse(
   index += 3;
   EXPECT_LT(mse_tail.segment<3>(index).norm(), std::pow(0.1, 2)) << "Velocity MSE";
   index += 3;
-  EXPECT_LT(mse_tail.segment<3>(index).norm(), std::pow(0.001, 2)) << "Gyro bias MSE";
+  EXPECT_LT(mse_tail.segment<3>(index).norm(), std::pow(0.002, 2)) << "Gyro bias MSE";
   index += 3;
-  EXPECT_LT(mse_tail.segment<3>(index).norm(), std::pow(0.01, 2)) << "Accelerometer bias MSE";
+  EXPECT_LT(mse_tail.segment<3>(index).norm(), std::pow(0.02, 2)) << "Accelerometer bias MSE";
   index += 3;
-  EXPECT_LT(mse_tail.segment<9>(index).norm(), std::pow(1e-3, 2)) << "Tg MSE";
+  EXPECT_LT(mse_tail.segment<9>(index).norm(), std::pow(4e-3, 2)) << "Tg MSE";
   index += 9;
   EXPECT_LT(mse_tail.segment<9>(index).norm(), std::pow(1e-3, 2)) << "Ts MSE";
   index += 9;
   EXPECT_LT(mse_tail.segment<9>(index).norm(), std::pow(5e-3, 2)) << "Ta MSE";
   index += 9;
-  EXPECT_LT(mse_tail.segment<3>(index).norm(), std::pow(0.01, 2)) << "p_CS MSE";
+  EXPECT_LT(mse_tail.segment<3>(index).norm(), std::pow(0.04, 2)) << "p_CS MSE";
   index += 3;
   EXPECT_LT(mse_tail.segment<4>(index).norm(), std::pow(1, 2)) << "fxy cxy MSE";
   index += 4;
@@ -559,6 +562,15 @@ void check_tail_nees(const Eigen::Vector3d &nees_tail) {
   EXPECT_LT(nees_tail[0], 8) << "Position NEES";
   EXPECT_LT(nees_tail[1], 5) << "Orientation NEES";
   EXPECT_LT(nees_tail[2], 10) << "Pose NEES";
+}
+
+okvis::Optimization initOptimizationConfig() {
+  okvis::Optimization optConfig;
+  optConfig.translationThreshold = 0.4;
+  optConfig.rotationThreshold = 0.2618;
+  optConfig.trackingRateThreshold = 0.5;
+  optConfig.minTrackLength = 3u;
+  return optConfig;
 }
 
 void testHybridFilterCircle() {
@@ -750,15 +762,12 @@ void testHybridFilterCircle() {
       }
       // run the optimization
       estimator->optimize(1, 1, false);
-      double translationThreshold = 0.4;
-      double rotationThreshold = 0.2618;
-      double trackingRateThreshold = 0.5;
-      size_t minTrackLength = 3u;
+      okvis::Optimization sharedOptConfig = initOptimizationConfig();
       estimator->setKeyframeRedundancyThresholds(
-          translationThreshold,
-          rotationThreshold,
-          trackingRateThreshold,
-          minTrackLength);
+          sharedOptConfig.translationThreshold,
+          sharedOptConfig.rotationThreshold,
+          sharedOptConfig.trackingRateThreshold,
+          sharedOptConfig.minTrackLength);
       okvis::MapPointVector removedLandmarks;
       estimator->applyMarginalizationStrategy(5, 25, removedLandmarks);
     }
@@ -817,11 +826,14 @@ void testHybridFilterCircle() {
   }
 }
 
-// Note the std for noises used in covariance propagation should be slightly
-// larger than the std used in sampling noises, becuase the process model
-// involves many approximations other than these noise terms.
+/**
+ * @brief testHybridFilterSinusoid
+ * @param outputPath
+ * @param runs
+ * @param trajectoryId: 0: yarn torus, 1: yarn ball
+ */
 void testHybridFilterSinusoid(const std::string &outputPath,
-                              const int runs = 100) {
+                              const int runs = 100, const int trajectoryId=1) {
   const double DURATION = 300.0;     // length of motion in seconds
 
   const double maxTrackLength = 60;  // maximum length of a feature track
@@ -921,13 +933,24 @@ void testHybridFilterSinusoid(const std::string &outputPath,
     const okvis::Time tStart(20);
     const okvis::Time tEnd(20 + DURATION);
 
-    CircularSinusoidalTrajectory3 cst(imuParameters.rate,
-                                      Eigen::Vector3d(0, 0, -imuParameters.g));
-    cst.getTruePoses(tStart, tEnd, qs2w);
-    cst.getSampleTimes(tStart, tEnd, times);
+    std::shared_ptr<CircularSinusoidalTrajectory> cst;
+    switch (trajectoryId) {
+      case 0:
+        cst.reset(new CircularSinusoidalTrajectory2(
+            imuParameters.rate, Eigen::Vector3d(0, 0, -imuParameters.g)));
+        break;
+      case 1:
+      default:
+        cst.reset(new CircularSinusoidalTrajectory3(
+            imuParameters.rate, Eigen::Vector3d(0, 0, -imuParameters.g)));
+        break;
+      ;
+    }
+    cst->getTruePoses(tStart, tEnd, qs2w);
+    cst->getSampleTimes(tStart, tEnd, times);
     ASSERT_EQ(qs2w.size(), times.size()) << "timestamps and true poses should have the same size!";
     okvis::ImuMeasurementDeque imuMeasurements;
-    cst.getTrueInertialMeasurements(tStart - okvis::Duration(1),
+    cst->getTrueInertialMeasurements(tStart - okvis::Duration(1),
                                     tEnd + okvis::Duration(1), imuMeasurements);
     okvis::ImuMeasurementDeque trueBiases;  // true biases used for computing RMSE
 
@@ -1042,9 +1065,9 @@ void testHybridFilterSinusoid(const std::string &outputPath,
           k = 0;
           mf->resetCameraSystemAndFrames(*cameraSystem2);
           okvis::kinematics::Transformation truePose =
-              cst.computeGlobalPose(*iter);
+              cst->computeGlobalPose(*iter);
           Eigen::Vector3d p_WS = truePose.r();
-          Eigen::Vector3d v_WS = cst.computeGlobalLinearVelocity(*iter);
+          Eigen::Vector3d v_WS = cst->computeGlobalLinearVelocity(*iter);
 
           pvstd.p_WS = p_WS;
           pvstd.q_WS = truePose.q();
@@ -1115,19 +1138,16 @@ void testHybridFilterSinusoid(const std::string &outputPath,
         myAccumulator(trackedFeatures);
 
         estimator->optimize(1, 1, false);
-        double translationThreshold = 0.4;
-        double rotationThreshold = 0.2618;
-        double trackingRateThreshold = 0.5;
-        size_t minTrackLength = 3u;
+        okvis::Optimization sharedOptConfig = initOptimizationConfig();
         estimator->setKeyframeRedundancyThresholds(
-            translationThreshold,
-            rotationThreshold,
-            trackingRateThreshold,
-            minTrackLength);
+            sharedOptConfig.translationThreshold,
+            sharedOptConfig.rotationThreshold,
+            sharedOptConfig.trackingRateThreshold,
+            sharedOptConfig.minTrackLength);
         okvis::MapPointVector removedLandmarks;
         estimator->applyMarginalizationStrategy(5, 25, removedLandmarks);
 
-        Eigen::Vector3d v_WS_true = cst.computeGlobalLinearVelocity(*iter);
+        Eigen::Vector3d v_WS_true = cst->computeGlobalLinearVelocity(*iter);
 
         estimator->print(debugStream);
         if (bVerbose) {
@@ -1224,16 +1244,30 @@ void testHybridFilterSinusoid(const std::string &outputPath,
   rmseStream.close();
 }
 
-TEST(FILTER, MSCKF) {
+TEST(FILTER, MSCKF_BALL) {
   int32_t old_algorithm = FLAGS_estimator_algorithm;
   FLAGS_estimator_algorithm = 1;
   testHybridFilterSinusoid("", 5);
   FLAGS_estimator_algorithm = old_algorithm;
 }
 
-TEST(FILTER, PAVIO) {
+TEST(FILTER, PAVIO_BALL) {
   int32_t old_algorithm = FLAGS_estimator_algorithm;
   FLAGS_estimator_algorithm = 2;
   testHybridFilterSinusoid("", 5);
+  FLAGS_estimator_algorithm = old_algorithm;
+}
+
+TEST(FILTER, MSCKF_TORUS) {
+  int32_t old_algorithm = FLAGS_estimator_algorithm;
+  FLAGS_estimator_algorithm = 1;
+  testHybridFilterSinusoid("", 5, 0);
+  FLAGS_estimator_algorithm = old_algorithm;
+}
+
+TEST(FILTER, PAVIO_TORUS) {
+  int32_t old_algorithm = FLAGS_estimator_algorithm;
+  FLAGS_estimator_algorithm = 2;
+  testHybridFilterSinusoid("", 5, 0);
   FLAGS_estimator_algorithm = old_algorithm;
 }
