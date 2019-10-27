@@ -14,10 +14,10 @@ void StreamHelper::composeHeaderLine(const std::string &imu_model,
                                      const std::string &cam0_extrinsic_opt_rep,
                                      const std::string &cam0_distortion_rep,
                                      DUMP_RESULT_OPTION result_option,
-                                     std::string *header_line) {
+                                     std::string *header_line, bool include_frameid) {
   composeHeaderLine(imu_model, ProjectionOptNameToId(cam0_proj_opt_rep),
                     ExtrinsicModelNameToId(cam0_extrinsic_opt_rep),
-                    cam0_distortion_rep, result_option, header_line);
+                    cam0_distortion_rep, result_option, header_line, include_frameid);
 }
 
 void StreamHelper::composeHeaderLine(const std::string &imu_model,
@@ -25,10 +25,12 @@ void StreamHelper::composeHeaderLine(const std::string &imu_model,
                                      const int &cam0_extrinsic_opt_mode,
                                      const std::string &cam0_distortion_rep,
                                      DUMP_RESULT_OPTION result_option,
-                                     std::string *header_line) {
+                                     std::string *header_line,
+                                     bool include_frameid) {
   std::stringstream stream;
-  stream << "%timestamp" << FLAGS_datafile_separator << "frameIdInSource"
-         << FLAGS_datafile_separator << "p_WS_W_x" << FLAGS_datafile_separator
+  stream << "%timestamp" << FLAGS_datafile_separator
+         << (include_frameid ? "frameIdInSource" + FLAGS_datafile_separator : "")
+         << "p_WS_W_x" << FLAGS_datafile_separator
          << "p_WS_W_y" << FLAGS_datafile_separator << "p_WS_W_z"
          << FLAGS_datafile_separator << "q_WS_x" << FLAGS_datafile_separator
          << "q_WS_y" << FLAGS_datafile_separator << "q_WS_z"

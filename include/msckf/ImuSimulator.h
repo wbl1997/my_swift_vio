@@ -1,17 +1,21 @@
 #ifndef IMU_SIMULATOR_H_
 #define IMU_SIMULATOR_H_
+
 #include "okvis/Measurements.hpp"
+#include "okvis/Parameters.hpp"
 #include "okvis/Time.hpp"
 #include "sophus/se3.hpp"  //from Sophus
 #include "vio/eigen_utils.h"
 
 #include <Eigen/Core>
 #include <Eigen/Dense>
+#include <Eigen/StdVector>
 
 #include <fstream>
 #include <iostream>
 #include <vector>
 
+namespace imu {
 /**
  *@brief interpolate IMU data given control poses and their uniform timestamps
  *@param q02n, nominal trajecotry poses,i.e., control points, q_0^w, q_1^w, ...,
@@ -164,10 +168,13 @@ void InterpolateIMUData(
 typedef std::vector<okvis::ImuMeasurement,
                     Eigen::aligned_allocator<okvis::ImuMeasurement>>
     ImuMeasurementVector;
-// implements the horizontal circular and vertical sinusoidal motion of the body
-// frame world frame x right, y forward, z up, sit at the circle center body
-// frame, at each point on the curve, x outward along the radius, y tangent, z
-// up imu frame coincides with body frame
+
+// implements the horizontal circular and vertical sinusoidal
+// motion of a body frame
+// world frame x right, y forward, z up, sit at the circle center
+// body frame, at each point on the curve,
+// x outward along the radius, y tangent, z up
+// imu frame coincides with body frame
 class CircularSinusoidalTrajectory {
  protected:
   const double wz;    // parameter determining the angular rate of sinusoidal
@@ -184,44 +191,45 @@ class CircularSinusoidalTrajectory {
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
   CircularSinusoidalTrajectory();
   CircularSinusoidalTrajectory(double imuFreq, Eigen::Vector3d ginw);
-  virtual ~CircularSinusoidalTrajectory(){};
+  virtual ~CircularSinusoidalTrajectory() {}
   virtual void getTrueInertialMeasurements(
       const okvis::Time tStart, const okvis::Time tEnd,
-      okvis::ImuMeasurementDeque& imuMeasurements);
+      okvis::ImuMeasurementDeque& imuMeasurements) final;
 
   virtual void getNoisyInertialMeasurements(
       const okvis::Time tStart, const okvis::Time tEnd,
-      okvis::ImuMeasurementDeque& imuMeasurements);
+      okvis::ImuMeasurementDeque& imuMeasurements) final;
 
   virtual void getTruePoses(
       const okvis::Time tStart, const okvis::Time tEnd,
-      std::vector<okvis::kinematics::Transformation>& vT_WB);
+      std::vector<okvis::kinematics::Transformation>& vT_WB) final;
 
   virtual void getSampleTimes(const okvis::Time tStart, const okvis::Time tEnd,
-                              std::vector<okvis::Time>& vTime);
+                              std::vector<okvis::Time>& vTime) final;
 
-  // compute angular rate in the global frame
+  // compute angular rate in the global frame, $\omega_{WB}^{W}$
   virtual Eigen::Vector3d computeGlobalAngularRate(const okvis::Time time);
 
+  // $a_{WB}^W$, applied force
   virtual Eigen::Vector3d computeGlobalLinearAcceleration(
       const okvis::Time time);
-
+  // $v_{WB}^W$
   virtual Eigen::Vector3d computeGlobalLinearVelocity(const okvis::Time time);
-
+  // $T_{WB}$
   virtual okvis::kinematics::Transformation computeGlobalPose(
       const okvis::Time time);
 };
 
 // Yarn torus
-class CircularSinusoidalTrajectory2 : public CircularSinusoidalTrajectory {
+class TorusTrajectory : public CircularSinusoidalTrajectory {
  protected:
   const double wr;    // angular rate that the radius changes
   const double xosc;  // the oscillation mag in global x direction
  public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
-  CircularSinusoidalTrajectory2();
-  CircularSinusoidalTrajectory2(double imuFreq, Eigen::Vector3d ginw);
-  virtual ~CircularSinusoidalTrajectory2(){};
+  TorusTrajectory();
+  TorusTrajectory(double imuFreq, Eigen::Vector3d ginw);
+  virtual ~TorusTrajectory() {}
   virtual Eigen::Vector3d computeGlobalLinearAcceleration(
       const okvis::Time time);
 
@@ -232,13 +240,13 @@ class CircularSinusoidalTrajectory2 : public CircularSinusoidalTrajectory {
 };
 
 // Yarn ball
-class CircularSinusoidalTrajectory3 : public CircularSinusoidalTrajectory {
+class SphereTrajectory : public CircularSinusoidalTrajectory {
  protected:
  public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
-  CircularSinusoidalTrajectory3();
-  CircularSinusoidalTrajectory3(double imuFreq, Eigen::Vector3d ginw);
-  virtual ~CircularSinusoidalTrajectory3(){};
+  SphereTrajectory();
+  SphereTrajectory(double imuFreq, Eigen::Vector3d ginw);
+  virtual ~SphereTrajectory() {}
   virtual Eigen::Vector3d computeGlobalAngularRate(const okvis::Time time);
 
   virtual Eigen::Vector3d computeGlobalLinearAcceleration(
@@ -249,6 +257,55 @@ class CircularSinusoidalTrajectory3 : public CircularSinusoidalTrajectory {
   virtual okvis::kinematics::Transformation computeGlobalPose(
       const okvis::Time time);
 };
+
+// planar motion with constant velocity magnitude
+class RoundedSquare : public CircularSinusoidalTrajectory {
+public:
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+  RoundedSquare();
+  RoundedSquare(double imuFreq, Eigen::Vector3d ginw,
+                okvis::Time startEpoch = okvis::Time(0, 0), double radius = 1.0,
+                double sideLength = 2, double velocityNorm = 0.8);
+
+  virtual Eigen::Vector3d computeGlobalAngularRate(const okvis::Time time);
+
+  virtual Eigen::Vector3d computeGlobalLinearAcceleration(
+      const okvis::Time time);
+
+  virtual Eigen::Vector3d computeGlobalLinearVelocity(const okvis::Time time);
+
+  virtual okvis::kinematics::Transformation computeGlobalPose(
+      const okvis::Time time);
+
+private:
+
+  // decide time slot, endEpochs_[j-1] < time_into_period <= endEpochs_[j]
+  void decideTimeSlot(double time_into_period, size_t* j,
+                      double* time_into_slot);
+
+  void initDataStructures();
+
+  double getPeriodRemainder(const okvis::Time time);
+
+  okvis::Time startEpoch_; // reference time to start the motion
+
+  const double radius_; // radius of four arcs at corners
+  const double sideLength_; // contiguous to the arc of radius
+  const double velocityNorm_; // magnitude of velocity, to ensure continuity in velocity
+
+  okvis::Duration period_; // time to travel through the rounded square
+  double omega_; // angular rate
+  std::vector<double> endEpochs_; // end epochs for each segments
+  std::vector<Eigen::Vector2d, Eigen::aligned_allocator<Eigen::Vector2d>>
+      centers_;  // centers for corner arcs
+
+  // beginPoints for the 5 line segments on four sides
+  // the first side has two halves because the starting point is at its middle
+  std::vector<Eigen::Vector2d, Eigen::aligned_allocator<Eigen::Vector2d>>
+      beginPoints_;
+};
+
+Eigen::Matrix2d rotMat2d(double theta);
 
 struct TestSetting {
   bool addImuNoise;
@@ -269,4 +326,17 @@ struct TestSetting {
   }
 };
 
+/**
+ * @brief addImuNoise
+ * @param imuParameters
+ * @param imuMeasurements as input original perfect imu measurement,
+ *     as output imu measurements with added bias and noise
+ * @param trueBiases output added biases
+ * @param inertialStream
+ */
+void addImuNoise(const okvis::ImuParameters& imuParameters,
+                 okvis::ImuMeasurementDeque* imuMeasurements,
+                 okvis::ImuMeasurementDeque* trueBiases,
+                 std::ofstream* inertialStream);
+} // namespace imu
 #endif
