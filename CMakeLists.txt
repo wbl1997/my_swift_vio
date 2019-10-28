@@ -191,6 +191,7 @@ list(APPEND TEST_SRC_FILES
     test/msckf/TestExtrinsicJacobian.cpp
     test/msckf/TestHybridFilter.cpp
     test/msckf/TestImuOdometry.cpp
+    test/msckf/TestImuSimulator.cpp
     test/msckf/TestTriangulate.cpp
     test/msckf/TestBoundedImuDeque.cpp
     test/msckf/TestRelativeMotionJacobian.cpp

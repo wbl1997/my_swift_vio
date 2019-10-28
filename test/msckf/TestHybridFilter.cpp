@@ -21,7 +21,6 @@
 #include <vio/Sample.h>
 #include <okvis/ceres/EuclideanParamBlock.hpp>
 
-
 #include "io_wrap/StreamHelper.hpp"
 
 #include "msckf/ImuOdometry.h"
@@ -535,7 +534,8 @@ okvis::Optimization initOptimizationConfig() {
  * @brief testHybridFilterSinusoid
  * @param outputPath
  * @param runs
- * @param trajectoryId: 0: yarn torus, 1: yarn ball, 2: rounded square
+ * @param trajectoryId: 0: yarn torus, 1: yarn ball, 2: rounded square,
+ *     3: circle, 4: dot
  */
 void testHybridFilterSinusoid(const std::string& outputPath,
                               const int runs = 100, const int trajectoryId=1) {
@@ -648,6 +648,18 @@ void testHybridFilterSinusoid(const std::string& outputPath,
       case 2:
         cst.reset(new imu::RoundedSquare(
             imuParameters.rate, Eigen::Vector3d(0, 0, -imuParameters.g)));
+        projOptModelName = "FIXED";
+        break;
+      case 3:
+        cst.reset(new imu::RoundedSquare(
+            imuParameters.rate, Eigen::Vector3d(0, 0, -imuParameters.g),
+            okvis::Time(0, 0), 1.0, 0, 0.8));
+        projOptModelName = "FIXED";
+        break;
+      case 4:
+        cst.reset(new imu::RoundedSquare(
+            imuParameters.rate, Eigen::Vector3d(0, 0, -imuParameters.g),
+            okvis::Time(0, 0), 1e-3, 0, 0.8e-3));
         projOptModelName = "FIXED";
         break;
       case 1:
@@ -1017,5 +1029,33 @@ TEST(FILTER, PAVIO_SQUIRCLE) {
   int32_t old_algorithm = FLAGS_estimator_algorithm;
   FLAGS_estimator_algorithm = 2;
   testHybridFilterSinusoid(FLAGS_log_dir, 5, 2);
+  FLAGS_estimator_algorithm = old_algorithm;
+}
+
+TEST(FILTER, MSCKF_CIRCLE) {
+  int32_t old_algorithm = FLAGS_estimator_algorithm;
+  FLAGS_estimator_algorithm = 1;
+  testHybridFilterSinusoid(FLAGS_log_dir, 5, 3);
+  FLAGS_estimator_algorithm = old_algorithm;
+}
+
+TEST(FILTER, PAVIO_CIRCLE) {
+  int32_t old_algorithm = FLAGS_estimator_algorithm;
+  FLAGS_estimator_algorithm = 2;
+  testHybridFilterSinusoid(FLAGS_log_dir, 5, 3);
+  FLAGS_estimator_algorithm = old_algorithm;
+}
+
+TEST(FILTER, MSCKF_DOT) {
+  int32_t old_algorithm = FLAGS_estimator_algorithm;
+  FLAGS_estimator_algorithm = 1;
+  testHybridFilterSinusoid(FLAGS_log_dir, 5, 4);
+  FLAGS_estimator_algorithm = old_algorithm;
+}
+
+TEST(FILTER, PAVIO_DOT) {
+  int32_t old_algorithm = FLAGS_estimator_algorithm;
+  FLAGS_estimator_algorithm = 2;
+  testHybridFilterSinusoid(FLAGS_log_dir, 5, 4);
   FLAGS_estimator_algorithm = old_algorithm;
 }

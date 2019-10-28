@@ -277,7 +277,9 @@ public:
   virtual okvis::kinematics::Transformation computeGlobalPose(
       const okvis::Time time);
 
-private:
+  std::vector<double> getEndEpochs() { return endEpochs_; }
+
+ private:
 
   // decide time slot, endEpochs_[j-1] < time_into_period <= endEpochs_[j]
   void decideTimeSlot(double time_into_period, size_t* j,

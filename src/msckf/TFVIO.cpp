@@ -37,14 +37,16 @@ DECLARE_bool(use_IEKF);
 
 DECLARE_double(max_proj_tolerance);
 
-DEFINE_bool(
-    head_tail, false,
-    "If true, use the fixed head observation and "
-    "the receding tail observation of a landmark to "
-    "form one two-view constraint in one filter update step; "
-    "or else the entire feature track of a landmark is used to "
+DEFINE_int32(
+    two_view_constraint_scheme, 0,
+    "0 the entire feature track of a landmark is used to "
     "compose two-view constraints which are used in one filter update step "
-    "as the landmark disappears");
+    "as the landmark disappears; "
+    "1, use the latest two observations of a landmark to "
+    "form one two-view constraint in one filter update step; "
+    "2, use the fixed head observation and "
+    "the receding tail observation of a landmark to "
+    "form one two-view constraint in one filter update step");
 DEFINE_double(
     image_noise_cov_multiplier, 9.0,
     "Enlarge the image observation noise covariance by this multiplier.");
@@ -788,7 +790,8 @@ bool TFVIO::featureJacobian(
   std::vector<okvis::kinematics::Transformation,
               Eigen::aligned_allocator<okvis::kinematics::Transformation>>
       T_WSs;
-  RetrieveObsSeqType seqType = FLAGS_head_tail ? HEAD_TAIL : ENTIRE_TRACK;
+  RetrieveObsSeqType seqType =
+      static_cast<RetrieveObsSeqType>(FLAGS_two_view_constraint_scheme);
   size_t numFeatures = gatherPoseObservForTriang(mp, tempCameraGeometry, &frameIds, &T_WSs,
                             &obsDirections, &obsInPixels, &imagePointNoiseStds,
                             seqType);
@@ -800,8 +803,10 @@ bool TFVIO::featureJacobian(
   // due to correlation in head_tail scheme
   size_t trackLength = mp.observations.size();
   double headObsCovModifier[2] = {1.0, 1.0};
-  headObsCovModifier[0] = FLAGS_head_tail ?
-      (static_cast<double>(trackLength - minTrackLength_ + 2u)) : 1.0;
+  headObsCovModifier[0] =
+      seqType == HEAD_TAIL
+          ? (static_cast<double>(trackLength - minTrackLength_ + 2u))
+          : 1.0;
 
   std::vector<std::pair<int, int>> featurePairs =
       TwoViewPair::getFramePairs(numFeatures, TwoViewPair::FIXED_MIDDLE);
@@ -902,11 +907,12 @@ int TFVIO::computeStackedJacobianAndResidual(
   std::vector<Eigen::MatrixXd, Eigen::aligned_allocator<Eigen::MatrixXd>> vr;
   std::vector<Eigen::MatrixXd, Eigen::aligned_allocator<Eigen::MatrixXd>> vH;
   std::vector<Eigen::MatrixXd, Eigen::aligned_allocator<Eigen::MatrixXd>> vR;
-
+  RetrieveObsSeqType seqType =
+      static_cast<RetrieveObsSeqType>(FLAGS_two_view_constraint_scheme);
   for (auto it = landmarksMap_.begin(); it != landmarksMap_.end(); ++it) {
     ResidualizeCase rc = it->second.residualizeCase;
     const size_t nNumObs = it->second.observations.size();
-    if (!FLAGS_head_tail) {
+    if (seqType == ENTIRE_TRACK) {
       if (rc != NotInState_NotTrackedNow || nNumObs < minTrackLength_) {
         continue;
       }

@@ -2909,9 +2909,14 @@ bool HybridFilter::print(std::ostream& stream) const {
 
   Eigen::IOFormat SpaceInitFmt(Eigen::StreamPrecision, Eigen::DontAlignCols,
                                " ", " ", "", "", "", "");
+  Eigen::Quaterniond q_WS = T_WS.q();
+  if (q_WS.w() < 0) {
+      q_WS.coeffs() *= -1;
+  }
   stream << currentTime << " " << multiFramePtrMap_.rbegin()->second->idInSource
          << " " << std::setfill(' ')
-         << T_WS.parameters().transpose().format(SpaceInitFmt);
+         << T_WS.r().transpose().format(SpaceInitFmt) << " "
+         << q_WS.coeffs().transpose().format(SpaceInitFmt);
   // update imu sensor states
   const int imuIdx = 0;
   const States stateInQuestion = statesMap_.rbegin()->second;

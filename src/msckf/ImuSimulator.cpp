@@ -437,6 +437,8 @@ RoundedSquare::RoundedSquare()
 }
 
 void RoundedSquare::initDataStructures() {
+  double eps = 1e-8;
+  CHECK_GT(radius_, eps);
   period_.fromSec((2 * M_PI * radius_ + 4 * sideLength_) / velocityNorm_);
   omega_ = velocityNorm_ / radius_;
   // compute endEpochs
@@ -522,7 +524,11 @@ okvis::kinematics::Transformation RoundedSquare::computeGlobalPose(
   R_WB3d.topLeftCorner<2, 2>() = R_WB;
   Eigen::Vector3d t_WB;
   t_WB << xny, 0;
-  return okvis::kinematics::Transformation(t_WB, Eigen::Quaterniond(R_WB3d));
+  Eigen::Quaterniond q_WB(R_WB3d);
+  if (q_WB.w() < 0) {
+    q_WB.coeffs() *= -1;
+  }
+  return okvis::kinematics::Transformation(t_WB, q_WB);
 }
 
 Eigen::Vector3d RoundedSquare::computeGlobalAngularRate(
