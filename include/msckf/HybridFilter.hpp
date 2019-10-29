@@ -760,6 +760,40 @@ class HybridFilter : public VioBackendInterface {
       Eigen::Matrix<double, Eigen::Dynamic, 3> *pH_fi =
           (Eigen::Matrix<double, Eigen::Dynamic, 3> *)(NULL)) const;
 
+  /**
+   * @brief measurementJacobian for one epipolar constraint
+   * @param tempCameraGeometry
+   * @param frameId2
+   * @param T_WS2
+   * @param obsDirection2
+   * @param obsInPixel2
+   * @param imagePointNoiseStd2
+   * @param camIdx
+   * @param H_xjk has the proper size upon calling this func
+   * @param H_fjk is an empty vector upon calling this func
+   * @param cov_fjk is an empty vector upon entering this func
+   * @param residual
+   * @return
+   */
+  bool measurementJacobianEpipolar(
+      const std::shared_ptr<okvis::cameras::CameraBase> tempCameraGeometry,
+      const std::vector<uint64_t>& frameId2,
+      const std::vector<
+          okvis::kinematics::Transformation,
+          Eigen::aligned_allocator<okvis::kinematics::Transformation>>& T_WS2,
+      const std::vector<Eigen::Vector3d,
+                        Eigen::aligned_allocator<Eigen::Vector3d>>&
+          obsDirection2,
+      const std::vector<Eigen::Vector2d,
+                        Eigen::aligned_allocator<Eigen::Vector2d>>& obsInPixel2,
+      const std::vector<double>& imagePointNoiseStd2, int camIdx,
+      Eigen::Matrix<double, 1, Eigen::Dynamic>* H_xjk,
+      std::vector<Eigen::Matrix<double, 1, 3>,
+                  Eigen::aligned_allocator<Eigen::Matrix<double, 1, 3>>>* H_fjk,
+      std::vector<Eigen::Matrix3d, Eigen::aligned_allocator<Eigen::Matrix3d>>*
+          cov_fjk,
+      double* residual) const;
+
 
   /// print out the most recent state vector and the stds of its elements. This
   /// function can be called in the optimizationLoop, but a better way to save
@@ -928,6 +962,23 @@ struct IsObservedInFrame {
  private:
   uint64_t frameId;  ///< Multiframe ID.
 };
+
+/**
+ * @brief obsDirectionJacobian
+ * @param obsInPixel [u, v] affected with noise in image
+ * @param cameraGeometry
+ * @param pixelNoiseStd
+ * @param dfj_dXcam
+ * @param cov_fj
+ */
+void obsDirectionJacobian(
+    const Eigen::Vector3d& obsInPixel,
+    const std::shared_ptr<okvis::cameras::CameraBase> cameraGeometry,
+    int projOptModelId,
+    double pixelNoiseStd,
+    Eigen::Matrix<double, 3, Eigen::Dynamic>* dfj_dXcam,
+    Eigen::Matrix3d* cov_fj);
+
 }  // namespace okvis
 
 #include "implementation/HybridFilter.hpp"

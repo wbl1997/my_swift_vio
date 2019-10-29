@@ -950,7 +950,7 @@ void testHybridFilterSinusoid(const std::string& outputPath,
                 << e.what();
       // revert the accumulated errors and delete the corresponding file
       if (debugStream.is_open()) debugStream.close();
-      unlink(outputFile.c_str());
+//      unlink(outputFile.c_str());
     }
     double elapsedTime = filterTimer.stop();
     LOG(INFO) << "Run " << run << " using time [sec] " << elapsedTime;

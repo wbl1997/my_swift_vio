@@ -89,40 +89,6 @@ class TFVIO : public HybridFilter {
   virtual void optimize(size_t numIter, size_t numThreads = 1,
                         bool verbose = false) final;
 
-  /**
-   * @brief measurementJacobian
-   * @param tempCameraGeometry
-   * @param frameId2
-   * @param T_WS2
-   * @param obsDirection2
-   * @param obsInPixel2
-   * @param imagePointNoiseStd2
-   * @param camIdx
-   * @param H_xjk has the proper size upon calling this func
-   * @param H_fjk is an empty vector upon calling this func
-   * @param cov_fjk is an empty vector upon entering this func
-   * @param residual
-   * @return
-   */
-  bool measurementJacobian(
-      const std::shared_ptr<okvis::cameras::CameraBase> tempCameraGeometry,
-      const std::vector<uint64_t>& frameId2,
-      const std::vector<
-          okvis::kinematics::Transformation,
-          Eigen::aligned_allocator<okvis::kinematics::Transformation>>& T_WS2,
-      const std::vector<Eigen::Vector3d,
-                        Eigen::aligned_allocator<Eigen::Vector3d>>&
-          obsDirection2,
-      const std::vector<Eigen::Vector2d,
-                        Eigen::aligned_allocator<Eigen::Vector2d>>& obsInPixel2,
-      const std::vector<double>& imagePointNoiseStd2, int camIdx,
-      Eigen::Matrix<double, 1, Eigen::Dynamic>* H_xjk,
-      std::vector<Eigen::Matrix<double, 1, 3>,
-                  Eigen::aligned_allocator<Eigen::Matrix<double, 1, 3>>>* H_fjk,
-      std::vector<Eigen::Matrix3d, Eigen::aligned_allocator<Eigen::Matrix3d>>*
-          cov_fjk,
-      double* residual) const;
-
  private:
   uint64_t getMinValidStateID() const;
 
@@ -144,22 +110,6 @@ class TFVIO : public HybridFilter {
       Eigen::MatrixXd* R_q) const;
 
 };
-
-/**
- * @brief obsDirectionJacobian
- * @param obsInPixel [u, v] affected with noise in image
- * @param cameraGeometry
- * @param pixelNoiseStd
- * @param dfj_dXcam
- * @param cov_fj
- */
-void obsDirectionJacobian(
-    const Eigen::Vector3d& obsInPixel,
-    const std::shared_ptr<okvis::cameras::CameraBase> cameraGeometry,
-    int projOptModelId,
-    double pixelNoiseStd,
-    Eigen::Matrix<double, 3, Eigen::Dynamic>* dfj_dXcam,
-    Eigen::Matrix3d* cov_fj);
 
 }  // namespace okvis
 
