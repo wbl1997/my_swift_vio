@@ -307,12 +307,24 @@ class CameraSystemCreator {
                                           const int /*camIdx*/) {
     Eigen::Matrix<double, 4, 4> matT_SC0;
     switch (caseId) {
-      case 1:
-        matT_SC0 << 1, 0, 0, 0, 0, 0, 1, 0, 0, -1, 0, 0, 0, 0, 0, 1;
+      case 1: // sideways motion facing inward if the device goes straight forward
+        matT_SC0 << 1, 0, 0, 0,
+                    0, 0, 1, 0,
+                    0, -1, 0, 0,
+                    0, 0, 0, 1;
         break;
-      case 0:
+      case 2: // sideways motion facing outward if the device goes straight forward
+        matT_SC0 << -1, 0, 0, 0,
+                    0, 0, -1, 0,
+                    0, -1, 0, 0,
+                    0, 0, 0, 1;
+        break;
+      case 0: // forward motion if the device goes straight forward
       default:
-        matT_SC0 << 0, 0, 1, 0, -1, 0, 0, 0, 0, -1, 0, 0, 0, 0, 0, 1;
+        matT_SC0 << 0, 0, 1, 0,
+                   -1, 0, 0, 0,
+                   0, -1, 0, 0,
+                   0, 0, 0, 1;
         break;
     }
     return matT_SC0;
@@ -536,9 +548,13 @@ okvis::Optimization initOptimizationConfig() {
  * @param runs
  * @param trajectoryId: 0: yarn torus, 1: yarn ball, 2: rounded square,
  *     3: circle, 4: dot
+ * @param cameraOrientation 0: forward 1: sideways inward 2: sidways outward
+ *     Sideways orientation is geometrically favorable for motion estimation.
  */
 void testHybridFilterSinusoid(const std::string& outputPath,
-                              const int runs = 100, const int trajectoryId=1) {
+                              const int runs = 100,
+                              const int trajectoryId=1,
+                              const int cameraOrientation=0) {
   const double DURATION = 300.0;     // length of motion in seconds
 
   const double maxTrackLength = 60;  // maximum length of a feature track
@@ -697,7 +713,7 @@ void testHybridFilterSinusoid(const std::string& outputPath,
     // create the map
     std::shared_ptr<okvis::ceres::Map> mapPtr(new okvis::ceres::Map);
 
-    CameraSystemCreator csc(0, projOptModelName, extrinsicModelName);
+    CameraSystemCreator csc(cameraOrientation, projOptModelName, extrinsicModelName);
     // reference camera system
     std::shared_ptr<okvis::cameras::CameraBase> cameraGeometry0;
     std::shared_ptr<okvis::cameras::NCameraSystem> cameraSystem0;
