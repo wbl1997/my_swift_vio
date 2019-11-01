@@ -6,8 +6,8 @@
  */
 
 /* notation specific to this header file
- * T_cam0_cam1 takes a vector from the cam0 frame to the cam1 frame.
- * R_cam0_cam1, t_cam0_cam1 are defined accordingly
+ * T_A_B takes a vector from the A frame to the B frame.
+ * R_A_B, t_A_B are defined accordingly
  */
 
 #ifndef MSCKF_VIO_FEATURE_HPP_

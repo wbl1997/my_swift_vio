@@ -392,7 +392,9 @@ void TrailManager::updateEstimatorObservations(
     } else if (it->uTrackLength == 2) {
       uint64_t lmId = okvis::IdProvider::instance().newId();
       Eigen::Matrix<double, 4, 1> hP_W;
+      // TODO(jhuai): use triangulateFast
       hP_W.setOnes();  // random initialization
+
       bool canBeInitialized = true;
       estimator.addLandmark(lmId, hP_W);
       OKVIS_ASSERT_TRUE(Exception, estimator.isLandmarkAdded(lmId),

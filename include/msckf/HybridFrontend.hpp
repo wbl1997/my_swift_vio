@@ -10,6 +10,7 @@
 #include <msckf/MSCKF2.hpp>
 
 #include <feature_tracker/TrailManager.h>
+#include <feature_tracker/feature_tracker.h>
 
 #include <boost/accumulators/accumulators.hpp>
 #include <boost/accumulators/statistics/density.hpp>
@@ -302,6 +303,7 @@ class HybridFrontend {
   float keyframeInsertionMatchingRatioThreshold_;  // 0.2
 
   feature_tracker::TrailManager trailManager_;
+  feature_tracker::FeatureTracker featureTracker_;
   /**
    * @brief Decision whether a new frame should be keyframe or not.
    * @param estimator     const reference to the estimator.

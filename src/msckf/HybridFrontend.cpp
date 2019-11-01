@@ -11,8 +11,6 @@
 
 #include <opencv2/imgproc/imgproc.hpp>
 
-#include <glog/logging.h>
-
 #include <msckf/VioFrameMatchingAlgorithm.hpp>
 #include <okvis/IdProvider.hpp>
 #include <okvis/ceres/ImuError.hpp>
@@ -28,10 +26,11 @@
 #include <msckf/HybridFrameAbsolutePoseSacProblem.hpp>
 #include <msckf/HybridFrameRelativePoseSacProblem.hpp>
 #include <msckf/HybridFrameRotationOnlySacProblem.hpp>
-#include <opengv/sac/Ransac.hpp>
 
 #include <msckf/HybridFrameNoncentralAbsoluteAdapter.hpp>
 #include <msckf/HybridFrameRelativeAdapter.hpp>
+
+#include <opengv/sac/Ransac.hpp>
 
 DEFINE_int32(feature_tracking_method, 0,
              "0 default okvis brisk matching, "

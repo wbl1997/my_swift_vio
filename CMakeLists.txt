@@ -120,6 +120,7 @@ LIST(APPEND SOURCEFILES
     src/feature_tracker/TrackResultReader.cpp
     src/feature_tracker/TrailManager.cpp
     src/feature_tracker/FeatureTrail.cpp
+    src/feature_tracker/feature_tracker.cpp
 )
 
 add_library(${PROJECT_NAME} STATIC
