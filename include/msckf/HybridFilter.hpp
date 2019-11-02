@@ -160,6 +160,14 @@ class HybridFilter : public VioBackendInterface {
   template <class GEOMETRY_TYPE>
   ::ceres::ResidualBlockId addObservation(uint64_t landmarkId, uint64_t poseId,
                                           size_t camIdx, size_t keypointIdx);
+
+  /**
+   * @brief Add an observation to a landmark without adding
+   *    residual to the ceres solver
+   */
+  bool addLandmarkObservation(uint64_t landmarkId, uint64_t poseId,
+                              size_t camIdx, size_t keypointIdx);
+
   /**
    * @brief Remove an observation from a landmark, if available.
    * @param landmarkId ID of landmark.

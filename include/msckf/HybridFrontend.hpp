@@ -343,6 +343,13 @@ class HybridFrontend {
       bool removeOutliers =
           true);  // for wide-baseline matches (good initial guess)
 
+  template <class CAMERA_GEOMETRY_T>
+  int matchToLastFrameKLT(okvis::HybridFilter& estimator,
+                          const okvis::VioParameters& params,
+                          std::shared_ptr<okvis::MultiFrame> framesInOut,
+                          bool& rotationOnly, bool usePoseUncertainty = true,
+                          bool removeOutliers = true);
+
   /**
    * @brief Match a new multiframe to the last frame.
    * @tparam MATCHING_ALGORITHM Algorithm to match new keypoints to existing

@@ -5,6 +5,11 @@
  * All rights reserved.
  */
 
+/* notation specific to this header file
+ * T_A_B takes a vector from the A frame to the B frame.
+ * R_A_B, t_A_B are defined accordingly
+ */
+
 #ifndef MSCKF_VIO_FEATURE_TRACKER_H
 #define MSCKF_VIO_FEATURE_TRACKER_H
 
@@ -15,7 +20,8 @@
 #include <opencv2/opencv.hpp>
 #include <opencv2/video.hpp>
 
-#if 0
+#undef USE_ROS_MESSAGE
+#ifdef USE_ROS_MESSAGE
 #include <sensor_msgs/Imu.h>
 typedef std_msgs::Header MessageHeader;
 typedef sensor_msgs::Imu ImuMessage;
@@ -23,6 +29,7 @@ typedef sensor_msgs::ImuConstPtr ImuMessageConstPtr;
 typedef ros::Time TimeSource;
 #else
 #include <okvis/Time.hpp>
+#include <okvis/IdProvider.hpp>
 namespace feature_tracker {
 struct MessageHeader {
   okvis::Time stamp;
@@ -52,7 +59,7 @@ namespace feature_tracker {
 /*
  * @brief FeatureIDType An alias for unsigned long long int.
  */
-typedef unsigned long long int FeatureIDType;
+typedef uint64_t FeatureIDType;
 
 class FeatureTracker {
 public:
@@ -91,7 +98,7 @@ public:
       const cv::Vec4d& distortion_coeffs,
       std::vector<cv::Point2f>& pts_out,
       const cv::Matx33d &rectification_matrix = cv::Matx33d::eye(),
-      const cv::Vec4d &new_intrinsics = cv::Vec4d(1,1,0,0));
+      const cv::Vec4d &new_intrinsics = cv::Vec4d(1,1,0,0)) const;
 
   /*
    * @brief drawFeaturesMono
@@ -125,9 +132,39 @@ public:
    */
   typedef std::map<int, std::vector<FeatureMetaData> > GridFeatures;
 
-  inline std::shared_ptr<GridFeatures> getCurrFeaturesPtr() {
-    return curr_features_ptr;
-  }
+  /*
+   * @brief
+   * @param curr_ids initially empty vector
+   */
+  void getCurrentFeatureIds(std::vector<feature_tracker::FeatureIDType>* curr_ids) const;
+
+  /*
+   * @brief
+   * @param curr_cam0_points initially empty vector
+   * @param curr_cam1_points initially empty vector
+   */
+  void getCurrentFeatures(std::vector<cv::Point2f>* curr_cam0_points,
+                          std::vector<cv::Point2f>* curr_cam1_points) const;
+
+  /*
+   * @brief
+   * @param curr_cam0_points
+   * @param curr_cam1_points
+   * @param curr_cam0_points_undistorted initially empty vector
+   * @param curr_cam1_points_undistorted initially empty vector
+   */
+  void getCurrentFeaturesUndistorted(
+      std::vector<cv::Point2f>* curr_cam0_points_undistorted,
+      std::vector<cv::Point2f>* curr_cam1_points_undistorted) const;
+  
+  /*
+   * @brief
+   * @param curr_cam0_points initially empty vector
+   * @param curr_cam1_points initially empty vector
+   */
+  void getCurrentKeypoints(std::vector<cv::KeyPoint>* curr_cam0_points, 
+                           std::vector<cv::KeyPoint>* curr_cam1_points,
+                           float _size=8.0f) const;
 
   /*
    * @brief ProcessorConfig Configuration parameters for
@@ -364,6 +401,13 @@ private:
     return;
   }
 
+  inline FeatureIDType getNextFeatureId() {
+#ifdef USE_ROS_MESSAGE
+    return next_feature_id++;
+#else
+    return okvis::IdProvider::instance().newId();
+#endif
+  }
   // Indicate if this is the first image message.
   bool is_first_img;
 

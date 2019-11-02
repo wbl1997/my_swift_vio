@@ -241,7 +241,7 @@ void FeatureTracker::initializeFirstFrame() {
     for (int k = 0; k < processor_config.grid_min_feature_num &&
         k < static_cast<int>(new_features_this_grid.size()); ++k) {
       features_this_grid.push_back(new_features_this_grid[k]);
-      features_this_grid.back().id = next_feature_id++;
+      features_this_grid.back().id = getNextFeatureId();
       features_this_grid.back().lifetime = 1;
     }
   }
@@ -734,7 +734,7 @@ void FeatureTracker::addNewFeatures() {
     for (int k = 0;
         k < vacancy_num && k < static_cast<int>(new_features_this_grid.size()); ++k) {
       features_this_grid.push_back(new_features_this_grid[k]);
-      features_this_grid.back().id = next_feature_id++;
+      features_this_grid.back().id = getNextFeatureId();
       features_this_grid.back().lifetime = 1;
 
       ++new_added_feature_num;
@@ -770,7 +770,7 @@ void FeatureTracker::undistortPoints(
     const cv::Vec4d& distortion_coeffs,
     vector<cv::Point2f>& pts_out,
     const cv::Matx33d &rectification_matrix,
-    const cv::Vec4d &new_intrinsics) {
+    const cv::Vec4d &new_intrinsics) const {
 
   if (pts_in.size() == 0) return;
 
@@ -1363,5 +1363,66 @@ void FeatureTracker::featureLifetimeStatistics() {
     cout << data.first << " : " << data.second << endl;
 
   return;
+}
+
+void FeatureTracker::getCurrentFeatureIds(
+    std::vector<feature_tracker::FeatureIDType>* curr_ids) const {
+  for (const auto& grid_features : (*curr_features_ptr)) {
+    for (const auto& feature : grid_features.second) {
+      curr_ids->push_back(feature.id);
+    }
+  }
+}
+
+void FeatureTracker::getCurrentFeatures(
+    vector<Point2f>* curr_cam0_points,
+    vector<Point2f>* curr_cam1_points) const {
+  for (const auto& grid_features : (*curr_features_ptr)) {
+    for (const auto& feature : grid_features.second) {
+      curr_cam0_points->push_back(feature.cam0_point);
+    }
+  }
+  if (!processor_config.monocular) {
+    for (const auto& grid_features : (*curr_features_ptr)) {
+      for (const auto& feature : grid_features.second) {
+        curr_cam1_points->push_back(feature.cam1_point);
+      }
+    }
+  }
+}
+
+void FeatureTracker::getCurrentFeaturesUndistorted(
+    vector<Point2f>* curr_cam0_points_undistorted,
+    vector<Point2f>* curr_cam1_points_undistorted) const {
+  vector<Point2f> curr_cam0_points(0);
+  vector<Point2f> curr_cam1_points(0);
+  getCurrentFeatures(&curr_cam0_points, &curr_cam1_points);
+  undistortPoints(
+      curr_cam0_points, cam0_intrinsics, 
+      cam0_distortion_model,
+      cam0_distortion_coeffs, 
+      *curr_cam0_points_undistorted);
+  undistortPoints(
+      curr_cam1_points, cam1_intrinsics, 
+      cam1_distortion_model,
+      cam1_distortion_coeffs,
+      *curr_cam1_points_undistorted);
+}
+
+void FeatureTracker::getCurrentKeypoints(
+    std::vector<cv::KeyPoint>* curr_cam0_points, 
+    std::vector<cv::KeyPoint>* curr_cam1_points, float _size) const {
+  for (const auto& grid_features : (*curr_features_ptr)) {
+    for (const auto& feature : grid_features.second) {
+      curr_cam0_points->emplace_back(feature.cam0_point, _size);
+    }
+  }
+  if (!processor_config.monocular) {
+    for (const auto& grid_features : (*curr_features_ptr)) {
+      for (const auto& feature : grid_features.second) {
+        curr_cam1_points->emplace_back(feature.cam1_point, _size);
+      }
+    }
+  }
 }
 } // end namespace feature_tracker

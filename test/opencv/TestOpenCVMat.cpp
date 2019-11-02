@@ -57,7 +57,7 @@ TEST(OpenCV, Mat)
     a.normalize();
     cout<<a<<endl;
     cv::Mat ginw=cv::Mat::zeros(3,1, CV_32F);
-    string strSettingPath="/home/jianzhuhuai0108/ScaViSLAM/data/viso2settings.yaml";
+    string strSettingPath="ScaViSLAM/data/viso2settings.yaml";
     cv::FileStorage mfsSettings(strSettingPath, cv::FileStorage::READ);
     cv::Mat gw;
     mfsSettings["gw"]>>ginw;

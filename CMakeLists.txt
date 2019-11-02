@@ -182,6 +182,7 @@ list(APPEND TEST_SRC_FILES
     test/boost/TestBoostAccumulators.cpp
     test/boost/TestChiSquared.cpp
 
+    test/eigen/TestEigen2CV.cpp
     test/eigen/TestEigenMatrixInitialization.cpp
     test/eigen/TestEigenQR.cpp
 

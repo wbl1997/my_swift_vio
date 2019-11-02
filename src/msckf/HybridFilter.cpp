@@ -3419,4 +3419,22 @@ bool HybridFilter::measurementJacobianEpipolar(
   return true;
 }
 
+// Add an observation to a landmark without adding residual to the ceres solver
+bool HybridFilter::addLandmarkObservation(uint64_t landmarkId, uint64_t poseId,
+                                          size_t camIdx, size_t keypointIdx) {
+  OKVIS_ASSERT_TRUE_DBG(Exception, isLandmarkAdded(landmarkId),
+                        "landmark not added");
+  // avoid double observations
+  okvis::KeypointIdentifier kid(poseId, camIdx, keypointIdx);
+  if (landmarksMap_.at(landmarkId).observations.find(kid) !=
+      landmarksMap_.at(landmarkId).observations.end()) {
+    return false;
+  }
+
+  landmarksMap_.at(landmarkId)
+      .observations.insert(std::pair<okvis::KeypointIdentifier, uint64_t>(
+          kid, reinterpret_cast<uint64_t>(nullptr)));
+  return true;
+}
+
 }  // namespace okvis
