@@ -61,8 +61,7 @@ HybridVio::HybridVio(okvis::VioParameters &parameters)
       frameSynchronizer_(okvis::FrameSynchronizer(parameters)),
       lastAddedImageTimestamp_(okvis::Time(0, 0)),
       optimizationDone_(true),
-      frontend_(parameters.nCameraSystem.numCameras(),
-                parameters.input.voFeatureTracksFile),
+      frontend_(parameters.nCameraSystem.numCameras()),
       parameters_(parameters),
       maxImuInputQueueSize_(2 * max_camera_input_queue_size *
                             parameters.imu.rate /

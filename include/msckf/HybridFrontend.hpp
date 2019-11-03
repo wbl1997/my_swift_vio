@@ -9,7 +9,6 @@
 
 #include <msckf/MSCKF2.hpp>
 
-#include <feature_tracker/TrailManager.h>
 #include <feature_tracker/feature_tracker.h>
 
 #include <boost/accumulators/accumulators.hpp>
@@ -35,10 +34,8 @@ class HybridFrontend {
   /**
    * @brief Constructor.
    * @param numCameras Number of cameras in the sensor configuration.
-   * @param orbTrackOutput Optional, path to the VO feature track output, used
-   * to replace brisk detector and matcher
    */
-  HybridFrontend(size_t numCameras, std::string orbTrackOutput = "");
+  HybridFrontend(size_t numCameras);
   virtual ~HybridFrontend() {}
 
   ///@{
@@ -302,7 +299,6 @@ class HybridFrontend {
    */
   float keyframeInsertionMatchingRatioThreshold_;  // 0.2
 
-  feature_tracker::TrailManager trailManager_;
   feature_tracker::FeatureTracker featureTracker_;
   /**
    * @brief Decision whether a new frame should be keyframe or not.

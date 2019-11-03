@@ -31,7 +31,6 @@
 #include <boost/accumulators/statistics/density.hpp>
 #include <boost/accumulators/statistics/stats.hpp>
 
-#include <feature_tracker/TrailManager.h>
 
 DECLARE_bool(use_mahalanobis);
 DECLARE_int32(estimator_algorithm);
@@ -201,8 +200,11 @@ void create_landmark_grid(
   }
 }
 
+typedef boost::iterator_range<std::vector<std::pair<double, double>>::iterator>
+    HistogramType;
+
 void outputFeatureHistogram(const std::string& featureHistFile,
-                            const feature_tracker::histogram_type& hist) {
+                            const HistogramType& hist) {
   std::ofstream featureHistStream(featureHistFile, std::ios_base::out);
   double total = 0.0;
   featureHistStream << "Histogram of number of features in images (bin "
@@ -581,9 +583,11 @@ void testHybridFilterSinusoid(const std::string& outputPath,
   std::ofstream truthStream;
 
   // number of features tracked in a frame
-  feature_tracker::MyAccumulator myAccumulator(
-      boost::accumulators::tag::density::num_bins = 20,
-      boost::accumulators::tag::density::cache_size = 40);
+  boost::accumulators::accumulator_set<
+      double, boost::accumulators::features<boost::accumulators::tag::count,
+                                            boost::accumulators::tag::density>>
+      frameFeatureTally(boost::accumulators::tag::density::num_bins = 20,
+                        boost::accumulators::tag::density::cache_size = 40);
   std::string featureHistFile = outputPath + "/sinusoidFeatureHist.txt";
 
   okvis::timing::Timer filterTimer("msckf timer", true);
@@ -893,7 +897,7 @@ void testHybridFilterSinusoid(const std::string& outputPath,
             }
           }
         }
-        myAccumulator(trackedFeatures);
+        frameFeatureTally(trackedFeatures);
 
         estimator->optimize(1, 1, false);
         okvis::Optimization sharedOptConfig = initOptimizationConfig();
@@ -972,8 +976,7 @@ void testHybridFilterSinusoid(const std::string& outputPath,
     LOG(INFO) << "Run " << run << " using time [sec] " << elapsedTime;
   }  // next run
 
-  feature_tracker::histogram_type hist =
-      boost::accumulators::density(myAccumulator);
+  HistogramType hist = boost::accumulators::density(frameFeatureTally);
   outputFeatureHistogram(featureHistFile, hist);
 
   for (auto it = neesSum.begin(); it != neesSum.end(); ++it)

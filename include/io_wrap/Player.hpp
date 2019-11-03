@@ -55,7 +55,6 @@ class Player {
          const okvis::VioParameters& param_reader);
 
   void Run();
-  void RunWithSavedTracks();
   std::atomic<bool> mbFinished;
 
  protected:

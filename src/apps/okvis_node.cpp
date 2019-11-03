@@ -54,11 +54,6 @@ DEFINE_string(time_file, "",
 
 DEFINE_string(imu_file, "", "full name of an input IMU file");
 
-DEFINE_string(vo_poses_file, "", "full name of external VO poses");
-
-DEFINE_string(vo_feature_tracks_file, "",
-              "full name of external VO output feature tracks");
-
 DEFINE_int32(start_index, 0, "index of the first frame to be processed");
 
 DEFINE_int32(finish_index, 0, "index of the last frame to be processed");
@@ -70,8 +65,6 @@ bool setInputParameters(okvis::InputData *input) {
   input->imageFolder = FLAGS_image_folder;
   input->imuFile = FLAGS_imu_file;
   input->timeFile = FLAGS_time_file;
-  input->voPosesFile = FLAGS_vo_poses_file;
-  input->voFeatureTracksFile = FLAGS_vo_feature_tracks_file;
   input->startIndex = FLAGS_start_index;
   input->finishIndex = FLAGS_finish_index;
   return true;

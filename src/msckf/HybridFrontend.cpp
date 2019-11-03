@@ -41,7 +41,7 @@ DEFINE_int32(feature_tracking_method, 0,
 namespace okvis {
 
 // Constructor.
-HybridFrontend::HybridFrontend(size_t numCameras, std::string orbTrackOutput)
+HybridFrontend::HybridFrontend(size_t numCameras)
     : isInitialized_(false),
       numCameras_(numCameras),
       briskDetectionOctaves_(0),
@@ -54,8 +54,7 @@ HybridFrontend::HybridFrontend(size_t numCameras, std::string orbTrackOutput)
       matcher_(
           std::unique_ptr<okvis::DenseMatcher>(new okvis::DenseMatcher(4))),
       keyframeInsertionOverlapThreshold_(0.6),
-      keyframeInsertionMatchingRatioThreshold_(0.2),
-      trailManager_(orbTrackOutput) {
+      keyframeInsertionMatchingRatioThreshold_(0.2) {
   // create mutexes for feature detectors and descriptor extractors
   for (size_t i = 0; i < numCameras_; ++i) {
     featureDetectorMutexes_.push_back(
@@ -1105,7 +1104,9 @@ void HybridFrontend::initialiseBriskFeatureDetectors() {
 }
 
 void HybridFrontend::printNumFeatureDistribution(std::ofstream& stream) const {
-  trailManager_.printNumFeatureDistribution(stream);
+// TODO(jhuai): featureTracker records #feature of every frame and
+// then print the histogram
+//  featureTracker_.printNumFeatureDistribution(stream);
 }
 
 }  // namespace okvis
