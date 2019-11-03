@@ -162,6 +162,27 @@ class HybridFilter : public VioBackendInterface {
                                           size_t camIdx, size_t keypointIdx);
 
   /**
+   * @brief for a landmark, remove its existing epipolar constraints,
+   *     add its observations as reprojection errors,
+   *     assuming no reprojection errors for the landmark have been added before.
+   *     thread unsafe, call it when the estimator is protected by the estimator_mutex_.
+   * @param lmId ID of landmark.
+   */
+  template <class GEOMETRY_TYPE>
+  bool replaceEpipolarWithReprojectionErrors(uint64_t lmId);
+
+  /**
+   * @brief for a landmark, add its current first and last observations
+   *     as an epipolar constraint.
+   *     thread unsafe, call it when the estimator is protected by the estimator_mutex_.
+   * @param lmId ID of landmark.
+   * @param removeExisting remove existing epipolar constraints for this landmark.
+   */
+  template <class GEOMETRY_TYPE>
+  bool addEpipolarConstraint(
+      uint64_t lmId, bool removeExisting=false);
+
+  /**
    * @brief Add an observation to a landmark without adding
    *    residual to the ceres solver
    */
@@ -233,6 +254,17 @@ class HybridFilter : public VioBackendInterface {
 
   /// @name Getters
   ///\{
+
+  /**
+   * @brief Get a specific landmark's first observation.
+   *     thread unsafe, only call it when the estimator is locked by estimator_mutex_
+   * @param[in]  landmarkId ID of desired landmark.
+   * @param[out] kpId keypoint identifier of the first observation thanks to
+   *     the fact that the MapPoint::observations is an ordered map
+   * @return True if successful.
+   */
+  bool getLandmarkHeadObs(uint64_t landmarkId, okvis::KeypointIdentifier* kpId) const;
+
   /**
    * @brief Get a specific landmark.
    * @param[in]  landmarkId ID of desired landmark.
@@ -306,6 +338,10 @@ class HybridFilter : public VioBackendInterface {
   bool getCameraSensorStates(uint64_t poseId, size_t cameraIdx,
                              okvis::kinematics::Transformation &T_SCi) const;
 
+  template <class PARAMETER_BLOCK_T>
+  bool getSensorStateEstimateAs(
+      uint64_t poseId, int sensorIdx, int sensorType, int stateType,
+      typename PARAMETER_BLOCK_T::estimate_t &state) const;
 
   int getCameraExtrinsicOptType(size_t cameraIdx) const;
 
@@ -332,6 +368,12 @@ class HybridFilter : public VioBackendInterface {
   /// @brief Get the ID of the newest frame added to the state.
   /// \return The ID of the current frame.
   uint64_t currentFrameId() const;
+
+  okvis::Time currentFrameTimestamp() const;
+
+  uint64_t oldestFrameId() const;
+
+  size_t statesMapSize() const;
 
   ///@}
 
@@ -423,39 +465,6 @@ class HybridFilter : public VioBackendInterface {
   void setMap(std::shared_ptr<okvis::ceres::Map> mapPtr) { mapPtr_ = mapPtr; }
   ///@}
 
- private:
- public:  // huai
-  /**
-   * @brief Remove an observation from a landmark.
-   * @param residualBlockId Residual ID for this landmark.
-   * @return True if successful.
-   */
-  bool removeObservation(::ceres::ResidualBlockId residualBlockId);
-
-  /// \brief StateInfo This configures the state vector ordering
-  struct StateInfo {
-    /// \brief Constructor
-    /// @param[in] id The Id.
-    /// @param[in] isRequired Whether or not we require the state.
-    /// @param[in] exists Whether or not this exists in the ceres problem.
-    StateInfo(uint64_t id = 0, bool isRequired = true, bool exists = false)
-        : id(id), isRequired(isRequired), exists(exists) {}
-    uint64_t id;       ///< The ID.
-    bool isRequired;   ///< Whether or not we require the state.
-    bool exists;       ///< Whether or not this exists in the ceres problem.
-    uint64_t idInCov;  ///< start id of the state within the covariance matrix
-    int minimalDim;    ///< minimal dimension of this state, which can acctually
-                       ///< replace member "exists"
-  };
-
-  /// \brief GlobalStates The global states enumerated
-  enum GlobalStates {
-    T_WS = 0,           ///< Pose.
-    MagneticZBias = 1,  ///< Magnetometer z-bias, currently unused
-    Qff = 2,            ///< QFF (pressure at sea level), currently unused
-    T_GW = 3            ///< Alignment of global frame, currently unused
-  };
-
   /// \brief SensorStates The sensor-internal states enumerated
   enum SensorStates {
     Camera = 0,      ///< Camera
@@ -491,6 +500,38 @@ class HybridFilter : public VioBackendInterface {
             ///< fedeltiy
     TS,
     TA
+  };
+
+ protected:
+  /**
+   * @brief Remove an observation from a landmark.
+   * @param residualBlockId Residual ID for this landmark.
+   * @return True if successful.
+   */
+  bool removeObservation(::ceres::ResidualBlockId residualBlockId);
+
+  /// \brief StateInfo This configures the state vector ordering
+  struct StateInfo {
+    /// \brief Constructor
+    /// @param[in] id The Id.
+    /// @param[in] isRequired Whether or not we require the state.
+    /// @param[in] exists Whether or not this exists in the ceres problem.
+    StateInfo(uint64_t id = 0, bool isRequired = true, bool exists = false)
+        : id(id), isRequired(isRequired), exists(exists) {}
+    uint64_t id;       ///< The ID.
+    bool isRequired;   ///< Whether or not we require the state.
+    bool exists;       ///< Whether or not this exists in the ceres problem.
+    uint64_t idInCov;  ///< start id of the state within the covariance matrix
+    int minimalDim;    ///< minimal dimension of this state, which can acctually
+                       ///< replace member "exists"
+  };
+
+  /// \brief GlobalStates The global states enumerated
+  enum GlobalStates {
+    T_WS = 0,           ///< Pose.
+    MagneticZBias = 1,  ///< Magnetometer z-bias, currently unused
+    Qff = 2,            ///< QFF (pressure at sea level), currently unused
+    T_GW = 3            ///< Alignment of global frame, currently unused
   };
 
   /// \brief PositionSensorStates, currently unused
@@ -535,11 +576,6 @@ class HybridFilter : public VioBackendInterface {
   bool getSensorStateParameterBlockPtr(
       uint64_t poseId, int sensorIdx, int sensorType, int stateType,
       std::shared_ptr<ceres::ParameterBlock> &stateParameterBlockPtr) const;
-
-  template <class PARAMETER_BLOCK_T>
-  bool getSensorStateEstimateAs(
-      uint64_t poseId, int sensorIdx, int sensorType, int stateType,
-      typename PARAMETER_BLOCK_T::estimate_t &state) const;
 
   // setters
   template <class PARAMETER_BLOCK_T>

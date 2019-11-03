@@ -1,4 +1,5 @@
 #include <msckf/HybridFrontend.hpp>
+#include <msckf/implementation/HybridFrontend.hpp>
 
 #include <algorithm>
 #include <list>
@@ -9,7 +10,6 @@
 
 #include <brisk/brisk.h>
 
-#include <opencv2/core/eigen.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 
 #include <msckf/VioFrameMatchingAlgorithm.hpp>
@@ -172,7 +172,7 @@ bool HybridFrontend::dataAssociationAndInitialization(
   // first frame? (did do addStates before, so 1 frame minimum in estimator)
   if (estimator.numFrames() > 1) {
     int requiredMatches = 5;
-    double uncertainMatchFraction = 0;
+//    double uncertainMatchFraction = 0;
     bool rotationOnly = false;
 
     // match to last keyframe
@@ -531,96 +531,11 @@ int HybridFrontend::matchToKeyframes(
   return retCtr;
 }
 
-template <class CAMERA_GEOMETRY_T>
-void loadParameters(const std::shared_ptr<okvis::MultiFrame> multiframe,
-                    const okvis::HybridFilter& estimator,
-                    feature_tracker::FeatureTracker* feature_tracker) {
-  // Camera calibration parameters
-  // TODO(jhuai): modify here along with functions in feature_tracker.cpp
-  // to deal with multiple distortion models
-  int camId = 0;
-  std::string distortionName =
-      multiframe->geometryAs<CAMERA_GEOMETRY_T>(camId)->distortionType();
-  feature_tracker->cam0_distortion_model =
-      distortionName.compare("RadialTangentialDistortion") == 0 ? "radtan"
-                                                                : "cult";
-
-  uint32_t width =
-      multiframe->geometryAs<CAMERA_GEOMETRY_T>(camId)->imageWidth();
-  uint32_t height =
-      multiframe->geometryAs<CAMERA_GEOMETRY_T>(camId)->imageHeight();
-  feature_tracker->cam0_resolution[0] = width;
-  feature_tracker->cam0_resolution[1] = height;
-
-  Eigen::VectorXd intrinsics;
-  multiframe->geometryAs<CAMERA_GEOMETRY_T>(camId)->getIntrinsics(intrinsics);
-  feature_tracker->cam0_intrinsics[0] = intrinsics[0];
-  feature_tracker->cam0_intrinsics[1] = intrinsics[1];
-  feature_tracker->cam0_intrinsics[2] = intrinsics[2];
-  feature_tracker->cam0_intrinsics[3] = intrinsics[3];
-
-  int numProjIntrinsics = CAMERA_GEOMETRY_T::NumProjectionIntrinsics;
-  feature_tracker->cam0_distortion_coeffs[0] = intrinsics[numProjIntrinsics];
-  feature_tracker->cam0_distortion_coeffs[1] =
-      intrinsics[numProjIntrinsics + 1];
-  feature_tracker->cam0_distortion_coeffs[2] =
-      intrinsics[numProjIntrinsics + 2];
-  feature_tracker->cam0_distortion_coeffs[3] =
-      intrinsics[numProjIntrinsics + 3];
-
-  uint64_t fId = multiframe->id();
-  okvis::kinematics::Transformation T_SC;
-  estimator.getCameraSensorStates(fId, camId, T_SC);
-  Eigen::Matrix3d R_SC = T_SC.C();
-  Eigen::Vector3d t_SC = T_SC.r();
-  cv::eigen2cv(R_SC, feature_tracker->R_cam0_imu);
-  cv::eigen2cv(t_SC, feature_tracker->t_cam0_imu);
-
-  if (multiframe->numFrames() > 1) {
-    int camId = 1;
-    std::string distortionName =
-        multiframe->geometryAs<CAMERA_GEOMETRY_T>(camId)->distortionType();
-    feature_tracker->cam1_distortion_model =
-        distortionName.compare("RadialTangentialDistortion") == 0 ? "radtan"
-                                                                  : "cult";
-    uint32_t width =
-        multiframe->geometryAs<CAMERA_GEOMETRY_T>(camId)->imageWidth();
-    uint32_t height =
-        multiframe->geometryAs<CAMERA_GEOMETRY_T>(camId)->imageHeight();
-    feature_tracker->cam1_resolution[0] = width;
-    feature_tracker->cam1_resolution[1] = height;
-
-    Eigen::VectorXd intrinsics;
-    multiframe->geometryAs<CAMERA_GEOMETRY_T>(camId)->getIntrinsics(intrinsics);
-    feature_tracker->cam1_intrinsics[0] = intrinsics[0];
-    feature_tracker->cam1_intrinsics[1] = intrinsics[1];
-    feature_tracker->cam1_intrinsics[2] = intrinsics[2];
-    feature_tracker->cam1_intrinsics[3] = intrinsics[3];
-
-    int numProjIntrinsics = CAMERA_GEOMETRY_T::NumProjectionIntrinsics;
-    feature_tracker->cam1_distortion_coeffs[0] = intrinsics[numProjIntrinsics];
-    feature_tracker->cam1_distortion_coeffs[1] =
-        intrinsics[numProjIntrinsics + 1];
-    feature_tracker->cam1_distortion_coeffs[2] =
-        intrinsics[numProjIntrinsics + 2];
-    feature_tracker->cam1_distortion_coeffs[3] =
-        intrinsics[numProjIntrinsics + 3];
-
-    okvis::kinematics::Transformation T_SC;
-    estimator.getCameraSensorStates(fId, camId, T_SC);
-    Eigen::Matrix3d R_SC = T_SC.C();
-    Eigen::Vector3d t_SC = T_SC.r();
-    cv::eigen2cv(R_SC, feature_tracker->R_cam1_imu);
-    cv::eigen2cv(t_SC, feature_tracker->t_cam1_imu);
-  }
-  feature_tracker->processor_config.monocular = multiframe->numFrames() == 1;
-}
-
 // Match a new multiframe to the last frame.
 template <class CAMERA_GEOMETRY_T>
 int HybridFrontend::matchToLastFrameKLT(
     okvis::HybridFilter& estimator,
-    const okvis::VioParameters& params,
+    const okvis::VioParameters& /*params*/,
     std::shared_ptr<okvis::MultiFrame> framesInOut,
     bool& rotationOnly,
     bool /*usePoseUncertainty*/, bool /*removeOutliers*/) {
@@ -630,6 +545,27 @@ int HybridFrontend::matchToLastFrameKLT(
   if (estimator.numFrames() == 1) {
     loadParameters<CAMERA_GEOMETRY_T>(framesInOut, estimator, &featureTracker_);
     featureTracker_.initialize();
+  } else {
+    uint64_t fIdB = framesInOut->id();
+    okvis::kinematics::Transformation T_WSb;
+    estimator.get_T_WS(fIdB, T_WSb);
+
+    uint64_t fIdA = estimator.frameIdByAge(1);
+    okvis::kinematics::Transformation T_WSa;
+    estimator.get_T_WS(fIdA, T_WSa);
+
+    std::vector<cv::Matx33f> R_CkCkm1_list;
+    for (size_t camId = 0; camId < framesInOut->numFrames(); ++camId) {
+      okvis::kinematics::Transformation T_SC;
+      estimator.getCameraSensorStates(fIdA, camId, T_SC);
+      Eigen::Quaterniond q_CkCkm1 =
+          (T_WSb.q() * T_SC.q()).conjugate() * (T_WSa.q() * T_SC.q());
+      Eigen::Matrix3f R_CkCkm1 = q_CkCkm1.toRotationMatrix().cast<float>();
+      cv::Matx33f mat_R_CkCkm1;
+      cv::eigen2cv(R_CkCkm1, mat_R_CkCkm1);
+      R_CkCkm1_list.emplace_back(mat_R_CkCkm1);
+    }
+    featureTracker_.setRelativeOrientation(R_CkCkm1_list);
   }
 
   featureTracker_.stereoCallback(
@@ -639,7 +575,7 @@ int HybridFrontend::matchToLastFrameKLT(
           cv::Mat(),
       feature_tracker::MessageHeader{framesInOut->timestamp()});
 
-  cv::Mat out_img = featureTracker_.drawFeaturesMono();
+  featureTracker_.drawFeaturesMono();
 
   std::vector<feature_tracker::FeatureIDType> curr_ids(0);
   featureTracker_.getCurrentFeatureIds(&curr_ids);
@@ -650,55 +586,12 @@ int HybridFrontend::matchToLastFrameKLT(
 
   featureTracker_.prepareForNextFrame(); // clear many things for next frame
 
-  for (size_t im = 0; im < params.nCameraSystem.numCameras(); ++im) {
+  for (size_t im = 0; im < framesInOut->numFrames(); ++im) {
     framesInOut->resetKeypoints(im, curr_keypoints[im]);
   }
 
-  uint64_t fId = framesInOut->id();
-  for (size_t im = 0; im < params.nCameraSystem.numCameras(); ++im) {
-    int keypointIndex = 0;
-    for (auto lmId : curr_ids) {
-      bool added = estimator.isLandmarkAdded(lmId);
-      framesInOut->setLandmarkId(im, keypointIndex, lmId);
-      if (added) {
-        bool initialized = estimator.isLandmarkInitialized(lmId);
-        if (!initialized) {
-            // try to initialize with triangulateFast or stereoTriangulate
-
-            //   matchingAlgorithm.setBestMatch(vpairs[i].indexA, i,
-            //   vpairs[i].distance);
-
-            // if fails (not enough disparity or big chi2)
-            //   estimator.addEpipolarConstraint() {
-            //   if the landmark has enough feature observations
-            //     add an epipolar constraint head_tail
-            //     TODO(jhuai): do we remove the previous head tail constraints
-            //   else pass
-            //   end
-            //   }
-            // else
-            //   remove all previous (epipolar constraint) residual blocks for this landmark,
-            //   add all observations as reprojection errors
-        } else {
-          estimator.addObservation<CAMERA_GEOMETRY_T>(lmId, fId,
-                                                      im, keypointIndex);
-        }
-      } else { // add a landmark with only one observation.
-          Eigen::Matrix<double, 4, 1> hP_W;
-          hP_W.setZero();
-          // addLandmark is alright because ceres solver can single it out if
-          // the landmark has no related residual terms.
-          // But do not use addObservation which adds a residual to the solver
-          // because we only have one observation for the landmark which
-          // is not properly initialized
-          estimator.addLandmark(lmId, hP_W);
-          OKVIS_ASSERT_TRUE(Exception, estimator.isLandmarkAdded(lmId), lmId << " not added, bug");
-          estimator.setLandmarkInitialized(lmId, false);
-          estimator.addLandmarkObservation(lmId, fId, im, keypointIndex);
-      }
-      ++keypointIndex;
-    }
-  }
+  addConstraintToEstimator<CAMERA_GEOMETRY_T>(
+      curr_ids, framesInOut, estimator);
   return retCtr;
 }
 
@@ -1103,7 +996,7 @@ void HybridFrontend::initialiseBriskFeatureDetectors() {
   }
 }
 
-void HybridFrontend::printNumFeatureDistribution(std::ofstream& stream) const {
+void HybridFrontend::printNumFeatureDistribution(std::ofstream& /*stream*/) const {
 // TODO(jhuai): featureTracker records #feature of every frame and
 // then print the histogram
 //  featureTracker_.printNumFeatureDistribution(stream);

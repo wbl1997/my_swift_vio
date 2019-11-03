@@ -139,7 +139,7 @@ void computeFeatureMeasJacobian(okvis::cameras::NCameraSystem::DistortionType di
     okvis::Time lastKFTime = t0;
 
     if (k != 0) {
-        lastKFTime = estimator.statesMap_.rbegin()->second.timestamp;
+        lastKFTime = estimator.currentFrameTimestamp();
     }
     okvis::ImuMeasurementDeque imuSegment =
         okvis::getImuMeasurements(lastKFTime, currentKFTime, imuMeasurements, nullptr);
@@ -148,7 +148,7 @@ void computeFeatureMeasJacobian(okvis::cameras::NCameraSystem::DistortionType di
         createMultiFrame(currentKFTime, cameraSystem);
     estimator.addStates(mf, imuSegment, true);
   }
-  int stateMapSize = estimator.statesMap_.size();
+  int stateMapSize = estimator.statesMapSize();
   int featureVariableDimen = estimator.cameraParamsMinimalDimen() +
                              estimator.kClonedStateMinimalDimen * (stateMapSize - 1);
   Eigen::Matrix<double, 2, Eigen::Dynamic> H_x(2, featureVariableDimen);
@@ -161,9 +161,9 @@ void computeFeatureMeasJacobian(okvis::cameras::NCameraSystem::DistortionType di
 
   Eigen::Vector2d obs(100, -150);
 
-  uint64_t poseId = estimator.statesMap_.begin()->first;
+  uint64_t poseId = estimator.oldestFrameId();
   const int camIdx = 0;
-  uint64_t anchorId = estimator.statesMap_.rbegin()->first;
+  uint64_t anchorId = estimator.currentFrameId();
   std::cout << "poseId " << poseId << " anchorId " << anchorId << std::endl;
   okvis::kinematics::Transformation T_WBa(Eigen::Vector3d(0, 0, 1),
                                           Eigen::Quaterniond(1, 0, 0, 0));

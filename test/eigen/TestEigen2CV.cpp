@@ -20,4 +20,11 @@ TEST(Eigen, Eigen2CV) {
   cv::cv2eigen(cvVec, convertedVec);
   EXPECT_LT((convertedVec - eigenVec).lpNorm<Eigen::Infinity>(), eps);
   // cv2eigen(cvVec, eigenMat); // watch out! wrong result without a warning
+
+  Eigen::Matrix3f eigenRf = Eigen::Matrix3f::Random();
+  cv::Matx33f cvRf;
+  cv::eigen2cv(eigenRf, cvRf);
+  Eigen::Matrix3f convertedRf;
+  cv::cv2eigen(cvRf, convertedRf);
+  EXPECT_LT((convertedRf - eigenRf).lpNorm<Eigen::Infinity>(), eps);
 }

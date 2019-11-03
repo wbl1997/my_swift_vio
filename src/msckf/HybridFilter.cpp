@@ -2560,11 +2560,26 @@ uint64_t HybridFilter::frameIdByAge(size_t age) const {
   return rit->first;
 }
 
-// Get the ID of the newest frame added to the state.
 uint64_t HybridFilter::currentFrameId() const {
   OKVIS_ASSERT_TRUE_DBG(Exception, statesMap_.size() > 0,
                         "no frames added yet.")
   return statesMap_.rbegin()->first;
+}
+
+okvis::Time HybridFilter::currentFrameTimestamp() const {
+  OKVIS_ASSERT_TRUE_DBG(Exception, statesMap_.size() > 0,
+                        "no frames added yet.")
+  return statesMap_.rbegin()->second.timestamp;
+}
+
+uint64_t HybridFilter::oldestFrameId() const {
+  OKVIS_ASSERT_TRUE_DBG(Exception, statesMap_.size() > 0,
+                        "no frames added yet.")
+  return statesMap_.begin()->first;
+}
+
+size_t HybridFilter::statesMapSize() const {
+  return statesMap_.size();
 }
 
 // Checks if a particular frame is still in the IMU window
@@ -3434,6 +3449,18 @@ bool HybridFilter::addLandmarkObservation(uint64_t landmarkId, uint64_t poseId,
   landmarksMap_.at(landmarkId)
       .observations.insert(std::pair<okvis::KeypointIdentifier, uint64_t>(
           kid, reinterpret_cast<uint64_t>(nullptr)));
+  return true;
+}
+
+bool HybridFilter::getLandmarkHeadObs(uint64_t landmarkId,
+                                      okvis::KeypointIdentifier* kpId) const {
+  auto lmIt = landmarksMap_.find(landmarkId);
+  if (lmIt == landmarksMap_.end()) {
+    OKVIS_THROW_DBG(Exception,
+                    "landmark with id = " << landmarkId << " does not exist.")
+    return false;
+  }
+  *kpId = lmIt->second.observations.begin()->first;
   return true;
 }
 

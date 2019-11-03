@@ -83,8 +83,6 @@ void FeatureTracker::stereoCallback(
     //ROS_INFO("Detection time: %f",
     //    (TimeSource::now()-start_time).toSec());
     is_first_img = false;
-
-  
   } else {
     // Track the feature in the previous image.
     TimeSource start_time = TimeSource::now();
@@ -832,6 +830,7 @@ vector<cv::Point2f> FeatureTracker::distortPoints(
 
 void FeatureTracker::integrateImuData(
     Matx33f& cam0_R_p_c, Matx33f& cam1_R_p_c) {
+#ifdef USE_ROS_MESSAGE
   // Find the start and the end limit within the imu msg buffer.
   auto begin_iter = imu_msg_buffer.begin();
   while (begin_iter != imu_msg_buffer.end()) {
@@ -875,6 +874,12 @@ void FeatureTracker::integrateImuData(
 
   // Delete the useless and used imu messages.
   imu_msg_buffer.erase(imu_msg_buffer.begin(), end_iter);
+#else
+  cam0_R_p_c = cam_R_p_c_[0];
+  if (!processor_config.monocular) {
+    cam1_R_p_c = cam_R_p_c_[1];
+  }
+#endif
   return;
 }
 

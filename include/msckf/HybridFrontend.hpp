@@ -7,7 +7,7 @@
 #include <okvis/assert_macros.hpp>
 #include <okvis/timing/Timer.hpp>
 
-#include <msckf/MSCKF2.hpp>
+#include <msckf/HybridFilter.hpp>
 
 #include <feature_tracker/feature_tracker.h>
 

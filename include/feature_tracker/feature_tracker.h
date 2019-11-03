@@ -167,6 +167,14 @@ public:
                            float _size=8.0f) const;
 
   /*
+   * @brief setRelativeOrientation
+   * @param cam_R_p_c rotate a vector in previous frame to current frame
+   */
+  inline void setRelativeOrientation(const std::vector<cv::Matx33f>& cam_R_p_c) {
+    cam_R_p_c_ = cam_R_p_c;
+  }
+
+  /*
    * @brief ProcessorConfig Configuration parameters for
    *    feature detection and tracking.
    */
@@ -425,6 +433,8 @@ private:
   // Features in the previous and current image.
   std::shared_ptr<GridFeatures> prev_features_ptr;
   std::shared_ptr<GridFeatures> curr_features_ptr;
+
+  std::vector<cv::Matx33f> cam_R_p_c_;
 
   // Debugging
   std::map<FeatureIDType, int> feature_lifetime;

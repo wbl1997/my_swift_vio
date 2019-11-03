@@ -185,16 +185,18 @@ list(APPEND TEST_SRC_FILES
 
     test/io_wrap/TestVioDatasetPlayer.cpp
 
-    test/msckf/TestFeatureInitialization.cpp
-    test/msckf/TestPointObsJacobian.cpp
+    test/msckf/TestBoundedImuDeque.cpp
+    test/msckf/TestEpipolarJacobian.cpp
     test/msckf/TestExtrinsicJacobian.cpp
+    test/msckf/TestFeatureInitialization.cpp
     test/msckf/TestHybridFilter.cpp
     test/msckf/TestImuOdometry.cpp
     test/msckf/TestImuSimulator.cpp
-    test/msckf/TestTriangulate.cpp
-    test/msckf/TestBoundedImuDeque.cpp
+    test/msckf/TestPointObsJacobian.cpp
     test/msckf/TestRelativeMotionJacobian.cpp
-    test/msckf/TestEpipolarJacobian.cpp
+    # test/msckf/TestRsReprojectionError.cpp
+    test/msckf/TestEpipolarConstraint.cpp
+    test/msckf/TestTriangulate.cpp
     test/msckf/TestTwoViewPair.cpp
 
     test/opencv/TestOpenCVDistortion.cpp
