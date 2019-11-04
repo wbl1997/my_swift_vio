@@ -599,8 +599,10 @@ int MSCKF2::marginalizeRedundantFrames(size_t maxClonedStates) {
       auto obsIter = std::find_if(obsMap.begin(), obsMap.end(),
                                   IsObservedInFrame(camStateId));
       if (obsIter != obsMap.end()) {
-        mapPtr_->removeResidualBlock(
-            reinterpret_cast<::ceres::ResidualBlockId>(obsIter->second));
+        if (obsIter->second) {
+          mapPtr_->removeResidualBlock(
+              reinterpret_cast<::ceres::ResidualBlockId>(obsIter->second));
+        }
         obsMap.erase(obsIter);
       }
     }

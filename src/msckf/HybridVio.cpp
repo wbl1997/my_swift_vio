@@ -448,7 +448,7 @@ void HybridVio::frameConsumerLoop(size_t cameraIndex) {
         * (*parameters_.nCameraSystem.T_SC(frame->sensorId));
     beforeDetectTimer.stop();
 
-    if (FLAGS_feature_tracking_method == 0) {
+    if (FLAGS_feature_tracking_method != 1) {
       detectTimer.start();
       frontend_.detectAndDescribe(frame->sensorId, multiFrame, T_WC, nullptr);
       detectTimer.stop();

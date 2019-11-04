@@ -575,7 +575,7 @@ int HybridFrontend::matchToLastFrameKLT(
           cv::Mat(),
       feature_tracker::MessageHeader{framesInOut->timestamp()});
 
-  featureTracker_.drawFeaturesMono();
+//  featureTracker_.drawFeaturesMono();
 
   std::vector<feature_tracker::FeatureIDType> curr_ids(0);
   featureTracker_.getCurrentFeatureIds(&curr_ids);
