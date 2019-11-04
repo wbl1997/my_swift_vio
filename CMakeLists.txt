@@ -103,7 +103,6 @@ LIST(APPEND SOURCEFILES
     src/msckf/FilterHelper.cpp
     src/msckf/ImuOdometry.cpp
     src/msckf/HybridVio.cpp
-    src/msckf/InitialPVandStd.cpp
     src/msckf/HybridFrontend.cpp
     src/msckf/triangulate.cpp
     src/msckf/triangulateFast.cpp

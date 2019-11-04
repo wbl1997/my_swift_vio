@@ -18,8 +18,11 @@
 
 DEFINE_int32(
     estimator_algorithm, 1,
-    "0 for okvis optimization paired with ThreadedKFVio\n, "
-    "1 for msckf, 2 for tf-vio, 3 for hybrid filter, 1, 2, and 3 are paired with HybridVio.");
+    "0 and 1 for okvis optimization paired with ThreadedKFVio. "
+    "0 okvis original estimator, 1 okvis general estimator, 2 pavio.\n"
+    "4 for msckf, 5 for triangulation free vio, 6 for hybrid filter, "
+    "4, 5, and 6 are paired with HybridVio.\n"
+    "This flag will overwrite parameters.optimization.algorithm");
 
 DECLARE_int32(feature_tracking_method);
 
@@ -82,8 +85,7 @@ HybridVio::HybridVio(okvis::VioParameters &parameters)
       break;
   }
   estimator_->resetInitialPVandStd(
-      InitialPVandStd(parameters.initialState),
-      parameters.initialState.bUseExternalInitState);
+      InitialPVandStd(parameters.initialState));
   msckf_vio::Feature::optimization_config.translation_threshold =
       parameters.optimization.triangulationTranslationThreshold;
   setBlocking(false);
@@ -721,7 +723,7 @@ void HybridVio::optimizationLoop() {
       optimizationTimer.stop();
 
       deleteImuMeasurementsUntil =
-          estimator_->firstStateTimestamp() - temporal_imu_data_overlap;
+          estimator_->oldestFrameTimestamp() - temporal_imu_data_overlap;
 
       marginalizationTimer.start();
       estimator_->setKeyframeRedundancyThresholds(

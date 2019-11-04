@@ -126,13 +126,14 @@ void computeFeatureMeasJacobian(okvis::cameras::NCameraSystem::DistortionType di
   Eigen::Quaterniond q_WS = Eigen::Quaterniond(R_WS);
 
   okvis::InitialPVandStd pvstd;
+  pvstd.initWithExternalSource_ = true;
   pvstd.p_WS = p_WS;
   pvstd.q_WS = Eigen::Quaterniond(q_WS);
   pvstd.v_WS = v_WS;
   pvstd.std_p_WS = Eigen::Vector3d(1e-2, 1e-2, 1e-2);
   pvstd.std_v_WS = Eigen::Vector3d(1e-1, 1e-1, 1e-1);
   pvstd.std_q_WS = Eigen::Vector3d(5e-2, 5e-2, 5e-2);
-  estimator.resetInitialPVandStd(pvstd, true);
+  estimator.resetInitialPVandStd(pvstd);
 
   for (int k = 0; k < 3; ++k) {
     okvis::Time currentKFTime = t0 + okvis::Duration(0.5 * k + 0.5);

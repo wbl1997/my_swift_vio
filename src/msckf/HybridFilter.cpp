@@ -20,7 +20,7 @@
 #include <msckf/RelativeMotionJacobian.hpp>
 
 #include <okvis/ceres/CameraTimeParamBlock.hpp>
-#include <okvis/ceres/EuclideanParamBlock.hpp>
+#include <msckf/EuclideanParamBlock.hpp>
 #include <okvis/timing/Timer.hpp>
 
 #include <io_wrap/StreamHelper.hpp>
@@ -45,11 +45,7 @@ const okvis::Duration HybridFilter::half_window_(2, 0);
 // Constructor if a ceres map is already available.
 HybridFilter::HybridFilter(std::shared_ptr<okvis::ceres::Map> mapPtr,
                            const double readoutTime)
-    : mapPtr_(mapPtr),
-      referencePoseId_(0),
-      cauchyLossFunctionPtr_(new ::ceres::CauchyLoss(1)),
-      huberLossFunctionPtr_(new ::ceres::HuberLoss(1)),
-      marginalizationResidualId_(0),
+    : Estimator(mapPtr),
       imageReadoutTime(readoutTime),
       minValidStateID(0),
       triangulateTimer("3.1.1.1 triangulateAMapPoint", true),
@@ -58,16 +54,11 @@ HybridFilter::HybridFilter(std::shared_ptr<okvis::ceres::Map> mapPtr,
       updateStatesTimer("3.1.3 updateStates", true),
       updateCovarianceTimer("3.1.4 updateCovariance", true),
       updateLandmarksTimer("3.1.5 updateLandmarks", true),
-      useExternalInitialPose_(false),
       mTrackLengthAccumulator(100, 0) {}
 
 // The default constructor.
 HybridFilter::HybridFilter(const double readoutTime)
-    : mapPtr_(new okvis::ceres::Map()),
-      referencePoseId_(0),
-      cauchyLossFunctionPtr_(new ::ceres::CauchyLoss(1)),
-      huberLossFunctionPtr_(new ::ceres::HuberLoss(1)),
-      marginalizationResidualId_(0),
+    : Estimator(),
       imageReadoutTime(readoutTime),
       minValidStateID(0),
       triangulateTimer("3.1.1.1 triangulateAMapPoint", true),
@@ -76,36 +67,12 @@ HybridFilter::HybridFilter(const double readoutTime)
       updateStatesTimer("3.1.3 updateStates", true),
       updateCovarianceTimer("3.1.4 updateCovariance", true),
       updateLandmarksTimer("3.1.5 updateLandmarks", true),
-      useExternalInitialPose_(false),
       mTrackLengthAccumulator(100, 0) {}
 
-HybridFilter::~HybridFilter() {}
-
-// Add a camera to the configuration. Sensors can only be added and never
-// removed.
-int HybridFilter::addCamera(
-    const ExtrinsicsEstimationParameters& extrinsicsEstimationParameters) {
-  extrinsicsEstimationParametersVec_.push_back(extrinsicsEstimationParameters);
-  return extrinsicsEstimationParametersVec_.size() - 1;
+HybridFilter::~HybridFilter() {
+  LOG(INFO) << "Destructing HybridFilter";
 }
 
-// Add an IMU to the configuration.
-int HybridFilter::addImu(const ImuParameters& imuParameters) {
-  if (imuParametersVec_.size() > 1) {
-    LOG(ERROR) << "only one IMU currently supported";
-    return -1;
-  }
-  imuParametersVec_.push_back(imuParameters);
-  return imuParametersVec_.size() - 1;
-}
-
-// Remove all cameras from the configuration
-void HybridFilter::clearCameras() {
-  extrinsicsEstimationParametersVec_.clear();
-}
-
-// Remove all IMUs from the configuration.
-void HybridFilter::clearImus() { imuParametersVec_.clear(); }
 
 bool HybridFilter::addStates(okvis::MultiFramePtr multiFrame,
                              const okvis::ImuMeasurementDeque& imuMeasurements,
@@ -120,7 +87,7 @@ bool HybridFilter::addStates(okvis::MultiFramePtr multiFrame,
   if (statesMap_.empty()) {
     correctedStateTime = multiFrame->timestamp() + tdEstimate;
     // in case this is the first frame ever, let's initialize the pose:
-    if (useExternalInitialPose_)
+    if (pvstd_.initWithExternalSource_)
       T_WS = okvis::kinematics::Transformation(pvstd_.p_WS, pvstd_.q_WS);
     else {
       bool success0 = initPoseFromImu(imuMeasurements, T_WS);
@@ -311,7 +278,7 @@ bool HybridFilter::addStates(okvis::MultiFramePtr multiFrame,
   for (size_t i = 0; i < extrinsicsEstimationParametersVec_.size(); ++i) {
     SpecificSensorStatesContainer cameraInfos(5);
     cameraInfos.at(CameraSensorStates::T_SCi).exists = true;
-    cameraInfos.at(CameraSensorStates::Intrinsic).exists = true;
+    cameraInfos.at(CameraSensorStates::Intrinsics).exists = true;
     cameraInfos.at(CameraSensorStates::Distortion).exists = true;
     cameraInfos.at(CameraSensorStates::TD).exists = true;
     cameraInfos.at(CameraSensorStates::TR).exists = true;
@@ -324,15 +291,15 @@ bool HybridFilter::addStates(okvis::MultiFramePtr multiFrame,
               .at(i)
               .at(CameraSensorStates::T_SCi)
               .id;
-      cameraInfos.at(CameraSensorStates::Intrinsic).exists =
+      cameraInfos.at(CameraSensorStates::Intrinsics).exists =
           lastElementIterator->second.sensors.at(SensorStates::Camera)
               .at(i)
-              .at(CameraSensorStates::Intrinsic)
+              .at(CameraSensorStates::Intrinsics)
               .exists;
-      cameraInfos.at(CameraSensorStates::Intrinsic).id =
+      cameraInfos.at(CameraSensorStates::Intrinsics).id =
           lastElementIterator->second.sensors.at(SensorStates::Camera)
               .at(i)
-              .at(CameraSensorStates::Intrinsic)
+              .at(CameraSensorStates::Intrinsics)
               .id;
       cameraInfos.at(CameraSensorStates::Distortion).id =
           lastElementIterator->second.sensors.at(SensorStates::Camera)
@@ -379,10 +346,10 @@ bool HybridFilter::addStates(okvis::MultiFramePtr multiFrame,
                 projectionDim));
         mapPtr_->addParameterBlock(projectionParamBlockPtr,
                                    ceres::Map::Parameterization::Trivial);
-        cameraInfos.at(CameraSensorStates::Intrinsic).id = id;
+        cameraInfos.at(CameraSensorStates::Intrinsics).id = id;
       } else {
-        cameraInfos.at(CameraSensorStates::Intrinsic).exists = false;
-        cameraInfos.at(CameraSensorStates::Intrinsic).id = 0u;
+        cameraInfos.at(CameraSensorStates::Intrinsics).exists = false;
+        cameraInfos.at(CameraSensorStates::Intrinsics).id = 0u;
       }
 
       id = IdProvider::instance().newId();
@@ -625,82 +592,8 @@ void HybridFilter::addCovForClonedStates() {
   covariance_ = covarianceAugmented;
 }
 
-// Add a landmark.
-bool HybridFilter::addLandmark(uint64_t landmarkId,
-                               const Eigen::Vector4d& landmark) {
-  std::shared_ptr<okvis::ceres::HomogeneousPointParameterBlock>
-      pointParameterBlock(new okvis::ceres::HomogeneousPointParameterBlock(
-          landmark, landmarkId));
-  if (!mapPtr_->addParameterBlock(pointParameterBlock,
-                                  okvis::ceres::Map::HomogeneousPoint)) {
-    return false;
-  }
 
-  // remember
-  double dist = std::numeric_limits<double>::max();
-  if (fabs(landmark[3]) > 1.0e-8) {
-    dist = (landmark / landmark[3]).head<3>().norm();  // euclidean distance
-  }
-  landmarksMap_.insert(std::pair<uint64_t, MapPoint>(
-      landmarkId, MapPoint(landmarkId, landmark, 0.0, dist)));
-  OKVIS_ASSERT_TRUE_DBG(Exception, isLandmarkAdded(landmarkId),
-                        "bug: inconsistend landmarkdMap_ with mapPtr_.");
-  return true;
-}
 
-// Remove an observation from a landmark.
-bool HybridFilter::removeObservation(::ceres::ResidualBlockId residualBlockId) {
-  const ceres::Map::ParameterBlockCollection parameters =
-      mapPtr_->parameters(residualBlockId);
-  const uint64_t landmarkId = parameters.at(1).first;
-  // remove in landmarksMap
-  MapPoint& mapPoint = landmarksMap_.at(landmarkId);
-  for (std::map<okvis::KeypointIdentifier, uint64_t>::iterator it =
-           mapPoint.observations.begin();
-       it != mapPoint.observations.end();) {
-    if (it->second == uint64_t(residualBlockId)) {
-      it = mapPoint.observations.erase(it);
-      break;  // added by Huai
-    } else {
-      it++;
-    }
-  }
-  // remove residual block
-  mapPtr_->removeResidualBlock(residualBlockId);
-  return true;
-}
-
-// Remove an observation from a landmark, if available.
-bool HybridFilter::removeObservation(uint64_t landmarkId, uint64_t poseId,
-                                     size_t camIdx, size_t keypointIdx) {
-  if (landmarksMap_.find(landmarkId) == landmarksMap_.end()) {
-    for (PointMap::iterator it = landmarksMap_.begin();
-         it != landmarksMap_.end(); ++it) {
-      LOG(INFO) << it->first
-                << ", no. obs = " << it->second.observations.size();
-    }
-    LOG(INFO) << landmarksMap_.at(landmarkId).id;
-  }
-  OKVIS_ASSERT_TRUE_DBG(Exception, isLandmarkAdded(landmarkId),
-                        "landmark not added");
-
-  okvis::KeypointIdentifier kid(poseId, camIdx, keypointIdx);
-  MapPoint& mapPoint = landmarksMap_.at(landmarkId);
-  std::map<okvis::KeypointIdentifier, uint64_t>::iterator it =
-      mapPoint.observations.find(kid);
-  if (it == landmarksMap_.at(landmarkId).observations.end()) {
-    return false;  // observation not present
-  }
-
-  // remove residual block
-  mapPtr_->removeResidualBlock(
-      reinterpret_cast<::ceres::ResidualBlockId>(it->second));
-
-  // remove also in local map
-  mapPoint.observations.erase(it);
-
-  return true;
-}
 
 // Applies the dropping/marginalization strategy, i.e., state management,
 // according to Li and Mourikis RSS 12 optimization based thesis
@@ -970,70 +863,7 @@ bool HybridFilter::applyMarginalizationStrategy(
   return true;
 }
 
-// Prints state information to buffer.
-void HybridFilter::printStates(uint64_t poseId, std::ostream& buffer) const {
-  buffer << "GLOBAL: ";
-  for (size_t i = 0; i < statesMap_.at(poseId).global.size(); ++i) {
-    if (statesMap_.at(poseId).global.at(i).exists) {
-      uint64_t id = statesMap_.at(poseId).global.at(i).id;
-      if (mapPtr_->parameterBlockPtr(id)->fixed()) buffer << "(";
-      buffer << "id=" << id << ":";
-      buffer << mapPtr_->parameterBlockPtr(id)->typeInfo();
-      if (mapPtr_->parameterBlockPtr(id)->fixed()) buffer << ")";
-      buffer << ", ";
-    }
-  }
-  buffer << "SENSOR: ";
-  for (size_t i = 0; i < statesMap_.at(poseId).sensors.size(); ++i) {
-    for (size_t j = 0; j < statesMap_.at(poseId).sensors.at(i).size(); ++j) {
-      for (size_t k = 0; k < statesMap_.at(poseId).sensors.at(i).at(j).size();
-           ++k) {
-        if (statesMap_.at(poseId).sensors.at(i).at(j).at(k).exists) {
-          uint64_t id = statesMap_.at(poseId).sensors.at(i).at(j).at(k).id;
-          if (mapPtr_->parameterBlockPtr(id)->fixed()) buffer << "(";
-          buffer << "id=" << id << ":";
-          buffer << mapPtr_->parameterBlockPtr(id)->typeInfo();
-          if (mapPtr_->parameterBlockPtr(id)->fixed()) buffer << ")";
-          buffer << ", ";
-        }
-      }
-    }
-  }
-  buffer << std::endl;
-}
 
-// Initialise pose from IMU measurements. For convenience as static.
-// Huai: this also can be realized with Quaterniond::FromTwoVectors() c.f.
-// https://github.com/dennisss/mvision
-bool HybridFilter::initPoseFromImu(
-    const okvis::ImuMeasurementDeque& imuMeasurements,
-    okvis::kinematics::Transformation& T_WS) {
-  // set translation to zero, unit rotation
-  T_WS.setIdentity();
-
-  if (imuMeasurements.size() == 0) return false;
-
-  // acceleration vector
-  Eigen::Vector3d acc_B = Eigen::Vector3d::Zero();
-  for (okvis::ImuMeasurementDeque::const_iterator it = imuMeasurements.begin();
-       it < imuMeasurements.end(); ++it) {
-    acc_B += it->measurement.accelerometers;
-  }
-  acc_B /= double(imuMeasurements.size());
-  Eigen::Vector3d e_acc = acc_B.normalized();
-
-  // align with ez_W:  //huai:this is expected direction of applied force,
-  // opposite to gravity
-  Eigen::Vector3d ez_W(0.0, 0.0, 1.0);
-  Eigen::Matrix<double, 6, 1> poseIncrement;
-  poseIncrement.head<3>() = Eigen::Vector3d::Zero();
-  poseIncrement.tail<3>() = ez_W.cross(e_acc).normalized();
-  double angle = std::acos(ez_W.transpose() * e_acc);
-  poseIncrement.tail<3>() *= angle;
-  T_WS.oplus(-poseIncrement);
-
-  return true;
-}
 
 void HybridFilter::retrieveEstimatesOfConstants() {  
   mStateID2CovID_.clear();
@@ -1053,7 +883,7 @@ void HybridFilter::retrieveEstimatesOfConstants() {
   if (camera_rig_.getMinimalProjectionDimen(camIdx) > 0) {
     getSensorStateEstimateAs<ceres::EuclideanParamBlock>(
         currFrameId, camIdx, SensorStates::Camera,
-        CameraSensorStates::Intrinsic, projectionIntrinsic);
+        CameraSensorStates::Intrinsics, projectionIntrinsic);
   }
 
   Eigen::Matrix<double, Eigen::Dynamic, 1> distortionCoeffs;
@@ -1782,7 +1612,7 @@ void HybridFilter::updateStates(
   if (minProjectionDim > 0) {
     uint64_t intrinsicId = stateInQuestion.sensors.at(SensorStates::Camera)
                                .at(camIdx)
-                               .at(CameraSensorStates::Intrinsic)
+                               .at(CameraSensorStates::Intrinsics)
                                .id;
     std::shared_ptr<ceres::EuclideanParamBlock> intrinsicParamBlockPtr =
         std::static_pointer_cast<ceres::EuclideanParamBlock>(
@@ -2424,94 +2254,7 @@ void HybridFilter::optimize(size_t /*numIter*/, size_t /*numThreads*/,
   }
 }
 
-// Set a time limit for the optimization process.
-bool HybridFilter::setOptimizationTimeLimit(double timeLimit,
-                                            int minIterations) {
-  if (ceresCallback_ != nullptr) {
-    if (timeLimit < 0.0) {
-      // no time limit => set minimum iterations to maximum iterations
-      ceresCallback_->setMinimumIterations(mapPtr_->options.max_num_iterations);
-      return true;
-    }
-    ceresCallback_->setTimeLimit(timeLimit);
-    ceresCallback_->setMinimumIterations(minIterations);
-    return true;
-  } else if (timeLimit >= 0.0) {
-    ceresCallback_ = std::unique_ptr<okvis::ceres::CeresIterationCallback>(
-        new okvis::ceres::CeresIterationCallback(timeLimit, minIterations));
-    mapPtr_->options.callbacks.push_back(ceresCallback_.get());
-    return true;
-  }
-  // no callback yet registered with ceres.
-  // but given time limit is lower than 0, so no callback needed
-  return true;
-}
-
 // getters
-// Get a specific landmark.
-bool HybridFilter::getLandmark(uint64_t landmarkId, MapPoint& mapPoint) const {
-  std::lock_guard<std::mutex> l(statesMutex_);
-  if (landmarksMap_.find(landmarkId) == landmarksMap_.end()) {
-    OKVIS_THROW_DBG(Exception,
-                    "landmark with id = " << landmarkId << " does not exist.")
-    return false;
-  }
-  mapPoint = landmarksMap_.at(landmarkId);
-  return true;
-}
-
-// Checks whether the landmark is initialized.
-bool HybridFilter::isLandmarkInitialized(uint64_t landmarkId) const {
-  OKVIS_ASSERT_TRUE_DBG(Exception, isLandmarkAdded(landmarkId),
-                        "landmark not added");
-  return std::static_pointer_cast<okvis::ceres::HomogeneousPointParameterBlock>(
-             mapPtr_->parameterBlockPtr(landmarkId))
-      ->initialized();
-}
-
-// Get a copy of all the landmarks as a PointMap.
-size_t HybridFilter::getLandmarks(PointMap& landmarks) const {
-  std::lock_guard<std::mutex> l(statesMutex_);
-  landmarks = landmarksMap_;
-  return landmarksMap_.size();
-}
-
-// Get a copy of all the landmark in a MapPointVector. This is for legacy
-// support. Use getLandmarks(okvis::PointMap&) if possible.
-size_t HybridFilter::getLandmarks(MapPointVector& landmarks) const {
-  std::lock_guard<std::mutex> l(statesMutex_);
-  landmarks.clear();
-  landmarks.reserve(landmarksMap_.size());
-  for (PointMap::const_iterator it = landmarksMap_.begin();
-       it != landmarksMap_.end(); ++it) {
-    landmarks.push_back(it->second);
-  }
-  return landmarksMap_.size();
-}
-
-// Get pose for a given pose ID.
-bool HybridFilter::get_T_WS(uint64_t poseId,
-                            okvis::kinematics::Transformation& T_WS) const {
-  if (!getGlobalStateEstimateAs<ceres::PoseParameterBlock>(
-          poseId, GlobalStates::T_WS, T_WS)) {
-    return false;
-  }
-
-  return true;
-}
-
-// Feel free to implement caching for them...
-// Get speeds and IMU biases for a given pose ID.
-bool HybridFilter::getSpeedAndBias(uint64_t poseId, uint64_t imuIdx,
-                                   okvis::SpeedAndBiases& speedAndBias) const {
-  if (!getSensorStateEstimateAs<ceres::SpeedAndBiasParameterBlock>(
-          poseId, imuIdx, SensorStates::Imu, ImuSensorStates::SpeedAndBias,
-          speedAndBias)) {
-    return false;
-  }
-  return true;
-}
-
 bool HybridFilter::getTimeDelay(uint64_t poseId, int camIdx,
                                 okvis::Duration* td) const {
   double tdd;
@@ -2523,189 +2266,11 @@ bool HybridFilter::getTimeDelay(uint64_t poseId, int camIdx,
   return true;
 }
 
-// Get camera states for a given pose ID.
-bool HybridFilter::getCameraSensorStates(
-    uint64_t poseId, size_t cameraIdx,
-    okvis::kinematics::Transformation& T_SCi) const {
-  return getSensorStateEstimateAs<ceres::PoseParameterBlock>(
-      poseId, cameraIdx, SensorStates::Camera, CameraSensorStates::T_SCi,
-      T_SCi);
-}
-
 int HybridFilter::getCameraExtrinsicOptType(size_t cameraIdx) const {
   return camera_rig_.getExtrinsicOptMode(cameraIdx);
 }
 
-// Get the ID of the current keyframe.
-uint64_t HybridFilter::currentKeyframeId() const {
-  for (std::map<uint64_t, States>::const_reverse_iterator rit =
-           statesMap_.rbegin();
-       rit != statesMap_.rend(); ++rit) {
-    if (rit->second.isKeyframe) {
-      return rit->first;
-    }
-  }
-  OKVIS_THROW_DBG(Exception, "no keyframes existing...");
-  return 0;
-}
-
-// Get the ID of an older frame.
-uint64_t HybridFilter::frameIdByAge(size_t age) const {
-  std::map<uint64_t, States>::const_reverse_iterator rit = statesMap_.rbegin();
-  for (size_t i = 0; i < age; ++i) {
-    ++rit;
-    OKVIS_ASSERT_TRUE_DBG(Exception, rit != statesMap_.rend(),
-                          "requested age " << age << " out of range.");
-  }
-  return rit->first;
-}
-
-uint64_t HybridFilter::currentFrameId() const {
-  OKVIS_ASSERT_TRUE_DBG(Exception, statesMap_.size() > 0,
-                        "no frames added yet.")
-  return statesMap_.rbegin()->first;
-}
-
-okvis::Time HybridFilter::currentFrameTimestamp() const {
-  OKVIS_ASSERT_TRUE_DBG(Exception, statesMap_.size() > 0,
-                        "no frames added yet.")
-  return statesMap_.rbegin()->second.timestamp;
-}
-
-uint64_t HybridFilter::oldestFrameId() const {
-  OKVIS_ASSERT_TRUE_DBG(Exception, statesMap_.size() > 0,
-                        "no frames added yet.")
-  return statesMap_.begin()->first;
-}
-
-size_t HybridFilter::statesMapSize() const {
-  return statesMap_.size();
-}
-
-// Checks if a particular frame is still in the IMU window
-bool HybridFilter::isInImuWindow(uint64_t frameId) const {
-  if (statesMap_.at(frameId).sensors.at(SensorStates::Imu).size() == 0) {
-    return false;  // no IMU added
-  }
-  return statesMap_.at(frameId)
-      .sensors.at(SensorStates::Imu)
-      .at(0)
-      .at(ImuSensorStates::SpeedAndBias)
-      .exists;
-}
-
-// Set pose for a given pose ID.
-bool HybridFilter::set_T_WS(uint64_t poseId,
-                            const okvis::kinematics::Transformation& T_WS) {
-  if (!setGlobalStateEstimateAs<ceres::PoseParameterBlock>(
-          poseId, GlobalStates::T_WS, T_WS)) {
-    return false;
-  }
-
-  return true;
-}
-
-// Set the speeds and IMU biases for a given pose ID.
-bool HybridFilter::setSpeedAndBias(uint64_t poseId, size_t imuIdx,
-                                   const okvis::SpeedAndBiases& speedAndBias) {
-  return setSensorStateEstimateAs<ceres::SpeedAndBiasParameterBlock>(
-      poseId, imuIdx, SensorStates::Imu, ImuSensorStates::SpeedAndBias,
-      speedAndBias);
-}
-
-// Set the transformation from sensor to camera frame for a given pose ID.
-bool HybridFilter::setCameraSensorStates(
-    uint64_t poseId, size_t cameraIdx,
-    const okvis::kinematics::Transformation& T_SCi) {
-  return setSensorStateEstimateAs<ceres::PoseParameterBlock>(
-      poseId, cameraIdx, SensorStates::Camera, CameraSensorStates::T_SCi,
-      T_SCi);
-}
-
-// Set the homogeneous coordinates for a landmark.
-bool HybridFilter::setLandmark(uint64_t landmarkId,
-                               const Eigen::Vector4d& landmark) {
-  std::shared_ptr<ceres::ParameterBlock> parameterBlockPtr =
-      mapPtr_->parameterBlockPtr(landmarkId);
-#ifndef NDEBUG
-  std::shared_ptr<ceres::HomogeneousPointParameterBlock>
-      derivedParameterBlockPtr =
-          std::dynamic_pointer_cast<ceres::HomogeneousPointParameterBlock>(
-              parameterBlockPtr);
-  if (!derivedParameterBlockPtr) {
-    OKVIS_THROW_DBG(Exception, "wrong pointer type requested.")
-    return false;
-  }
-  derivedParameterBlockPtr->setEstimate(landmark);
-  ;
-#else
-  std::static_pointer_cast<ceres::HomogeneousPointParameterBlock>(
-      parameterBlockPtr)
-      ->setEstimate(landmark);
-#endif
-
-  // also update in map
-  landmarksMap_.at(landmarkId).pointHomog = landmark;
-  return true;
-}
-
-// Set the landmark initialization state.
-void HybridFilter::setLandmarkInitialized(uint64_t landmarkId,
-                                          bool initialized) {
-  OKVIS_ASSERT_TRUE_DBG(Exception, isLandmarkAdded(landmarkId),
-                        "landmark not added");
-  std::static_pointer_cast<okvis::ceres::HomogeneousPointParameterBlock>(
-      mapPtr_->parameterBlockPtr(landmarkId))
-      ->setInitialized(initialized);
-}
-
 // private stuff
-// getters
-bool HybridFilter::getGlobalStateParameterBlockPtr(
-    uint64_t poseId, int stateType,
-    std::shared_ptr<ceres::ParameterBlock>& stateParameterBlockPtr) const {
-  // check existence in states set
-  if (statesMap_.find(poseId) == statesMap_.end()) {
-    OKVIS_THROW(Exception, "pose with id = " << poseId << " does not exist.")
-    return false;
-  }
-
-  // obtain the parameter block ID
-  uint64_t id = statesMap_.at(poseId).global.at(stateType).id;
-  if (!mapPtr_->parameterBlockExists(id)) {
-    OKVIS_THROW(Exception, "pose with id = " << id << " does not exist.")
-    return false;
-  }
-
-  stateParameterBlockPtr = mapPtr_->parameterBlockPtr(id);
-  return true;
-}
-
-bool HybridFilter::getSensorStateParameterBlockPtr(
-    uint64_t poseId, int sensorIdx, int sensorType, int stateType,
-    std::shared_ptr<ceres::ParameterBlock>& stateParameterBlockPtr) const {
-  // check existence in states set
-  if (statesMap_.find(poseId) == statesMap_.end()) {
-    OKVIS_THROW_DBG(Exception,
-                    "pose with id = " << poseId << " does not exist.")
-    return false;
-  }
-
-  // obtain the parameter block ID
-  uint64_t id = statesMap_.at(poseId)
-                    .sensors.at(sensorType)
-                    .at(sensorIdx)
-                    .at(stateType)
-                    .id;
-  if (!mapPtr_->parameterBlockExists(id)) {
-    OKVIS_THROW_DBG(Exception,
-                    "pose with id = " << poseId << " does not exist.")
-    return false;
-  }
-  stateParameterBlockPtr = mapPtr_->parameterBlockPtr(id);
-  return true;
-}
-
 size_t HybridFilter::gatherPoseObservForTriang(
     const MapPoint& mp,
     const std::shared_ptr<cameras::CameraBase> cameraGeometry,
@@ -2892,92 +2457,57 @@ bool HybridFilter::triangulateAMapPoint(
   return triangulated;
 }
 
-okvis::Time HybridFilter::firstStateTimestamp() {
-  return statesMap_.begin()->second.timestamp;
-}
-
-// print states and their std
-// std::string debugFile; // to store the states and stds
-bool HybridFilter::print(const std::string debugFile) const {
-  static std::ofstream stream;  // the stream corresponding to the debugFile
-  if (!stream.is_open()) {
-    stream.open(debugFile, std::ofstream::out);
-    std::string header = "";
-    StreamHelper::composeHeaderLine(
-        imuParametersVec_[0].model_type,
-        camera_rig_.getProjectionOptMode(0),
-        camera_rig_.getExtrinsicOptMode(0),
-        camera_rig_.getCameraGeometry(0)->distortionType(),
-        FULL_STATE_WITH_ALL_CALIBRATION,
-        &header);
-    stream << header << std::endl;
-  }
-  return print(stream);
-}
-
 bool HybridFilter::print(std::ostream& stream) const {
-  uint64_t poseId = statesMap_.rbegin()->first;
-  std::shared_ptr<ceres::PoseParameterBlock> poseParamBlockPtr =
-      std::static_pointer_cast<ceres::PoseParameterBlock>(
-          mapPtr_->parameterBlockPtr(poseId));
-  kinematics::Transformation T_WS = poseParamBlockPtr->estimate();
-  okvis::Time currentTime = statesMap_.rbegin()->second.timestamp;
-  assert(multiFramePtrMap_.rbegin()->first == poseId);
-
+  Estimator::print(stream);
   Eigen::IOFormat SpaceInitFmt(Eigen::StreamPrecision, Eigen::DontAlignCols,
                                " ", " ", "", "", "", "");
-  Eigen::Quaterniond q_WS = T_WS.q();
-  if (q_WS.w() < 0) {
-      q_WS.coeffs() *= -1;
-  }
-  stream << currentTime << " " << multiFramePtrMap_.rbegin()->second->idInSource
-         << " " << std::setfill(' ')
-         << T_WS.r().transpose().format(SpaceInitFmt) << " "
-         << q_WS.coeffs().transpose().format(SpaceInitFmt);
-  // update imu sensor states
+  // imu sensor states
   const int imuIdx = 0;
   const States stateInQuestion = statesMap_.rbegin()->second;
-  uint64_t SBId = stateInQuestion.sensors.at(SensorStates::Imu)
-                      .at(imuIdx)
-                      .at(ImuSensorStates::SpeedAndBias)
-                      .id;
-  std::shared_ptr<ceres::SpeedAndBiasParameterBlock> sbParamBlockPtr =
-      std::static_pointer_cast<ceres::SpeedAndBiasParameterBlock>(
-          mapPtr_->parameterBlockPtr(SBId));
-  SpeedAndBiases sb = sbParamBlockPtr->estimate();
-  stream << " " << sb.transpose().format(SpaceInitFmt);
+  if (stateInQuestion.sensors.at(SensorStates::Imu)
+          .at(imuIdx)
+          .at(ImuSensorStates::TG)
+          .exists) {
+    uint64_t TGId = stateInQuestion.sensors.at(SensorStates::Imu)
+                        .at(imuIdx)
+                        .at(ImuSensorStates::TG)
+                        .id;
+    std::shared_ptr<ceres::ShapeMatrixParamBlock> tgParamBlockPtr =
+        std::static_pointer_cast<ceres::ShapeMatrixParamBlock>(
+            mapPtr_->parameterBlockPtr(TGId));
+    Eigen::Matrix<double, 9, 1> sm = tgParamBlockPtr->estimate();
+    stream << " " << sm.transpose().format(SpaceInitFmt);
+  }
+  if (stateInQuestion.sensors.at(SensorStates::Imu)
+          .at(imuIdx)
+          .at(ImuSensorStates::TS)
+          .exists) {
+    uint64_t TSId = stateInQuestion.sensors.at(SensorStates::Imu)
+                        .at(imuIdx)
+                        .at(ImuSensorStates::TS)
+                        .id;
+    std::shared_ptr<ceres::ShapeMatrixParamBlock> tsParamBlockPtr =
+        std::static_pointer_cast<ceres::ShapeMatrixParamBlock>(
+            mapPtr_->parameterBlockPtr(TSId));
+    Eigen::Matrix<double, 9, 1> sm = tsParamBlockPtr->estimate();
+    stream << " " << sm.transpose().format(SpaceInitFmt);
+  }
+  if (stateInQuestion.sensors.at(SensorStates::Imu)
+          .at(imuIdx)
+          .at(ImuSensorStates::TA)
+          .exists) {
+    uint64_t TAId = stateInQuestion.sensors.at(SensorStates::Imu)
+                        .at(imuIdx)
+                        .at(ImuSensorStates::TA)
+                        .id;
+    std::shared_ptr<ceres::ShapeMatrixParamBlock> taParamBlockPtr =
+        std::static_pointer_cast<ceres::ShapeMatrixParamBlock>(
+            mapPtr_->parameterBlockPtr(TAId));
+    Eigen::Matrix<double, 9, 1> sm = taParamBlockPtr->estimate();
+    stream << " " << sm.transpose().format(SpaceInitFmt);
+  }
 
-  uint64_t TGId = stateInQuestion.sensors.at(SensorStates::Imu)
-                      .at(imuIdx)
-                      .at(ImuSensorStates::TG)
-                      .id;
-  std::shared_ptr<ceres::ShapeMatrixParamBlock> tgParamBlockPtr =
-      std::static_pointer_cast<ceres::ShapeMatrixParamBlock>(
-          mapPtr_->parameterBlockPtr(TGId));
-  Eigen::Matrix<double, 9, 1> sm = tgParamBlockPtr->estimate();
-  stream << " " << sm.transpose().format(SpaceInitFmt);
-
-  uint64_t TSId = stateInQuestion.sensors.at(SensorStates::Imu)
-                      .at(imuIdx)
-                      .at(ImuSensorStates::TS)
-                      .id;
-  std::shared_ptr<ceres::ShapeMatrixParamBlock> tsParamBlockPtr =
-      std::static_pointer_cast<ceres::ShapeMatrixParamBlock>(
-          mapPtr_->parameterBlockPtr(TSId));
-  sm = tsParamBlockPtr->estimate();
-  stream << " " << sm.transpose().format(SpaceInitFmt);
-
-  uint64_t TAId = stateInQuestion.sensors.at(SensorStates::Imu)
-                      .at(imuIdx)
-                      .at(ImuSensorStates::TA)
-                      .id;
-  std::shared_ptr<ceres::ShapeMatrixParamBlock> taParamBlockPtr =
-      std::static_pointer_cast<ceres::ShapeMatrixParamBlock>(
-          mapPtr_->parameterBlockPtr(TAId));
-  sm = taParamBlockPtr->estimate();
-  stream << " " << sm.transpose().format(SpaceInitFmt);
-
-  // update camera sensor states
+  // camera sensor states
   const int camIdx = 0;
   uint64_t extrinsicId = stateInQuestion.sensors.at(SensorStates::Camera)
                              .at(camIdx)
@@ -2988,78 +2518,70 @@ bool HybridFilter::print(std::ostream& stream) const {
           mapPtr_->parameterBlockPtr(extrinsicId));
   kinematics::Transformation T_SC0 = extrinsicParamBlockPtr->estimate();
   std::string extrinsicValues;
-  ExtrinsicModelToParamsValueString(
-        camera_rig_.getExtrinsicOptMode(camIdx),
-        T_SC0, " ", &extrinsicValues);
+  ExtrinsicModelToParamsValueString(camera_rig_.getExtrinsicOptMode(camIdx),
+                                    T_SC0, " ", &extrinsicValues);
   stream << " " << extrinsicValues;
 
   const int minProjectionDim = camera_rig_.getMinimalProjectionDimen(camIdx);
   if (minProjectionDim > 0) {
     uint64_t intrinsicId = stateInQuestion.sensors.at(SensorStates::Camera)
                                .at(camIdx)
-                               .at(CameraSensorStates::Intrinsic)
+                               .at(CameraSensorStates::Intrinsics)
                                .id;
     std::shared_ptr<ceres::EuclideanParamBlock> intrinsicParamBlockPtr =
         std::static_pointer_cast<ceres::EuclideanParamBlock>(
             mapPtr_->parameterBlockPtr(intrinsicId));
-    Eigen::VectorXd cameraIntrinsics =
-        intrinsicParamBlockPtr->estimate();
+    Eigen::VectorXd cameraIntrinsics = intrinsicParamBlockPtr->estimate();
     stream << " " << cameraIntrinsics.transpose().format(SpaceInitFmt);
   }
-  uint64_t distortionId = stateInQuestion.sensors.at(SensorStates::Camera)
-                              .at(camIdx)
-                              .at(CameraSensorStates::Distortion)
-                              .id;
-  std::shared_ptr<ceres::EuclideanParamBlock> distortionParamBlockPtr =
-      std::static_pointer_cast<ceres::EuclideanParamBlock>(
-          mapPtr_->parameterBlockPtr(distortionId));
-  Eigen::VectorXd cameraDistortion =
-      distortionParamBlockPtr->estimate();
-  stream << " " << cameraDistortion.transpose().format(SpaceInitFmt);
-
-  uint64_t tdId = stateInQuestion.sensors.at(SensorStates::Camera)
-                      .at(camIdx)
-                      .at(CameraSensorStates::TD)
-                      .id;
-  std::shared_ptr<ceres::ParameterBlock> tdParamBlockPtr =
-          mapPtr_->parameterBlockPtr(tdId);
-  double td = tdParamBlockPtr->parameters()[0];
-  stream << " " << td;
-
-  uint64_t trId = stateInQuestion.sensors.at(SensorStates::Camera)
-                      .at(camIdx)
-                      .at(CameraSensorStates::TR)
-                      .id;
-  std::shared_ptr<ceres::ParameterBlock> trParamBlockPtr =
-          mapPtr_->parameterBlockPtr(trId);
-  double tr = trParamBlockPtr->parameters()[0];
-  stream << " " << tr;
+  if (stateInQuestion.sensors.at(SensorStates::Camera)
+          .at(camIdx)
+          .at(CameraSensorStates::Distortion)
+          .exists) {
+    uint64_t distortionId = stateInQuestion.sensors.at(SensorStates::Camera)
+                                .at(camIdx)
+                                .at(CameraSensorStates::Distortion)
+                                .id;
+    std::shared_ptr<ceres::EuclideanParamBlock> distortionParamBlockPtr =
+        std::static_pointer_cast<ceres::EuclideanParamBlock>(
+            mapPtr_->parameterBlockPtr(distortionId));
+    Eigen::VectorXd cameraDistortion = distortionParamBlockPtr->estimate();
+    stream << " " << cameraDistortion.transpose().format(SpaceInitFmt);
+  }
+  if (stateInQuestion.sensors.at(SensorStates::Camera)
+          .at(camIdx)
+          .at(CameraSensorStates::TD)
+          .exists) {
+    uint64_t tdId = stateInQuestion.sensors.at(SensorStates::Camera)
+                        .at(camIdx)
+                        .at(CameraSensorStates::TD)
+                        .id;
+    std::shared_ptr<ceres::ParameterBlock> tdParamBlockPtr =
+        mapPtr_->parameterBlockPtr(tdId);
+    double td = tdParamBlockPtr->parameters()[0];
+    stream << " " << td;
+  }
+  if (stateInQuestion.sensors.at(SensorStates::Camera)
+          .at(camIdx)
+          .at(CameraSensorStates::TR)
+          .exists) {
+    uint64_t trId = stateInQuestion.sensors.at(SensorStates::Camera)
+                        .at(camIdx)
+                        .at(CameraSensorStates::TR)
+                        .id;
+    std::shared_ptr<ceres::ParameterBlock> trParamBlockPtr =
+        mapPtr_->parameterBlockPtr(trId);
+    double tr = trParamBlockPtr->parameters()[0];
+    stream << " " << tr;
+  }
 
   // stds
   const int stateDim = startIndexOfClonedStates();
   Eigen::Matrix<double, Eigen::Dynamic, 1> variances =
       covariance_.topLeftCorner(stateDim, stateDim).diagonal();
 
-  stream << " " << variances.cwiseSqrt().transpose().format(SpaceInitFmt)
-         << std::endl;
+  stream << " " << variances.cwiseSqrt().transpose().format(SpaceInitFmt);
   return true;
-}
-
-// Get frame id in source and whether the state is a keyframe
-bool HybridFilter::getFrameId(uint64_t poseId, int& frameIdInSource,
-                              bool& isKF) const {
-  frameIdInSource = multiFramePtrMap_.at(poseId)->idInSource;
-  isKF = statesMap_.at(poseId).isKeyframe;
-  return true;
-}
-
-// return number of observations for a landmark in the landmark map
-size_t HybridFilter::numObservations(uint64_t landmarkId) {
-  PointMap::const_iterator it = landmarksMap_.find(landmarkId);
-  if (it != landmarksMap_.end())
-    return it->second.observations.size();
-  else
-    return 0;
 }
 
 void HybridFilter::printTrackLengthHistogram(std::ostream& stream) const {
@@ -3079,7 +2601,7 @@ uint64_t HybridFilter::getCameraCalibrationEstimate(
   int optProjDim = camera_rig_.getMinimalProjectionDimen(camIdx);
   if (optProjDim > 0) {
     getSensorStateEstimateAs<ceres::EuclideanParamBlock>(
-        poseId, camIdx, SensorStates::Camera, CameraSensorStates::Intrinsic,
+        poseId, camIdx, SensorStates::Camera, CameraSensorStates::Intrinsics,
         intrinsic);
   }
   Eigen::VectorXd distortionCoeffs;
@@ -3449,18 +2971,6 @@ bool HybridFilter::addLandmarkObservation(uint64_t landmarkId, uint64_t poseId,
   landmarksMap_.at(landmarkId)
       .observations.insert(std::pair<okvis::KeypointIdentifier, uint64_t>(
           kid, reinterpret_cast<uint64_t>(nullptr)));
-  return true;
-}
-
-bool HybridFilter::getLandmarkHeadObs(uint64_t landmarkId,
-                                      okvis::KeypointIdentifier* kpId) const {
-  auto lmIt = landmarksMap_.find(landmarkId);
-  if (lmIt == landmarksMap_.end()) {
-    OKVIS_THROW_DBG(Exception,
-                    "landmark with id = " << landmarkId << " does not exist.")
-    return false;
-  }
-  *kpId = lmIt->second.observations.begin()->first;
   return true;
 }
 

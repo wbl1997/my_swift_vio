@@ -10,7 +10,7 @@
 #include <okvis/ceres/RelativePoseError.hpp>
 #include <okvis/ceres/SpeedAndBiasError.hpp>
 
-#include <okvis/ceres/EuclideanParamBlock.hpp>
+#include <msckf/EuclideanParamBlock.hpp>
 #include <okvis/ceres/CameraTimeParamBlock.hpp>
 
 #include <msckf/FilterHelper.hpp>
@@ -69,7 +69,7 @@ bool MSCKF2::addStates(okvis::MultiFramePtr multiFrame,
     tdEstimate.fromSec(imuParametersVec_.at(0).td0);
     correctedStateTime = multiFrame->timestamp() + tdEstimate;
 
-    if (useExternalInitialPose_) {
+    if (pvstd_.initWithExternalSource_) {
       T_WS = okvis::kinematics::Transformation(pvstd_.p_WS, pvstd_.q_WS);
     } else {
       bool success0 = initPoseFromImu(imuMeasurements, T_WS);
@@ -254,7 +254,7 @@ bool MSCKF2::addStates(okvis::MultiFramePtr multiFrame,
   for (size_t i = 0; i < extrinsicsEstimationParametersVec_.size(); ++i) {
     SpecificSensorStatesContainer cameraInfos(5);
     cameraInfos.at(CameraSensorStates::T_SCi).exists = true;
-    cameraInfos.at(CameraSensorStates::Intrinsic).exists = true;
+    cameraInfos.at(CameraSensorStates::Intrinsics).exists = true;
     cameraInfos.at(CameraSensorStates::Distortion).exists = true;
     cameraInfos.at(CameraSensorStates::TD).exists = true;
     cameraInfos.at(CameraSensorStates::TR).exists = true;
@@ -267,15 +267,15 @@ bool MSCKF2::addStates(okvis::MultiFramePtr multiFrame,
               .at(i)
               .at(CameraSensorStates::T_SCi)
               .id;
-      cameraInfos.at(CameraSensorStates::Intrinsic).exists =
+      cameraInfos.at(CameraSensorStates::Intrinsics).exists =
           lastElementIterator->second.sensors.at(SensorStates::Camera)
               .at(i)
-              .at(CameraSensorStates::Intrinsic)
+              .at(CameraSensorStates::Intrinsics)
               .exists;
-      cameraInfos.at(CameraSensorStates::Intrinsic).id =
+      cameraInfos.at(CameraSensorStates::Intrinsics).id =
           lastElementIterator->second.sensors.at(SensorStates::Camera)
               .at(i)
-              .at(CameraSensorStates::Intrinsic)
+              .at(CameraSensorStates::Intrinsics)
               .id;
       cameraInfos.at(CameraSensorStates::Distortion).id =
           lastElementIterator->second.sensors.at(SensorStates::Camera)
@@ -324,10 +324,10 @@ bool MSCKF2::addStates(okvis::MultiFramePtr multiFrame,
                 optProjIntrinsics, id, correctedStateTime, minProjectionDim));
         mapPtr_->addParameterBlock(intrinsicParamBlockPtr,
                                    ceres::Map::Parameterization::Trivial);
-        cameraInfos.at(CameraSensorStates::Intrinsic).id = id;
+        cameraInfos.at(CameraSensorStates::Intrinsics).id = id;
       } else {
-        cameraInfos.at(CameraSensorStates::Intrinsic).exists = false;
-        cameraInfos.at(CameraSensorStates::Intrinsic).id = 0u;
+        cameraInfos.at(CameraSensorStates::Intrinsics).exists = false;
+        cameraInfos.at(CameraSensorStates::Intrinsics).id = 0u;
       }
       id = IdProvider::instance().newId();
       const int distortionDim = camera_rig_.getDistortionDimen(i);

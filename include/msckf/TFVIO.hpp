@@ -23,7 +23,6 @@
 #include <okvis/ceres/SpeedAndBiasParameterBlock.hpp>
 
 #include <okvis/timing/Timer.hpp>
-#include "msckf/InitialPVandStd.hpp"
 #include "vio/CsvReader.h"
 #include <vio/ImuErrorModel.h>
 

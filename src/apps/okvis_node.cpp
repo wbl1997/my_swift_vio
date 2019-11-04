@@ -128,9 +128,11 @@ int main(int argc, char **argv) {
   setInputParameters(&parameters.input);
 
   std::shared_ptr<okvis::VioInterface> okvis_estimator;
-  // http://eigen.tuxfamily.org/bz/show_bug.cgi?id=1049
   switch (FLAGS_estimator_algorithm) {
     case 0:
+    case 4:
+      parameters.optimization.algorithm = FLAGS_estimator_algorithm;
+      // http://eigen.tuxfamily.org/bz/show_bug.cgi?id=1049
       okvis_estimator.reset(new okvis::ThreadedKFVio(parameters));
       break;
     case 1:

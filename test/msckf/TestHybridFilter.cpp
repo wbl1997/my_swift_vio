@@ -1,7 +1,8 @@
 #include <gtest/gtest.h>
 
-#include <msckf/TFVIO.hpp>
-#include <msckf/MSCKF2.hpp>
+#include <vio/Sample.h>
+
+#include "io_wrap/StreamHelper.hpp"
 
 #include <okvis/IdProvider.hpp>
 #include <okvis/cameras/PinholeCamera.hpp>
@@ -17,11 +18,11 @@
 #include <okvis/ceres/ReprojectionError.hpp>
 #include <okvis/ceres/SpeedAndBiasError.hpp>
 #include <okvis/ceres/SpeedAndBiasParameterBlock.hpp>
+#include <msckf/EuclideanParamBlock.hpp>
 
-#include <vio/Sample.h>
-#include <okvis/ceres/EuclideanParamBlock.hpp>
-
-#include "io_wrap/StreamHelper.hpp"
+#include <msckf/GeneralEstimator.hpp>
+#include <msckf/MSCKF2.hpp>
+#include <msckf/TFVIO.hpp>
 
 #include "msckf/ImuOdometry.h"
 #include "msckf/ImuSimulator.h"
@@ -200,6 +201,20 @@ void create_landmark_grid(
   }
 }
 
+void addLandmarkNoise(
+    const std::vector<Eigen::Vector4d,
+                      Eigen::aligned_allocator<Eigen::Vector4d>>&
+        homogeneousPoints,
+    std::vector<Eigen::Vector4d, Eigen::aligned_allocator<Eigen::Vector4d>>*
+        noisyHomogeneousPoints,
+    double axisSigma = 0.1) {
+  *noisyHomogeneousPoints = homogeneousPoints;
+  for (auto iter = noisyHomogeneousPoints->begin();
+       iter != noisyHomogeneousPoints->end(); ++iter) {
+    iter->head<3>() = iter->head<3>() + Eigen::Vector3d::Random() * axisSigma;
+  }
+}
+
 typedef boost::iterator_range<std::vector<std::pair<double, double>>::iterator>
     HistogramType;
 
@@ -368,7 +383,7 @@ class CameraSystemCreator {
 const std::string CameraSystemCreator::distortName_ = "RadialTangentialDistortion";
 
 /**
- * @brief compute_errors
+ * @brief computeErrors
  * @param estimator
  * @param T_WS
  * @param v_WS_true
@@ -378,8 +393,8 @@ const std::string CameraSystemCreator::distortName_ = "RadialTangentialDistortio
  * @param rmsError rmse in xyz, \alpha, v_WS, bg, ba, Tg, Ts, Ta, p_CB,
  *  (fx, fy), (cx, cy), k1, k2, p1, p2, td, tr
  */
-void compute_errors(
-    const okvis::HybridFilter* estimator,
+void computeErrors(
+    const okvis::Estimator* estimator,
     const okvis::kinematics::Transformation& T_WS,
     const Eigen::Vector3d& v_WS_true,
     const okvis::ImuSensorReadings& ref_measurement,
@@ -397,15 +412,16 @@ void compute_errors(
                                         Eigen::Matrix3d::Identity());
   Eigen::Matrix<double, 6, 1> deltaPose;
   deltaPose << delta, alpha;
-
+  Eigen::MatrixXd covariance;
+  estimator->computeCovariance(&covariance);
   (*normalizedError)[0] =
       delta.transpose() *
-      estimator->covariance_.topLeftCorner<3, 3>().inverse() * delta;
+      covariance.topLeftCorner<3, 3>().inverse() * delta;
   (*normalizedError)[1] = alpha.transpose() *
-                          estimator->covariance_.block<3, 3>(3, 3).inverse() *
+                          covariance.block<3, 3>(3, 3).inverse() *
                           alpha;
   Eigen::Matrix<double, 6, 1> tempPoseError =
-      estimator->covariance_.topLeftCorner<6, 6>().ldlt().solve(deltaPose);
+      covariance.topLeftCorner<6, 6>().ldlt().solve(deltaPose);
   (*normalizedError)[2] = deltaPose.transpose() * tempPoseError;
 
   Eigen::Matrix<double, 9, 1> eye;
@@ -465,7 +481,7 @@ void compute_errors(
   if (projOptModelDim > 0) {
     estimator->getSensorStateEstimateAs<okvis::ceres::EuclideanParamBlock>(
         currFrameId, 0, okvis::HybridFilter::SensorStates::Camera,
-        okvis::HybridFilter::CameraSensorStates::Intrinsic,
+        okvis::HybridFilter::CameraSensorStates::Intrinsics,
         projectionIntrinsic);
     Eigen::VectorXd local_opt_params;
     okvis::ProjectionOptGlobalToLocal(
@@ -544,6 +560,42 @@ okvis::Optimization initOptimizationConfig() {
   return optConfig;
 }
 
+bool isFilteringMethod(int algorithmId) {
+  return algorithmId >= 4;
+}
+
+std::string estimatorIdToLabel(int algorithmId) {
+  switch (algorithmId) {
+    case 0:
+      return "OKVIS";
+    case 1:
+      return "Generic";
+    case 4:
+      return "MSCKF";
+    case 5:
+      return "TFVIO";
+    default:
+      return "Uncanny";
+  }
+}
+
+std::string trajectoryIdToLabel(int trajId) {
+  switch (trajId) {
+    case 0:
+      return "Torus";
+    case 1:
+      return "Ball";
+    case 2:
+      return "Squircle";
+    case 3:
+      return "Circle";
+    case 4:
+      return "Dot";
+    default:
+      return "Uncanny";
+  }
+}
+
 /**
  * @brief testHybridFilterSinusoid
  * @param outputPath
@@ -577,9 +629,10 @@ void testHybridFilterSinusoid(const std::string& outputPath,
       Eigen::aligned_allocator<std::pair<okvis::Time, Eigen::VectorXd>>>
       rmse, rmseSum;
 
-  std::string neesFile = outputPath + "/sinusoidNEES.txt";
-  std::string rmseFile = outputPath + "/sinusoidRMSE.txt";
-  std::string truthFile = outputPath + "/sinusoidTruth.txt";
+  std::string neesFile = outputPath + "/NEES.txt";
+  std::string rmseFile = outputPath + "/RMSE.txt";
+  std::string trajLabel = trajectoryIdToLabel(trajectoryId);
+  std::string truthFile = outputPath + "/" + trajLabel + ".txt";
   std::ofstream truthStream;
 
   // number of features tracked in a frame
@@ -588,13 +641,13 @@ void testHybridFilterSinusoid(const std::string& outputPath,
                                             boost::accumulators::tag::density>>
       frameFeatureTally(boost::accumulators::tag::density::num_bins = 20,
                         boost::accumulators::tag::density::cache_size = 40);
-  std::string featureHistFile = outputPath + "/sinusoidFeatureHist.txt";
+  std::string featureHistFile = outputPath + "/FeatureHist.txt";
 
   okvis::timing::Timer filterTimer("msckf timer", true);
+  std::string estimatorLabel = estimatorIdToLabel(FLAGS_estimator_algorithm);
 
-  std::string estimator_label = FLAGS_estimator_algorithm == 2 ? "PAVIO" : "MSCKF";
-  LOG(INFO) << "Estimator algorithm: " << FLAGS_estimator_algorithm << " "
-            << estimator_label << "\n";
+  LOG(INFO) << "Estimator algorithm: " << FLAGS_estimator_algorithm
+            << " " << estimatorLabel << " trajectory " << trajLabel;
 
   // only output the ground truth and data for the first successful trial
   bool bVerbose = false;
@@ -609,13 +662,12 @@ void testHybridFilterSinusoid(const std::string& outputPath,
 
     srand((unsigned int)time(0)); // comment out to make tests deterministic
     imu::TestSetting cases[] = {
-        imu::TestSetting(true, true, true, true)};  // noisy data, vins integration
-
+        imu::TestSetting(true, true, true, true)};
     size_t c = 0;
     LOG(INFO) << "Run " << run << " " << cases[c].print();
 
-    std::string pointFile = outputPath + "/sinusoidPoints.txt";
-    std::string imuSampleFile = outputPath + "/sinusoidInertial.txt";
+    std::string pointFile = outputPath + "/Points.txt";
+    std::string imuSampleFile = outputPath + "/Inertial.txt";
     std::ofstream inertialStream;
     if (bVerbose) {
       truthStream.open(truthFile, std::ofstream::out);
@@ -632,10 +684,10 @@ void testHybridFilterSinusoid(const std::string& outputPath,
 
     std::stringstream ss;
     ss << run;
-    std::string outputFile =
-        outputPath + "/sinusoid_" + estimator_label + "_" + ss.str() + ".txt";
-    std::string trackStatFile = outputPath + "/sinusoid_" + estimator_label +
-                                "_trackstat_" + ss.str() + ".txt";
+    std::string outputFile = outputPath + "/" + estimatorLabel + "_" +
+                             trajLabel + "_" + ss.str() + ".txt";
+    std::string trackStatFile = outputPath + "/" + estimatorLabel + "_" +
+                                trajLabel + "_trackstat_" + ss.str() + ".txt";
 
     double pCB_std = 2e-2;
     double ba_std = 2e-2;
@@ -756,11 +808,21 @@ void testHybridFilterSinusoid(const std::string& outputPath,
     if (cases[c].addPriorNoise)
       trNoisy = vio::gauss_rand(0, extrinsicsEstimationParameters.sigma_tr);
 
-    std::shared_ptr<okvis::HybridFilter> estimator;
-    if (FLAGS_estimator_algorithm == 2) {
-      estimator.reset(new okvis::TFVIO(mapPtr, trNoisy));
-    } else {
-      estimator.reset(new okvis::MSCKF2(mapPtr, trNoisy));
+    std::shared_ptr<okvis::Estimator> estimator;
+    switch (FLAGS_estimator_algorithm) {
+      case 0:
+        estimator.reset(new okvis::Estimator(mapPtr));
+        break;
+      case 1:
+        estimator.reset(new okvis::GeneralEstimator(mapPtr));
+        break;
+      case 5:
+        estimator.reset(new okvis::TFVIO(mapPtr, trNoisy));
+        break;
+      case 4:
+      default:
+        estimator.reset(new okvis::MSCKF2(mapPtr, trNoisy));
+        break;
     }
 
     std::vector<Eigen::Vector4d, Eigen::aligned_allocator<Eigen::Vector4d>>
@@ -768,7 +830,10 @@ void testHybridFilterSinusoid(const std::string& outputPath,
     std::vector<uint64_t> lmIds;
 
     create_landmark_grid(&homogeneousPoints, &lmIds, bVerbose ? pointFile : "");
-
+    std::vector<Eigen::Vector4d, Eigen::aligned_allocator<Eigen::Vector4d>>
+        noisyHomogeneousPoints;
+    double axisSigma = 0.1;
+    addLandmarkNoise(homogeneousPoints, &noisyHomogeneousPoints, axisSigma);
     estimator->addCamera(extrinsicsEstimationParameters);
     estimator->addImu(imuParameters);
 
@@ -813,7 +878,7 @@ void testHybridFilterSinusoid(const std::string& outputPath,
               cst->computeGlobalPose(*iter);
           Eigen::Vector3d p_WS = truePose.r();
           Eigen::Vector3d v_WS = cst->computeGlobalLinearVelocity(*iter);
-
+          pvstd.initWithExternalSource_ = true;
           pvstd.p_WS = p_WS;
           pvstd.q_WS = truePose.q();
           pvstd.v_WS = v_WS;
@@ -822,12 +887,14 @@ void testHybridFilterSinusoid(const std::string& outputPath,
             //                p_WS += 0.1*Eigen::Vector3d::Random();
             v_WS += vio::Sample::gaussian(1, 3).cwiseProduct(pvstd.std_v_WS);
           }
-          estimator->resetInitialPVandStd(pvstd, true);
+          estimator->resetInitialPVandStd(pvstd);
           estimator->addStates(mf, imuSegment, true);
 
-          ASSERT_EQ(estimator->covariance_.rows(),
-                    60 + okvis::ProjectionOptGetMinimalDim(projOptModelId))
-              << "Initial cov with one cloned state has a wrong dim";
+          if (isFilteringMethod(FLAGS_estimator_algorithm)) {
+            ASSERT_EQ(estimator->getEstimatedVariableMinimalDim(),
+                      60 + okvis::ProjectionOptGetMinimalDim(projOptModelId))
+                << "Initial cov with one cloned state has a wrong dim";
+          }
         } else {
           // use the dummy because the estimator should no longer use info of the cameraSystem
           mf->resetCameraSystemAndFrames(*cameraSystem1);
@@ -876,11 +943,23 @@ void testHybridFilterSinusoid(const std::string& outputPath,
               size_t j = lmk_indices[k];
               size_t numObs = estimator->numObservations(lmIds[j]);
               if (numObs == 0) {
-                // use dummy values to keep info secret from the estimator
-                //                  estimator->addLandmark(lmIds[j],
-                //                  homogeneousPoints[j]);
-                Eigen::Vector4d unknown = Eigen::Vector4d::Zero();
-                estimator->addLandmark(lmIds[j], unknown);
+                if (isFilteringMethod(FLAGS_estimator_algorithm)) {
+                  // use dummy values to keep info secret from the estimator
+                  Eigen::Vector4d unknown = Eigen::Vector4d::Zero();
+                  estimator->addLandmark(lmIds[j], unknown);
+                } else {
+                  Eigen::Vector2d kp{keypoints[k].pt.x, keypoints[k].pt.y};
+                  Eigen::Vector3d xy1;
+                  bool backProjOk =
+                      cameraSystem0->cameraGeometry(i)->backProject(kp, &xy1);
+                  if (backProjOk) {
+                    Eigen::Vector3d infinityGuess =
+                        (T_WS * (*(cameraSystem0->T_SC(i)))).inverse() * xy1 * 1e3;
+                    estimator->addLandmark(lmIds[j], noisyHomogeneousPoints[j]);
+                  } else {
+                    continue;
+                  }
+                }
                 estimator->addObservation<okvis::cameras::PinholeCamera<
                     okvis::cameras::RadialTangentialDistortion>>(
                     lmIds[j], mf->id(), i, k);
@@ -898,8 +977,9 @@ void testHybridFilterSinusoid(const std::string& outputPath,
           }
         }
         frameFeatureTally(trackedFeatures);
-
-        estimator->optimize(1, 1, false);
+        size_t maxIterations = 10u;
+        size_t numThreads = 2u;
+        estimator->optimize(maxIterations, numThreads, false);
         okvis::Optimization sharedOptConfig = initOptimizationConfig();
         estimator->setKeyframeRedundancyThresholds(
             sharedOptConfig.translationThreshold,
@@ -907,8 +987,14 @@ void testHybridFilterSinusoid(const std::string& outputPath,
             sharedOptConfig.trackingRateThreshold,
             sharedOptConfig.minTrackLength);
         okvis::MapPointVector removedLandmarks;
-        estimator->applyMarginalizationStrategy(5, 25, removedLandmarks);
+        size_t numKeyFrames = 5u;
+        size_t numImuFrames = 3u;
+        if (isFilteringMethod(FLAGS_estimator_algorithm)) {
+          numImuFrames = 20u;
+        }
+        estimator->applyMarginalizationStrategy(numKeyFrames, numImuFrames, removedLandmarks);
         estimator->print(debugStream);
+        debugStream << std::endl;
 
         Eigen::Vector3d v_WS_true = cst->computeGlobalLinearVelocity(*iter);
         if (bVerbose) {
@@ -933,8 +1019,10 @@ void testHybridFilterSinusoid(const std::string& outputPath,
 
         Eigen::Vector3d normalizedError;
         Eigen::VectorXd rmsError;
-        compute_errors(estimator.get(), T_WS, v_WS_true, trueBiasIter->measurement,
-                       cameraGeometry0, projOptModelId, &normalizedError, &rmsError);
+        if (isFilteringMethod(FLAGS_estimator_algorithm)) {
+          computeErrors(estimator.get(), T_WS, v_WS_true, trueBiasIter->measurement,
+                         cameraGeometry0, projOptModelId, &normalizedError, &rmsError);
+        }
         nees.push_back(std::make_pair(*iter, normalizedError));
         rmse.push_back(std::make_pair(*iter, rmsError));
         lastKFTime = currentKFTime;
@@ -949,8 +1037,10 @@ void testHybridFilterSinusoid(const std::string& outputPath,
           rmseSum[jack].second += rmse[jack].second;
         }
       }
-      check_tail_mse(rmse.back().second, projOptModelId);
-      check_tail_nees(nees.back().second);
+      if (isFilteringMethod(FLAGS_estimator_algorithm)) {
+        check_tail_mse(rmse.back().second, projOptModelId);
+        check_tail_nees(nees.back().second);
+      }
 
       LOG(INFO) << "Run " << run << " finishes with last added frame " << k
                 << " of tracked features " << trackedFeatures << std::endl;
@@ -1011,70 +1101,84 @@ void testHybridFilterSinusoid(const std::string& outputPath,
 // FLAGS_log_dir can be passed in commandline as --log_dir=/some/log/dir
 TEST(FILTER, MSCKF_BALL) {
   int32_t old_algorithm = FLAGS_estimator_algorithm;
-  FLAGS_estimator_algorithm = 1;
+  FLAGS_estimator_algorithm = 4;
   testHybridFilterSinusoid(FLAGS_log_dir, 5, 1);
   FLAGS_estimator_algorithm = old_algorithm;
 }
 
 TEST(FILTER, PAVIO_BALL) {
   int32_t old_algorithm = FLAGS_estimator_algorithm;
-  FLAGS_estimator_algorithm = 2;
+  FLAGS_estimator_algorithm = 5;
   testHybridFilterSinusoid(FLAGS_log_dir, 5, 1);
   FLAGS_estimator_algorithm = old_algorithm;
 }
 
 TEST(FILTER, MSCKF_TORUS) {
   int32_t old_algorithm = FLAGS_estimator_algorithm;
-  FLAGS_estimator_algorithm = 1;
+  FLAGS_estimator_algorithm = 4;
   testHybridFilterSinusoid(FLAGS_log_dir, 5, 0);
   FLAGS_estimator_algorithm = old_algorithm;
 }
 
 TEST(FILTER, PAVIO_TORUS) {
   int32_t old_algorithm = FLAGS_estimator_algorithm;
-  FLAGS_estimator_algorithm = 2;
+  FLAGS_estimator_algorithm = 5;
   testHybridFilterSinusoid(FLAGS_log_dir, 5, 0);
   FLAGS_estimator_algorithm = old_algorithm;
 }
 
 TEST(FILTER, MSCKF_SQUIRCLE) {
   int32_t old_algorithm = FLAGS_estimator_algorithm;
-  FLAGS_estimator_algorithm = 1;
+  FLAGS_estimator_algorithm = 4;
   testHybridFilterSinusoid(FLAGS_log_dir, 5, 2);
   FLAGS_estimator_algorithm = old_algorithm;
 }
 
 TEST(FILTER, PAVIO_SQUIRCLE) {
   int32_t old_algorithm = FLAGS_estimator_algorithm;
-  FLAGS_estimator_algorithm = 2;
+  FLAGS_estimator_algorithm = 5;
   testHybridFilterSinusoid(FLAGS_log_dir, 5, 2);
   FLAGS_estimator_algorithm = old_algorithm;
 }
 
 TEST(FILTER, MSCKF_CIRCLE) {
   int32_t old_algorithm = FLAGS_estimator_algorithm;
-  FLAGS_estimator_algorithm = 1;
+  FLAGS_estimator_algorithm = 4;
   testHybridFilterSinusoid(FLAGS_log_dir, 5, 3);
+  FLAGS_estimator_algorithm = old_algorithm;
+}
+
+TEST(FILTER, OKVIS_CIRCLE) {
+  int32_t old_algorithm = FLAGS_estimator_algorithm;
+  FLAGS_estimator_algorithm = 0;
+  testHybridFilterSinusoid(FLAGS_log_dir, 5, 3);
+  FLAGS_estimator_algorithm = old_algorithm;
+}
+
+TEST(FILTER, OKVIS_BALL) {
+  int32_t old_algorithm = FLAGS_estimator_algorithm;
+  FLAGS_estimator_algorithm = 0;
+  testHybridFilterSinusoid(FLAGS_log_dir, 5, 1);
   FLAGS_estimator_algorithm = old_algorithm;
 }
 
 TEST(FILTER, PAVIO_CIRCLE) {
   int32_t old_algorithm = FLAGS_estimator_algorithm;
-  FLAGS_estimator_algorithm = 2;
+  FLAGS_estimator_algorithm = 5;
   testHybridFilterSinusoid(FLAGS_log_dir, 5, 3);
   FLAGS_estimator_algorithm = old_algorithm;
 }
 
 TEST(FILTER, MSCKF_DOT) {
   int32_t old_algorithm = FLAGS_estimator_algorithm;
-  FLAGS_estimator_algorithm = 1;
+  FLAGS_estimator_algorithm = 4;
   testHybridFilterSinusoid(FLAGS_log_dir, 5, 4);
   FLAGS_estimator_algorithm = old_algorithm;
 }
 
 TEST(FILTER, PAVIO_DOT) {
   int32_t old_algorithm = FLAGS_estimator_algorithm;
-  FLAGS_estimator_algorithm = 2;
+  FLAGS_estimator_algorithm = 5;
   testHybridFilterSinusoid(FLAGS_log_dir, 5, 4);
   FLAGS_estimator_algorithm = old_algorithm;
 }
