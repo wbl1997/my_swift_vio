@@ -74,7 +74,7 @@ msckf_index_server = Msckf2Constants(misalignment_dim, extrinsic_dim, ...
     project_intrinsic_dim, distort_intrinsic_dim);
 
 fontsize = 18;
-msckf_estimates = dlmread(filename, ',', 1, 0);
+msckf_estimates = readmatrix(filename, 'NumHeaderLines', 1);
 data = msckf_estimates;
 original_data = data;
 startTime = data(1, 1);
@@ -160,7 +160,7 @@ if(~isempty(gt))
 end
 
 if (cmp_data_file)
-    cmp_data = dlmread(cmp_data_file, ' ', 3, 0);
+    cmp_data = readmatrix(cmp_data_file, 'NumHeaderLines', 1);
     plot3(cmp_data(:, 4), cmp_data(:, 5), cmp_data(:, 6), '-g');
     legend_list{end+1} = 'okvis';
 end

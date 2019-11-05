@@ -328,17 +328,6 @@ struct TestSetting {
   }
 };
 
-/**
- * @brief addImuNoise
- * @param imuParameters
- * @param imuMeasurements as input original perfect imu measurement,
- *     as output imu measurements with added bias and noise
- * @param trueBiases output added biases
- * @param inertialStream
- */
-void addImuNoise(const okvis::ImuParameters& imuParameters,
-                 okvis::ImuMeasurementDeque* imuMeasurements,
-                 okvis::ImuMeasurementDeque* trueBiases,
-                 std::ofstream* inertialStream);
+
 } // namespace imu
 #endif

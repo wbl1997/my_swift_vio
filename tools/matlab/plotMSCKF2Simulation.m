@@ -1,11 +1,24 @@
-%usage: matlab
+% OBSOLETE
 
 close all;
-addpath('C:\JianzhuHuai\GPS_IMU\programs\matlab_ws\voicebox');
-addpath('C:\JianzhuHuai\GPS_IMU\programs\matlab_ws\instk');
-path = 'G:/temp';
-outputPath = 'G:/temp';
-filename= [path, '/sinusoidMSCKF2_590.txt'];
+if ~exist('export_fig_path','var')
+    export_fig_path = input('path of export_fig:', 's');
+end
+if isempty(export_fig_path)
+    export_fig_path = '/media/jhuai/Seagate/jhuai/export_fig/';
+end
+if ~exist('voicebox_path','var')
+    voicebox_path = input('path of voicebox:', 's');
+end
+if isempty(voicebox_path)
+    voicebox_path = '/media/jhuai/Seagate/jhuai/doctoral_work/ekfmonoslam/voicebox';
+end
+addpath(export_fig_path);
+addpath(voicebox_path);
+
+path = '/home/jhuai/Desktop/temp';
+outputPath = path;
+filename= [path, '/TFVIO_Squircle_0.txt'];
 data = load(filename);
 finishTime = 400;
 data(:,1)= data(:,1)- data(1,1);
@@ -16,11 +29,11 @@ end
 data = data(1:index,:);
 
 % ground truth file must have the same number of rows as output data
-gt = load([path, '/sinusoidTruth.txt']);
+gt = load([path, '/Squircle.txt']);
 gt = gt(1:index, :);
 
 gtPoints =[];
-gtPoints = load([path, '/sinusoidPoints.txt']);
+gtPoints = load([path, '/Points.txt']);
 %indices=find(abs(gtPoints(:, 4))<2.3);
 %gtPoints= gtPoints(indices, :);
 

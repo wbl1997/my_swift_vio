@@ -374,59 +374,6 @@ SphereTrajectory::computeGlobalPose(const okvis::Time time) {
           Eigen::AngleAxisd(thetaZ, Eigen::Vector3d::UnitY()));
 }
 
-void addImuNoise(const okvis::ImuParameters& imuParameters,
-                 okvis::ImuMeasurementDeque* imuMeasurements,
-                 okvis::ImuMeasurementDeque* trueBiases,
-                 std::ofstream* inertialStream) {
-  // multiply the accelerometer and gyro scope noise root PSD by this
-  // reduction factor in generating noise to account for linearization
-  // uncertainty in optimization.
-  // As a result, the std for noises used in covariance propagation is slightly
-  // larger than the std used in sampling noises. This is necessary
-  // because the process model involves many approximations other than these noise terms.
-  double imuNoiseFactor = 0.5;
-  *trueBiases = (*imuMeasurements);
-  Eigen::Vector3d bgk = Eigen::Vector3d::Zero();
-  Eigen::Vector3d bak = Eigen::Vector3d::Zero();
-
-  for (size_t i = 0; i < imuMeasurements->size(); ++i) {
-    if (inertialStream) {
-      Eigen::Vector3d porterGyro = imuMeasurements->at(i).measurement.gyroscopes;
-      Eigen::Vector3d porterAcc = imuMeasurements->at(i).measurement.accelerometers;
-      (*inertialStream) << imuMeasurements->at(i).timeStamp << " " << porterGyro[0]
-                        << " " << porterGyro[1] << " " << porterGyro[2] << " "
-                        << porterAcc[0] << " " << porterAcc[1] << " "
-                        << porterAcc[2];
-    }
-
-    trueBiases->at(i).measurement.gyroscopes = bgk;
-    trueBiases->at(i).measurement.accelerometers = bak;
-
-    double sqrtRate = std::sqrt(imuParameters.rate);
-    double sqrtDeltaT = 1 / sqrtRate;
-    // eq 50, Oliver Woodman, An introduction to inertial navigation
-    imuMeasurements->at(i).measurement.gyroscopes +=
-        (bgk +
-         vio::Sample::gaussian(imuParameters.sigma_g_c * sqrtRate * imuNoiseFactor,
-                               3));
-    imuMeasurements->at(i).measurement.accelerometers +=
-        (bak +
-         vio::Sample::gaussian(imuParameters.sigma_a_c * sqrtRate * imuNoiseFactor,
-                               3));
-    // eq 51, Oliver Woodman, An introduction to inertial navigation,
-    // we do not divide sqrtDeltaT by sqrtT because sigma_gw_c is bias white noise density
-    // whereas eq 51 uses bias instability having the same unit as the IMU measurements
-    bgk += vio::Sample::gaussian(imuParameters.sigma_gw_c * sqrtDeltaT, 3);
-    bak += vio::Sample::gaussian(imuParameters.sigma_aw_c * sqrtDeltaT, 3);
-    if (inertialStream) {
-      Eigen::Vector3d porterGyro = imuMeasurements->at(i).measurement.gyroscopes;
-      Eigen::Vector3d porterAcc = imuMeasurements->at(i).measurement.accelerometers;
-      (*inertialStream) << " " << porterGyro[0] << " " << porterGyro[1] << " "
-                        << porterGyro[2] << " " << porterAcc[0] << " "
-                        << porterAcc[1] << " " << porterAcc[2] << std::endl;
-    }
-  }
-}
 
 RoundedSquare::RoundedSquare()
     : CircularSinusoidalTrajectory(),
