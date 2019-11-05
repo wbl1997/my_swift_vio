@@ -1236,7 +1236,7 @@ void testHybridFilterSinusoid(const std::string& outputPath,
 #endif
 
 TEST(MSCKF, Ball)
-TEST_ALGO_TRAJ(MSCKF, BALL, 5, 0)
+TEST_ALGO_TRAJ(MSCKF, Ball, 5, 0)
 
 TEST(OKVIS, Ball)
 TEST_ALGO_TRAJ(OKVIS, Ball, 5, 0)
