@@ -6,7 +6,7 @@
 namespace okvis {
 template <class CAMERA_GEOMETRY_T>
 void loadParameters(const std::shared_ptr<okvis::MultiFrame> multiframe,
-                    const okvis::HybridFilter& estimator,
+                    const okvis::Estimator& estimator,
                     feature_tracker::FeatureTracker* feature_tracker) {
   // Camera calibration parameters
   // TODO(jhuai): modify here along with functions in feature_tracker.cpp
@@ -93,7 +93,7 @@ template <class CAMERA_GEOMETRY_T>
 int addConstraintToEstimator(
     const std::vector<feature_tracker::FeatureIDType>& curr_ids,
     std::shared_ptr<okvis::MultiFrame> framesInOut,
-    okvis::HybridFilter& estimator) {
+    okvis::Estimator& estimator) {
   uint64_t fIdB = framesInOut->id();
   okvis::kinematics::Transformation T_WSb;
   // T_WS is available because addStates precedes dataAssociationAndInitialization

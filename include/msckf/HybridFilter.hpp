@@ -97,34 +97,6 @@ class HybridFilter : public Estimator {
                          const okvis::ImuMeasurementDeque &imuMeasurements,
                          bool asKeyframe);
 
-  /**
-   * @brief for a landmark, remove its existing epipolar constraints,
-   *     add its observations as reprojection errors,
-   *     assuming no reprojection errors for the landmark have been added before.
-   *     thread unsafe, call it when the estimator is protected by the estimator_mutex_.
-   * @param lmId ID of landmark.
-   */
-  template <class GEOMETRY_TYPE>
-  bool replaceEpipolarWithReprojectionErrors(uint64_t lmId);
-
-  /**
-   * @brief for a landmark, add its current first and last observations
-   *     as an epipolar constraint.
-   *     thread unsafe, call it when the estimator is protected by the estimator_mutex_.
-   * @param lmId ID of landmark.
-   * @param removeExisting remove existing epipolar constraints for this landmark.
-   */
-  template <class GEOMETRY_TYPE>
-  bool addEpipolarConstraint(
-      uint64_t lmId, bool removeExisting=false);
-
-  /**
-   * @brief Add an observation to a landmark without adding
-   *    residual to the ceres solver
-   */
-  bool addLandmarkObservation(uint64_t landmarkId, uint64_t poseId,
-                              size_t camIdx, size_t keypointIdx);
-
 
   /**
    * @brief Applies the dropping/marginalization strategy according to the
@@ -408,8 +380,7 @@ class HybridFilter : public Estimator {
   static const size_t maxTrackLength_ = 12;
   // i.e., max cloned states in the cov matrix
 
-  size_t minTrackLength_;
-  // i.e., min observs to triang a landmark for the monocular case
+
 
   std::vector<size_t>
       mTrackLengthAccumulator;  // histogram of the track lengths, start from
@@ -450,7 +421,5 @@ void obsDirectionJacobian(
     Eigen::Matrix3d* cov_fj);
 
 }  // namespace okvis
-
-#include "implementation/HybridFilter.hpp"
 
 #endif /* INCLUDE_OKVIS_HYBRID_FILTER_HPP_ */

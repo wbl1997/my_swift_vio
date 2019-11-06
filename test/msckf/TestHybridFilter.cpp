@@ -18,15 +18,15 @@
 #include <okvis/ceres/ReprojectionError.hpp>
 #include <okvis/ceres/SpeedAndBiasError.hpp>
 #include <okvis/ceres/SpeedAndBiasParameterBlock.hpp>
+
 #include <msckf/EuclideanParamBlock.hpp>
-
 #include <msckf/GeneralEstimator.hpp>
-#include <msckf/MSCKF2.hpp>
-#include <msckf/TFVIO.hpp>
-
 #include "msckf/ImuOdometry.h"
 #include "msckf/ImuSimulator.h"
+#include <msckf/MSCKF2.hpp>
 #include "msckf/ProjParamOptModels.hpp"
+#include <msckf/SimulationFrontend.hpp>
+#include <msckf/TFVIO.hpp>
 
 #include <boost/accumulators/accumulators.hpp>
 #include <boost/accumulators/statistics/density.hpp>
@@ -235,107 +235,6 @@ void addImuNoise(const okvis::ImuParameters& imuParameters,
   }
 }
 
-void create_landmark_grid(
-    std::vector<Eigen::Vector4d, Eigen::aligned_allocator<Eigen::Vector4d>>
-        *homogeneousPoints,
-    std::vector<uint64_t> *lmIds, std::string pointFile = "") {
-  //        const double xyLimit = 10, zLimit = 5,
-  //            xyzIncrement = 0.5, offsetNoiseMag = 0.1;
-  //        const double xyLimit = 5, zLimit = 2.5,
-  //            xyzIncrement = 0.25, offsetNoiseMag = 0.05;
-  const double xyLimit = 5, zLimit = 2.5, xyzIncrement = 0.5,
-               offsetNoiseMag = 0.05;
-  // four walls
-  double x(xyLimit), y(xyLimit), z(zLimit);
-  for (y = -xyLimit; y <= xyLimit; y += xyzIncrement) {
-    for (z = -zLimit; z <= zLimit; z += xyzIncrement) {
-      homogeneousPoints->push_back(
-          Eigen::Vector4d(x + vio::gauss_rand(0, offsetNoiseMag),
-                          y + vio::gauss_rand(0, offsetNoiseMag),
-                          z + vio::gauss_rand(0, offsetNoiseMag), 1));
-      lmIds->push_back(okvis::IdProvider::instance().newId());
-    }
-  }
-
-  for (y = -xyLimit; y <= xyLimit; y += xyzIncrement) {
-    for (z = -zLimit; z <= zLimit; z += xyzIncrement) {
-      homogeneousPoints->push_back(
-          Eigen::Vector4d(y + vio::gauss_rand(0, offsetNoiseMag),
-                          x + vio::gauss_rand(0, offsetNoiseMag),
-                          z + vio::gauss_rand(0, offsetNoiseMag), 1));
-      lmIds->push_back(okvis::IdProvider::instance().newId());
-    }
-  }
-
-  x = -xyLimit;
-  for (y = -xyLimit; y <= xyLimit; y += xyzIncrement) {
-    for (z = -zLimit; z <= zLimit; z += xyzIncrement) {
-      homogeneousPoints->push_back(
-          Eigen::Vector4d(x + vio::gauss_rand(0, offsetNoiseMag),
-                          y + vio::gauss_rand(0, offsetNoiseMag),
-                          z + vio::gauss_rand(0, offsetNoiseMag), 1));
-      lmIds->push_back(okvis::IdProvider::instance().newId());
-    }
-  }
-
-  for (y = -xyLimit; y <= xyLimit; y += xyzIncrement) {
-    for (z = -zLimit; z <= zLimit; z += xyzIncrement) {
-      homogeneousPoints->push_back(
-          Eigen::Vector4d(y + vio::gauss_rand(0, offsetNoiseMag),
-                          x + vio::gauss_rand(0, offsetNoiseMag),
-                          z + vio::gauss_rand(0, offsetNoiseMag), 1));
-      lmIds->push_back(okvis::IdProvider::instance().newId());
-    }
-  }
-//  // top
-//  z = zLimit;
-//  for (y = -xyLimit; y <= xyLimit; y += xyzIncrement) {
-//    for (x = -xyLimit; x <= xyLimit; x += xyzIncrement) {
-//      homogeneousPoints->push_back(
-//          Eigen::Vector4d(x + vio::gauss_rand(0, offsetNoiseMag),
-//                          y + vio::gauss_rand(0, offsetNoiseMag),
-//                          z + vio::gauss_rand(0, offsetNoiseMag), 1));
-//      lmIds->push_back(okvis::IdProvider::instance().newId());
-//    }
-//  }
-//  // bottom
-//  z = -zLimit;
-//  for (y = -xyLimit; y <= xyLimit; y += xyzIncrement) {
-//    for (x = -xyLimit; x <= xyLimit; x += xyzIncrement) {
-//      homogeneousPoints->push_back(
-//          Eigen::Vector4d(x + vio::gauss_rand(0, offsetNoiseMag),
-//                          y + vio::gauss_rand(0, offsetNoiseMag),
-//                          z + vio::gauss_rand(0, offsetNoiseMag), 1));
-//      lmIds->push_back(okvis::IdProvider::instance().newId());
-//    }
-//  }
-
-  // save these points into file
-  if (pointFile.size()) {
-    std::ofstream pointStream(pointFile, std::ofstream::out);
-    pointStream << "%id, x, y, z in the world frame " << std::endl;
-    auto iter = homogeneousPoints->begin();
-    for (auto it = lmIds->begin(); it != lmIds->end(); ++it, ++iter)
-      pointStream << *it << " " << (*iter)[0] << " " << (*iter)[1] << " "
-                  << (*iter)[2] << std::endl;
-    pointStream.close();
-    assert(iter == homogeneousPoints->end());
-  }
-}
-
-void addLandmarkNoise(
-    const std::vector<Eigen::Vector4d,
-                      Eigen::aligned_allocator<Eigen::Vector4d>>&
-        homogeneousPoints,
-    std::vector<Eigen::Vector4d, Eigen::aligned_allocator<Eigen::Vector4d>>*
-        noisyHomogeneousPoints,
-    double axisSigma = 0.1) {
-  *noisyHomogeneousPoints = homogeneousPoints;
-  for (auto iter = noisyHomogeneousPoints->begin();
-       iter != noisyHomogeneousPoints->end(); ++iter) {
-    iter->head<3>() = iter->head<3>() + Eigen::Vector3d::Random() * axisSigma;
-  }
-}
 
 typedef boost::iterator_range<std::vector<std::pair<double, double>>::iterator>
     HistogramType;
@@ -682,10 +581,6 @@ okvis::Optimization initOptimizationConfig() {
   return optConfig;
 }
 
-bool isFilteringMethod(int algorithmId) {
-  return algorithmId >= 4;
-}
-
 std::map<int, std::string> estimatorIdToLabel{
   {0, "OKVIS"},
   {1, "Generic"},
@@ -728,8 +623,6 @@ void testHybridFilterSinusoid(const std::string& outputPath,
                               const int cameraOrientation=0) {
   const double DURATION = 300.0;     // length of motion in seconds
 
-  const double maxTrackLength = 60;  // maximum length of a feature track
-  double imageNoiseMag = 1.0;        // pixel unit
 
   // definition of NEES in Huang et al. 2007 Generalized Analysis and
   // Improvement of the consistency of EKF-based SLAM
@@ -944,15 +837,11 @@ void testHybridFilterSinusoid(const std::string& outputPath,
         break;
     }
 
-    std::vector<Eigen::Vector4d, Eigen::aligned_allocator<Eigen::Vector4d>>
-        homogeneousPoints;
-    std::vector<uint64_t> lmIds;
+    okvis::SimulationFrontend frontend(cameraSystem0->numCameras(),
+                                       cases[c].addImageNoise,
+                                       60,
+                                       bVerbose ? pointFile : "");
 
-    create_landmark_grid(&homogeneousPoints, &lmIds, bVerbose ? pointFile : "");
-    std::vector<Eigen::Vector4d, Eigen::aligned_allocator<Eigen::Vector4d>>
-        noisyHomogeneousPoints;
-    double axisSigma = 0.1;
-    addLandmarkNoise(homogeneousPoints, &noisyHomogeneousPoints, axisSigma);
     estimator->addCamera(extrinsicsEstimationParameters);
     estimator->addImu(imuParameters);
 
@@ -960,7 +849,7 @@ void testHybridFilterSinusoid(const std::string& outputPath,
 
     size_t kale = 0;  // imu data counter
     bool bStarted = false;
-    int k = -1;               // number of frames used in estimator
+    int frameCount = -1;               // number of frames used in estimator
     int trackedFeatures = 0;  // feature tracks observed in a frame
     const int cameraIntervalRatio = 10; // number imu meas for 1 camera frame
     okvis::Time lastKFTime = times.front();
@@ -987,11 +876,11 @@ void testHybridFilterSinusoid(const std::string& outputPath,
         okvis::Time imuDataBeginTime = lastKFTime - okvis::Duration(1);
         okvis::ImuMeasurementDeque imuSegment = okvis::getImuMeasurements(
             imuDataBeginTime, imuDataEndTime, imuMeasurements, nullptr);
-
+        bool asKeyframe = true;
         // add it in the window to create a new time instance
         if (bStarted == false) {
           bStarted = true;
-          k = 0;
+          frameCount = 0;
           mf->resetCameraSystemAndFrames(*cameraSystem2);
           okvis::kinematics::Transformation truePose =
               cst->computeGlobalPose(*iter);
@@ -1007,9 +896,9 @@ void testHybridFilterSinusoid(const std::string& outputPath,
             v_WS += vio::Sample::gaussian(1, 3).cwiseProduct(pvstd.std_v_WS);
           }
           estimator->resetInitialPVandStd(pvstd);
-          estimator->addStates(mf, imuSegment, true);
+          estimator->addStates(mf, imuSegment, asKeyframe);
 
-          if (isFilteringMethod(FLAGS_estimator_algorithm)) {
+          if (okvis::isFilteringMethod(FLAGS_estimator_algorithm)) {
             ASSERT_EQ(estimator->getEstimatedVariableMinimalDim(),
                       57 +
                           okvis::ExtrinsicModelGetMinimalDim(extrinsicModelId) +
@@ -1019,85 +908,16 @@ void testHybridFilterSinusoid(const std::string& outputPath,
         } else {
           // use the dummy because the estimator should no longer use info of the cameraSystem
           mf->resetCameraSystemAndFrames(*cameraSystem1);
-          estimator->addStates(mf, imuSegment, true);
-          ++k;
+          estimator->addStates(mf, imuSegment, asKeyframe);
+          ++frameCount;
         }
 
         // add landmark observations
         trackedFeatures = 0;
         if (cases[c].useImageObservs) {
-          size_t numFrames = mf->numFrames();
-          std::vector<std::vector<size_t>> frame_landmark_index;
-          std::vector<std::vector<cv::KeyPoint>> frame_keypoints;
-          // project landmarks onto frames of mf
-          for (size_t i = 0; i < mf->numFrames(); ++i) {
-            std::vector<size_t> lmk_indices;
-            std::vector<cv::KeyPoint> keypoints;
-            for (size_t j = 0; j < homogeneousPoints.size(); ++j) {
-              Eigen::Vector2d projection;
-              Eigen::Vector4d point_C = cameraSystem0->T_SC(i)->inverse() *
-                                        T_WS.inverse() * homogeneousPoints[j];
-              okvis::cameras::CameraBase::ProjectionStatus status =
-                  cameraSystem0->cameraGeometry(i)->projectHomogeneous(
-                      point_C, &projection);
-              if (status ==
-                  okvis::cameras::CameraBase::ProjectionStatus::Successful) {
-                Eigen::Vector2d measurement(projection);
-                if (cases[c].addImageNoise) {
-                  measurement[0] += vio::gauss_rand(0, imageNoiseMag);
-                  measurement[1] += vio::gauss_rand(0, imageNoiseMag);
-                }
-                keypoints.emplace_back(measurement[0], measurement[1], 8.0);
-                lmk_indices.emplace_back(j);
-              }
-            }
-            frame_landmark_index.emplace_back(lmk_indices);
-            frame_keypoints.emplace_back(keypoints);
-            mf->resetKeypoints(i, keypoints);
-          }
-
-          // add landmark observations in the mf to the estimator
-          for (size_t i = 0; i < numFrames; ++i) {
-            const std::vector<size_t>& lmk_indices = frame_landmark_index[i];
-            const std::vector<cv::KeyPoint>& keypoints = frame_keypoints[i];
-            for (size_t k = 0; k < keypoints.size(); ++k) {
-              size_t j = lmk_indices[k];
-              size_t numObs = estimator->numObservations(lmIds[j]);
-              if (numObs == 0) {
-                if (isFilteringMethod(FLAGS_estimator_algorithm)) {
-                  // use dummy values to keep info secret from the estimator
-                  Eigen::Vector4d unknown = Eigen::Vector4d::Zero();
-                  estimator->addLandmark(lmIds[j], unknown);
-                } else {
-                    // TODO(jhuai): use more sophisticated schemes to simulate frontend
-//                  Eigen::Vector2d kp{keypoints[k].pt.x, keypoints[k].pt.y};
-//                  Eigen::Vector3d xy1;
-//                  bool backProjOk =
-//                      cameraSystem0->cameraGeometry(i)->backProject(kp, &xy1);
-//                  if (backProjOk) {
-//                    Eigen::Vector3d infinityGuess =
-//                        (T_WS * (*(cameraSystem0->T_SC(i)))).inverse() * xy1 * 1e3;
-//                    estimator->addLandmark(lmIds[j], noisyHomogeneousPoints[j]);
-//                  } else {
-//                    continue;
-//                  }
-                  estimator->addLandmark(lmIds[j], homogeneousPoints[j]);
-                }
-                estimator->addObservation<okvis::cameras::PinholeCamera<
-                    okvis::cameras::RadialTangentialDistortion>>(
-                    lmIds[j], mf->id(), i, k);
-                ++trackedFeatures;
-              } else {
-                double sam = vio::Sample::uniform();
-                if (sam > numObs / maxTrackLength) {
-                  estimator->addObservation<okvis::cameras::PinholeCamera<
-                      okvis::cameras::RadialTangentialDistortion>>(
-                      lmIds[j], mf->id(), i, k);
-                  ++trackedFeatures;
-                }
-              }
-            }
-          }
+          trackedFeatures = frontend.dataAssociationAndInitialization(
+              *estimator, T_WS, cameraSystem0, mf, &asKeyframe);
+          estimator->setKeyframe(mf->id(), asKeyframe);
         }
         frameFeatureTally(trackedFeatures);
         size_t maxIterations = 10u;
@@ -1112,7 +932,7 @@ void testHybridFilterSinusoid(const std::string& outputPath,
         okvis::MapPointVector removedLandmarks;
         size_t numKeyFrames = 5u;
         size_t numImuFrames = 3u;
-        if (isFilteringMethod(FLAGS_estimator_algorithm)) {
+        if (okvis::isFilteringMethod(FLAGS_estimator_algorithm)) {
           numImuFrames = 20u;
         }
         estimator->applyMarginalizationStrategy(numKeyFrames, numImuFrames, removedLandmarks);
@@ -1142,7 +962,7 @@ void testHybridFilterSinusoid(const std::string& outputPath,
 
         Eigen::Vector3d normalizedError;
         Eigen::VectorXd rmsError;
-        if (isFilteringMethod(FLAGS_estimator_algorithm)) {
+        if (okvis::isFilteringMethod(FLAGS_estimator_algorithm)) {
           computeErrors(estimator.get(), T_WS, v_WS_true, trueBiasIter->measurement,
                          cameraGeometry0, projOptModelId, &normalizedError, &rmsError);
         }
@@ -1160,12 +980,12 @@ void testHybridFilterSinusoid(const std::string& outputPath,
           rmseSum[jack].second += rmse[jack].second;
         }
       }
-      if (isFilteringMethod(FLAGS_estimator_algorithm)) {
+      if (okvis::isFilteringMethod(FLAGS_estimator_algorithm)) {
         check_tail_mse(rmse.back().second, projOptModelId);
         check_tail_nees(nees.back().second);
       }
 
-      LOG(INFO) << "Run " << run << " finishes with last added frame " << k
+      LOG(INFO) << "Run " << run << " finishes with last added frame " << frameCount
                 << " of tracked features " << trackedFeatures << std::endl;
 
       // output track length distribution
@@ -1179,7 +999,7 @@ void testHybridFilterSinusoid(const std::string& outputPath,
       ++successRuns;
     } catch (std::exception &e) {
       if (truthStream.is_open()) truthStream.close();
-      LOG(INFO) << "Run and last added frame " << run << " " << k << " "
+      LOG(INFO) << "Run and last added frame " << run << " " << frameCount << " "
                 << e.what();
       // revert the accumulated errors and delete the corresponding file
       if (debugStream.is_open()) debugStream.close();

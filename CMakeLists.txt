@@ -91,32 +91,35 @@ add_definitions(-fPIC -march=native -Wextra -Winit-self -Woverloaded-virtual
                 -Wnon-virtual-dtor -Wsign-promo -Wno-long-long -std=c++0x)
 
 LIST(APPEND SOURCEFILES
-    src/io_wrap/Subscriber.cpp
+    src/feature_tracker/feature_tracker.cpp
+
     src/io_wrap/Player.cpp
+    src/io_wrap/PoseViewer.cpp
     src/io_wrap/Publisher.cpp
     src/io_wrap/RosParametersReader.cpp
-    src/io_wrap/PoseViewer.cpp
     src/io_wrap/StreamHelper.cpp
+    src/io_wrap/Subscriber.cpp
+
     src/okvis/ceres/CameraTimeParamBlock.cpp
 
     src/msckf/BoundedImuDeque.cpp
     src/msckf/FilterHelper.cpp
-    src/msckf/ImuOdometry.cpp
-    src/msckf/HybridVio.cpp
+    src/msckf/HybridFilter.cpp
+    src/msckf/HybridFrameNoncentralAbsoluteAdapter.cpp
+    src/msckf/HybridFrameRelativeAdapter.cpp
     src/msckf/HybridFrontend.cpp
+    src/msckf/HybridVio.cpp
+    src/msckf/ImuOdometry.cpp
+    src/msckf/ImuSimulator.cpp
+    src/msckf/MSCKF2.cpp
+    src/msckf/PreconditionedEkfUpdater.cpp
+    src/msckf/SimulationFrontend.cpp
+    src/msckf/TFVIO.cpp
+    src/msckf/TwoViewPair.cpp
+    src/msckf/VioFrameMatchingAlgorithm.cpp
     src/msckf/triangulate.cpp
     src/msckf/triangulateFast.cpp
-    src/msckf/VioFrameMatchingAlgorithm.cpp
-    src/msckf/HybridFrameRelativeAdapter.cpp
-    src/msckf/HybridFrameNoncentralAbsoluteAdapter.cpp
-    src/msckf/ImuSimulator.cpp
-    src/msckf/PreconditionedEkfUpdater.cpp
-    src/msckf/HybridFilter.cpp
-    src/msckf/MSCKF2.cpp
-    src/msckf/TwoViewPair.cpp
-    src/msckf/TFVIO.cpp
 
-    src/feature_tracker/feature_tracker.cpp
 )
 
 add_library(${PROJECT_NAME} STATIC
