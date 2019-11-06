@@ -906,8 +906,9 @@ void testHybridFilterSinusoid(const std::string& outputPath,
                 << "Initial cov with one cloned state has a wrong dim";
           }
         } else {
-          // use the dummy because the estimator should no longer use info of the cameraSystem
-          mf->resetCameraSystemAndFrames(*cameraSystem1);
+          // the cameraSystem will be used for triangulating landmarks in
+          // the frontend which add observations to the estimator
+          mf->resetCameraSystemAndFrames(*cameraSystem0);
           estimator->addStates(mf, imuSegment, asKeyframe);
           ++frameCount;
         }
