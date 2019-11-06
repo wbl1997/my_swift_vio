@@ -583,7 +583,7 @@ okvis::Optimization initOptimizationConfig() {
 
 std::map<int, std::string> estimatorIdToLabel{
   {0, "OKVIS"},
-  {1, "Generic"},
+  {1, "General"},
   {2, "PAVIO"},
   {4, "MSCKF"},
   {5, "TFVIO"},
@@ -592,7 +592,7 @@ std::map<int, std::string> estimatorIdToLabel{
 
 std::map<std::string, int> estimatorLabelToId{
   {"OKVIS", 0},
-  {"Generic", 1},
+  {"General", 1},
   {"PAVIO", 2},
   {"MSCKF", 4},
   {"TFVIO", 5},
@@ -607,6 +607,10 @@ std::map<std::string, int> trajectoryLabelToId{
     {"Torus", 0},  {"Ball", 1}, {"Squircle", 2},
     {"Circle", 3}, {"Dot", 4},  {"Uncanny", 5},
 };
+
+inline bool isFilteringMethod(int algorithmId) {
+  return algorithmId >= 4;
+}
 
 /**
  * @brief testHybridFilterSinusoid
@@ -826,6 +830,7 @@ void testHybridFilterSinusoid(const std::string& outputPath,
         estimator.reset(new okvis::Estimator(mapPtr));
         break;
       case 1:
+      case 2:
         estimator.reset(new okvis::GeneralEstimator(mapPtr));
         break;
       case 5:
@@ -898,7 +903,7 @@ void testHybridFilterSinusoid(const std::string& outputPath,
           estimator->resetInitialPVandStd(pvstd);
           estimator->addStates(mf, imuSegment, asKeyframe);
 
-          if (okvis::isFilteringMethod(FLAGS_estimator_algorithm)) {
+          if (isFilteringMethod(FLAGS_estimator_algorithm)) {
             ASSERT_EQ(estimator->getEstimatedVariableMinimalDim(),
                       57 +
                           okvis::ExtrinsicModelGetMinimalDim(extrinsicModelId) +
@@ -933,7 +938,7 @@ void testHybridFilterSinusoid(const std::string& outputPath,
         okvis::MapPointVector removedLandmarks;
         size_t numKeyFrames = 5u;
         size_t numImuFrames = 3u;
-        if (okvis::isFilteringMethod(FLAGS_estimator_algorithm)) {
+        if (isFilteringMethod(FLAGS_estimator_algorithm)) {
           numImuFrames = 20u;
         }
         estimator->applyMarginalizationStrategy(numKeyFrames, numImuFrames, removedLandmarks);
@@ -963,7 +968,7 @@ void testHybridFilterSinusoid(const std::string& outputPath,
 
         Eigen::Vector3d normalizedError;
         Eigen::VectorXd rmsError;
-        if (okvis::isFilteringMethod(FLAGS_estimator_algorithm)) {
+        if (isFilteringMethod(FLAGS_estimator_algorithm)) {
           computeErrors(estimator.get(), T_WS, v_WS_true, trueBiasIter->measurement,
                          cameraGeometry0, projOptModelId, &normalizedError, &rmsError);
         }
@@ -981,7 +986,7 @@ void testHybridFilterSinusoid(const std::string& outputPath,
           rmseSum[jack].second += rmse[jack].second;
         }
       }
-      if (okvis::isFilteringMethod(FLAGS_estimator_algorithm)) {
+      if (isFilteringMethod(FLAGS_estimator_algorithm)) {
         check_tail_mse(rmse.back().second, projOptModelId);
         check_tail_nees(nees.back().second);
       }
@@ -1068,11 +1073,20 @@ TEST_ALGO_TRAJ(TFVIO, Ball, 5, 0)
 TEST(MSCKF, Torus)
 TEST_ALGO_TRAJ(MSCKF, Torus, 5, 0)
 
+TEST(PAVIO, Torus)
+TEST_ALGO_TRAJ(PAVIO, Torus, 5, 0)
+
 TEST(TFVIO, Torus)
 TEST_ALGO_TRAJ(TFVIO, Torus, 5, 0)
 
 TEST(MSCKF, Squircle)
 TEST_ALGO_TRAJ(MSCKF, Squircle, 5, 0)
+
+TEST(OKVIS, Squircle)
+TEST_ALGO_TRAJ(OKVIS, Squircle, 5, 0)
+
+TEST(PAVIO, Squircle)
+TEST_ALGO_TRAJ(PAVIO, Squircle, 5, 0)
 
 TEST(TFVIO, Squircle)
 TEST_ALGO_TRAJ(TFVIO, Squircle, 5, 0)
@@ -1082,6 +1096,9 @@ TEST_ALGO_TRAJ(MSCKF, Circle, 5, 0)
 
 TEST(OKVIS, Circle)
 TEST_ALGO_TRAJ(OKVIS, Circle, 5, 0)
+
+TEST(PAVIO, Circle)
+TEST_ALGO_TRAJ(PAVIO, Circle, 5, 0)
 
 TEST(TFVIO, Circle)
 TEST_ALGO_TRAJ(TFVIO, Circle, 5, 0)

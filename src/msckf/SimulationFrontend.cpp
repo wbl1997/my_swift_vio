@@ -393,7 +393,7 @@ int SimulationFrontend::addMatchToEstimator(
           IdA.keypointIndex, IdB.keypointIndex, hP_Ca, canBeInitialized,
           raySigma, true);
 
-      if (valid || isFilteringMethod(FLAGS_estimator_algorithm)) {
+      if (valid) {
         prevFrames->setLandmarkId(landmarkMatch.previousKeypoint.cameraIndex,
                                   landmarkMatch.previousKeypoint.keypointIndex,
                                   landmarkMatch.landmarkId);
