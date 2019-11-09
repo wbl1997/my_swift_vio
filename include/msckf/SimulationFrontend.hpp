@@ -150,10 +150,6 @@ class SimulationFrontend {
       const std::vector<LandmarkKeypointMatch>& landmarkMatches) const;
 };
 
-inline bool isFilteringMethod(int algorithmId) {
-  return algorithmId >= 4;
-}
-
 }  // namespace okvis
 
 #endif  // INCLUDE_OKVIS_SIMULATION_FRONTEND_HPP_

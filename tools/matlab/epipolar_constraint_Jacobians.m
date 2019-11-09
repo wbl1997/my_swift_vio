@@ -34,10 +34,10 @@ dev = simplify(jac - jac_ref);
 assert(isequaln(dev, sym(zeros(1, 3))));
 assume(theta, 'clear');
 assume(theta, 'real');
-
 end
 
 function h = epipolar_constraint(R_est, t, theta, fj, fk)
 R = (eye(3) + skew(theta)) * R_est;
 h = (R * fk)' * (skew(t) * fj);
+h = (skew(fj) * (R * fk))' * t; % it has the same effect as its above line
 end

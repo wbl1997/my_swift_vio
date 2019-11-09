@@ -189,6 +189,7 @@ list(APPEND TEST_SRC_FILES
 
     test/msckf/TestBoundedImuDeque.cpp
     test/msckf/TestEpipolarJacobian.cpp
+    test/msckf/TestEuclideanParamError.cpp
     test/msckf/TestExtrinsicJacobian.cpp
     test/msckf/TestFeatureInitialization.cpp
     test/msckf/TestHybridFilter.cpp
@@ -196,8 +197,8 @@ list(APPEND TEST_SRC_FILES
     test/msckf/TestImuSimulator.cpp
     test/msckf/TestPointObsJacobian.cpp
     test/msckf/TestRelativeMotionJacobian.cpp
-    # test/msckf/TestRsReprojectionError.cpp
-    test/msckf/TestEpipolarConstraint.cpp
+    test/msckf/TestRsReprojectionError.cpp
+    test/msckf/TestEpipolarFactor.cpp
     test/msckf/TestTriangulate.cpp
     test/msckf/TestTwoViewPair.cpp
 

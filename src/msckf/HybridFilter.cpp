@@ -15,7 +15,7 @@
 #include <msckf/triangulate.h>
 #include <msckf/triangulateFast.hpp>
 #include <msckf/ExtrinsicModels.hpp>
-#include <msckf/ProjParamOptModels.hpp>
+
 #include <msckf/EpipolarJacobian.hpp>
 #include <msckf/RelativeMotionJacobian.hpp>
 
@@ -2671,31 +2671,6 @@ okvis::Time HybridFilter::removeState(uint64_t stateId) {
   multiFramePtrMap_.erase(stateId);
   statesMap_.erase(it);
   return removedStateTime;
-}
-
-
-void obsDirectionJacobian(
-    const Eigen::Vector3d& obsDirection,
-    const std::shared_ptr<okvis::cameras::CameraBase> cameraGeometry,
-    int projOptModelId, double pixelNoiseStd,
-    Eigen::Matrix<double, 3, Eigen::Dynamic>* dfj_dXcam,
-    Eigen::Matrix3d* cov_fj) {
-  const Eigen::Vector3d& fj = obsDirection;
-  Eigen::Vector2d imagePoint;
-  Eigen::Matrix<double, 2, 3> pointJacobian;
-  Eigen::Matrix2Xd intrinsicsJacobian;
-  cameraGeometry->project(fj, &imagePoint, &pointJacobian, &intrinsicsJacobian);
-  ProjectionOptKneadIntrinsicJacobian(projOptModelId, &intrinsicsJacobian);
-  Eigen::Matrix2d dz_df12 = pointJacobian.topLeftCorner<2, 2>();
-  Eigen::Matrix2d df12_dz = dz_df12.inverse();
-  int cols = intrinsicsJacobian.cols();
-  dfj_dXcam->resize(3, cols);
-  dfj_dXcam->topLeftCorner(2, cols) = -df12_dz * intrinsicsJacobian;
-  dfj_dXcam->row(2).setZero();
-  cov_fj->setZero();
-  cov_fj->topLeftCorner<2, 2>() = df12_dz * Eigen::Matrix2d::Identity() *
-                                  df12_dz.transpose() * pixelNoiseStd *
-                                  pixelNoiseStd;
 }
 
 bool HybridFilter::measurementJacobianEpipolar(

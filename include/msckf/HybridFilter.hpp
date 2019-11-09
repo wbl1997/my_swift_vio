@@ -404,22 +404,6 @@ struct IsObservedInFrame {
   uint64_t frameId;  ///< Multiframe ID.
 };
 
-/**
- * @brief obsDirectionJacobian
- * @param obsInPixel [u, v] affected with noise in image
- * @param cameraGeometry
- * @param pixelNoiseStd
- * @param dfj_dXcam
- * @param cov_fj
- */
-void obsDirectionJacobian(
-    const Eigen::Vector3d& obsInPixel,
-    const std::shared_ptr<okvis::cameras::CameraBase> cameraGeometry,
-    int projOptModelId,
-    double pixelNoiseStd,
-    Eigen::Matrix<double, 3, Eigen::Dynamic>* dfj_dXcam,
-    Eigen::Matrix3d* cov_fj);
-
 }  // namespace okvis
 
 #endif /* INCLUDE_OKVIS_HYBRID_FILTER_HPP_ */

@@ -359,8 +359,8 @@ int SimulationFrontend::addMatchToEstimator(
       okvis::kinematics::Transformation T_WSa = T_WSp_ref;
       okvis::kinematics::Transformation T_WSb = T_WSc_ref;
       // TODO(jhuai): do we use estimates or reference values?
-//      estimator.get_T_WS(IdA.frameId, T_WSa);
-//      estimator.get_T_WS(IdB.frameId, T_WSb);
+      estimator.get_T_WS(IdA.frameId, T_WSa);
+      estimator.get_T_WS(IdB.frameId, T_WSb);
 
       okvis::kinematics::Transformation T_SaCa;
       estimator.getCameraSensorStates(IdA.frameId, IdA.cameraIndex, T_SaCa);

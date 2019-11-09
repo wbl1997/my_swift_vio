@@ -11,7 +11,6 @@ TEST(EigenMatrix, Initialization){
     Eigen::MatrixXd b = Eigen::MatrixXd::Random(2,4);
     Eigen::MatrixXd c = a*b;
 
-
     Eigen::MatrixXd cov;
     Eigen::Matrix3d cov3= Eigen::Matrix3d::Identity()*0.2;
     Eigen::Matrix2d cov2= Eigen::Matrix2d::Identity()*0.3;
@@ -62,5 +61,26 @@ TEST(EigenMatrix, AngleAxis){
     ASSERT_NEAR((Rx- Rxs2f.transpose()).lpNorm<Eigen::Infinity>(), 0, 1e-8);
     ASSERT_NEAR((Ry- Rys2f.transpose()).lpNorm<Eigen::Infinity>(), 0, 1e-8);
     ASSERT_NEAR((Rz- Rzs2f.transpose()).lpNorm<Eigen::Infinity>(), 0, 1e-8);
+
+}
+
+TEST(EigenMatrix, VectorSize) {
+  Eigen::Matrix<double, 8, 1> testVec;
+  testVec << 1, 2, 3, 4, 5, 6, 7, 8;
+  EXPECT_EQ(testVec.size(), 8);
+  EXPECT_EQ(testVec.tail<4>().size(), 4);
+}
+
+TEST(EigenMatrix, RowMajor) {
+  Eigen::Matrix<double, 1, 5, Eigen::RowMajor> row5;
+  Eigen::Map<Eigen::Matrix<double, 1, 5, Eigen::RowMajor>> row5map(row5.data());
+  for (int j = 0; j < row5map.size(); ++j) {
+    row5map[j] = j + 1;
+  }
+  Eigen::Matrix<double, 1, 5> expectedRow5;
+  expectedRow5 << 1, 2, 3, 4, 5;
+  EXPECT_TRUE(expectedRow5.isApprox(row5, 1e-8));
+
+//  Eigen::Matrix<double, 4, 1, Eigen::RowMajor> col4; // compile error
 
 }
