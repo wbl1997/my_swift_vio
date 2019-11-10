@@ -3,6 +3,11 @@
 
 #include <glog/logging.h>
 
+DEFINE_double(sim_sigma_g_c, 1.2e-3, "simulated gyro noise density");
+DEFINE_double(sim_sigma_a_c, 8e-3, "simulated accelerometer noise density");
+DEFINE_double(sim_sigma_gw_c, 2e-5, "simulated gyro bias noise density");
+DEFINE_double(sim_sigma_aw_c, 5.5e-5, "simulated accelerometer bias noise density");
+
 namespace imu {
 CircularSinusoidalTrajectory::CircularSinusoidalTrajectory()
     : wz(17 * M_PI / 41),
@@ -583,4 +588,76 @@ double RoundedSquare::getPeriodRemainder(const okvis::Time time) {
   okvis::Duration elapsed = time - startEpoch_;
   return std::fmod(elapsed.toSec(), period_.toSec());
 }
+
+void initImuNoiseParams(
+    okvis::ImuParameters* imuParameters, bool addPriorNoise,
+    double sigma_bg, double sigma_ba, double std_Ta_elem,
+    double sigma_td, bool fixImuInternalParams) {
+  imuParameters->g = 9.81;
+  imuParameters->a_max = 1000.0;
+  imuParameters->g_max = 1000.0;
+  imuParameters->rate = 100;
+
+  imuParameters->sigma_g_c = FLAGS_sim_sigma_g_c;
+  imuParameters->sigma_a_c = FLAGS_sim_sigma_a_c;
+  imuParameters->sigma_gw_c = FLAGS_sim_sigma_gw_c;
+  imuParameters->sigma_aw_c = FLAGS_sim_sigma_aw_c;
+
+  LOG(INFO) << "sigma_g_c " << FLAGS_sim_sigma_g_c
+            << " sigma_a_c " << FLAGS_sim_sigma_a_c
+            << " sigma_gw_c " << FLAGS_sim_sigma_gw_c
+            << " sigma_aw_c " << FLAGS_sim_sigma_aw_c;
+
+  imuParameters->tau = 600.0;
+
+  imuParameters->sigma_bg = sigma_bg;
+  imuParameters->sigma_ba = sigma_ba;
+
+  if (fixImuInternalParams) {
+    imuParameters->sigma_TGElement = 0;
+    imuParameters->sigma_TSElement = 0;
+    imuParameters->sigma_TAElement = 0;
+  } else {
+    // std for every element in shape matrix T_g
+    imuParameters->sigma_TGElement = 5e-3;
+    imuParameters->sigma_TSElement = 1e-3;
+    imuParameters->sigma_TAElement = std_Ta_elem;
+  }
+  imuParameters->model_type = "BG_BA_TG_TS_TA";
+
+  Eigen::Matrix<double, 9, 1> eye;
+  eye << 1, 0, 0, 0, 1, 0, 0, 0, 1;
+
+  if (addPriorNoise) {
+    imuParameters->a0[0] = vio::gauss_rand(0, imuParameters->sigma_ba);
+    imuParameters->a0[1] = vio::gauss_rand(0, imuParameters->sigma_ba);
+    imuParameters->a0[2] = vio::gauss_rand(0, imuParameters->sigma_ba);
+    imuParameters->g0[0] = vio::gauss_rand(0, imuParameters->sigma_bg);
+    imuParameters->g0[1] = vio::gauss_rand(0, imuParameters->sigma_bg);
+    imuParameters->g0[2] = vio::gauss_rand(0, imuParameters->sigma_bg);
+
+    imuParameters->Tg0 =
+        eye + vio::Sample::gaussian(imuParameters->sigma_TGElement, 9);
+    imuParameters->Ts0 =
+        vio::Sample::gaussian(imuParameters->sigma_TSElement, 9);
+    imuParameters->Ta0 =
+        eye + vio::Sample::gaussian(imuParameters->sigma_TAElement, 9);
+    imuParameters->td0 =
+        vio::gauss_rand(0, sigma_td);
+  } else {
+    imuParameters->a0.setZero();
+    imuParameters->g0.setZero();
+
+    imuParameters->Tg0 = eye;
+    imuParameters->Ts0.setZero();
+    imuParameters->Ta0 = eye;
+    imuParameters->td0 = 0;
+  }
+}
+
+
+// TODO(jhuai): add a pure rotation test case in which the
+// angular rate is governed by the pendulum dynamic equation
+// see https://en.wikipedia.org/wiki/Pendulum_(mathematics)
+
 }  // namespace imu

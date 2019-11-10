@@ -19,6 +19,7 @@
 #include <okvis/ceres/SpeedAndBiasError.hpp>
 #include <okvis/ceres/SpeedAndBiasParameterBlock.hpp>
 
+#include <msckf/CameraSystemCreator.hpp>
 #include <msckf/EuclideanParamBlock.hpp>
 #include <msckf/GeneralEstimator.hpp>
 #include "msckf/ImuOdometry.h"
@@ -37,11 +38,6 @@
 //imuParameters.sigma_a_c = 2.0e-3;
 //imuParameters.sigma_gw_c = 3.0e-6;
 //imuParameters.sigma_aw_c = 2.0e-5;
-
-DEFINE_double(sim_sigma_g_c, 1.2e-3, "simulated gyro noise density");
-DEFINE_double(sim_sigma_a_c, 8e-3, "simulated accelerometer noise density");
-DEFINE_double(sim_sigma_gw_c, 2e-5, "simulated gyro bias noise density");
-DEFINE_double(sim_sigma_aw_c, 5.5e-5, "simulated accelerometer bias noise density");
 
 DEFINE_double(
     sim_ga_noise_factor, 0.5,
@@ -98,79 +94,6 @@ void initCameraNoiseParams(
         1e-3;  /// k1, k2, p1, p2, [k3]
     cameraNoiseParams->sigma_td = 5e-3;
     cameraNoiseParams->sigma_tr = 5e-3;
-  }
-}
-
-/**
- * @brief initImuNoiseParams
- * @param imuParameters
- * @param addPriorNoise
- * @param sigma_bg std dev of initial gyroscope bias.
- * @param sigma_ba std dev of initial accelerometer bias.
- */
-void initImuNoiseParams(
-    okvis::ImuParameters* imuParameters, bool addPriorNoise,
-    double sigma_bg, double sigma_ba, double std_Ta_elem,
-    double sigma_td, bool fixImuInternalParams) {
-  imuParameters->g = 9.81;
-  imuParameters->a_max = 1000.0;
-  imuParameters->g_max = 1000.0;
-  imuParameters->rate = 100;
-
-  imuParameters->sigma_g_c = FLAGS_sim_sigma_g_c;
-  imuParameters->sigma_a_c = FLAGS_sim_sigma_a_c;
-  imuParameters->sigma_gw_c = FLAGS_sim_sigma_gw_c;
-  imuParameters->sigma_aw_c = FLAGS_sim_sigma_aw_c;
-
-  LOG(INFO) << "sigma_g_c " << FLAGS_sim_sigma_g_c
-            << " sigma_a_c " << FLAGS_sim_sigma_a_c
-            << " sigma_gw_c " << FLAGS_sim_sigma_gw_c
-            << " sigma_aw_c " << FLAGS_sim_sigma_aw_c;
-
-  imuParameters->tau = 600.0;
-
-  imuParameters->sigma_bg = sigma_bg;
-  imuParameters->sigma_ba = sigma_ba;
-
-  if (fixImuInternalParams) {
-    imuParameters->sigma_TGElement = 0;
-    imuParameters->sigma_TSElement = 0;
-    imuParameters->sigma_TAElement = 0;
-  } else {
-    // std for every element in shape matrix T_g
-    imuParameters->sigma_TGElement = 5e-3;
-    imuParameters->sigma_TSElement = 1e-3;
-    imuParameters->sigma_TAElement = std_Ta_elem;
-  }
-  imuParameters->model_type = "BG_BA_TG_TS_TA";
-
-  Eigen::Matrix<double, 9, 1> eye;
-  eye << 1, 0, 0, 0, 1, 0, 0, 0, 1;
-
-  if (addPriorNoise) {
-    imuParameters->a0[0] = vio::gauss_rand(0, imuParameters->sigma_ba);
-    imuParameters->a0[1] = vio::gauss_rand(0, imuParameters->sigma_ba);
-    imuParameters->a0[2] = vio::gauss_rand(0, imuParameters->sigma_ba);
-    imuParameters->g0[0] = vio::gauss_rand(0, imuParameters->sigma_bg);
-    imuParameters->g0[1] = vio::gauss_rand(0, imuParameters->sigma_bg);
-    imuParameters->g0[2] = vio::gauss_rand(0, imuParameters->sigma_bg);
-
-    imuParameters->Tg0 =
-        eye + vio::Sample::gaussian(imuParameters->sigma_TGElement, 9);
-    imuParameters->Ts0 =
-        vio::Sample::gaussian(imuParameters->sigma_TSElement, 9);
-    imuParameters->Ta0 =
-        eye + vio::Sample::gaussian(imuParameters->sigma_TAElement, 9);
-    imuParameters->td0 =
-        vio::gauss_rand(0, sigma_td);
-  } else {
-    imuParameters->a0.setZero();
-    imuParameters->g0.setZero();
-
-    imuParameters->Tg0 = eye;
-    imuParameters->Ts0.setZero();
-    imuParameters->Ta0 = eye;
-    imuParameters->td0 = 0;
   }
 }
 
@@ -235,7 +158,6 @@ void addImuNoise(const okvis::ImuParameters& imuParameters,
   }
 }
 
-
 typedef boost::iterator_range<std::vector<std::pair<double, double>>::iterator>
     HistogramType;
 
@@ -254,154 +176,6 @@ void outputFeatureHistogram(const std::string& featureHistFile,
       << "Total of densities: " << total << " should be 1.";
 }
 
-class CameraSystemCreator {
- public:
-  CameraSystemCreator(const int cameraModelId,
-                      const std::string projIntrinsicRep,
-                      const std::string extrinsicRep)
-      : cameraModelId_(cameraModelId),
-        projIntrinsicRep_(projIntrinsicRep),
-        extrinsicRep_(extrinsicRep) {}
-
-  void createDummyCameraSystem(
-      std::shared_ptr<okvis::cameras::CameraBase>* cameraGeometry,
-      std::shared_ptr<okvis::cameras::NCameraSystem>* cameraSystem) {
-    Eigen::Matrix<double, 4, 4> matT_SC0 = create_T_SC(cameraModelId_, camIdx_);
-    std::shared_ptr<const okvis::kinematics::Transformation> T_SC_0(
-        new okvis::kinematics::Transformation(matT_SC0));
-    cameraGeometry->reset(new okvis::cameras::PinholeCamera<
-                          okvis::cameras::RadialTangentialDistortion>(
-        0, 0, 0, 0, 0, 0,
-        okvis::cameras::RadialTangentialDistortion(0.00, 0.00, 0.000, 0.000)));
-    cameraSystem->reset(new okvis::cameras::NCameraSystem);
-    (*cameraSystem)
-        ->addCamera(
-            T_SC_0, *cameraGeometry,
-            okvis::cameras::NCameraSystem::DistortionType::RadialTangential,
-            projIntrinsicRep_, extrinsicRep_);
-  }
-
-  void createNominalCameraSystem(
-      std::shared_ptr<okvis::cameras::CameraBase>* cameraGeometry,
-      std::shared_ptr<okvis::cameras::NCameraSystem>* cameraSystem) {
-    Eigen::Matrix<double, 4, 4> matT_SC0 = create_T_SC(cameraModelId_, camIdx_);
-    std::shared_ptr<const okvis::kinematics::Transformation> T_SC_0(
-        new okvis::kinematics::Transformation(matT_SC0));
-
-    *cameraGeometry = createCameraGeometry(cameraModelId_);
-
-    cameraSystem->reset(new okvis::cameras::NCameraSystem);
-    (*cameraSystem)
-        ->addCamera(
-            T_SC_0, *cameraGeometry,
-            okvis::cameras::NCameraSystem::DistortionType::RadialTangential,
-            projIntrinsicRep_, extrinsicRep_);
-  }
-
-  void createNoisyCameraSystem(
-      std::shared_ptr<okvis::cameras::CameraBase>* cameraGeometry,
-      std::shared_ptr<okvis::cameras::NCameraSystem>* cameraSystem,
-      const okvis::ExtrinsicsEstimationParameters& cameraNoiseParams) {
-    Eigen::Matrix<double, 4, 1> fcNoise = vio::Sample::gaussian(1, 4);
-    fcNoise.head<2>() *= cameraNoiseParams.sigma_focal_length;
-    fcNoise.tail<2>() *= cameraNoiseParams.sigma_principal_point;
-    Eigen::Matrix<double, 4, 1> kpNoise = vio::Sample::gaussian(1, 4);
-    for (int jack = 0; jack < 4; ++jack) {
-      kpNoise[jack] *= cameraNoiseParams.sigma_distortion[jack];
-    }
-    Eigen::Vector3d p_CBNoise;
-    for (int jack = 0; jack < 3; ++jack) {
-      p_CBNoise[jack] =
-          vio::gauss_rand(0, cameraNoiseParams.sigma_absolute_translation);
-    }
-
-    okvis::kinematics::Transformation ref_T_SC(create_T_SC(cameraModelId_, 0));
-    std::shared_ptr<const okvis::kinematics::Transformation> T_SC_noisy(
-        new okvis::kinematics::Transformation(
-            ref_T_SC.r() - ref_T_SC.C() * p_CBNoise, ref_T_SC.q()));
-    std::shared_ptr<const okvis::cameras::CameraBase> refCameraGeometry =
-        createCameraGeometry(cameraModelId_);
-    Eigen::VectorXd projDistortIntrinsics;
-    refCameraGeometry->getIntrinsics(projDistortIntrinsics);
-    cameraGeometry->reset(new okvis::cameras::PinholeCamera<
-                          okvis::cameras::RadialTangentialDistortion>(
-        refCameraGeometry->imageWidth(), refCameraGeometry->imageHeight(),
-        projDistortIntrinsics[0] + fcNoise[0],
-        projDistortIntrinsics[1] + fcNoise[1],
-        projDistortIntrinsics[2] + fcNoise[2],
-        projDistortIntrinsics[3] + fcNoise[3],
-        okvis::cameras::RadialTangentialDistortion(kpNoise[0], kpNoise[1],
-                                                   kpNoise[2], kpNoise[3])));
-    cameraSystem->reset(new okvis::cameras::NCameraSystem);
-    (*cameraSystem)
-        ->addCamera(
-            T_SC_noisy, *cameraGeometry,
-            okvis::cameras::NCameraSystem::DistortionType::RadialTangential,
-            projIntrinsicRep_, extrinsicRep_);
-  }
-
- private:
-  Eigen::Matrix<double, 4, 4> create_T_SC(const int caseId,
-                                          const int /*camIdx*/) {
-    Eigen::Matrix<double, 4, 4> matT_SC0;
-    switch (caseId) {
-      case 1: // sideways motion facing inward if the device goes straight forward
-        matT_SC0 << 1, 0, 0, 0,
-                    0, 0, 1, 0,
-                    0, -1, 0, 0,
-                    0, 0, 0, 1;
-        break;
-      case 2: // sideways motion facing outward if the device goes straight forward
-        matT_SC0 << -1, 0, 0, 0,
-                    0, 0, -1, 0,
-                    0, -1, 0, 0,
-                    0, 0, 0, 1;
-        break;
-      case 0: // forward motion if the device goes straight forward
-      default:
-        matT_SC0 << 0, 0, 1, 0,
-                   -1, 0, 0, 0,
-                   0, -1, 0, 0,
-                   0, 0, 0, 1;
-        break;
-    }
-    return matT_SC0;
-  }
-
-  std::shared_ptr<okvis::cameras::CameraBase> createCameraGeometry(
-      const int caseId) {
-    std::shared_ptr<okvis::cameras::CameraBase> cameraGeometry;
-    switch (caseId) {
-      case 1:
-        cameraGeometry.reset(new okvis::cameras::PinholeCamera<
-                             okvis::cameras::RadialTangentialDistortion>(
-            640, 480, 350, 350, 322, 238,
-            okvis::cameras::RadialTangentialDistortion(0, 0, 0, 0)));
-        break;
-
-      case 0:
-      default:
-        cameraGeometry.reset(new okvis::cameras::PinholeCamera<
-                             okvis::cameras::RadialTangentialDistortion>(
-            752, 480, 350, 360, 378, 238,
-            okvis::cameras::RadialTangentialDistortion(0.00, 0.00, 0.000,
-                                                       0.000)));
-        break;
-    }
-    return cameraGeometry;
-  }
-
-  static const okvis::cameras::NCameraSystem::DistortionType distortType_ =
-      okvis::cameras::NCameraSystem::DistortionType::RadialTangential;
-  static const std::string distortName_;
-  static const int camIdx_ = 0;
-
-  const int cameraModelId_;
-  const std::string projIntrinsicRep_;
-  const std::string extrinsicRep_;
-};
-
-const std::string CameraSystemCreator::distortName_ = "RadialTangentialDistortion";
 
 /**
  * @brief computeErrors
@@ -627,7 +401,6 @@ void testHybridFilterSinusoid(const std::string& outputPath,
                               const int cameraOrientation=0) {
   const double DURATION = 300.0;     // length of motion in seconds
 
-
   // definition of NEES in Huang et al. 2007 Generalized Analysis and
   // Improvement of the consistency of EKF-based SLAM
   // https://pdfs.semanticscholar.org/4881/2a9d4a2ae5eef95939cbee1119e9f15633e8.pdf
@@ -711,9 +484,10 @@ void testHybridFilterSinusoid(const std::string& outputPath,
                           FLAGS_zero_camera_intrinsic_param_noise);
 
     okvis::ImuParameters imuParameters;
-    initImuNoiseParams(&imuParameters, cases[c].addPriorNoise, 5e-3, ba_std,
-                       Ta_std, extrinsicsEstimationParameters.sigma_td,
-                       FLAGS_zero_imu_intrinsic_param_noise);
+    imu::initImuNoiseParams(&imuParameters, cases[c].addPriorNoise, 5e-3,
+                            ba_std, Ta_std,
+                            extrinsicsEstimationParameters.sigma_td,
+                            FLAGS_zero_imu_intrinsic_param_noise);
 
     okvis::InitialPVandStd pvstd;
     pvstd.std_p_WS = Eigen::Vector3d(1e-8, 1e-8, 1e-8);
@@ -785,7 +559,7 @@ void testHybridFilterSinusoid(const std::string& outputPath,
     // create the map
     std::shared_ptr<okvis::ceres::Map> mapPtr(new okvis::ceres::Map);
 
-    CameraSystemCreator csc(cameraOrientation, projOptModelName, extrinsicModelName);
+    simul::CameraSystemCreator csc(cameraOrientation, projOptModelName, extrinsicModelName);
     // reference camera system
     std::shared_ptr<okvis::cameras::CameraBase> cameraGeometry0;
     std::shared_ptr<okvis::cameras::NCameraSystem> cameraSystem0;

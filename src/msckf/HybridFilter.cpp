@@ -2700,8 +2700,9 @@ bool HybridFilter::measurementJacobianEpipolar(
   int projOptModelId = camera_rig_.getProjectionOptMode(camIdx);
   for (int j = 0; j < 2; ++j) {
     double pixelNoiseStd = imagePointNoiseStd2[j * 2];
-    obsDirectionJacobian(obsDirections[j], tempCameraGeometry, projOptModelId,
+    bool projectOk = obsDirectionJacobian(obsDirections[j], tempCameraGeometry, projOptModelId,
                          pixelNoiseStd, &dfj_dXcam[j], &cov_fj[j]);
+    OKVIS_ASSERT_TRUE(Exception, projectOk, "Backprojected direction failed to project onto image");
   }
 
   // compute the head and tail pose, velocity, Jacobians, and covariance
@@ -2802,12 +2803,12 @@ bool HybridFilter::measurementJacobianEpipolar(
       (T_WBtij[0] * T_SC0_).inverse() * (T_WBtij[1] * T_SC0_);
   okvis::kinematics::Transformation lP_T_Ctij_Ctik =
       (lP_T_WBtij[0] * T_SC0_).inverse() * (lP_T_WBtij[1] * T_SC0_);
-  EpipolarJacobian epj(T_Ctij_Ctik.q(), T_Ctij_Ctik.r(), obsDirections[0],
+  EpipolarJacobian epj(T_Ctij_Ctik.C(), T_Ctij_Ctik.r(), obsDirections[0],
                        obsDirections[1]);
   *residual = -epj.evaluate();  // observation is 0
 
   // compute Jacobians for camera parameters
-  EpipolarJacobian epj_lp(lP_T_Ctij_Ctik.q(), lP_T_Ctij_Ctik.r(),
+  EpipolarJacobian epj_lp(lP_T_Ctij_Ctik.C(), lP_T_Ctij_Ctik.r(),
                           obsDirections[0], obsDirections[1]);
   Eigen::Matrix<double, 1, 3> de_dfj[2];
   epj_lp.de_dfj(&de_dfj[0]);

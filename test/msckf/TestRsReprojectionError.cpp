@@ -1,10 +1,14 @@
-
+#include <glog/logging.h>
 #include <gtest/gtest.h>
+
+#include <ceres/ceres.h>
+
 #include <msckf/EuclideanParamBlock.hpp>
 #include <msckf/EuclideanParamBlockSized.hpp>
 #include <msckf/ExtrinsicModels.hpp>
 #include <msckf/ProjParamOptModels.hpp>
 #include <msckf/RsReprojectionError.hpp>
+#include <msckf/numeric_ceres_residual_Jacobian.hpp>
 
 #include <okvis/FrameTypedefs.hpp>
 #include <okvis/Time.hpp>
@@ -20,157 +24,6 @@
 #include <okvis/ceres/ReprojectionError.hpp>
 #include <okvis/ceres/SpeedAndBiasParameterBlock.hpp>
 #include <okvis/kinematics/Transformation.hpp>
-#include "ceres/ceres.h"
-#include "glog/logging.h"
-
-#define ARE_MATRICES_CLOSE(ref, computed, tol)                             \
-  do {                                                                     \
-    double devi2 = (ref - computed)                                        \
-                       .cwiseAbs()                                         \
-                       .cwiseQuotient(Eigen::MatrixXd(                     \
-                           (ref.cwiseAbs().array() > tol)                  \
-                               .select(ref.cwiseAbs().array(), 1)))        \
-                       .maxCoeff();                                        \
-    if (devi2 > tol) {                                                     \
-      std::cout << "Two matrices " << #ref << " and " << #computed         \
-                << " largest elementwise difference is " +                 \
-                       std::to_string(devi2)                               \
-                << std::endl;                                              \
-      std::cout << #ref << std::endl;                                      \
-      if (ref.cols() == 1)                                                 \
-        std::cout << ref.transpose() << std::endl;                         \
-      else                                                                 \
-        std::cout << ref << std::endl;                                     \
-      std::cout << '(' << #ref << '-' << #computed << ").cwiseAbs"         \
-                << std::endl;                                              \
-      if (ref.cols() == 1)                                                 \
-        std::cout << (ref - computed).cwiseAbs().transpose() << std::endl; \
-      else                                                                 \
-        std::cout << (ref - computed).cwiseAbs() << std::endl;             \
-      std::cout << "cwiseQuotient" << std::endl;                           \
-      if (ref.cols() == 1)                                                 \
-        std::cout << (ref - computed)                                      \
-                         .cwiseAbs()                                       \
-                         .cwiseQuotient(Eigen::MatrixXd(                   \
-                             (ref.cwiseAbs().array() > tol)                \
-                                 .select(ref.cwiseAbs().array(), 1)))      \
-                         .transpose();                                     \
-      else                                                                 \
-        std::cout << (ref - computed)                                      \
-                         .cwiseAbs()                                       \
-                         .cwiseQuotient(Eigen::MatrixXd(                   \
-                             (ref.cwiseAbs().array() > tol)                \
-                                 .select(ref.cwiseAbs().array(), 1)));     \
-      std::cout << std::endl;                                              \
-    }                                                                      \
-  } while (0)
-
-const double epsilon = 1e-6;
-
-template <class JacEigenType = Eigen::Matrix<double, Eigen::Dynamic,
-                                             Eigen::Dynamic, Eigen::RowMajor>>
-void computeNumericJac(okvis::ceres::ParameterBlock& paramBlock,
-                       okvis::ceres::ErrorInterface* costFuncPtr,
-                       double const* const* parameters,
-                       const Eigen::VectorXd& residuals,
-                       JacEigenType* jacNumeric) {
-  size_t paramDim = paramBlock.dimension();
-  Eigen::VectorXd purturbedResiduals = residuals;
-  for (size_t jack = 0; jack < paramDim; ++jack) {
-    Eigen::VectorXd deltaVec = Eigen::VectorXd::Zero(paramDim);
-    deltaVec[jack] = epsilon;
-    Eigen::VectorXd currEst(paramDim);
-    Eigen::VectorXd currAndDelta(paramDim);
-    double* paramPtr = paramBlock.parameters();
-    for (size_t k = 0; k < paramDim; ++k) {
-      currEst[k] = paramPtr[k];
-    }
-    currAndDelta = currEst + deltaVec;
-    paramBlock.setParameters(currAndDelta.data());
-    costFuncPtr->EvaluateWithMinimalJacobians(
-        parameters, purturbedResiduals.data(), NULL, NULL);
-    jacNumeric->col(jack) = (purturbedResiduals - residuals) / epsilon;
-    paramBlock.setParameters(currEst.data());
-  }
-}
-
-void computeNumericJacPose(okvis::ceres::PoseParameterBlock& paramBlock,
-                           okvis::ceres::ErrorInterface* costFuncPtr,
-                           double const* const* parameters,
-                           const Eigen::VectorXd& residuals,
-                           Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic,
-                                         Eigen::RowMajor>* jacNumeric,
-                           bool minimal) {
-  Eigen::VectorXd purturbedResiduals = residuals;
-  okvis::kinematics::Transformation T_init = paramBlock.estimate();
-  if (minimal) {
-    for (size_t jack = 0; jack < 6; ++jack) {
-      Eigen::Matrix<double, 6, 1> deltaVec =
-          Eigen::Matrix<double, 6, 1>::Zero();
-      deltaVec[jack] = epsilon;
-      okvis::kinematics::Transformation T_purturb = T_init;
-      T_purturb.oplus(deltaVec);
-      paramBlock.setEstimate(T_purturb);
-      costFuncPtr->EvaluateWithMinimalJacobians(
-          parameters, purturbedResiduals.data(), NULL, NULL);
-      jacNumeric->col(jack) = (purturbedResiduals - residuals) / epsilon;
-      paramBlock.setEstimate(T_init);
-    }
-    return;
-  }
-  for (size_t jack = 0; jack < 7; ++jack) {
-    okvis::kinematics::Transformation T_purturb = T_init;
-    Eigen::Matrix<double, 7, 1> originalParams = T_init.parameters();
-    Eigen::Matrix<double, 7, 1> deltaParams =
-        Eigen::Matrix<double, 7, 1>::Zero();
-    deltaParams[jack] = epsilon;
-    Eigen::Matrix<double, 7, 1> newParams = originalParams + deltaParams;
-    Eigen::Matrix<double, 4, 1> quat = newParams.tail<4>();
-    newParams.tail<4>() = quat.normalized();
-    T_purturb.setCoeffs(newParams);
-    paramBlock.setEstimate(T_purturb);
-
-    costFuncPtr->EvaluateWithMinimalJacobians(
-        parameters, purturbedResiduals.data(), NULL, NULL);
-    jacNumeric->col(jack) = (purturbedResiduals - residuals) / epsilon;
-    paramBlock.setEstimate(T_init);
-  }
-}
-
-void computeNumericJacPoint(
-    okvis::ceres::HomogeneousPointParameterBlock& paramBlock,
-    okvis::ceres::ErrorInterface* costFuncPtr, double const* const* parameters,
-    const Eigen::VectorXd& residuals,
-    Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>*
-        jacNumeric,
-    bool minimal) {
-  Eigen::VectorXd purturbedResiduals = residuals;
-  Eigen::Vector4d originalEstimate = paramBlock.estimate();
-  if (minimal) {
-    for (size_t jack = 0; jack < 3; ++jack) {
-      Eigen::Matrix<double, 3, 1> deltaVec =
-          Eigen::Matrix<double, 3, 1>::Zero();
-      deltaVec[jack] = epsilon;
-      Eigen::Vector4d perturbedEstimate = originalEstimate;
-      perturbedEstimate.head<3>() += deltaVec;
-      paramBlock.setEstimate(perturbedEstimate);
-      costFuncPtr->EvaluateWithMinimalJacobians(
-          parameters, purturbedResiduals.data(), NULL, NULL);
-      jacNumeric->col(jack) = (purturbedResiduals - residuals) / epsilon;
-      paramBlock.setEstimate(originalEstimate);
-    }
-    return;
-  }
-  for (size_t jack = 0; jack < 4; ++jack) {
-    Eigen::Matrix<double, 4, 1> deltaVec = Eigen::Matrix<double, 4, 1>::Zero();
-    deltaVec[jack] = epsilon;
-    paramBlock.setEstimate(originalEstimate + deltaVec);
-    costFuncPtr->EvaluateWithMinimalJacobians(
-        parameters, purturbedResiduals.data(), NULL, NULL);
-    jacNumeric->col(jack) = (purturbedResiduals - residuals) / epsilon;
-    paramBlock.setEstimate(originalEstimate);
-  }
-}
 
 // When readout time, tr is non zero, analytic, numeric and automatic Jacobians
 // of the rolling shutter reprojection factor are roughly the same.
@@ -486,17 +339,23 @@ void setupPoseOptProblem(bool perturbPose, bool rollingShutter,
         ARE_MATRICES_CLOSE(duv_td_auto, duv_td, 1e-1);
       }
 
-      Eigen::Matrix<double, 2, 3> duv_ds_auto = duv_sb_auto.topLeftCorner<2, 3>();
+      Eigen::Matrix<double, 2, 3> duv_ds_auto =
+          duv_sb_auto.topLeftCorner<2, 3>();
       Eigen::Matrix<double, 2, 3> duv_ds = duv_sb.topLeftCorner<2, 3>();
       ARE_MATRICES_CLOSE(duv_ds_auto, duv_ds, tol);
       Eigen::Matrix<double, 2, 3> duv_dbg_auto = duv_sb_auto.block<2, 3>(0, 3);
       Eigen::Matrix<double, 2, 3> duv_dbg = duv_sb.block<2, 3>(0, 3);
       EXPECT_LT((duv_dbg_auto - duv_dbg).lpNorm<Eigen::Infinity>(), 5e-2)
-          << "duv_dbg_auto:\n" << duv_dbg_auto << "\nduv_dbg\n" << duv_dbg;
-      Eigen::Matrix<double, 2, 3> duv_dba_auto = duv_sb_auto.topRightCorner<2, 3>();
+          << "duv_dbg_auto:\n"
+          << duv_dbg_auto << "\nduv_dbg\n"
+          << duv_dbg;
+      Eigen::Matrix<double, 2, 3> duv_dba_auto =
+          duv_sb_auto.topRightCorner<2, 3>();
       Eigen::Matrix<double, 2, 3> duv_dba = duv_sb.topRightCorner<2, 3>();
       EXPECT_LT((duv_dba_auto - duv_dba).lpNorm<Eigen::Infinity>(), 5e-3)
-          << "duv_dba_auto\n" << duv_dba_auto << "\nduv_dba\n" << duv_dba;
+          << "duv_dba_auto\n"
+          << duv_dba_auto << "\nduv_dba\n"
+          << duv_dba;
 
       ARE_MATRICES_CLOSE(duv_deltaTWS_minimal_auto, duv_deltaTWS_minimal, 5e-3);
       ARE_MATRICES_CLOSE(duv_deltahpW_minimal_auto, duv_deltahpW_minimal, tol);
@@ -536,37 +395,40 @@ void setupPoseOptProblem(bool perturbPose, bool rollingShutter,
       Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>
           duv_sb_numeric(2, 9);
 
-      computeNumericJacPose(poseParameterBlock, costFuncPtr, parameters,
-                            residuals, &duv_deltaTWS_minimal_numeric, true);
-      computeNumericJacPose(poseParameterBlock, costFuncPtr, parameters,
-                            residuals, &duv_deltaTWS_numeric, false);
+      simul::computeNumericJacPose(poseParameterBlock, costFuncPtr, parameters,
+                                   residuals, &duv_deltaTWS_minimal_numeric,
+                                   true);
+      simul::computeNumericJacPose(poseParameterBlock, costFuncPtr, parameters,
+                                   residuals, &duv_deltaTWS_numeric, false);
 
-      computeNumericJacPoint(*homogeneousPointParameterBlock_ptr, costFuncPtr,
-                             parameters, residuals,
-                             &duv_deltahpW_minimal_numeric, true);
-      computeNumericJacPoint(*homogeneousPointParameterBlock_ptr, costFuncPtr,
-                             parameters, residuals, &duv_deltahpW_numeric,
-                             false);
+      simul::computeNumericJacPoint(*homogeneousPointParameterBlock_ptr,
+                                    costFuncPtr, parameters, residuals,
+                                    &duv_deltahpW_minimal_numeric, true);
+      simul::computeNumericJacPoint(*homogeneousPointParameterBlock_ptr,
+                                    costFuncPtr, parameters, residuals,
+                                    &duv_deltahpW_numeric, false);
 
-      computeNumericJacPose(extrinsicsParameterBlock, costFuncPtr, parameters,
-                            residuals, &duv_deltaTSC_minimal_numeric, true);
-      computeNumericJacPose(extrinsicsParameterBlock, costFuncPtr, parameters,
-                            residuals, &duv_deltaTSC_numeric, false);
+      simul::computeNumericJacPose(extrinsicsParameterBlock, costFuncPtr,
+                                   parameters, residuals,
+                                   &duv_deltaTSC_minimal_numeric, true);
+      simul::computeNumericJacPose(extrinsicsParameterBlock, costFuncPtr,
+                                   parameters, residuals, &duv_deltaTSC_numeric,
+                                   false);
 
-      computeNumericJac(projectionParamBlock, costFuncPtr, parameters,
-                        residuals, &duv_proj_intrinsic_numeric);
+      simul::computeNumericJac(projectionParamBlock, costFuncPtr, parameters,
+                               residuals, &duv_proj_intrinsic_numeric);
 
-      computeNumericJac(distortionParamBlock, costFuncPtr, parameters,
-                        residuals, &duv_distortion_numeric);
+      simul::computeNumericJac(distortionParamBlock, costFuncPtr, parameters,
+                               residuals, &duv_distortion_numeric);
 
-      computeNumericJac<Eigen::Matrix<double, 2, 1>>(
+      simul::computeNumericJac<Eigen::Matrix<double, 2, 1>>(
           trParamBlock, costFuncPtr, parameters, residuals, &duv_tr_numeric);
 
-      computeNumericJac<Eigen::Matrix<double, 2, 1>>(
+      simul::computeNumericJac<Eigen::Matrix<double, 2, 1>>(
           tdBlock, costFuncPtr, parameters, residuals, &duv_td_numeric);
 
-      computeNumericJac(sbBlock, costFuncPtr, parameters, residuals,
-                        &duv_sb_numeric);
+      simul::computeNumericJac(sbBlock, costFuncPtr, parameters, residuals,
+                               &duv_sb_numeric);
 
       ARE_MATRICES_CLOSE(duv_deltaTWS_numeric, duv_deltaTWS, tol);
       ARE_MATRICES_CLOSE(duv_deltaTWS_minimal_numeric, duv_deltaTWS_minimal,
@@ -583,14 +445,21 @@ void setupPoseOptProblem(bool perturbPose, bool rollingShutter,
       ARE_MATRICES_CLOSE(duv_tr_numeric, duv_tr, 1e-1);
       ARE_MATRICES_CLOSE(duv_td_numeric, duv_td, 1e-1);
 
-      Eigen::Matrix<double, 2, 3> duv_ds_numeric = duv_sb_numeric.topLeftCorner<2, 3>();
+      Eigen::Matrix<double, 2, 3> duv_ds_numeric =
+          duv_sb_numeric.topLeftCorner<2, 3>();
       ARE_MATRICES_CLOSE(duv_ds_numeric, duv_ds, tol);
-      Eigen::Matrix<double, 2, 3> duv_dbg_numeric = duv_sb_numeric.block<2, 3>(0, 3);
+      Eigen::Matrix<double, 2, 3> duv_dbg_numeric =
+          duv_sb_numeric.block<2, 3>(0, 3);
       EXPECT_LT((duv_dbg_numeric - duv_dbg).lpNorm<Eigen::Infinity>(), 5e-2)
-          << "duv_dbg_numeric\n" << duv_dbg_numeric << "\nduv_dbg\n" << duv_dbg;
-      Eigen::Matrix<double, 2, 3> duv_dba_numeric = duv_sb_numeric.topRightCorner<2, 3>();
+          << "duv_dbg_numeric\n"
+          << duv_dbg_numeric << "\nduv_dbg\n"
+          << duv_dbg;
+      Eigen::Matrix<double, 2, 3> duv_dba_numeric =
+          duv_sb_numeric.topRightCorner<2, 3>();
       EXPECT_LT((duv_dba_numeric - duv_dba).lpNorm<Eigen::Infinity>(), 5e-3)
-          << "duv_dba_numeric\n" << duv_dba_numeric << "\nduv_dba\n" << duv_dba;
+          << "duv_dba_numeric\n"
+          << duv_dba_numeric << "\nduv_dba\n"
+          << duv_dba;
     }
   }
   std::cout << " [ OK ] " << std::endl;

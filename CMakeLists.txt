@@ -103,6 +103,7 @@ LIST(APPEND SOURCEFILES
     src/okvis/ceres/CameraTimeParamBlock.cpp
 
     src/msckf/BoundedImuDeque.cpp
+    src/msckf/CameraSystemCreator.cpp
     src/msckf/FilterHelper.cpp
     src/msckf/HybridFilter.cpp
     src/msckf/HybridFrameNoncentralAbsoluteAdapter.cpp
@@ -117,9 +118,9 @@ LIST(APPEND SOURCEFILES
     src/msckf/TFVIO.cpp
     src/msckf/TwoViewPair.cpp
     src/msckf/VioFrameMatchingAlgorithm.cpp
+    src/msckf/numeric_ceres_residual_Jacobian.cpp
     src/msckf/triangulate.cpp
     src/msckf/triangulateFast.cpp
-
 )
 
 add_library(${PROJECT_NAME} STATIC

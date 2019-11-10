@@ -61,7 +61,6 @@ TEST(EigenMatrix, AngleAxis){
     ASSERT_NEAR((Rx- Rxs2f.transpose()).lpNorm<Eigen::Infinity>(), 0, 1e-8);
     ASSERT_NEAR((Ry- Rys2f.transpose()).lpNorm<Eigen::Infinity>(), 0, 1e-8);
     ASSERT_NEAR((Rz- Rzs2f.transpose()).lpNorm<Eigen::Infinity>(), 0, 1e-8);
-
 }
 
 TEST(EigenMatrix, VectorSize) {
