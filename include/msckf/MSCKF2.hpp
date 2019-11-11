@@ -59,23 +59,6 @@ class MSCKF2 : public HybridFilter {
   virtual ~MSCKF2();
 
   /**
-   * @brief add a state to the state map
-   * @param multiFrame Matched multiFrame.
-   * @param imuMeasurements IMU measurements from last state to new one.
-   * imuMeasurements covers at least the current state and the last state in
-   * time, with an extension on both sides.
-   * @param asKeyframe Is this new frame a keyframe?
-   * @return True if successful.
-   * If it is the first state, initialize it and the covariance matrix. In
-   * initialization, please make sure the world frame has z axis in negative
-   * gravity direction which is assumed in the IMU propagation Only one IMU is
-   * supported for now
-   */
-  virtual bool addStates(okvis::MultiFramePtr multiFrame,
-                         const okvis::ImuMeasurementDeque& imuMeasurements,
-                         bool asKeyframe) final;
-
-  /**
    * @brief Applies the dropping/marginalization strategy according to the
    * RSS'13/IJRR'14 paper. The new number of frames in the window will be
    * numKeyframes+numImuFrames.

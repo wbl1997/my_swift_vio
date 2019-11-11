@@ -44,7 +44,7 @@ TEST(EpipolarJacobian, de_dfjk) {
   }
   EXPECT_LT(
       (de_dtheta_CjCk - de_dtheta_CjCk_anal).lpNorm<Eigen::Infinity>(),
-      eps);
+      5e-6);
 
   for (int i = 0; i < 3; ++i) {
     delta.setZero();

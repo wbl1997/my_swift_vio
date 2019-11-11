@@ -95,7 +95,7 @@ class HybridFilter : public Estimator {
    */
   virtual bool addStates(okvis::MultiFramePtr multiFrame,
                          const okvis::ImuMeasurementDeque &imuMeasurements,
-                         bool asKeyframe);
+                         bool asKeyframe) final;
 
 
   /**

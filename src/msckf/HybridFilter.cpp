@@ -73,10 +73,10 @@ HybridFilter::~HybridFilter() {
   LOG(INFO) << "Destructing HybridFilter";
 }
 
-
 bool HybridFilter::addStates(okvis::MultiFramePtr multiFrame,
                              const okvis::ImuMeasurementDeque& imuMeasurements,
                              bool asKeyframe) {
+  // note: this is before matching...
   okvis::kinematics::Transformation T_WS;
   okvis::SpeedAndBiases speedAndBias;
   okvis::Duration tdEstimate;
@@ -84,18 +84,20 @@ bool HybridFilter::addStates(okvis::MultiFramePtr multiFrame,
                                    // current td estimate
 
   Eigen::Matrix<double, 27, 1> vTgTsTa;
+
   if (statesMap_.empty()) {
-    correctedStateTime = multiFrame->timestamp() + tdEstimate;
     // in case this is the first frame ever, let's initialize the pose:
-    if (pvstd_.initWithExternalSource_)
+    tdEstimate.fromSec(imuParametersVec_.at(0).td0);
+    correctedStateTime = multiFrame->timestamp() + tdEstimate;
+
+    if (pvstd_.initWithExternalSource_) {
       T_WS = okvis::kinematics::Transformation(pvstd_.p_WS, pvstd_.q_WS);
-    else {
+    } else {
       bool success0 = initPoseFromImu(imuMeasurements, T_WS);
       OKVIS_ASSERT_TRUE_DBG(
           Exception, success0,
           "pose could not be initialized from imu measurements.");
       if (!success0) return false;
-
       pvstd_.updatePose(T_WS, correctedStateTime);
     }
 
@@ -104,11 +106,9 @@ bool HybridFilter::addStates(okvis::MultiFramePtr multiFrame,
     speedAndBias.segment<3>(3) = imuParametersVec_.at(0).g0;
     speedAndBias.segment<3>(6) = imuParametersVec_.at(0).a0;
 
-    vTgTsTa.setZero();
-    for (int jack = 0; jack < 3; ++jack) {
-      vTgTsTa[jack * 4] = 1;
-      vTgTsTa[jack * 4 + 18] = 1;
-    }
+    vTgTsTa.head<9>() = imuParametersVec_.at(0).Tg0;
+    vTgTsTa.segment<9>(9) = imuParametersVec_.at(0).Ts0;
+    vTgTsTa.tail<9>() = imuParametersVec_.at(0).Ta0;
 
   } else {
     // get the previous states
@@ -209,6 +209,13 @@ bool HybridFilter::addStates(okvis::MultiFramePtr multiFrame,
         speedAndBias.head<3>() = tempV_WS;
       }
     }
+    if (numUsedImuMeasurements < 2) {
+      LOG(WARNING) << "numUsedImuMeasurements=" << numUsedImuMeasurements
+                   << " correctedStateTime " << correctedStateTime
+                   << " lastFrameTimestamp " << startTime << " tdEstimate "
+                   << tdEstimate << std::endl;
+    }
+
     int covDim = covariance_.rows();
     covariance_.topLeftCorner(ceres::ode::OdoErrorStateDim,
                               ceres::ode::OdoErrorStateDim) = Pkm1;
@@ -225,15 +232,6 @@ bool HybridFilter::addStates(okvis::MultiFramePtr multiFrame,
                           covDim - ceres::ode::OdoErrorStateDim,
                           ceres::ode::OdoErrorStateDim) *
         F_tot.transpose();
-
-    if (numUsedImuMeasurements < 2) {
-      std::cout << "numUsedImuMeasurements=" << numUsedImuMeasurements
-                << " correctedStateTime " << correctedStateTime
-                << " lastFrameTimestamp " << startTime << " tdEstimate "
-                << tdEstimate << std::endl;
-      OKVIS_ASSERT_TRUE(Exception, numUsedImuMeasurements > 1,
-                        "propagation failed");
-    }
   }
 
   // create a states object:
@@ -273,7 +271,6 @@ bool HybridFilter::addStates(okvis::MultiFramePtr multiFrame,
   OKVIS_ASSERT_EQ_DBG(Exception, imuParametersVec_.size(), 1,
                       "Only one IMU is supported.");
   // initialize new sensor states
-
   // cameras:
   for (size_t i = 0; i < extrinsicsEstimationParametersVec_.size(); ++i) {
     SpecificSensorStatesContainer cameraInfos(5);
@@ -317,13 +314,15 @@ bool HybridFilter::addStates(okvis::MultiFramePtr multiFrame,
               .at(CameraSensorStates::TR)
               .id;
     } else {
-      // initialize the evolving camera geometry
+      // initialize the camera geometry
       const cameras::NCameraSystem& camSystem = multiFrame->GetCameraSystem();
       camera_rig_.addCamera(multiFrame->T_SC(i), camSystem.cameraGeometry(i),
-                            imageReadoutTime, 0, camSystem.projOptRep(i),
+                            imageReadoutTime, tdEstimate.toSec(),
+                            camSystem.projOptRep(i),
                             camSystem.extrinsicOptRep(i));
       const okvis::kinematics::Transformation T_SC =
           camera_rig_.getCameraExtrinsic(i);
+
       uint64_t id = IdProvider::instance().newId();
       std::shared_ptr<okvis::ceres::PoseParameterBlock>
           extrinsicsParameterBlockPtr(new okvis::ceres::PoseParameterBlock(
@@ -336,28 +335,27 @@ bool HybridFilter::addStates(okvis::MultiFramePtr multiFrame,
       camera_rig_.getCameraGeometry(i)->getIntrinsics(allIntrinsics);
       id = IdProvider::instance().newId();
       int projOptModelId = camera_rig_.getProjectionOptMode(i);
-      const int projectionDim = camera_rig_.getMinimalProjectionDimen(i);
-      if (projectionDim > 0) {
-        Eigen::VectorXd projIntrinsics;
-        ProjectionOptGlobalToLocal(projOptModelId, allIntrinsics, &projIntrinsics);
+      const int minProjectionDim = camera_rig_.getMinimalProjectionDimen(i);
+      if (minProjectionDim > 0) {
+        Eigen::VectorXd optProjIntrinsics;
+        ProjectionOptGlobalToLocal(projOptModelId, allIntrinsics,
+                                   &optProjIntrinsics);
         std::shared_ptr<okvis::ceres::EuclideanParamBlock>
-            projectionParamBlockPtr(new okvis::ceres::EuclideanParamBlock(
-                projIntrinsics, id, correctedStateTime,
-                projectionDim));
-        mapPtr_->addParameterBlock(projectionParamBlockPtr,
+            projIntrinsicParamBlockPtr(new okvis::ceres::EuclideanParamBlock(
+                optProjIntrinsics, id, correctedStateTime, minProjectionDim));
+        mapPtr_->addParameterBlock(projIntrinsicParamBlockPtr,
                                    ceres::Map::Parameterization::Trivial);
         cameraInfos.at(CameraSensorStates::Intrinsics).id = id;
       } else {
         cameraInfos.at(CameraSensorStates::Intrinsics).exists = false;
         cameraInfos.at(CameraSensorStates::Intrinsics).id = 0u;
       }
-
       id = IdProvider::instance().newId();
-      int distortionDim = camera_rig_.getDistortionDimen(i);
+      const int distortionDim = camera_rig_.getDistortionDimen(i);
       std::shared_ptr<okvis::ceres::EuclideanParamBlock>
           distortionParamBlockPtr(new okvis::ceres::EuclideanParamBlock(
-              allIntrinsics.tail(distortionDim), id,
-              correctedStateTime, distortionDim));
+              allIntrinsics.tail(distortionDim), id, correctedStateTime,
+              distortionDim));
       mapPtr_->addParameterBlock(distortionParamBlockPtr,
                                  ceres::Map::Parameterization::Trivial);
       cameraInfos.at(CameraSensorStates::Distortion).id = id;
@@ -421,24 +419,21 @@ bool HybridFilter::addStates(okvis::MultiFramePtr multiFrame,
               .at(ImuSensorStates::TA)
               .id;
     } else {
-      Eigen::Matrix<double, 9, 1> TG;
-      TG << 1, 0, 0, 0, 1, 0, 0, 0, 1;
+      Eigen::Matrix<double, 9, 1> TG = vTgTsTa.head<9>();
       uint64_t id = IdProvider::instance().newId();
       std::shared_ptr<ceres::ShapeMatrixParamBlock> tgBlockPtr(
           new ceres::ShapeMatrixParamBlock(TG, id, correctedStateTime));
       mapPtr_->addParameterBlock(tgBlockPtr, ceres::Map::Trivial);
       imuInfo.at(ImuSensorStates::TG).id = id;
 
-      const Eigen::Matrix<double, 9, 1> TS =
-          Eigen::Matrix<double, 9, 1>::Zero();
+      const Eigen::Matrix<double, 9, 1> TS = vTgTsTa.segment<9>(9);
       id = IdProvider::instance().newId();
       std::shared_ptr<okvis::ceres::ShapeMatrixParamBlock> tsBlockPtr(
           new okvis::ceres::ShapeMatrixParamBlock(TS, id, correctedStateTime));
       mapPtr_->addParameterBlock(tsBlockPtr, ceres::Map::Trivial);
       imuInfo.at(ImuSensorStates::TS).id = id;
 
-      Eigen::Matrix<double, 9, 1> TA;
-      TA << 1, 0, 0, 0, 1, 0, 0, 0, 1;
+      Eigen::Matrix<double, 9, 1> TA = vTgTsTa.tail<9>();
       id = IdProvider::instance().newId();
       std::shared_ptr<okvis::ceres::ShapeMatrixParamBlock> taBlockPtr(
           new okvis::ceres::ShapeMatrixParamBlock(TA, id, correctedStateTime));
@@ -453,11 +448,12 @@ bool HybridFilter::addStates(okvis::MultiFramePtr multiFrame,
   }
 
   // depending on whether or not this is the very beginning, we will construct
-  // covariance:
+  // covariance
   if (statesMap_.size() == 1) {
     const int camIdx = 0;
     initCovariance(camIdx);
   }
+  // record the imu measurements between two consecutive states
   mStateID2Imu.push_back(imuMeasurements);
 
   addCovForClonedStates();
@@ -2931,6 +2927,4 @@ bool HybridFilter::measurementJacobianEpipolar(
 
   return true;
 }
-
-
 }  // namespace okvis
