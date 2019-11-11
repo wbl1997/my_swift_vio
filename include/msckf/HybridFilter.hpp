@@ -69,14 +69,13 @@ class HybridFilter : public Estimator {
   /**
    * @brief The default constructor.
    */
-  HybridFilter(const double readoutTime);
+  HybridFilter();
 
   /**
    * @brief Constructor if a ceres map is already available.
    * @param mapPtr Shared pointer to ceres map.
    */
-  HybridFilter(std::shared_ptr<okvis::ceres::Map> mapPtr,
-               const double readoutTime = 0.0);
+  HybridFilter(std::shared_ptr<okvis::ceres::Map> mapPtr);
 
   virtual ~HybridFilter();
 
@@ -380,8 +379,6 @@ class HybridFilter : public Estimator {
   /// the error vector corresponds to states x_B | x_imu | x_c | \pi{B_{N-m}}
   /// ... \pi{B_{N-1}} following Li icra 2014 x_B = [^{G}p_B] ^{G}q_B ^{G}v_B
   /// b_g b_a]
-  const double imageReadoutTime;  // time to read out one image of the rolling
-                                  // shutter camera
 
   // map from state ID to segments of imu measurements, the imu measurements
   // covers the last state and current state of the id and extends on both sides

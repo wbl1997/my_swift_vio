@@ -47,14 +47,13 @@ class TFVIO : public HybridFilter {
   /**
    * @brief The default constructor.
    */
-  TFVIO(const double readoutTime);
+  TFVIO();
 
   /**
    * @brief Constructor if a ceres map is already available.
    * @param mapPtr Shared pointer to ceres map.
    */
-  TFVIO(std::shared_ptr<okvis::ceres::Map> mapPtr,
-         const double readoutTime = 0.0);
+  TFVIO(std::shared_ptr<okvis::ceres::Map> mapPtr);
 
   virtual ~TFVIO();
 

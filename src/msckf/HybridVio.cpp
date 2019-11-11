@@ -72,16 +72,14 @@ HybridVio::HybridVio(okvis::VioParameters &parameters)
   switch (FLAGS_estimator_algorithm) {
     case 1:
       estimator_.reset(
-          new okvis::MSCKF2(parameters.sensors_information.imageReadoutTime));
+          new okvis::MSCKF2());
       break;
     case 2:
-      estimator_.reset(new okvis::TFVIO(
-          parameters.sensors_information.imageReadoutTime));
+      estimator_.reset(new okvis::TFVIO());
       break;
     default:
       LOG(WARNING) << "There are bugs inside the present HybridFilter!";
-      estimator_.reset(new okvis::HybridFilter(
-          parameters.sensors_information.imageReadoutTime));
+      estimator_.reset(new okvis::HybridFilter());
       break;
   }
   estimator_->resetInitialPVandStd(
@@ -117,7 +115,8 @@ void HybridVio::init() {
   for (size_t i = 0; i < numCameras_; ++i) {
     // parameters_.camera_extrinsics is never set (default 0's)...
     // do they ever change?
-    estimator_->addCamera(parameters_.camera_extrinsics);
+    estimator_->addCamera(parameters_.camera_extrinsics,
+                          parameters_.sensors_information.imageReadoutTime);
     cameraMeasurementsReceived_.emplace_back(
           std::shared_ptr<threadsafe::ThreadSafeQueue<std::shared_ptr<okvis::CameraMeasurement> > >
           (new threadsafe::ThreadSafeQueue<std::shared_ptr<okvis::CameraMeasurement> >()));

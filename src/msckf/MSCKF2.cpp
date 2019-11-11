@@ -2,27 +2,20 @@
 
 #include <glog/logging.h>
 
-#include <okvis/IdProvider.hpp>
-#include <okvis/MultiFrame.hpp>
 #include <okvis/assert_macros.hpp>
 #include <okvis/ceres/PoseError.hpp>
 #include <okvis/ceres/PoseParameterBlock.hpp>
 #include <okvis/ceres/RelativePoseError.hpp>
 #include <okvis/ceres/SpeedAndBiasError.hpp>
+#include <okvis/IdProvider.hpp>
+#include <okvis/MultiFrame.hpp>
 
 #include <msckf/EuclideanParamBlock.hpp>
-#include <okvis/ceres/CameraTimeParamBlock.hpp>
-
 #include <msckf/FilterHelper.hpp>
 #include <msckf/ImuOdometry.h>
 #include <msckf/PreconditionedEkfUpdater.h>
 #include <msckf/triangulate.h>
 #include <msckf/triangulateFast.hpp>
-
-// the following #include's are only for testing
-#include <okvis/timing/Timer.hpp>
-#include "vio/ImuErrorModel.h"
-#include "vio/Sample.h"
 
 DEFINE_bool(use_AIDP, true,
             "use anchored inverse depth parameterization for a feature point?"
@@ -41,12 +34,11 @@ DEFINE_bool(use_IEKF, false,
 /// \brief okvis Main namespace of this package.
 namespace okvis {
 
-MSCKF2::MSCKF2(std::shared_ptr<okvis::ceres::Map> mapPtr,
-               const double readoutTime)
-    : HybridFilter(mapPtr, readoutTime) {}
+MSCKF2::MSCKF2(std::shared_ptr<okvis::ceres::Map> mapPtr)
+    : HybridFilter(mapPtr) {}
 
 // The default constructor.
-MSCKF2::MSCKF2(const double readoutTime) : HybridFilter(readoutTime) {}
+MSCKF2::MSCKF2() {}
 
 MSCKF2::~MSCKF2() {}
 

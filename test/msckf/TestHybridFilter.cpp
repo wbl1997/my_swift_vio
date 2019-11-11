@@ -1,17 +1,19 @@
+#include <boost/accumulators/accumulators.hpp>
+#include <boost/accumulators/statistics/density.hpp>
+#include <boost/accumulators/statistics/stats.hpp>
+
 #include <gtest/gtest.h>
 
 #include <vio/Sample.h>
 
-#include "io_wrap/StreamHelper.hpp"
+#include <io_wrap/StreamHelper.hpp>
 
 #include <okvis/IdProvider.hpp>
+#include <okvis/assert_macros.hpp>
 #include <okvis/cameras/PinholeCamera.hpp>
 #include <okvis/cameras/RadialTangentialDistortion.hpp>
-
-#include <okvis/assert_macros.hpp>
 #include <okvis/ceres/HomogeneousPointParameterBlock.hpp>
 #include <okvis/ceres/ImuError.hpp>
-#include <okvis/ceres/CameraTimeParamBlock.hpp>
 #include <okvis/ceres/PoseError.hpp>
 #include <okvis/ceres/PoseParameterBlock.hpp>
 #include <okvis/ceres/RelativePoseError.hpp>
@@ -20,18 +22,15 @@
 #include <okvis/ceres/SpeedAndBiasParameterBlock.hpp>
 
 #include <msckf/CameraSystemCreator.hpp>
+#include <msckf/CameraTimeParamBlock.hpp>
 #include <msckf/EuclideanParamBlock.hpp>
 #include <msckf/GeneralEstimator.hpp>
-#include "msckf/ImuOdometry.h"
-#include "msckf/ImuSimulator.h"
+#include <msckf/ImuOdometry.h>
+#include <msckf/ImuSimulator.h>
 #include <msckf/MSCKF2.hpp>
-#include "msckf/ProjParamOptModels.hpp"
+#include <msckf/ProjParamOptModels.hpp>
 #include <msckf/SimulationFrontend.hpp>
 #include <msckf/TFVIO.hpp>
-
-#include <boost/accumulators/accumulators.hpp>
-#include <boost/accumulators/statistics/density.hpp>
-#include <boost/accumulators/statistics/stats.hpp>
 
 // values used in TestEstimator.cpp
 //imuParameters.sigma_g_c = 6.0e-4;
@@ -608,11 +607,11 @@ void testHybridFilterSinusoid(const std::string& outputPath,
         estimator.reset(new okvis::GeneralEstimator(mapPtr));
         break;
       case 5:
-        estimator.reset(new okvis::TFVIO(mapPtr, trNoisy));
+        estimator.reset(new okvis::TFVIO(mapPtr));
         break;
       case 4:
       default:
-        estimator.reset(new okvis::MSCKF2(mapPtr, trNoisy));
+        estimator.reset(new okvis::MSCKF2(mapPtr));
         break;
     }
 
@@ -621,7 +620,7 @@ void testHybridFilterSinusoid(const std::string& outputPath,
                                        60,
                                        bVerbose ? pointFile : "");
 
-    estimator->addCamera(extrinsicsEstimationParameters);
+    estimator->addCamera(extrinsicsEstimationParameters, trNoisy);
     estimator->addImu(imuParameters);
 
     std::vector<uint64_t> multiFrameIds;

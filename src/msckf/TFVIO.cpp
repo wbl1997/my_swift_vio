@@ -3,10 +3,10 @@
 #include <glog/logging.h>
 
 #include <okvis/ceres/PoseParameterBlock.hpp>
-#include <okvis/ceres/CameraTimeParamBlock.hpp>
 #include <okvis/IdProvider.hpp>
 #include <okvis/MultiFrame.hpp>
 
+#include <msckf/CameraTimeParamBlock.hpp>
 #include <msckf/EpipolarJacobian.hpp>
 #include <msckf/EuclideanParamBlock.hpp>
 #include <msckf/FilterHelper.hpp>
@@ -41,12 +41,11 @@ DEFINE_double(
 /// \brief okvis Main namespace of this package.
 namespace okvis {
 
-TFVIO::TFVIO(std::shared_ptr<okvis::ceres::Map> mapPtr,
-             const double readoutTime)
-    : HybridFilter(mapPtr, readoutTime) {}
+TFVIO::TFVIO(std::shared_ptr<okvis::ceres::Map> mapPtr)
+    : HybridFilter(mapPtr) {}
 
 // The default constructor.
-TFVIO::TFVIO(const double readoutTime) : HybridFilter(readoutTime) {}
+TFVIO::TFVIO() {}
 
 TFVIO::~TFVIO() {}
 

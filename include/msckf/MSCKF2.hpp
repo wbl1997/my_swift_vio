@@ -47,14 +47,13 @@ class MSCKF2 : public HybridFilter {
   /**
    * @brief The default constructor.
    */
-  MSCKF2(const double readoutTime);
+  MSCKF2();
 
   /**
    * @brief Constructor if a ceres map is already available.
    * @param mapPtr Shared pointer to ceres map.
    */
-  MSCKF2(std::shared_ptr<okvis::ceres::Map> mapPtr,
-         const double readoutTime = 0.0);
+  MSCKF2(std::shared_ptr<okvis::ceres::Map> mapPtr);
 
   virtual ~MSCKF2();
 

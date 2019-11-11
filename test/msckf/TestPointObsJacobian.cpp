@@ -41,7 +41,7 @@ okvis::ImuMeasurementDeque createImuMeasurements(okvis::Time t0) {
 void computeFeatureMeasJacobian(okvis::cameras::NCameraSystem::DistortionType distortionId) {
   double trNoisy = 0.033;
   std::shared_ptr<okvis::ceres::Map> mapPtr(new okvis::ceres::Map);
-  okvis::MSCKF2 estimator(mapPtr, trNoisy);
+  okvis::MSCKF2 estimator(mapPtr);
 
   okvis::Time t0(5, 0);
   okvis::ImuMeasurementDeque imuMeasurements = createImuMeasurements(t0);
@@ -88,7 +88,7 @@ void computeFeatureMeasJacobian(okvis::cameras::NCameraSystem::DistortionType di
   extrinsicsEstimationParameters.sigma_td = 1E-4;
   extrinsicsEstimationParameters.sigma_tr = 1E-4;
 
-  estimator.addCamera(extrinsicsEstimationParameters);
+  estimator.addCamera(extrinsicsEstimationParameters, trNoisy);
   // set the imu parameters
   okvis::ImuParameters imuParameters;
   imuParameters.a0.setZero();

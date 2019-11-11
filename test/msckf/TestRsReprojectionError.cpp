@@ -3,6 +3,7 @@
 
 #include <ceres/ceres.h>
 
+#include <msckf/CameraTimeParamBlock.hpp>
 #include <msckf/EuclideanParamBlock.hpp>
 #include <msckf/EuclideanParamBlockSized.hpp>
 #include <msckf/ExtrinsicModels.hpp>
@@ -15,7 +16,6 @@
 #include <okvis/assert_macros.hpp>
 #include <okvis/cameras/EquidistantDistortion.hpp>
 #include <okvis/cameras/PinholeCamera.hpp>
-#include <okvis/ceres/CameraTimeParamBlock.hpp>
 #include <okvis/ceres/HomogeneousPointError.hpp>
 #include <okvis/ceres/HomogeneousPointLocalParameterization.hpp>
 #include <okvis/ceres/HomogeneousPointParameterBlock.hpp>

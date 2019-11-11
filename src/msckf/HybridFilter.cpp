@@ -1,29 +1,28 @@
 
-#include <glog/logging.h>
+
 #include <msckf/HybridFilter.hpp>
-#include <okvis/IdProvider.hpp>
-#include <okvis/MultiFrame.hpp>
+
+#include <glog/logging.h>
+
+#include <io_wrap/StreamHelper.hpp>
+
 #include <okvis/assert_macros.hpp>
 #include <okvis/ceres/PoseError.hpp>
 #include <okvis/ceres/PoseParameterBlock.hpp>
 #include <okvis/ceres/RelativePoseError.hpp>
 #include <okvis/ceres/SpeedAndBiasError.hpp>
+#include <okvis/IdProvider.hpp>
+#include <okvis/MultiFrame.hpp>
+#include <okvis/timing/Timer.hpp>
 
+#include <msckf/CameraTimeParamBlock.hpp>
+#include <msckf/EpipolarJacobian.hpp>
+#include <msckf/EuclideanParamBlock.hpp>
+#include <msckf/ExtrinsicModels.hpp>
 #include <msckf/FeatureTriangulation.hpp>
 #include <msckf/FilterHelper.hpp>
 #include <msckf/ImuOdometry.h>
-#include <msckf/triangulate.h>
-#include <msckf/triangulateFast.hpp>
-#include <msckf/ExtrinsicModels.hpp>
-
-#include <msckf/EpipolarJacobian.hpp>
 #include <msckf/RelativeMotionJacobian.hpp>
-
-#include <okvis/ceres/CameraTimeParamBlock.hpp>
-#include <msckf/EuclideanParamBlock.hpp>
-#include <okvis/timing/Timer.hpp>
-
-#include <io_wrap/StreamHelper.hpp>
 
 DEFINE_bool(use_RK4, false,
             "use 4th order runge-kutta or the trapezoidal "
@@ -43,10 +42,8 @@ namespace okvis {
 const okvis::Duration HybridFilter::half_window_(2, 0);
 
 // Constructor if a ceres map is already available.
-HybridFilter::HybridFilter(std::shared_ptr<okvis::ceres::Map> mapPtr,
-                           const double readoutTime)
+HybridFilter::HybridFilter(std::shared_ptr<okvis::ceres::Map> mapPtr)
     : Estimator(mapPtr),
-      imageReadoutTime(readoutTime),
       minValidStateID(0),
       triangulateTimer("3.1.1.1 triangulateAMapPoint", true),
       computeHTimer("3.1.1 featureJacobian", true),
@@ -57,9 +54,8 @@ HybridFilter::HybridFilter(std::shared_ptr<okvis::ceres::Map> mapPtr,
       mTrackLengthAccumulator(100, 0) {}
 
 // The default constructor.
-HybridFilter::HybridFilter(const double readoutTime)
+HybridFilter::HybridFilter()
     : Estimator(),
-      imageReadoutTime(readoutTime),
       minValidStateID(0),
       triangulateTimer("3.1.1.1 triangulateAMapPoint", true),
       computeHTimer("3.1.1 featureJacobian", true),
@@ -317,7 +313,7 @@ bool HybridFilter::addStates(okvis::MultiFramePtr multiFrame,
       // initialize the camera geometry
       const cameras::NCameraSystem& camSystem = multiFrame->GetCameraSystem();
       camera_rig_.addCamera(multiFrame->T_SC(i), camSystem.cameraGeometry(i),
-                            imageReadoutTime, tdEstimate.toSec(),
+                            imageReadoutTime_, tdEstimate.toSec(),
                             camSystem.projOptRep(i),
                             camSystem.extrinsicOptRep(i));
       const okvis::kinematics::Transformation T_SC =

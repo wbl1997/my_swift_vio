@@ -2,16 +2,16 @@
 
 #include <Eigen/StdVector>
 
-#include <msckf/ImuSimulator.h>
 #include <msckf/CameraSystemCreator.hpp>
+#include <msckf/CameraTimeParamBlock.hpp>
 #include <msckf/EpipolarFactor.hpp>
 #include <msckf/EuclideanParamBlock.hpp>
 #include <msckf/ExtrinsicModels.hpp>
+#include <msckf/ImuSimulator.h>
 #include <msckf/numeric_ceres_residual_Jacobian.hpp>
 
 #include <okvis/cameras/EquidistantDistortion.hpp>
 #include <okvis/cameras/PinholeCamera.hpp>
-#include <okvis/ceres/CameraTimeParamBlock.hpp>
 #include <okvis/ceres/PoseLocalParameterization.hpp>
 #include <okvis/ceres/PoseParameterBlock.hpp>
 #include <okvis/ceres/SpeedAndBiasParameterBlock.hpp>

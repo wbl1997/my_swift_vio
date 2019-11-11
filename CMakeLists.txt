@@ -100,8 +100,6 @@ LIST(APPEND SOURCEFILES
     src/io_wrap/StreamHelper.cpp
     src/io_wrap/Subscriber.cpp
 
-    src/okvis/ceres/CameraTimeParamBlock.cpp
-
     src/msckf/BoundedImuDeque.cpp
     src/msckf/CameraSystemCreator.cpp
     src/msckf/FilterHelper.cpp
