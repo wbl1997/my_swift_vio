@@ -2,27 +2,17 @@
 
 #include <glog/logging.h>
 
+#include <okvis/ceres/PoseParameterBlock.hpp>
+#include <okvis/ceres/CameraTimeParamBlock.hpp>
 #include <okvis/IdProvider.hpp>
 #include <okvis/MultiFrame.hpp>
-#include <okvis/assert_macros.hpp>
-#include <okvis/ceres/PoseError.hpp>
-#include <okvis/ceres/PoseParameterBlock.hpp>
-#include <okvis/ceres/RelativePoseError.hpp>
-#include <okvis/ceres/SpeedAndBiasError.hpp>
 
-#include <okvis/ceres/CameraTimeParamBlock.hpp>
+#include <msckf/EpipolarJacobian.hpp>
 #include <msckf/EuclideanParamBlock.hpp>
-
+#include <msckf/FilterHelper.hpp>
 #include <msckf/ImuOdometry.h>
 #include <msckf/PreconditionedEkfUpdater.h>
-
-#include <msckf/FilterHelper.hpp>
 #include <msckf/TwoViewPair.hpp>
-
-// the following #include's are only for testing
-#include <okvis/timing/Timer.hpp>
-#include "vio/ImuErrorModel.h"
-#include "vio/Sample.h"
 
 DECLARE_bool(use_AIDP);
 
@@ -145,7 +135,31 @@ bool TFVIO::featureJacobian(
   size_t numFeatures = gatherPoseObservForTriang(mp, tempCameraGeometry, &frameIds, &T_WSs,
                             &obsDirections, &obsInPixels, &imagePointNoiseStds,
                             seqType);
-  if (numFeatures < 2) { // A two view constraint requires at least two obs
+
+  // compute obsDirection Jacobians and count the valid ones, and
+  // meanwhile resize the relevant data structures
+  std::vector<
+      Eigen::Matrix<double, 3, Eigen::Dynamic>,
+      Eigen::aligned_allocator<Eigen::Matrix<double, 3, Eigen::Dynamic>>>
+      dfj_dXcam(numFeatures);
+  std::vector<Eigen::Matrix3d, Eigen::aligned_allocator<Eigen::Matrix3d>>
+      cov_fij(numFeatures);
+  std::vector<bool> projectStatus(numFeatures);
+  int projOptModelId = camera_rig_.getProjectionOptMode(camIdx);
+  for (int j = 0; j < numFeatures; ++j) {
+      double pixelNoiseStd = imagePointNoiseStds[2 * j];
+      bool projectOk = obsDirectionJacobian(obsDirections[j], tempCameraGeometry, projOptModelId,
+                             pixelNoiseStd, &dfj_dXcam[j], &cov_fij[j]);
+      projectStatus[j]= projectOk;
+  }
+  removeUnsetElements<uint64_t>(&frameIds, projectStatus);
+  removeUnsetMatrices<okvis::kinematics::Transformation>(&T_WSs, projectStatus);
+  removeUnsetMatrices<Eigen::Vector3d>(&obsDirections, projectStatus);
+  removeUnsetMatrices<Eigen::Vector2d>(&obsInPixels, projectStatus);
+  removeUnsetMatrices<Eigen::Matrix<double, 3, -1>>(&dfj_dXcam, projectStatus);
+  removeUnsetMatrices<Eigen::Matrix3d>(&cov_fij, projectStatus);
+  size_t numValidDirectionJac = frameIds.size();
+  if (numValidDirectionJac < 2u) { // A two view constraint requires at least two obs
       return false;
   }
 
@@ -159,7 +173,7 @@ bool TFVIO::featureJacobian(
           : 1.0;
 
   std::vector<std::pair<int, int>> featurePairs =
-      TwoViewPair::getFramePairs(numFeatures, TwoViewPair::FIXED_MIDDLE);
+      TwoViewPair::getFramePairs(numValidDirectionJac, TwoViewPair::FIXED_MIDDLE);
   const int numConstraints = featurePairs.size();
   int featureVariableDimen = cameraParamsMinimalDimen() +
                              kClonedStateMinimalDimen * (statesMap_.size());
@@ -167,51 +181,41 @@ bool TFVIO::featureJacobian(
   ri->resize(numConstraints, 1);
 
   Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> H_fi(numConstraints,
-                                                             3 * numFeatures);
+                                                             3 * numValidDirectionJac);
   H_fi.setZero();
-  Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> cov_fi(3 * numFeatures,
-                                                               3 * numFeatures);
+  Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> cov_fi(3 * numValidDirectionJac,
+                                                               3 * numValidDirectionJac);
   cov_fi.setZero();
 
+  int extrinsicModelId = camera_rig_.getExtrinsicOptMode(camIdx);
+  const int minExtrinsicDim = camera_rig_.getMinimalExtrinsicDimen(camIdx);
+  const int minProjDim = camera_rig_.getMinimalProjectionDimen(camIdx);
+  const int minDistortDim = camera_rig_.getDistortionDimen(camIdx);
+
+  EpipolarMeasurement epiMeas(*this, tempCameraGeometry, camIdx, extrinsicModelId,
+                              minExtrinsicDim, minProjDim, minDistortDim);
   for (int count = 0; count < numConstraints; ++count) {
     const std::pair<int, int>& feature_pair = featurePairs[count];
-    std::vector<uint64_t> frameId2;
-    std::vector<okvis::kinematics::Transformation,
-                Eigen::aligned_allocator<okvis::kinematics::Transformation>>
-        T_WS2;
-    std::vector<Eigen::Vector3d, Eigen::aligned_allocator<Eigen::Vector3d>>
-        obsDirection2;
-    std::vector<Eigen::Vector2d, Eigen::aligned_allocator<Eigen::Vector2d>>
-        obsInPixel2;
-    std::vector<double> imagePointNoiseStd2;
     std::vector<int> index_vec{feature_pair.first, feature_pair.second};
-    for (auto index : index_vec) {
-      frameId2.emplace_back(frameIds[index]);
-      T_WS2.emplace_back(T_WSs[index]);
-      obsDirection2.emplace_back(obsDirections[index]);
-      obsInPixel2.emplace_back(obsInPixels[index]);
-      imagePointNoiseStd2.emplace_back(imagePointNoiseStds[2 * index]);
-      imagePointNoiseStd2.emplace_back(imagePointNoiseStds[2 * index + 1]);
-    }
     Eigen::Matrix<double, 1, Eigen::Dynamic> H_xjk(1, featureVariableDimen);
     std::vector<Eigen::Matrix<double, 1, 3>,
                 Eigen::aligned_allocator<Eigen::Matrix<double, 1, 3>>>
         H_fjk;
-    std::vector<Eigen::Matrix3d, Eigen::aligned_allocator<Eigen::Matrix3d>>
-        cov_fjk;
     double rjk;
-    measurementJacobianEpipolar(tempCameraGeometry, frameId2, T_WS2, obsDirection2,
-                        obsInPixel2, imagePointNoiseStd2, camIdx, &H_xjk, &H_fjk,
-                        &cov_fjk, &rjk);
+    epiMeas.prepareTwoViewConstraint(frameIds, T_WSs, obsDirections,
+                                     obsInPixels, dfj_dXcam, cov_fij, index_vec);
+    epiMeas.measurementJacobian(&H_xjk, &H_fjk, &rjk);
     Hi->row(count) = H_xjk;
     (*ri)(count) = rjk;
     for (int j = 0; j < 2; ++j) {
       int index = index_vec[j];
       H_fi.block<1, 3>(count, index * 3) = H_fjk[j];
+      // TODO(jhuai): account for the IMU noise
       cov_fi.block<3, 3>(index * 3, index * 3) =
-          cov_fjk[j] * FLAGS_image_noise_cov_multiplier * headObsCovModifier[j];
+          cov_fij[index] * FLAGS_image_noise_cov_multiplier * headObsCovModifier[j];
     }
   }
+
   Ri->resize(numConstraints, numConstraints);
   *Ri = H_fi * cov_fi * H_fi.transpose();
   return true;

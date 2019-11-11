@@ -128,7 +128,18 @@ class HybridFilter : public Estimator {
   ///@}
 
  public:
-
+  /**
+   * @brief gatherPoseObservForTriang
+   * @param mp
+   * @param cameraGeometry
+   * @param frameIds
+   * @param T_WSs
+   * @param obsDirections Each observation is in image plane z=1, (\bar{x}, \bar{y}, 1).
+   * @param obsInPixel
+   * @param vSigmai
+   * @param seqType
+   * @return number of gathered valid observations
+   */
   size_t gatherPoseObservForTriang(
       const MapPoint &mp,
       const std::shared_ptr<cameras::CameraBase> cameraGeometry,
@@ -212,40 +223,6 @@ class HybridFilter : public Estimator {
       Eigen::Vector4d &ab1rho,
       Eigen::Matrix<double, Eigen::Dynamic, 3> *pH_fi =
           (Eigen::Matrix<double, Eigen::Dynamic, 3> *)(NULL)) const;
-
-  /**
-   * @brief measurementJacobian for one epipolar constraint
-   * @param tempCameraGeometry
-   * @param frameId2
-   * @param T_WS2
-   * @param obsDirection2
-   * @param obsInPixel2
-   * @param imagePointNoiseStd2
-   * @param camIdx
-   * @param H_xjk has the proper size upon calling this func
-   * @param H_fjk is an empty vector upon calling this func
-   * @param cov_fjk is an empty vector upon entering this func
-   * @param residual
-   * @return
-   */
-  bool measurementJacobianEpipolar(
-      const std::shared_ptr<okvis::cameras::CameraBase> tempCameraGeometry,
-      const std::vector<uint64_t>& frameId2,
-      const std::vector<
-          okvis::kinematics::Transformation,
-          Eigen::aligned_allocator<okvis::kinematics::Transformation>>& T_WS2,
-      const std::vector<Eigen::Vector3d,
-                        Eigen::aligned_allocator<Eigen::Vector3d>>&
-          obsDirection2,
-      const std::vector<Eigen::Vector2d,
-                        Eigen::aligned_allocator<Eigen::Vector2d>>& obsInPixel2,
-      const std::vector<double>& imagePointNoiseStd2, int camIdx,
-      Eigen::Matrix<double, 1, Eigen::Dynamic>* H_xjk,
-      std::vector<Eigen::Matrix<double, 1, 3>,
-                  Eigen::aligned_allocator<Eigen::Matrix<double, 1, 3>>>* H_fjk,
-      std::vector<Eigen::Matrix3d, Eigen::aligned_allocator<Eigen::Matrix3d>>*
-          cov_fjk,
-      double* residual) const;
 
 
   /// print out the most recent state vector and the stds of its elements.
@@ -333,6 +310,69 @@ class HybridFilter : public Estimator {
   void retrieveEstimatesOfConstants();
 
   void updateStates(const Eigen::Matrix<double, Eigen::Dynamic, 1> &deltaX);
+
+  // epipolar measurement used by filters for computing Jacobians
+  // https://en.cppreference.com/w/cpp/language/nested_types
+  class EpipolarMeasurement {
+   public:
+    EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+    EpipolarMeasurement(
+        const HybridFilter& filter,
+        const std::shared_ptr<okvis::cameras::CameraBase> tempCameraGeometry,
+        int camIdx, int extrinsicModelId, int minExtrinsicDim, int minProjDim,
+        int minDistortDim);
+
+    void prepareTwoViewConstraint(
+        const std::vector<uint64_t> &frameIds,
+        const std::vector<
+            okvis::kinematics::Transformation,
+            Eigen::aligned_allocator<okvis::kinematics::Transformation>> &T_WSs,
+        const std::vector<Eigen::Vector3d,
+                          Eigen::aligned_allocator<Eigen::Vector3d>>
+            &obsDirections,
+        const std::vector<Eigen::Vector2d,
+                          Eigen::aligned_allocator<Eigen::Vector2d>>
+            &obsInPixels,
+        const std::vector<
+            Eigen::Matrix<double, 3, Eigen::Dynamic>,
+            Eigen::aligned_allocator<Eigen::Matrix<double, 3, Eigen::Dynamic>>>
+            &dfj_dXcam,
+        const std::vector<Eigen::Matrix3d,
+                          Eigen::aligned_allocator<Eigen::Matrix3d>> &cov_fj,
+        const std::vector<int> &index_vec);
+
+    bool measurementJacobian(
+        Eigen::Matrix<double, 1, Eigen::Dynamic> *H_xjk,
+        std::vector<Eigen::Matrix<double, 1, 3>,
+                    Eigen::aligned_allocator<Eigen::Matrix<double, 1, 3>>>
+            *H_fjk,
+        double *residual) const;
+
+   private:
+    const HybridFilter& filter_;
+    const std::shared_ptr<okvis::cameras::CameraBase> tempCameraGeometry_;
+    const int camIdx_;
+    const uint32_t imageHeight_;
+    const int extrinsicModelId_;
+    const int minExtrinsicDim_;
+    const int minProjDim_;
+    const int minDistortDim_;
+
+    std::vector<uint64_t> frameId2;
+    std::vector<okvis::kinematics::Transformation,
+                Eigen::aligned_allocator<okvis::kinematics::Transformation>>
+        T_WS2;
+    std::vector<Eigen::Vector3d, Eigen::aligned_allocator<Eigen::Vector3d>>
+        obsDirection2;
+    std::vector<Eigen::Vector2d, Eigen::aligned_allocator<Eigen::Vector2d>>
+        obsInPixel2;
+    std::vector<
+        Eigen::Matrix<double, 3, Eigen::Dynamic>,
+        Eigen::aligned_allocator<Eigen::Matrix<double, 3, Eigen::Dynamic>>>
+        dfj_dXcam2;
+    std::vector<Eigen::Matrix3d, Eigen::aligned_allocator<Eigen::Matrix3d>>
+        cov_fj2;
+  };
 
   Eigen::MatrixXd
       covariance_;  ///< covariance of the error vector of all states, error is

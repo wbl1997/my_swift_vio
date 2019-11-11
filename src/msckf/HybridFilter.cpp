@@ -2322,7 +2322,6 @@ size_t HybridFilter::gatherPoseObservForTriang(
     if (!validDirection) {
         continue;
     }
-    // each observation is in image plane z=1, (\bar{x}, \bar{y}, 1)
     obsDirections->push_back(backProjectionDirection);
 
     obsInPixel->push_back(measurement);
@@ -2669,8 +2668,29 @@ okvis::Time HybridFilter::removeState(uint64_t stateId) {
   return removedStateTime;
 }
 
-bool HybridFilter::measurementJacobianEpipolar(
+HybridFilter::EpipolarMeasurement::EpipolarMeasurement(
+    const HybridFilter& filter,
     const std::shared_ptr<okvis::cameras::CameraBase> tempCameraGeometry,
+    int camIdx, int extrinsicModelId, int minExtrinsicDim, int minProjDim,
+    int minDistortDim)
+    : filter_(filter),
+      tempCameraGeometry_(tempCameraGeometry),
+      camIdx_(camIdx),
+      imageHeight_(tempCameraGeometry_->imageHeight()),
+      extrinsicModelId_(extrinsicModelId),
+      minExtrinsicDim_(minExtrinsicDim),
+      minProjDim_(minProjDim),
+      minDistortDim_(minDistortDim),
+      frameId2(2),
+      T_WS2(2),
+      obsDirection2(2),
+      obsInPixel2(2),
+      dfj_dXcam2(2),
+      cov_fj2(2) {
+
+}
+
+void HybridFilter::EpipolarMeasurement::prepareTwoViewConstraint(
     const std::vector<uint64_t>& frameIds,
     const std::vector<
         okvis::kinematics::Transformation,
@@ -2678,32 +2698,32 @@ bool HybridFilter::measurementJacobianEpipolar(
     const std::vector<Eigen::Vector3d,
                       Eigen::aligned_allocator<Eigen::Vector3d>>& obsDirections,
     const std::vector<Eigen::Vector2d,
-                      Eigen::aligned_allocator<Eigen::Vector2d>>& obsInPixel2,
-    const std::vector<double>& imagePointNoiseStd2, int camIdx,
+                      Eigen::aligned_allocator<Eigen::Vector2d>>& obsInPixels,
+    const std::vector<
+        Eigen::Matrix<double, 3, Eigen::Dynamic>,
+        Eigen::aligned_allocator<Eigen::Matrix<double, 3, Eigen::Dynamic>>>&
+        dfj_dXcam,
+    const std::vector<Eigen::Matrix3d,
+                      Eigen::aligned_allocator<Eigen::Matrix3d>>& cov_fj,
+    const std::vector<int>& index_vec) {
+  int j = 0;
+  for (auto index : index_vec) {
+    frameId2[j] = frameIds[index];
+    T_WS2[j] = T_WSs[index];
+    obsDirection2[j] = obsDirections[index];
+    obsInPixel2[j] = obsInPixels[index];
+    dfj_dXcam2[j] = dfj_dXcam[index];
+    cov_fj2[j] = cov_fj[index];
+    ++j;
+  }
+}
+
+bool HybridFilter::EpipolarMeasurement::measurementJacobian(
     Eigen::Matrix<double, 1, Eigen::Dynamic>* H_xjk,
     std::vector<Eigen::Matrix<double, 1, 3>,
                 Eigen::aligned_allocator<Eigen::Matrix<double, 1, 3>>>* H_fjk,
-    std::vector<Eigen::Matrix3d, Eigen::aligned_allocator<Eigen::Matrix3d>>*
-        cov_fjk,
     double* residual) const {
-  // camera related Jacobians and covariance
-  std::vector<
-      Eigen::Matrix<double, 3, Eigen::Dynamic>,
-      Eigen::aligned_allocator<Eigen::Matrix<double, 3, Eigen::Dynamic>>>
-      dfj_dXcam(2);
-  std::vector<Eigen::Matrix3d, Eigen::aligned_allocator<Eigen::Matrix3d>>
-      cov_fj(2);
-  int projOptModelId = camera_rig_.getProjectionOptMode(camIdx);
-  for (int j = 0; j < 2; ++j) {
-    double pixelNoiseStd = imagePointNoiseStd2[j * 2];
-    bool projectOk = obsDirectionJacobian(obsDirections[j], tempCameraGeometry, projOptModelId,
-                         pixelNoiseStd, &dfj_dXcam[j], &cov_fj[j]);
-    OKVIS_ASSERT_TRUE(Exception, projectOk, "Backprojected direction failed to project onto image");
-  }
-
   // compute the head and tail pose, velocity, Jacobians, and covariance
-  uint32_t imageHeight = camera_rig_.getCameraGeometry(camIdx)->imageHeight();
-  int extrinsicModelId = camera_rig_.getExtrinsicOptMode(camIdx);
   std::vector<okvis::kinematics::Transformation,
               Eigen::aligned_allocator<okvis::kinematics::Transformation>>
       T_WBtij, lP_T_WBtij;  // lp is short for linearization point
@@ -2716,23 +2736,24 @@ bool HybridFilter::measurementJacobianEpipolar(
 
   for (int j = 0; j < 2; ++j) {
     ImuMeasurement interpolatedInertialData;
-    uint64_t poseId = frameIds[j];
-    kinematics::Transformation T_WBj = T_WSs[j];
+    uint64_t poseId = frameId2[j];
+    kinematics::Transformation T_WBj = T_WS2[j];
 
-    // TODO(jhuai): do we ue the latest estimate for bg ba or the saved ones for
-    // each state?
+    // TODO(jhuai): do we ue the latest estimate for bg ba or the saved ones
+    // for each state?
     SpeedAndBiases sbj;
-    getSpeedAndBias(poseId, 0, sbj);
+    filter_.getSpeedAndBias(poseId, 0, sbj);
 
-    Time stateEpoch = statesMap_.at(poseId).timestamp;
-    auto imuMeas = mStateID2Imu.findWindow(stateEpoch, half_window_);
+    Time stateEpoch = filter_.statesMap_.at(poseId).timestamp;
+    auto imuMeas =
+        filter_.mStateID2Imu.findWindow(stateEpoch, filter_.half_window_);
     OKVIS_ASSERT_GT(Exception, imuMeas.size(), 0,
                     "the IMU measurement does not exist");
 
-    double kpN = obsInPixel2[j][1] / imageHeight - 0.5;  // k per N
+    double kpN = obsInPixel2[j][1] / imageHeight_ - 0.5;  // k per N
     dtij_dtr[j] = kpN;
-    Duration featureTime = Duration(tdLatestEstimate + trLatestEstimate * kpN) -
-                           statesMap_.at(poseId).tdAtCreation;
+    Duration featureTime = Duration(filter_.tdLatestEstimate + filter_.trLatestEstimate * kpN) -
+                           filter_.statesMap_.at(poseId).tdAtCreation;
     featureDelay[j] = featureTime.toSec();
     // for feature i, estimate $p_B^G(t_{f_i})$, $R_B^G(t_{f_i})$,
     // $v_B^G(t_{f_i})$, and $\omega_{GB}^B(t_{f_i})$ with the corresponding
@@ -2740,26 +2761,26 @@ bool HybridFilter::measurementJacobianEpipolar(
 
     kinematics::Transformation T_WB = T_WBj;
     SpeedAndBiases sb = sbj;
-    IMUErrorModel<double> iem(iem_);
+    IMUErrorModel<double> iem(filter_.iem_);
     iem.resetBgBa(sb.tail<6>());
     if (FLAGS_use_RK4) {
       if (featureTime >= Duration()) {
-        IMUOdometry::propagation_RungeKutta(imuMeas, imuParametersVec_.at(0),
-                                            T_WB, sb, vTGTSTA_, stateEpoch,
-                                            stateEpoch + featureTime);
+        IMUOdometry::propagation_RungeKutta(
+            imuMeas, filter_.imuParametersVec_.at(0), T_WB, sb, filter_.vTGTSTA_,
+            stateEpoch, stateEpoch + featureTime);
       } else {
         IMUOdometry::propagationBackward_RungeKutta(
-            imuMeas, imuParametersVec_.at(0), T_WB, sb, vTGTSTA_, stateEpoch,
-            stateEpoch + featureTime);
+            imuMeas, filter_.imuParametersVec_.at(0), T_WB, sb,
+            filter_.vTGTSTA_, stateEpoch, stateEpoch + featureTime);
       }
     } else {
       Eigen::Vector3d tempV_WS = sb.head<3>();
       if (featureTime >= Duration()) {
-        IMUOdometry::propagation(imuMeas, imuParametersVec_.at(0), T_WB,
+        IMUOdometry::propagation(imuMeas, filter_.imuParametersVec_.at(0), T_WB,
                                  tempV_WS, iem, stateEpoch,
                                  stateEpoch + featureTime);
       } else {
-        IMUOdometry::propagationBackward(imuMeas, imuParametersVec_.at(0), T_WB,
+        IMUOdometry::propagationBackward(imuMeas, filter_.imuParametersVec_.at(0), T_WB,
                                          tempV_WS, iem, stateEpoch,
                                          stateEpoch + featureTime);
       }
@@ -2775,16 +2796,16 @@ bool HybridFilter::measurementJacobianEpipolar(
     Eigen::Vector3d lP_v = sb.head<3>();
     if (FLAGS_use_first_estimate) {
       Eigen::Matrix<double, 6, 1> posVelFirstEstimate =
-          statesMap_.at(poseId).linearizationPoint;
+          filter_.statesMap_.at(poseId).linearizationPoint;
       lP_T_WB =
           kinematics::Transformation(posVelFirstEstimate.head<3>(), T_WBj.q());
       lP_v = posVelFirstEstimate.tail<3>();
       if (featureTime >= Duration()) {
-        IMUOdometry::propagation(imuMeas, imuParametersVec_.at(0), lP_T_WB,
+        IMUOdometry::propagation(imuMeas, filter_.imuParametersVec_.at(0), lP_T_WB,
                                  lP_v, iem, stateEpoch,
                                  stateEpoch + featureTime);
       } else {
-        IMUOdometry::propagationBackward(imuMeas, imuParametersVec_.at(0),
+        IMUOdometry::propagationBackward(imuMeas, filter_.imuParametersVec_.at(0),
                                          lP_T_WB, lP_v, iem, stateEpoch,
                                          stateEpoch + featureTime);
       }
@@ -2795,31 +2816,32 @@ bool HybridFilter::measurementJacobianEpipolar(
   }
 
   // compute residual
+  okvis::kinematics::Transformation T_SC0 = filter_.T_SC0_;
   okvis::kinematics::Transformation T_Ctij_Ctik =
-      (T_WBtij[0] * T_SC0_).inverse() * (T_WBtij[1] * T_SC0_);
+      (T_WBtij[0] * T_SC0).inverse() * (T_WBtij[1] * T_SC0);
   okvis::kinematics::Transformation lP_T_Ctij_Ctik =
-      (lP_T_WBtij[0] * T_SC0_).inverse() * (lP_T_WBtij[1] * T_SC0_);
-  EpipolarJacobian epj(T_Ctij_Ctik.C(), T_Ctij_Ctik.r(), obsDirections[0],
-                       obsDirections[1]);
+      (lP_T_WBtij[0] * T_SC0).inverse() * (lP_T_WBtij[1] * T_SC0);
+  EpipolarJacobian epj(T_Ctij_Ctik.C(), T_Ctij_Ctik.r(), obsDirection2[0],
+                       obsDirection2[1]);
   *residual = -epj.evaluate();  // observation is 0
 
   // compute Jacobians for camera parameters
   EpipolarJacobian epj_lp(lP_T_Ctij_Ctik.C(), lP_T_Ctij_Ctik.r(),
-                          obsDirections[0], obsDirections[1]);
+                          obsDirection2[0], obsDirection2[1]);
   Eigen::Matrix<double, 1, 3> de_dfj[2];
   epj_lp.de_dfj(&de_dfj[0]);
   epj_lp.de_dfk(&de_dfj[1]);
   Eigen::Matrix<double, 1, 3> de_dtheta_Ctij_Ctik, de_dt_Ctij_Ctik;
   epj_lp.de_dtheta_CjCk(&de_dtheta_Ctij_Ctik);
   epj_lp.de_dt_CjCk(&de_dt_Ctij_Ctik);
-  RelativeMotionJacobian rmj_lp(T_SC0_, lP_T_WBtij[0], lP_T_WBtij[1]);
+  RelativeMotionJacobian rmj_lp(T_SC0, lP_T_WBtij[0], lP_T_WBtij[1]);
   Eigen::Matrix<double, 3, 3> dtheta_dtheta_BC;
   Eigen::Matrix<double, 3, 3> dp_dtheta_BC;
   Eigen::Matrix<double, 3, 3> dp_dt_BC;
   Eigen::Matrix<double, 3, 3> dp_dt_CB;
 
   Eigen::Matrix<double, 1, Eigen::Dynamic> de_dExtrinsic;
-  switch (extrinsicModelId) {
+  switch (extrinsicModelId_) {
     case Extrinsic_p_SC_q_SC::kModelId:
       rmj_lp.dtheta_dtheta_BC(&dtheta_dtheta_BC);
       rmj_lp.dp_dtheta_BC(&dp_dtheta_BC);
@@ -2838,7 +2860,7 @@ bool HybridFilter::measurementJacobianEpipolar(
       break;
   }
   Eigen::Matrix<double, 1, Eigen::Dynamic> de_dxcam =
-      de_dfj[0] * dfj_dXcam[0] + de_dfj[1] * dfj_dXcam[1];
+      de_dfj[0] * dfj_dXcam2[0] + de_dfj[1] * dfj_dXcam2[1];
 
   // compute Jacobians for time parameters
   Eigen::Matrix<double, 3, 3> dtheta_dtheta_GBtij[2];
@@ -2897,34 +2919,28 @@ bool HybridFilter::measurementJacobianEpipolar(
 
   // assemble the Jacobians
   H_xjk->setZero();
-  const int minExtrinsicDim = camera_rig_.getMinimalExtrinsicDimen(camIdx);
-  const int minProjDim = camera_rig_.getMinimalProjectionDimen(camIdx);
-  const int minDistortDim = camera_rig_.getDistortionDimen(camIdx);
-  if (minExtrinsicDim > 0) {
-    H_xjk->topLeftCorner(1, minExtrinsicDim) = de_dExtrinsic;
+
+  if (minExtrinsicDim_ > 0) {
+    H_xjk->topLeftCorner(1, minExtrinsicDim_) = de_dExtrinsic;
   }
-  H_xjk->block(0, minExtrinsicDim, 1, minProjDim + minDistortDim) = de_dxcam;
-  int startIndex = minExtrinsicDim + minProjDim + minDistortDim;
+  H_xjk->block(0, minExtrinsicDim_, 1, minProjDim_ + minDistortDim_) = de_dxcam;
+  int startIndex = minExtrinsicDim_ + minProjDim_ + minDistortDim_;
   (*H_xjk)(startIndex) = de_dtd;
   startIndex += 1;
   (*H_xjk)(startIndex) = de_dtr;
 
-  const int minCamParamDim = cameraParamsMinimalDimen();
+  const int minCamParamDim = filter_.cameraParamsMinimalDimen();
   for (int j = 0; j < 2; ++j) {
-    uint64_t poseId = frameIds[j];
+    uint64_t poseId = frameId2[j];
     std::map<uint64_t, int>::const_iterator poseid_iter =
-        mStateID2CovID_.find(poseId);
+        filter_.mStateID2CovID_.find(poseId);
     int covid = poseid_iter->second;
     int startIndex = minCamParamDim + 9 * covid;
     H_xjk->block<1, 3>(0, startIndex) = de_dp_GBtj[j];
     H_xjk->block<1, 3>(0, startIndex + 3) = de_dtheta_GBtj[j];
     H_xjk->block<1, 3>(0, startIndex + 6) = de_dv_GBtj[j];
     H_fjk->emplace_back(de_dfj[j]);
-
-    // TODO(jhuai): account for the IMU noise
-    cov_fjk->emplace_back(cov_fj[j]);
   }
-
   return true;
 }
 }  // namespace okvis

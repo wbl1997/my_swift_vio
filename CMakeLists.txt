@@ -193,6 +193,7 @@ list(APPEND TEST_SRC_FILES
     test/msckf/TestEuclideanParamError.cpp
     test/msckf/TestExtrinsicJacobian.cpp
     test/msckf/TestFeatureInitialization.cpp
+    test/msckf/TestFilterHelper.cpp
     test/msckf/TestHybridFilter.cpp
     test/msckf/TestImuOdometry.cpp
     test/msckf/TestImuSimulator.cpp
