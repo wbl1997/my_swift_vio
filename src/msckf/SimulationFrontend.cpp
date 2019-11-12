@@ -132,10 +132,12 @@ void addLandmarkNoise(
 // Constructor.
 SimulationFrontend::SimulationFrontend(
     size_t numCameras, bool addImageNoise,
-    int maxTrackLength, std::string pointFile)
+    int maxTrackLength, VisualConstraints constraintScheme,
+    std::string pointFile)
     : isInitialized_(true), numCameras_(numCameras),
       addImageNoise_(addImageNoise),
-      maxTrackLength_(maxTrackLength) {
+      maxTrackLength_(maxTrackLength),
+      constraintScheme_(constraintScheme) {
   create_landmark_grid(&homogeneousPoints_, &lmIds_, pointFile);
 
   double axisSigma = 0.1;
@@ -192,6 +194,8 @@ int SimulationFrontend::dataAssociationAndInitialization(
   int trackedFeatures = 0;
   if (estimator.numFrames() > 1) {
     // find matches between the previous keyframe and current frame
+    // TODO(jhuai): matching to last Keyframe may encounter zombie landmark
+    // ids for filters that remove disappearing landmarks from landmarkMap_
     std::vector<LandmarkKeypointMatch> landmarkKeyframeMatches;
     matchToFrame(previousKeyframeKeypointIndices_, keypointIndices,
                  previousKeyframe_->id(), framesInOut->id(),
@@ -346,10 +350,22 @@ int SimulationFrontend::addMatchToEstimator(
         currFrames->setLandmarkId(landmarkMatch.currentKeypoint.cameraIndex,
                                   landmarkMatch.currentKeypoint.keypointIndex,
                                   lmIdPrevious);
-        estimator.addObservation<CAMERA_GEOMETRY_T>(
-            lmIdPrevious, currFrames->id(),
-            landmarkMatch.currentKeypoint.cameraIndex,
-            landmarkMatch.currentKeypoint.keypointIndex);
+        switch (constraintScheme_) {
+          case OnlyReprojectionErrors:
+            estimator.addObservation<CAMERA_GEOMETRY_T>(
+                lmIdPrevious, currFrames->id(),
+                landmarkMatch.currentKeypoint.cameraIndex,
+                landmarkMatch.currentKeypoint.keypointIndex);
+            break;
+          case OnlyTwoViewConstraints:
+            estimator.addEpipolarConstraint<CAMERA_GEOMETRY_T>(
+                lmIdPrevious, currFrames->id(),
+                landmarkMatch.currentKeypoint.cameraIndex,
+                landmarkMatch.currentKeypoint.keypointIndex, false);
+            break;
+          case TwoViewAndReprojection:
+            break;
+        }
         ++trackedFeatures;
       } // else do nothing
     } else {
@@ -403,12 +419,26 @@ int SimulationFrontend::addMatchToEstimator(
         estimator.addLandmark(landmarkMatch.landmarkId, T_WCa * hP_Ca);
         estimator.setLandmarkInitialized(landmarkMatch.landmarkId,
                                          canBeInitialized);
-        estimator.addObservation<CAMERA_GEOMETRY_T>(
-            landmarkMatch.landmarkId, IdA.frameId, IdA.cameraIndex,
-            IdA.keypointIndex);
-        estimator.addObservation<CAMERA_GEOMETRY_T>(
-            landmarkMatch.landmarkId, IdB.frameId, IdB.cameraIndex,
-            IdB.keypointIndex);
+        switch (constraintScheme_) {
+          case OnlyReprojectionErrors:
+            estimator.addObservation<CAMERA_GEOMETRY_T>(
+                landmarkMatch.landmarkId, IdA.frameId, IdA.cameraIndex,
+                IdA.keypointIndex);
+            estimator.addObservation<CAMERA_GEOMETRY_T>(
+                landmarkMatch.landmarkId, IdB.frameId, IdB.cameraIndex,
+                IdB.keypointIndex);
+            break;
+          case OnlyTwoViewConstraints:
+            estimator.addLandmarkObservation(landmarkMatch.landmarkId,
+                                             IdA.frameId, IdA.cameraIndex,
+                                             IdA.keypointIndex);
+            estimator.addEpipolarConstraint<CAMERA_GEOMETRY_T>(
+                landmarkMatch.landmarkId, IdB.frameId, IdB.cameraIndex,
+                IdB.keypointIndex);
+            break;
+          case TwoViewAndReprojection:
+            break;
+        }
         trackedFeatures += 2;
       } // else do nothing
     }

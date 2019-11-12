@@ -142,8 +142,7 @@ void setupPoseOptProblem(bool perturbPose, bool rollingShutter,
   // and the parameterization for points:
   ::ceres::LocalParameterization* homogeneousPointLocalParameterization(
       new okvis::ceres::HomogeneousPointLocalParameterization);
-  std::shared_ptr<okvis::ImuMeasurementDeque> imuMeasPtr(
-      new okvis::ImuMeasurementDeque());
+  okvis::ImuMeasurementDeque imuMeasDeque;
 
   // time * 100 Hz imu data centering at stateEpoch
   double gravity = 9.80665;
@@ -158,8 +157,8 @@ void setupPoseOptProblem(bool perturbPose, bool rollingShutter,
     Eigen::Vector3d accMeas =
         Eigen::Vector3d::Random() +
         T_WS.C().transpose() * Eigen::Vector3d(0, 0, gravity);
-    imuMeasPtr->push_back(okvis::ImuMeasurement(
-        time, okvis::ImuSensorReadings(gyrMeas, accMeas)));
+    imuMeasDeque.emplace_back(
+        time, okvis::ImuSensorReadings(gyrMeas, accMeas));
   }
 
   // get some random points and build error terms
@@ -199,7 +198,7 @@ void setupPoseOptProblem(bool perturbPose, bool rollingShutter,
         new okvis::ceres::RsReprojectionError<DistortedPinholeCameraGeometry,
                                               okvis::ProjectionOptFXY_CXY,
                                               okvis::Extrinsic_p_SC_q_SC>(
-            cameraGeometry, frameId, kp, information, imuMeasPtr, T_SC,
+            cameraGeometry, frameId, kp, information, imuMeasDeque, T_SC,
             stateEpoch, tdAtCreation, gravity));
     allCostFunctions.emplace_back(cost_function);
 

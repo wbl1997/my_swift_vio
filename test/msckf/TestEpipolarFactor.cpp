@@ -122,19 +122,17 @@ TEST(CeresErrorTerms, EpipolarFactor) {
     covariance12.push_back(covariance);
     covariance12.push_back(covariance);
 
-    std::vector<std::shared_ptr<const okvis::ImuMeasurementDeque>>
-        imuMeasCanopy{std::shared_ptr<okvis::ImuMeasurementDeque>(
-                          new okvis::ImuMeasurementDeque{imuMeasurements}),
-                      std::shared_ptr<okvis::ImuMeasurementDeque>(
-                          new okvis::ImuMeasurementDeque{imuMeasurements})};
+    std::vector<okvis::ImuMeasurementDeque,
+                Eigen::aligned_allocator<okvis::ImuMeasurementDeque>>
+        imuMeasCanopy{imuMeasurements, imuMeasurements};
 
     std::vector<double> tdAtCreation2{tdAtCreation, tdAtCreation};
     ::ceres::CostFunction* epiFactor =
         new okvis::ceres::EpipolarFactor<DistortedPinholeCameraGeometry,
-                                         okvis::ProjectionOptFXY_CXY,
-                                         okvis::Extrinsic_p_SC_q_SC>(
-            cameraGeometryArg, measurement12, covariance12, imuMeasCanopy, T_SC,
-            twoTimes, tdAtCreation2, imuParameters.g);
+                                         okvis::Extrinsic_p_SC_q_SC,
+                                         okvis::ProjectionOptFXY_CXY>(
+            cameraGeometryArg, j + 100, measurement12, covariance12,
+            imuMeasCanopy, T_SC, twoTimes, tdAtCreation2, imuParameters.g);
 
     // add parameter blocks
     uint64_t id = 1u;
@@ -223,11 +221,12 @@ TEST(CeresErrorTerms, EpipolarFactor) {
                                   de_dsb[1].data()};
 
     okvis::ceres::EpipolarFactor<DistortedPinholeCameraGeometry,
-                                      okvis::ProjectionOptFXY_CXY,
-                                      okvis::Extrinsic_p_SC_q_SC>* costFuncPtr =
-        static_cast<okvis::ceres::EpipolarFactor<
-            DistortedPinholeCameraGeometry, okvis::ProjectionOptFXY_CXY,
-            okvis::Extrinsic_p_SC_q_SC>*>(epiFactor);
+                                 okvis::Extrinsic_p_SC_q_SC,
+                                 okvis::ProjectionOptFXY_CXY>* costFuncPtr =
+        static_cast<okvis::ceres::EpipolarFactor<DistortedPinholeCameraGeometry,
+                                                 okvis::Extrinsic_p_SC_q_SC,
+                                                 okvis::ProjectionOptFXY_CXY>*>(
+            epiFactor);
     costFuncPtr->EvaluateWithMinimalJacobians(parameters, &residual, jacobians,
                                               jacobiansMinimal);
 

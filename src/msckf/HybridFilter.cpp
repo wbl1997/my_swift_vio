@@ -39,8 +39,6 @@ DEFINE_double(max_proj_tolerance, 7,
 /// \brief okvis Main namespace of this package.
 namespace okvis {
 
-const okvis::Duration HybridFilter::half_window_(2, 0);
-
 // Constructor if a ceres map is already available.
 HybridFilter::HybridFilter(std::shared_ptr<okvis::ceres::Map> mapPtr)
     : Estimator(mapPtr),
@@ -450,7 +448,7 @@ bool HybridFilter::addStates(okvis::MultiFramePtr multiFrame,
     initCovariance(camIdx);
   }
   // record the imu measurements between two consecutive states
-  mStateID2Imu.push_back(imuMeasurements);
+  inertialMeasForStates_.push_back(imuMeasurements);
 
   addCovForClonedStates();
   return true;
@@ -816,7 +814,7 @@ bool HybridFilter::applyMarginalizationStrategy(
                                         .at(ImuSensorStates::SpeedAndBias)
                                         .id);
 
-      mStateID2Imu.pop_front(statesMap_.find(rit->first)->second.timestamp - half_window_);
+      inertialMeasForStates_.pop_front(statesMap_.find(rit->first)->second.timestamp - half_window_);
       multiFramePtrMap_.erase(rit->first);
 
       //            std::advance(rit, 1);
@@ -995,7 +993,7 @@ bool HybridFilter::computeHxf(const uint64_t hpbid, const MapPoint& mp,
   getSpeedAndBias(currFrameId, 0, sbj);
 
   Time stateEpoch = statesMap_.at(currFrameId).timestamp;
-  auto imuMeas = mStateID2Imu.findWindow(stateEpoch, half_window_);
+  auto imuMeas = inertialMeasForStates_.findWindow(stateEpoch, half_window_);
   OKVIS_ASSERT_GT(Exception, imuMeas.size(), 0,
                   "the IMU measurement does not exist");
 
@@ -1287,7 +1285,7 @@ bool HybridFilter::featureJacobian(
     getSpeedAndBias(poseId, 0, sbj);
 
     Time stateEpoch = statesMap_.at(poseId).timestamp;
-    auto imuMeas = mStateID2Imu.findWindow(stateEpoch, half_window_);
+    auto imuMeas = inertialMeasForStates_.findWindow(stateEpoch, half_window_);
     OKVIS_ASSERT_GT(Exception, imuMeas.size(), 0,
                     "the IMU measurement does not exist");
 
@@ -2742,7 +2740,7 @@ bool HybridFilter::EpipolarMeasurement::measurementJacobian(
 
     Time stateEpoch = filter_.statesMap_.at(poseId).timestamp;
     auto imuMeas =
-        filter_.mStateID2Imu.findWindow(stateEpoch, filter_.half_window_);
+        filter_.inertialMeasForStates_.findWindow(stateEpoch, filter_.half_window_);
     OKVIS_ASSERT_GT(Exception, imuMeas.size(), 0,
                     "the IMU measurement does not exist");
 

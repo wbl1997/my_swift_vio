@@ -144,13 +144,16 @@ int addConstraintToEstimator(
               IdA.keypointIndex, keypointIndex, hP_Ca, canBeInitialized,
               raySigma, true);
 
-          estimator.addLandmarkObservation(lmId, fIdB, im, keypointIndex);
           if (valid && canBeInitialized) {
             estimator.setLandmark(lmId, T_WCa * hP_Ca);
             estimator.setLandmarkInitialized(lmId, true);
-            estimator.replaceEpipolarWithReprojectionErrors<CAMERA_GEOMETRY_T>(lmId);
+            estimator.replaceEpipolarWithReprojectionErrors<CAMERA_GEOMETRY_T>(
+                lmId);
+            estimator.addObservation<CAMERA_GEOMETRY_T>(lmId, fIdB, im,
+                                                        keypointIndex);
           } else {
-            estimator.addEpipolarConstraint<CAMERA_GEOMETRY_T>(lmId);
+            estimator.addEpipolarConstraint<CAMERA_GEOMETRY_T>(
+                lmId, fIdB, im, keypointIndex, false);
           }
         } else { // The landmark has been initialized.
           estimator.addObservation<CAMERA_GEOMETRY_T>(lmId, fIdB, im,

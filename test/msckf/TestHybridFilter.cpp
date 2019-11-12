@@ -598,6 +598,7 @@ void testHybridFilterSinusoid(const std::string& outputPath,
       trNoisy = vio::gauss_rand(0, extrinsicsEstimationParameters.sigma_tr);
 
     std::shared_ptr<okvis::Estimator> estimator;
+    okvis::VisualConstraints constraintScheme(okvis::OnlyReprojectionErrors);
     switch (FLAGS_estimator_algorithm) {
       case 0:
         estimator.reset(new okvis::Estimator(mapPtr));
@@ -605,6 +606,7 @@ void testHybridFilterSinusoid(const std::string& outputPath,
       case 1:
       case 2:
         estimator.reset(new okvis::GeneralEstimator(mapPtr));
+        constraintScheme = okvis::OnlyTwoViewConstraints;
         break;
       case 5:
         estimator.reset(new okvis::TFVIO(mapPtr));
@@ -617,7 +619,7 @@ void testHybridFilterSinusoid(const std::string& outputPath,
 
     okvis::SimulationFrontend frontend(cameraSystem0->numCameras(),
                                        cases[c].addImageNoise,
-                                       60,
+                                       60, constraintScheme,
                                        bVerbose ? pointFile : "");
 
     estimator->addCamera(extrinsicsEstimationParameters, trNoisy);

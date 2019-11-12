@@ -277,7 +277,7 @@ bool MSCKF2::applyMarginalizationStrategy(
 
   for (size_t k = 0; k < removeFrames.size(); ++k) {
     okvis::Time removedStateTime = removeState(removeFrames[k]);
-    mStateID2Imu.pop_front(removedStateTime - half_window_);
+    inertialMeasForStates_.pop_front(removedStateTime - half_window_);
   }
 
   // update covariance matrix
@@ -342,7 +342,7 @@ bool MSCKF2::measurementJacobianAIDP(
   getSpeedAndBias(poseId, 0, sbj);
 
   Time stateEpoch = statesMap_.at(poseId).timestamp;
-  auto imuMeas = mStateID2Imu.findWindow(stateEpoch, half_window_);
+  auto imuMeas = inertialMeasForStates_.findWindow(stateEpoch, half_window_);
   OKVIS_ASSERT_GT(Exception, imuMeas.size(), 0,
                   "the IMU measurement does not exist");
 
@@ -519,7 +519,7 @@ bool MSCKF2::measurementJacobian(
   getSpeedAndBias(poseId, 0, sbj);
 
   Time stateEpoch = statesMap_.at(poseId).timestamp;
-  auto imuMeas = mStateID2Imu.findWindow(stateEpoch, half_window_);
+  auto imuMeas = inertialMeasForStates_.findWindow(stateEpoch, half_window_);
   OKVIS_ASSERT_GT(Exception, imuMeas.size(), 0,
                   "the IMU measurement does not exist");
 

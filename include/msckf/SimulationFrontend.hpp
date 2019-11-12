@@ -8,6 +8,7 @@
 #include <okvis/timing/Timer.hpp>
 
 #include <okvis/Estimator.hpp>
+#include <okvis/triangulation/ProbabilisticStereoTriangulator.hpp>
 
 #include <feature_tracker/feature_tracker.h>
 
@@ -31,7 +32,7 @@ class SimulationFrontend {
    * @param numCameras Number of cameras in the sensor configuration.
    */
   SimulationFrontend(size_t numCameras, bool addImageNoise, int maxTrackLength,
-                     std::string pointFile);
+                     VisualConstraints constraintScheme, std::string pointFile);
   virtual ~SimulationFrontend() {}
 
   ///@{
@@ -79,7 +80,8 @@ class SimulationFrontend {
   const size_t numCameras_;  ///< Number of cameras in the configuration.
   bool addImageNoise_; ///< Add noise to image observations
   int maxTrackLength_; ///< Cap feature track length
-  // used to check if a keyframe is needed
+  const VisualConstraints constraintScheme_;
+
   std::shared_ptr<okvis::MultiFrame> previousKeyframe_;
   okvis::kinematics::Transformation previousKeyframePose_;
   // the keypoint index corresponding to each scene landmark in the previous keyframe

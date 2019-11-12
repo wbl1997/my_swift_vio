@@ -19,7 +19,18 @@
 namespace okvis {
 
 /**
- * @brief A frontend using BRISK features
+ * @brief A frontend for sliding window filters mainly uses matchToLastFrame
+ * for feature association. By contrast, the OKVIS frontend uses both
+ * matchToKeyframes and matchToLastFrame. The MSCKF filter garners
+ * observations of landmarks no longer observed in the current frame for update,
+ * and removes entire feature tracks not showing up in the current frame for
+ * maintenance. But the landmark Ids recorded in multiframes are not reset in
+ * removing feature observations. Therefore, if a frontend with matchToKeyframes
+ * provides feature matches to MSCKF, it is possible that some zombie landmark
+ * Ids may cause issues in adding feature matches and in gathering observations
+ * for MSCKF. Zombie landmarks however does not exist for OKVIS which only
+ * remove feature observations in frames that are no longer in states, and are
+ * longer used for feature association.
  */
 class HybridFrontend {
  public:

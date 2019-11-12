@@ -31,7 +31,6 @@
 #include <vio/CsvReader.h>
 #include <vio/ImuErrorModel.h>
 
-#include "msckf/BoundedImuDeque.hpp"
 
 /// \brief okvis Main namespace of this package.
 namespace okvis {
@@ -291,13 +290,6 @@ class HybridFilter : public Estimator {
     return ceres::ode::OdoErrorStateDim;
   }
 
-  // The window centered at a stateEpoch for retrieving the inertial data
-  // which is used for propagating the camera pose to epochs in the window,
-  // i.e., timestamps of observations in a rolling shutter image.
-  // A value greater than (t_d + t_r)/2 is recommended.
-  // Note camera observations in MSCKF will not occur at the latest frame.
-  static const okvis::Duration half_window_;
-
   // error state: \delta p, \alpha for q, \delta v
   // state: \pi_{B_i}(=[p_{B_i}^G, q_{B_i}^G, v_{B_i}^G])
   static const int kClonedStateMinimalDimen = 9;
@@ -379,10 +371,6 @@ class HybridFilter : public Estimator {
   /// the error vector corresponds to states x_B | x_imu | x_c | \pi{B_{N-m}}
   /// ... \pi{B_{N-1}} following Li icra 2014 x_B = [^{G}p_B] ^{G}q_B ^{G}v_B
   /// b_g b_a]
-
-  // map from state ID to segments of imu measurements, the imu measurements
-  // covers the last state and current state of the id and extends on both sides
-  okvis::BoundedImuDeque mStateID2Imu;
 
   std::map<uint64_t, int>
       mStateID2CovID_;  // maps state id to the ordered cloned states in the

@@ -88,7 +88,7 @@ bool TFVIO::applyMarginalizationStrategy(
 
   for (size_t k = 0; k < removeFrames.size(); ++k) {
     okvis::Time removedStateTime = removeState(removeFrames[k]);
-    mStateID2Imu.pop_front(removedStateTime - half_window_);
+    inertialMeasForStates_.pop_front(removedStateTime - half_window_);
   }
 
   // update covariance matrix
@@ -145,7 +145,7 @@ bool TFVIO::featureJacobian(
       cov_fij(numFeatures);
   std::vector<bool> projectStatus(numFeatures);
   int projOptModelId = camera_rig_.getProjectionOptMode(camIdx);
-  for (int j = 0; j < numFeatures; ++j) {
+  for (size_t j = 0; j < numFeatures; ++j) {
       double pixelNoiseStd = imagePointNoiseStds[2 * j];
       bool projectOk = obsDirectionJacobian(obsDirections[j], tempCameraGeometry, projOptModelId,
                              pixelNoiseStd, &dfj_dXcam[j], &cov_fij[j]);
