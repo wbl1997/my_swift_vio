@@ -81,7 +81,7 @@ class SimulationFrontend {
   bool addImageNoise_; ///< Add noise to image observations
   int maxTrackLength_; ///< Cap feature track length
   const VisualConstraints constraintScheme_;
-
+  static const bool singleTwoViewConstraint_ = false;
   std::shared_ptr<okvis::MultiFrame> previousKeyframe_;
   okvis::kinematics::Transformation previousKeyframePose_;
   // the keypoint index corresponding to each scene landmark in the previous keyframe

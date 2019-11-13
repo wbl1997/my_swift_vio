@@ -507,20 +507,20 @@ void testHybridFilterSinusoid(const std::string& outputPath,
       case 2:
         cst.reset(new imu::RoundedSquare(
             imuParameters.rate, Eigen::Vector3d(0, 0, -imuParameters.g)));
-        projOptModelName = "FIXED";
+//        projOptModelName = "FIXED";
         extrinsicModelName = "FIXED";
         break;
       case 3:
         cst.reset(new imu::RoundedSquare(
             imuParameters.rate, Eigen::Vector3d(0, 0, -imuParameters.g),
             okvis::Time(0, 0), 1.0, 0, 0.8));
-        projOptModelName = "FIXED";
+//        projOptModelName = "FIXED";
         break;
       case 4:
         cst.reset(new imu::RoundedSquare(
             imuParameters.rate, Eigen::Vector3d(0, 0, -imuParameters.g),
             okvis::Time(0, 0), 1e-3, 0, 0.8e-3));
-        projOptModelName = "FIXED";
+//        projOptModelName = "FIXED";
         break;
       case 1:
       default:

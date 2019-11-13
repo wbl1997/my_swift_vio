@@ -361,7 +361,8 @@ int SimulationFrontend::addMatchToEstimator(
             estimator.addEpipolarConstraint<CAMERA_GEOMETRY_T>(
                 lmIdPrevious, currFrames->id(),
                 landmarkMatch.currentKeypoint.cameraIndex,
-                landmarkMatch.currentKeypoint.keypointIndex, false);
+                landmarkMatch.currentKeypoint.keypointIndex,
+                singleTwoViewConstraint_);
             break;
           case TwoViewAndReprojection:
             break;
@@ -429,12 +430,19 @@ int SimulationFrontend::addMatchToEstimator(
                 IdB.keypointIndex);
             break;
           case OnlyTwoViewConstraints:
-            estimator.addLandmarkObservation(landmarkMatch.landmarkId,
-                                             IdA.frameId, IdA.cameraIndex,
-                                             IdA.keypointIndex);
+            if (estimator.numObservations(landmarkMatch.landmarkId) + 1 <
+                estimator.minTrackLength()) {
+              estimator.addLandmarkObservation(landmarkMatch.landmarkId,
+                                               IdA.frameId, IdA.cameraIndex,
+                                               IdA.keypointIndex);
+            } else {
+              estimator.addEpipolarConstraint<CAMERA_GEOMETRY_T>(
+                  landmarkMatch.landmarkId, IdA.frameId, IdA.cameraIndex,
+                  IdA.keypointIndex, singleTwoViewConstraint_);
+            }
             estimator.addEpipolarConstraint<CAMERA_GEOMETRY_T>(
                 landmarkMatch.landmarkId, IdB.frameId, IdB.cameraIndex,
-                IdB.keypointIndex);
+                IdB.keypointIndex, singleTwoViewConstraint_);
             break;
           case TwoViewAndReprojection:
             break;

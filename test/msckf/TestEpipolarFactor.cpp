@@ -100,7 +100,7 @@ TEST(CeresErrorTerms, EpipolarFactor) {
     }
   }
   LOG(INFO) << "Found " << numValidPoint << " visible in both views out of "
-            << attempts << "tries.";
+            << attempts << " tries.";
   std::shared_ptr<const DistortedPinholeCameraGeometry> cameraGeometryArg =
       std::static_pointer_cast<const DistortedPinholeCameraGeometry>(
           cameraGeometry0);
@@ -127,12 +127,23 @@ TEST(CeresErrorTerms, EpipolarFactor) {
         imuMeasCanopy{imuMeasurements, imuMeasurements};
 
     std::vector<double> tdAtCreation2{tdAtCreation, tdAtCreation};
+
+    std::vector<okvis::ceres::SpeedAndBias,
+                Eigen::aligned_allocator<okvis::ceres::SpeedAndBias>>
+        sb2(2);
+    for (int j = 0; j < 2; ++j) {
+      okvis::ceres::SpeedAndBias sb;
+      sb.setZero();
+      sb.head<3>() = two_vW[j] + Eigen::Vector3d::Random();
+      sb2[j] = sb;
+    }
+
     ::ceres::CostFunction* epiFactor =
         new okvis::ceres::EpipolarFactor<DistortedPinholeCameraGeometry,
                                          okvis::Extrinsic_p_SC_q_SC,
                                          okvis::ProjectionOptFXY_CXY>(
             cameraGeometryArg, j + 100, measurement12, covariance12,
-            imuMeasCanopy, T_SC, twoTimes, tdAtCreation2, imuParameters.g);
+            imuMeasCanopy, T_SC, twoTimes, tdAtCreation2, sb2, imuParameters.g);
 
     // add parameter blocks
     uint64_t id = 1u;
@@ -170,29 +181,13 @@ TEST(CeresErrorTerms, EpipolarFactor) {
     okvis::ceres::CameraTimeParamBlock tdParamBlock(timeOffset, id++,
                                                     twoTimes[0]);
 
-    okvis::ceres::SpeedAndBias sb2[2];
-    for (int j = 0; j < 2; ++j) {
-      okvis::ceres::SpeedAndBias sb;
-      sb.setZero();
-      sb.head<3>() = two_vW[j] + Eigen::Vector3d::Random();
-      sb2[j] = sb;
-    }
-    okvis::ceres::SpeedAndBiasParameterBlock sbBlock[2] = {
-        okvis::ceres::SpeedAndBiasParameterBlock(sb2[0], id++,
-                                                 twoTimes[0]),
-        okvis::ceres::SpeedAndBiasParameterBlock(sb2[1], id++,
-                                                 twoTimes[1]),
-    };
-
     double const* const parameters[] = {poseParameterBlock0.parameters(),
                                         poseParameterBlock1.parameters(),
                                         extrinsicsParameterBlock.parameters(),
                                         projectionParamBlock.parameters(),
                                         distortionParamBlock.parameters(),
                                         trParamBlock.parameters(),
-                                        tdParamBlock.parameters(),
-                                        sbBlock[0].parameters(),
-                                        sbBlock[1].parameters()};
+                                        tdParamBlock.parameters()};
     double residual;
     Eigen::Matrix<double, 1, 7, Eigen::RowMajor> de_dT_WS[2];
     Eigen::Matrix<double, 1, 7, Eigen::RowMajor> de_dT_SC;
@@ -203,22 +198,18 @@ TEST(CeresErrorTerms, EpipolarFactor) {
     Eigen::Matrix<double, 1, distortionDim, Eigen::RowMajor> de_ddistortion;
     Eigen::Matrix<double, 1, 1> de_dtr;
     Eigen::Matrix<double, 1, 1> de_dtd;
-    Eigen::Matrix<double, 1, 9, Eigen::RowMajor> de_dsb[2];
 
     double* jacobians[] = {de_dT_WS[0].data(),    de_dT_WS[1].data(),
                            de_dT_SC.data(),       de_dproj_intrinsic.data(),
                            de_ddistortion.data(), de_dtr.data(),
-                           de_dtd.data(),         de_dsb[0].data(),
-                           de_dsb[1].data()};
+                           de_dtd.data()};
     double* jacobiansMinimal[] = {de_dT_WS_minimal[0].data(),
                                   de_dT_WS_minimal[1].data(),
                                   de_dT_SC_minimal.data(),
                                   de_dproj_intrinsic.data(),
                                   de_ddistortion.data(),
                                   de_dtr.data(),
-                                  de_dtd.data(),
-                                  de_dsb[0].data(),
-                                  de_dsb[1].data()};
+                                  de_dtd.data()};
 
     okvis::ceres::EpipolarFactor<DistortedPinholeCameraGeometry,
                                  okvis::Extrinsic_p_SC_q_SC,
@@ -247,7 +238,6 @@ TEST(CeresErrorTerms, EpipolarFactor) {
     Eigen::Matrix<double, -1, -1, Eigen::RowMajor> de_ddistortion_numeric(1, distortionDim);
     Eigen::Matrix<double, 1, 1> de_dtr_numeric;
     Eigen::Matrix<double, 1, 1> de_dtd_numeric;
-    Eigen::Matrix<double, 1, 9, Eigen::RowMajor> de_dsb_numeric[2];
     simul::computeNumericJacPose(poseParameterBlock0, costFuncPtr, parameters,
                                  residualMat, &de_dT_WS_numeric[0], false);
     simul::computeNumericJacPose(poseParameterBlock0, costFuncPtr, parameters,
@@ -273,10 +263,7 @@ TEST(CeresErrorTerms, EpipolarFactor) {
                              residualMat, &de_dtr_numeric);
     simul::computeNumericJac<Eigen::Matrix<double, 1, 1>>(tdParamBlock, costFuncPtr, parameters,
                              residualMat, &de_dtd_numeric);
-    simul::computeNumericJac<Eigen::Matrix<double, 1, 9>>(sbBlock[0], costFuncPtr, parameters,
-                             residualMat, &de_dsb_numeric[0]);
-    simul::computeNumericJac<Eigen::Matrix<double, 1, 9>>(sbBlock[1], costFuncPtr, parameters,
-                             residualMat, &de_dsb_numeric[1]);
+
     double tol = 1e-5;
     ARE_MATRICES_CLOSE(de_dT_WS_numeric[0], de_dT_WS[0], tol);
     ARE_MATRICES_CLOSE(de_dT_WS_numeric[1], de_dT_WS[1], tol);
@@ -290,12 +277,8 @@ TEST(CeresErrorTerms, EpipolarFactor) {
     tol = 1e-6;
     ARE_MATRICES_CLOSE(de_dtr_numeric, de_dtr, tol);
     ARE_MATRICES_CLOSE(de_dtd_numeric, de_dtd, tol);
-    ARE_MATRICES_CLOSE(de_dsb_numeric[0], de_dsb[0], tol);
-    ARE_MATRICES_CLOSE(de_dsb_numeric[1], de_dsb[1], tol);
     LOG(INFO) << "de_dtr " << de_dtr << " numeric " << de_dtr_numeric;
     LOG(INFO) << "de_dtd " << de_dtd << " numeric " << de_dtd_numeric;
-    LOG(INFO) << "de_dsb0 " << de_dsb[0] << " numeric " << de_dsb_numeric[0];
-    LOG(INFO) << "de_dsb1 " << de_dsb[1] << " numeric " << de_dsb_numeric[1];
 
     // TODO(jhuai): add to the ceres solver for optimization
   }
