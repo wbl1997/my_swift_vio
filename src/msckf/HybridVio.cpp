@@ -70,11 +70,11 @@ HybridVio::HybridVio(okvis::VioParameters &parameters)
                             parameters.imu.rate /
                             parameters.sensors_information.cameraRate) {
   switch (FLAGS_estimator_algorithm) {
-    case 1:
+    case 4:
       estimator_.reset(
           new okvis::MSCKF2());
       break;
-    case 2:
+    case 5:
       estimator_.reset(new okvis::TFVIO());
       break;
     default:

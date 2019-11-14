@@ -81,5 +81,16 @@ TEST(EigenMatrix, RowMajor) {
   EXPECT_TRUE(expectedRow5.isApprox(row5, 1e-8));
 
 //  Eigen::Matrix<double, 4, 1, Eigen::RowMajor> col4; // compile error
-
 }
+
+TEST(EigenMatrix, DynamicResize) {
+  Eigen::MatrixXd mat;
+  mat.resize(0, 5);
+  EXPECT_EQ(mat.rows(), 0);
+  EXPECT_EQ(mat.cols(), 5);
+
+  mat.resize(3, Eigen::NoChange);
+  EXPECT_EQ(mat.rows(), 3);
+  EXPECT_EQ(mat.cols(), 5);
+}
+

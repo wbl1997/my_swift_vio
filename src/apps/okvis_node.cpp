@@ -130,14 +130,15 @@ int main(int argc, char **argv) {
   std::shared_ptr<okvis::VioInterface> okvis_estimator;
   switch (FLAGS_estimator_algorithm) {
     case 0:
-    case 4:
+    case 1:
+    case 2:
       parameters.optimization.algorithm = FLAGS_estimator_algorithm;
       // http://eigen.tuxfamily.org/bz/show_bug.cgi?id=1049
       okvis_estimator.reset(new okvis::ThreadedKFVio(parameters));
       break;
-    case 1:
-    case 2:
-    case 3:
+    case 4:
+    case 5:
+    case 6:
       okvis_estimator.reset(new okvis::HybridVio(parameters));
       break;
     default:

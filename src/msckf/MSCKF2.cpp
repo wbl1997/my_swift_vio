@@ -31,6 +31,10 @@ DEFINE_bool(use_IEKF, false,
             "use iterated EKF in optimization, empirically IEKF cost at"
             "least twice as much time as EKF");
 
+DEFINE_bool(msckf_use_epipolar_constraint, true,
+            "use epipolar constraints in case of low disparity or "
+            "triangulation failure");
+
 /// \brief okvis Main namespace of this package.
 namespace okvis {
 
@@ -138,6 +142,7 @@ int MSCKF2::marginalizeRedundantFrames(size_t maxClonedStates) {
     Eigen::Matrix<double, Eigen::Dynamic, 1> r_oi;  //(nObsDim, 1)
     Eigen::MatrixXd R_oi;                           //(nObsDim, nObsDim)
 
+    // TODO(jhuai): do we consider the two view constraints here?
     bool isValidJacobian =
         featureJacobian(it->second, H_oi, r_oi, R_oi, &involved_cam_state_ids);
     if (!isValidJacobian) {
@@ -664,9 +669,9 @@ bool MSCKF2::featureJacobian(const MapPoint &mp, Eigen::MatrixXd &H_oi,
       auto anchorIter = std::find_if(obsMap.begin(), obsMap.end(), IsObservedInFrame(anchorId));
       anchorSeqId = std::distance(obsMap.begin(), anchorIter);
     }
-    bool bSucceeded =
-        triangulateAMapPoint(mp, obsInPixel, frameIds, v4Xhomog, vRi,
-                             tempCameraGeometry, T_SC0_, anchorSeqId);
+    bool bSucceeded = triangulateAMapPoint(
+        mp, obsInPixel, frameIds, v4Xhomog, vRi, tempCameraGeometry, T_SC0_,
+        anchorSeqId, FLAGS_msckf_use_epipolar_constraint);
 
     if (!bSucceeded) {
       computeHTimer.stop();
@@ -774,9 +779,9 @@ bool MSCKF2::featureJacobian(const MapPoint &mp, Eigen::MatrixXd &H_oi,
     return true;
   } else {
     // The landmark is expressed with Euclidean coordinates in the global frame
-    bool bSucceeded =
-        triangulateAMapPoint(mp, obsInPixel, frameIds, v4Xhomog, vRi,
-                             tempCameraGeometry, T_SC0_);
+    bool bSucceeded = triangulateAMapPoint(mp, obsInPixel, frameIds, v4Xhomog,
+                                           vRi, tempCameraGeometry, T_SC0_, -1,
+                                           FLAGS_msckf_use_epipolar_constraint);
     if (!bSucceeded) {
       computeHTimer.stop();
       return false;
@@ -914,12 +919,19 @@ int MSCKF2::computeStackedJacobianAndResidual(
     }
 
     Eigen::MatrixXd H_oi;                           //(nObsDim, dimH_o[1])
+    H_oi.resize(0, featureVariableDimen);
     Eigen::Matrix<double, Eigen::Dynamic, 1> r_oi;  //(nObsDim, 1)
     Eigen::MatrixXd R_oi;                           //(nObsDim, nObsDim)
     bool isValidJacobian = featureJacobian(it->second, H_oi, r_oi, R_oi);
     if (!isValidJacobian) {
-      ++culledPoints[0];
-      continue;
+      isValidJacobian = FLAGS_msckf_use_epipolar_constraint
+                            ? featureJacobianEpipolar(it->second, &H_oi, &r_oi,
+                                                      &R_oi, ENTIRE_TRACK)
+                            : isValidJacobian;
+      if (!isValidJacobian) {
+        ++culledPoints[0];
+        continue;
+      }
     }
 
     if (!FilterHelper::gatingTest(H_oi, r_oi, R_oi, variableCov)) {

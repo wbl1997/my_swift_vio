@@ -153,6 +153,21 @@ class HybridFilter : public Estimator {
       RetrieveObsSeqType seqType=ENTIRE_TRACK) const;
 
   /**
+   * @brief hasLowDisparity check if a feature track has low disparity at its endpoints
+   * @param obsDirections [x, y, 1]
+   * @param T_WSs assume the poses are either optimized or propagated with IMU data
+   * @return true if low disparity at its endpoints
+   */
+  bool hasLowDisparity(
+      const std::vector<Eigen::Vector3d,
+                        Eigen::aligned_allocator<Eigen::Vector3d>>
+          &obsDirections,
+      const std::vector<
+          okvis::kinematics::Transformation,
+          Eigen::aligned_allocator<okvis::kinematics::Transformation>> &T_WSs,
+      const kinematics::Transformation &T_SC0) const;
+
+  /**
    * @brief triangulateAMapPoint, does not support rays which arise from static
    * mode, pure rotation, or points at infinity. Assume the same camera model
    * for all observations, and rolling shutter effect is not accounted for
@@ -177,8 +192,8 @@ class HybridFilter : public Estimator {
       std::vector<uint64_t> &frameIds, Eigen::Vector4d &v4Xhomog,
       std::vector<double> &vSigmai,
       const std::shared_ptr<okvis::cameras::CameraBase> cameraGeometry,
-      const okvis::kinematics::Transformation &T_SC0,
-      int anchorSeqId = -1) const;
+      const okvis::kinematics::Transformation &T_SC0, int anchorSeqId = -1,
+      bool checkDisparity = false) const;
   /**
    * @brief computeHxf, compute the residual and Jacobians for a SLAM feature i
    * observed in current frame
@@ -364,6 +379,22 @@ class HybridFilter : public Estimator {
     std::vector<Eigen::Matrix3d, Eigen::aligned_allocator<Eigen::Matrix3d>>
         cov_fj2;
   };
+
+  /**
+   * @brief featureJacobian
+   * @warn Number of columns of Hi equals to the required variable dimen.
+   * @param mp MapPoint from which all observations are retrieved
+   * @param Hi de_dX.
+   * @param ri residual 0 - \hat{e}
+   * @param Ri cov(\hat{e})
+   * @return true if Jacobian is computed successfully
+   */
+  bool featureJacobianEpipolar(
+      const MapPoint &mp,
+      Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> *Hi,
+      Eigen::Matrix<double, Eigen::Dynamic, 1> *ri,
+      Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> *Ri,
+      RetrieveObsSeqType seqType) const;
 
   Eigen::MatrixXd
       covariance_;  ///< covariance of the error vector of all states, error is

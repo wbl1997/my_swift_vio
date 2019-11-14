@@ -73,18 +73,7 @@ class TFVIO : public HybridFilter {
  private:
   uint64_t getMinValidStateID() const;
 
-  /**
-   * @brief featureJacobian
-   * @param mp MapPoint from which all observations are retrieved
-   * @param Hi de_dX
-   * @param ri residual 0 - \hat{e}
-   * @param Ri cov(\hat{e})
-   * @return true if Jacobian is computed successfully
-   */
-  bool featureJacobian(const MapPoint& mp,
-                       Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic>* Hi,
-                       Eigen::Matrix<double, Eigen::Dynamic, 1>* ri,
-                       Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic>* Ri) const;
+
 
   int computeStackedJacobianAndResidual(
       Eigen::MatrixXd* T_H, Eigen::Matrix<double, Eigen::Dynamic, 1>* r_q,
