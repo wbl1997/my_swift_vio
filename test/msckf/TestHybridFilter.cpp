@@ -624,6 +624,7 @@ void testHybridFilterSinusoid(const std::string& outputPath,
       case 6:
         estimator.reset(new okvis::MSCKF2(mapPtr));
         FLAGS_msckf_use_epipolar_constraint=true;
+        break;
       case 4:
       default:
         estimator.reset(new okvis::MSCKF2(mapPtr));
