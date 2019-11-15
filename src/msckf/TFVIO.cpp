@@ -24,7 +24,7 @@ DECLARE_bool(use_IEKF);
 DECLARE_double(max_proj_tolerance);
 
 DEFINE_int32(
-    two_view_constraint_scheme, 2,
+    two_view_obs_seq_type, 2,
     "0 the entire feature track of a landmark is used to "
     "compose two-view constraints which are used in one filter update step "
     "as the landmark disappears; "
@@ -119,7 +119,7 @@ int TFVIO::computeStackedJacobianAndResidual(
   std::vector<Eigen::MatrixXd, Eigen::aligned_allocator<Eigen::MatrixXd>> vH;
   std::vector<Eigen::MatrixXd, Eigen::aligned_allocator<Eigen::MatrixXd>> vR;
   RetrieveObsSeqType seqType =
-      static_cast<RetrieveObsSeqType>(FLAGS_two_view_constraint_scheme);
+      static_cast<RetrieveObsSeqType>(FLAGS_two_view_obs_seq_type);
   for (auto it = landmarksMap_.begin(); it != landmarksMap_.end(); ++it) {
     ResidualizeCase rc = it->second.residualizeCase;
     const size_t nNumObs = it->second.observations.size();
@@ -138,8 +138,6 @@ int TFVIO::computeStackedJacobianAndResidual(
     Eigen::Matrix<double, Eigen::Dynamic, 1> ri;
     Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> Ri;
 
-    RetrieveObsSeqType seqType =
-        static_cast<RetrieveObsSeqType>(FLAGS_two_view_constraint_scheme);
     bool isValidJacobian = featureJacobianEpipolar(it->second, &Hi, &ri, &Ri, seqType);
     if (!isValidJacobian) {
       continue;

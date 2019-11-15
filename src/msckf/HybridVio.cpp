@@ -19,8 +19,8 @@
 DEFINE_int32(
     estimator_algorithm, 1,
     "0 and 1 for okvis optimization paired with ThreadedKFVio. "
-    "0 okvis original estimator, 1 okvis general estimator, 2 pavio.\n"
-    "4 for msckf, 5 for triangulation free vio, 6 for hybrid filter, "
+    "0 okvis original estimator, 1 general estimator.\n"
+    "4 for msckf, 5 for triangulation free vio, 6 for pavio, "
     "4, 5, and 6 are paired with HybridVio.\n"
     "This flag will overwrite parameters.optimization.algorithm");
 
@@ -71,6 +71,7 @@ HybridVio::HybridVio(okvis::VioParameters &parameters)
                             parameters.sensors_information.cameraRate) {
   switch (FLAGS_estimator_algorithm) {
     case 4:
+    case 6:
       estimator_.reset(
           new okvis::MSCKF2());
       break;
