@@ -196,17 +196,14 @@ int MSCKF2::marginalizeRedundantFrames(size_t maxClonedStates) {
   // remove observations in removed frames
   for (okvis::PointMap::iterator it = landmarksMap_.begin(); it != landmarksMap_.end();
        ++it) {
-    // this feature has been marginalized earlier in optimize(),
-    // will be delete in applyMarginalizationStrategy
-    if (it->second.residualizeCase ==
-        NotInState_NotTrackedNow) {
-      continue;
-    }
     std::map<okvis::KeypointIdentifier, uint64_t>& obsMap = it->second.observations;
     for (auto camStateId : rm_cam_state_ids) {
       auto obsIter = std::find_if(obsMap.begin(), obsMap.end(),
                                   IsObservedInFrame(camStateId));
       if (obsIter != obsMap.end()) {
+        const KeypointIdentifier& kpi = obsIter->first;
+        multiFramePtrMap_.at(kpi.frameId)
+            ->setLandmarkId(kpi.cameraIndex, kpi.keypointIndex, 0);
         if (obsIter->second) {
           mapPtr_->removeResidualBlock(
               reinterpret_cast<::ceres::ResidualBlockId>(obsIter->second));
@@ -258,21 +255,20 @@ bool MSCKF2::applyMarginalizationStrategy(
   // remove features tracked no more
   for (PointMap::iterator pit = landmarksMap_.begin();
        pit != landmarksMap_.end();) {
-    if (pit->second.residualizeCase ==
-        NotInState_NotTrackedNow) {
-
-      ceres::Map::ResidualBlockCollection residuals =
-          mapPtr_->residuals(pit->first);
-      ++mTrackLengthAccumulator[residuals.size()];
-      for (size_t r = 0; r < residuals.size(); ++r) {
-        std::shared_ptr<ceres::ReprojectionErrorBase> reprojectionError =
-            std::dynamic_pointer_cast<ceres::ReprojectionErrorBase>(
-                residuals[r].errorInterfacePtr);
-        OKVIS_ASSERT_TRUE(Exception, reprojectionError,
-                          "Wrong index of reprojection error");
-        removeObservation(residuals[r].residualBlockId);
+    if (pit->second.residualizeCase == NotInState_NotTrackedNow) {
+      const MapPoint& mapPoint = pit->second;
+      ++mTrackLengthAccumulator[mapPoint.observations.size()];
+      for (std::map<okvis::KeypointIdentifier, uint64_t>::const_iterator it =
+               mapPoint.observations.begin();
+           it != mapPoint.observations.end(); ++it) {
+        if (it->second) {
+          mapPtr_->removeResidualBlock(
+              reinterpret_cast<::ceres::ResidualBlockId>(it->second));
+        }
+        const KeypointIdentifier& kpi = it->first;
+        multiFramePtrMap_.at(kpi.frameId)
+            ->setLandmarkId(kpi.cameraIndex, kpi.keypointIndex, 0);
       }
-
       mapPtr_->removeParameterBlock(pit->first);
       pit = landmarksMap_.erase(pit);
     } else {
@@ -1087,7 +1083,8 @@ void MSCKF2::optimize(size_t /*numIter*/, size_t /*numThreads*/, bool verbose) {
           NotInState_NotTrackedNow)
         continue;
       // this happens with a just inserted landmark without triangulation.
-      if (it->second.observations.size() < 2) continue;
+      OKVIS_ASSERT_GE(Exception, it->second.observations.size(), 2,
+                      "A landmark has to have at least two obs");
 
       auto itObs = it->second.observations.begin();
       if (itObs->first.frameId < minValidStateID) {
