@@ -42,6 +42,9 @@ DEFINE_double(
     image_noise_cov_multiplier, 4.0,
     "Enlarge the image observation noise covariance by this multiplier.");
 
+DEFINE_double(sigma_keypoint_size, 8.0,
+              "The keypoint size for checking low disparity");
+
 /// \brief okvis Main namespace of this package.
 namespace okvis {
 
@@ -2351,7 +2354,7 @@ bool HybridFilter::hasLowDisparity(
   Eigen::VectorXd intrinsics;
   camera_rig_.getCameraGeometry(0)->getIntrinsics(intrinsics);
   double focalLength = intrinsics[0];
-  double keypointAStdDev = 0.8 * 8.0 / 12.0;
+  double keypointAStdDev = 0.8 * FLAGS_sigma_keypoint_size / 12.0;
   const double fourthRoot2 = 1.1892071150;
   double raySigma = fourthRoot2 * keypointAStdDev / focalLength;
   Eigen::Vector3d rayA_inA = obsDirections.front().normalized();
