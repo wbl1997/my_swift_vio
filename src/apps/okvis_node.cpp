@@ -36,7 +36,8 @@ DEFINE_int32(
     "0, direct results to ROS publishers, other options save results to csvs"
     "1, save states, 2, save states and camera extrinsics, "
     "3, save states, and all calibration parameters, 4, save states,"
-    "all calibration parameters, feature tracks, and landmarks");
+    "all calibration parameters, feature tracks, and landmarks."
+    "3 currently do not support okvis");
 
 DEFINE_int32(load_input_option, 1,
              "0, get input by subscribing to ros topics"
