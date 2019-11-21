@@ -854,7 +854,7 @@ void HybridVio::publisherLoop() {
     // call all user callbacks
     if (stateCallback_ && !result.onlyPublishLandmarks)
       stateCallback_(result.stamp, result.T_WS);
-    if (!result.onlyPublishLandmarks && result.isKeyframe) {
+    if (!result.onlyPublishLandmarks/* && result.isKeyframe*/) {
       if (fullStateCallback_)
         fullStateCallback_(result.stamp, result.T_WS, result.speedAndBiases,
                            result.omega_S, result.frameIdInSource);

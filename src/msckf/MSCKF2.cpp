@@ -194,9 +194,11 @@ int MSCKF2::marginalizeRedundantFrames(size_t maxClonedStates) {
   }
 
   // remove observations in removed frames
-  for (okvis::PointMap::iterator it = landmarksMap_.begin(); it != landmarksMap_.end();
-       ++it) {
-    std::map<okvis::KeypointIdentifier, uint64_t>& obsMap = it->second.observations;
+  for (okvis::PointMap::iterator it = landmarksMap_.begin();
+       it != landmarksMap_.end();) {
+    std::map<okvis::KeypointIdentifier, uint64_t>& obsMap =
+        it->second.observations;
+    bool removeAllEpipolarConstraints = false;
     for (auto camStateId : rm_cam_state_ids) {
       auto obsIter = std::find_if(obsMap.begin(), obsMap.end(),
                                   IsObservedInFrame(camStateId));
@@ -207,9 +209,42 @@ int MSCKF2::marginalizeRedundantFrames(size_t maxClonedStates) {
         if (obsIter->second) {
           mapPtr_->removeResidualBlock(
               reinterpret_cast<::ceres::ResidualBlockId>(obsIter->second));
+        } else {
+          if (obsIter == obsMap.begin()) {
+            // this is a head obs for epipolar constraints, remove all of them
+            removeAllEpipolarConstraints = true;
+          }  // else do nothing. This can happen if we removed an epipolar
+             // constraint in a previous step and up to now the landmark has not
+             // been initialized so its observations are not converted to
+             // reprojection errors.
         }
         obsMap.erase(obsIter);
       }
+    }
+    if (removeAllEpipolarConstraints) {
+      std::map<okvis::KeypointIdentifier, uint64_t>& obsMap =
+          it->second.observations;
+      for (auto& obsItem : obsMap) {
+        if (obsItem.second) {
+          ::ceres::ResidualBlockId rid =
+              reinterpret_cast<::ceres::ResidualBlockId>(obsItem.second);
+
+          std::shared_ptr<const okvis::ceres::ErrorInterface> err =
+              mapPtr_->errorInterfacePtr(rid);
+
+          OKVIS_ASSERT_EQ(Exception, err->residualDim(), 1,
+                          "Head obs not associated to a residual means that "
+                          "the following are all epipolar constraints");
+          mapPtr_->removeResidualBlock(rid);
+          obsItem.second = 0u;
+        }
+      }
+    }
+    if (obsMap.size() == 0u) {
+      mapPtr_->removeParameterBlock(it->first);
+      it = landmarksMap_.erase(it);
+    } else {
+      ++it;
     }
   }
 
@@ -1082,9 +1117,10 @@ void MSCKF2::optimize(size_t /*numIter*/, size_t /*numThreads*/, bool verbose) {
       if (it->second.residualizeCase ==
           NotInState_NotTrackedNow)
         continue;
-      // this happens with a just inserted landmark without triangulation.
-      OKVIS_ASSERT_GE(Exception, it->second.observations.size(), 2,
-                      "A landmark has to have at least two obs");
+      // #Obs may be 1 for a new landmark by the KLT tracking frontend.
+      // It ought to be >= 2 for descriptor matching frontend.
+      if (it->second.observations.size() < 2)
+        continue;
 
       auto itObs = it->second.observations.begin();
       if (itObs->first.frameId < minValidStateID) {
