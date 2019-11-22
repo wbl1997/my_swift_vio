@@ -162,21 +162,6 @@ int TFVIO::computeStackedJacobianAndResidual(
   return dimH[0];
 }
 
-uint64_t TFVIO::getMinValidStateID() const {
-  uint64_t min_state_id = statesMap_.rbegin()->first;
-  for (auto it = landmarksMap_.begin(); it != landmarksMap_.end(); ++it) {
-    if (it->second.residualizeCase == NotInState_NotTrackedNow) continue;
-
-    auto itObs = it->second.observations.begin();
-    if (itObs->first.frameId <
-        min_state_id) {  // this assume that it->second.observations is an
-                         // ordered map
-      min_state_id = itObs->first.frameId;
-    }
-  }
-  return min_state_id;
-}
-
 void TFVIO::optimize(size_t /*numIter*/, size_t /*numThreads*/, bool verbose) {
   uint64_t currFrameId = currentFrameId();
   OKVIS_ASSERT_EQ(Exception, covariance_.rows() - startIndexOfClonedStates(),
@@ -277,17 +262,11 @@ void TFVIO::optimize(size_t /*numIter*/, size_t /*numThreads*/, bool verbose) {
   {
     updateLandmarksTimer.start();
     retrieveEstimatesOfConstants();  // do this because states are just updated
-    minValidStateID = statesMap_.rbegin()->first;
+    minValidStateID = getMinValidStateID();
     for (auto it = landmarksMap_.begin(); it != landmarksMap_.end(); ++it) {
       if (it->second.residualizeCase == NotInState_NotTrackedNow) continue;
       // this happens with a just inserted landmark without triangulation.
       if (it->second.observations.size() < 2) continue;
-
-      auto itObs = it->second.observations.begin();
-      if (itObs->first.frameId < minValidStateID) {
-        // this assume that it->second.observations is an ordered map
-        minValidStateID = itObs->first.frameId;
-      }
 
       // update coordinates of map points, this is only necessary when
       // (1) they are used to predict the points projection in new frames OR

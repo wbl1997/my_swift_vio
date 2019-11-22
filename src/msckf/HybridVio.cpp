@@ -548,7 +548,7 @@ void HybridVio::matchingLoop() {
       waitForOptimizationTimer.stop();
       addStateTimer.start();
       okvis::Time t0Matching = okvis::Time::now();
-      bool asKeyframe = true;  // for msckf always set a frame as keyframe
+      bool asKeyframe = false;  // for msckf always set a frame as keyframe
       if (estimator_->addStates(frame, imuData, asKeyframe)) {
         lastAddedStateTimestamp_ = frame->timestamp();
         addStateTimer.stop();

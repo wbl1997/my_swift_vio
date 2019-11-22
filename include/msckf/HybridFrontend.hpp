@@ -427,6 +427,24 @@ class HybridFrontend {
       uint64_t olderFrameId, bool initializePose, bool removeOutliers,
       bool& rotationOnly);
 
+  /**
+   * @brief Check the relative motion between current frame and an older frame,
+   * and record the relative motion in the estimator. If overlap area or
+   * matching ratio in the overlap area between the two frames does not meet
+   * thresholds, the current frame will be chosen as a keyframe.
+   * @param estimator
+   * @param params
+   * @param currentFrameId
+   * @param olderFrameId
+   * @param removeOutliers
+   * @param asKeyframe
+   * @return
+   */
+  int runRansac2d2d(okvis::HybridFilter& estimator,
+                    const okvis::VioParameters& params, uint64_t currentFrameId,
+                    uint64_t olderFrameId, bool removeOutliers,
+                    bool* asKeyframe);
+
   /// (re)instantiates feature detectors and descriptor extractors. Used after
   /// settings changed or at startup.
   void initialiseBriskFeatureDetectors();

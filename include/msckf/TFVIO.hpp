@@ -71,9 +71,6 @@ class TFVIO : public HybridFilter {
                         bool verbose = false) final;
 
  private:
-  uint64_t getMinValidStateID() const;
-
-
 
   int computeStackedJacobianAndResidual(
       Eigen::MatrixXd* T_H, Eigen::Matrix<double, Eigen::Dynamic, 1>* r_q,

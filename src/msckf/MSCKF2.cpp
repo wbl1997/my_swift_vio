@@ -48,47 +48,30 @@ MSCKF2::~MSCKF2() {}
 
 void MSCKF2::findRedundantCamStates(
     std::vector<uint64_t>* rm_cam_state_ids) {
-  // Move the iterator to the key position.
-  auto key_cam_state_iter = statesMap_.end();
-  for (int i = 0; i < minCulledFrames_ + 2; ++i)
-    --key_cam_state_iter;
-  auto cam_state_iter = key_cam_state_iter;
-  ++cam_state_iter;
-  auto first_cam_state_iter = statesMap_.begin();
-
-  // Pose of the key camera state.
-  okvis::kinematics::Transformation key_T_WS;
-  get_T_WS(key_cam_state_iter->first, key_T_WS);
-
-  const Eigen::Vector3d key_position = key_T_WS.r();
-  const Eigen::Matrix3d key_rotation = key_T_WS.C();
-
-  // Mark the camera states to be removed based on the
-  // motion between states.
   int closeFrames(0), oldFrames(0);
-  for (int i = 0; i < minCulledFrames_; ++i) {
-    okvis::kinematics::Transformation T_WS;
-    get_T_WS(cam_state_iter->first, T_WS);
-
-    const Eigen::Vector3d position = T_WS.r();
-    const Eigen::Matrix3d rotation = T_WS.C();
-
-    double distance = (position-key_position).norm();
-    double angle = Eigen::AngleAxisd(
-        rotation*key_rotation.transpose()).angle();
-
-    if (angle < rotationThreshold_ &&
-        distance < translationThreshold_ &&
-        trackingRate_ > trackingRateThreshold_) {
-      rm_cam_state_ids->push_back(cam_state_iter->first);
-      ++cam_state_iter;
+  rm_cam_state_ids->clear();
+  rm_cam_state_ids->reserve(minCulledFrames_);
+  for (auto rit = ++statesMap_.rbegin(); rit != statesMap_.rend(); ++rit) {
+    if (rm_cam_state_ids->size() >= minCulledFrames_) {
+      break;
+    }
+    if (!rit->second.isKeyframe) {
+      rm_cam_state_ids->push_back(rit->first);
       ++closeFrames;
-    } else {
-      rm_cam_state_ids->push_back(first_cam_state_iter->first);
-      ++first_cam_state_iter;
-      ++oldFrames;
     }
   }
+  if (rm_cam_state_ids->size() < minCulledFrames_) {
+    for (auto it = statesMap_.begin(); it != --statesMap_.end(); ++it) {
+      if (it->second.isKeyframe) {
+        rm_cam_state_ids->push_back(it->first);
+        ++oldFrames;
+      }
+      if (rm_cam_state_ids->size() >= minCulledFrames_) {
+        break;
+      }
+    }
+  }
+
   sort(rm_cam_state_ids->begin(), rm_cam_state_ids->end());
   return;
 }
@@ -270,7 +253,6 @@ int MSCKF2::marginalizeRedundantFrames(size_t maxClonedStates) {
   minValidStateID = std::min(minValidStateID, firstStateId);
   return rm_cam_state_ids.size();
 }
-
 
 bool MSCKF2::applyMarginalizationStrategy(
     size_t numKeyframes, size_t numImuFrames,
@@ -987,23 +969,6 @@ int MSCKF2::computeStackedJacobianAndResidual(
   return dimH_o[0];
 }
 
-uint64_t MSCKF2::getMinValidStateID() const {
-  uint64_t min_state_id = statesMap_.rbegin()->first;
-  for (auto it = landmarksMap_.begin(); it != landmarksMap_.end();
-       ++it) {
-    if (it->second.residualizeCase == NotInState_NotTrackedNow)
-      continue;
-
-    auto itObs = it->second.observations.begin();
-    if (itObs->first.frameId <
-        min_state_id) {  // this assume that it->second.observations is an
-                         // ordered map
-      min_state_id = itObs->first.frameId;
-    }
-  }
-  return min_state_id;
-}
-
 void MSCKF2::optimize(size_t /*numIter*/, size_t /*numThreads*/, bool verbose) {
   uint64_t currFrameId = currentFrameId();
   OKVIS_ASSERT_EQ(
@@ -1111,7 +1076,7 @@ void MSCKF2::optimize(size_t /*numIter*/, size_t /*numThreads*/, bool verbose) {
   {
     updateLandmarksTimer.start();
     retrieveEstimatesOfConstants();  // do this because states are just updated
-    minValidStateID = statesMap_.rbegin()->first;
+    minValidStateID = getMinValidStateID();
     for (auto it = landmarksMap_.begin(); it != landmarksMap_.end();
          ++it) {
       if (it->second.residualizeCase ==
@@ -1121,12 +1086,6 @@ void MSCKF2::optimize(size_t /*numIter*/, size_t /*numThreads*/, bool verbose) {
       // It ought to be >= 2 for descriptor matching frontend.
       if (it->second.observations.size() < 2)
         continue;
-
-      auto itObs = it->second.observations.begin();
-      if (itObs->first.frameId < minValidStateID) {
-        // this assume that it->second.observations is an ordered map
-        minValidStateID = itObs->first.frameId;
-      }
 
       // update coordinates of map points, this is only necessary when
       // (1) they are used to predict the points projection in new frames OR

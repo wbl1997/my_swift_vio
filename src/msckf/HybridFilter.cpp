@@ -2365,6 +2365,24 @@ bool HybridFilter::hasLowDisparity(
                                                raySigma);
 }
 
+bool HybridFilter::isPureRotation(const MapPoint& mp) const {
+  const std::map<okvis::KeypointIdentifier, uint64_t>& observations =
+      mp.observations;
+  const okvis::KeypointIdentifier& headKpi = observations.begin()->first;
+  const okvis::KeypointIdentifier& tailKpi = observations.rbegin()->first;
+  const int camIdx = 0;
+  std::vector<uint64_t> relativeFrameIds(2);
+  std::vector<RelativeMotionType> relativeMotionTypes(2);
+  auto headIter = multiFramePtrMap_.find(headKpi.frameId);
+  headIter->second->getRelativeMotion(
+      camIdx, &relativeFrameIds[0], &relativeMotionTypes[0]);
+  auto tailIter = multiFramePtrMap_.find(tailKpi.frameId);
+  tailIter->second->getRelativeMotion(
+      camIdx, &relativeFrameIds[1], &relativeMotionTypes[1]);
+  // TODO(jhuai): do we need to make it more complex?
+  return relativeMotionTypes[1] == ROTATION_ONLY;
+}
+
 bool HybridFilter::triangulateAMapPoint(
     const MapPoint& mp,
     std::vector<Eigen::Vector2d, Eigen::aligned_allocator<Eigen::Vector2d>>&
@@ -2391,9 +2409,15 @@ bool HybridFilter::triangulateAMapPoint(
       triangulateTimer.stop();
       return false;
   }
-  if (checkDisparity && hasLowDisparity(obsDirections, T_WSs, T_SC0)) {
-    triangulateTimer.stop();
-    return false;
+  if (checkDisparity) {
+    if (isPureRotation(mp)) {
+      triangulateTimer.stop();
+      return false;
+    }
+//    if (hasLowDisparity(obsDirections, T_WSs, T_SC0)) {
+//      triangulateTimer.stop();
+//      return false;
+//    }
   }
 
   /*{
@@ -3082,6 +3106,25 @@ bool HybridFilter::featureJacobianEpipolar(
   Ri->resize(numConstraints, numConstraints);
   *Ri = H_fi * cov_fi * H_fi.transpose();
   return true;
+}
+
+uint64_t HybridFilter::getMinValidStateID() const {
+  uint64_t min_state_id = statesMap_.rbegin()->first;
+  for (auto it = landmarksMap_.begin(); it != landmarksMap_.end();
+       ++it) {
+    if (it->second.residualizeCase == NotInState_NotTrackedNow)
+      continue;
+
+    auto itObs = it->second.observations.begin();
+    if (itObs->first.frameId <
+        min_state_id) {  // this assume that it->second.observations is an
+                         // ordered map
+      min_state_id = itObs->first.frameId;
+    }
+  }
+  OKVIS_ASSERT_LE(Exception, min_state_id, currentKeyframeId(),
+                  "Removing the current keyframe!");
+  return min_state_id;
 }
 
 }  // namespace okvis

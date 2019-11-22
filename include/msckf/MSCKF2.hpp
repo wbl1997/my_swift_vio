@@ -87,7 +87,6 @@ class MSCKF2 : public HybridFilter {
       Eigen::Vector2d* residual) const;
 
  private:
-  uint64_t getMinValidStateID() const;
 
   /**
    * @brief compute the marginalized Jacobian for a feature i's

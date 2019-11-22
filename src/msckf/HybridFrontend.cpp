@@ -166,6 +166,11 @@ bool HybridFrontend::dataAssociationAndInitialization(
     if (num3dMatches <= requiredMatches) {
       LOG(WARNING) << "Tracking last frame failure. Number of 3d2d-matches: " << num3dMatches;
     }
+    uint64_t currentFrameId = framesInOut->id();
+    uint64_t lastFrameId = estimator.currentKeyframeId();
+    bool removeOutliers = false;
+    runRansac2d2d(estimator, params, currentFrameId, lastFrameId,
+                  removeOutliers, asKeyframe);
     return true;
   }
 
@@ -289,6 +294,11 @@ bool HybridFrontend::dataAssociationAndInitialization(
     if (num3dMatches <= requiredMatches) {
       LOG(WARNING) << "Tracking last frame failure. Number of 3d2d-matches: " << num3dMatches;
     }
+    uint64_t currentFrameId = framesInOut->id();
+    uint64_t lastFrameId = estimator.currentKeyframeId();
+    bool removeOutliers = false;
+    runRansac2d2d(estimator, params, currentFrameId, lastFrameId,
+                  removeOutliers, asKeyframe);
   } else
     *asKeyframe = true;  // first frame needs to be keyframe
 
@@ -960,6 +970,151 @@ int HybridFrontend::runRansac2d2d(
   }
 
   return 0;
+}
+
+int HybridFrontend::runRansac2d2d(okvis::HybridFilter& estimator,
+                                  const okvis::VioParameters& params,
+                                  uint64_t currentFrameId,
+                                  uint64_t olderFrameId, bool removeOutliers,
+                                  bool* asKeyframe) {
+  const size_t numCameras = params.nCameraSystem.numCameras();
+  RelativeMotionType rmt = UNCERTAIN_MOTION;
+  size_t totalInlierNumber = 0;
+  bool rotation_only_success = false;
+  bool rel_pose_success = false;
+  double maxOverlap = 0.0;
+  double maxMatchRatio = 0.0;
+  std::shared_ptr<okvis::MultiFrame> frameBPtr =
+      estimator.multiFrame(currentFrameId);
+  // run relative RANSAC
+  for (size_t im = 0; im < numCameras; ++im) {
+    // relative pose adapter for Kneip toolchain
+    opengv::relative_pose::HybridFrameRelativeAdapter adapter(
+        estimator, params.nCameraSystem, olderFrameId, im, currentFrameId, im);
+    double overlap;
+    double matchRatio;
+
+    adapter.computeMatchStats(frameBPtr, im, &overlap, &matchRatio);
+    maxOverlap = std::max(overlap, maxOverlap);
+    maxMatchRatio = std::max(matchRatio, maxMatchRatio);
+    size_t numCorrespondences = adapter.getNumberCorrespondences();
+
+    if (numCorrespondences < 10) { // won't generate meaningful results.
+      estimator.multiFrame(currentFrameId)
+          ->setRelativeMotion(im, olderFrameId, rmt);
+      continue;
+    }
+    // try both the rotation-only RANSAC and the relative one:
+
+    // create a RelativePoseSac problem and RANSAC
+    typedef opengv::sac_problems::relative_pose::
+        HybridFrameRotationOnlySacProblem HybridFrameRotationOnlySacProblem;
+    opengv::sac::Ransac<HybridFrameRotationOnlySacProblem> rotation_only_ransac;
+    std::shared_ptr<HybridFrameRotationOnlySacProblem>
+        rotation_only_problem_ptr(
+            new HybridFrameRotationOnlySacProblem(adapter));
+    rotation_only_ransac.sac_model_ = rotation_only_problem_ptr;
+    rotation_only_ransac.threshold_ = 9;
+    rotation_only_ransac.max_iterations_ = 50;
+
+    // run the ransac
+    rotation_only_ransac.computeModel(0);
+
+    // get quality
+    int rotation_only_inliers = rotation_only_ransac.inliers_.size();
+    float rotation_only_ratio = static_cast<float>(rotation_only_inliers) /
+                                static_cast<float>(numCorrespondences);
+
+    // now the rel_pose one:
+    typedef opengv::sac_problems::relative_pose::
+        HybridFrameRelativePoseSacProblem HybridFrameRelativePoseSacProblem;
+    opengv::sac::Ransac<HybridFrameRelativePoseSacProblem> rel_pose_ransac;
+    std::shared_ptr<HybridFrameRelativePoseSacProblem> rel_pose_problem_ptr(
+        new HybridFrameRelativePoseSacProblem(
+            adapter, HybridFrameRelativePoseSacProblem::STEWENIUS));
+    rel_pose_ransac.sac_model_ = rel_pose_problem_ptr;
+    rel_pose_ransac.threshold_ = 9;     //(1.0 - cos(0.5/600));
+    rel_pose_ransac.max_iterations_ = 50;
+
+    // run the ransac
+    rel_pose_ransac.computeModel(0);
+
+    // assess success
+    int rel_pose_inliers = rel_pose_ransac.inliers_.size();
+    float rel_pose_ratio = static_cast<float>(rel_pose_inliers) /
+                           static_cast<float>(numCorrespondences);
+
+    // decide on success and fill inliers
+    std::vector<bool> inliers(numCorrespondences, false);
+    if (rotation_only_ratio > rel_pose_ratio || rotation_only_ratio > 0.8) {
+      if (rotation_only_inliers > 10) {
+        rotation_only_success = true;
+      }
+      rmt = ROTATION_ONLY;
+      totalInlierNumber += rotation_only_inliers;
+      for (size_t k = 0; k < rotation_only_ransac.inliers_.size(); ++k) {
+        inliers.at(rotation_only_ransac.inliers_.at(k)) = true;
+      }
+    } else {
+      if (rel_pose_inliers > 10) {
+        rel_pose_success = true;
+      }
+      rmt = RELATIVE_POSE;
+      totalInlierNumber += rel_pose_inliers;
+      for (size_t k = 0; k < rel_pose_ransac.inliers_.size(); ++k) {
+        inliers.at(rel_pose_ransac.inliers_.at(k)) = true;
+      }
+    }
+
+    estimator.multiFrame(currentFrameId)
+        ->setRelativeMotion(im, olderFrameId, rmt);
+
+    // failure?
+    if (!rotation_only_success && !rel_pose_success) {
+      LOG(INFO) << "2D-2D RANSAC failed";
+      continue;
+    } else {
+      LOG(INFO) << "2D-2D RANSAC "
+                << (rel_pose_success ? "rel pose" : "rot only");
+    }
+
+    // otherwise: kick out outliers!
+    std::shared_ptr<okvis::MultiFrame> multiFrame = estimator.multiFrame(
+        currentFrameId);
+
+    for (size_t k = 0; k < numCorrespondences; ++k) {
+      size_t idxB = adapter.getMatchKeypointIdxB(k);
+      if (!inliers[k]) {
+        uint64_t lmId = multiFrame->landmarkId(im, idxB);
+        // reset ID:
+        multiFrame->setLandmarkId(im, idxB, 0);
+        // remove observation
+        if (removeOutliers) {
+          if (lmId != 0 && estimator.isLandmarkAdded(lmId)){
+            estimator.removeObservation(lmId, currentFrameId, im, idxB);
+          }
+        }
+      }
+    }
+  }
+
+  if (totalInlierNumber <= 15 || rmt == UNCERTAIN_MOTION) {
+    *asKeyframe = true;
+  }
+  if (isInitialized_) {
+    if (maxOverlap > keyframeInsertionOverlapThreshold_ &&
+        maxMatchRatio > keyframeInsertionMatchingRatioThreshold_) {
+      *asKeyframe = *asKeyframe;
+    } else {
+      *asKeyframe = true;
+    }
+  }
+
+  if (rel_pose_success || rotation_only_success) {
+    return totalInlierNumber;
+  } else {
+    return -1;
+  }
 }
 
 // (re)instantiates feature detectors and descriptor extractors. Used after

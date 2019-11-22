@@ -167,6 +167,8 @@ class HybridFilter : public Estimator {
           Eigen::aligned_allocator<okvis::kinematics::Transformation>> &T_WSs,
       const kinematics::Transformation &T_SC0) const;
 
+  bool isPureRotation(const MapPoint& mp) const;
+
   /**
    * @brief triangulateAMapPoint, does not support rays which arise from static
    * mode, pure rotation, or points at infinity. Assume the same camera model
@@ -316,6 +318,8 @@ class HybridFilter : public Estimator {
   void retrieveEstimatesOfConstants();
 
   void updateStates(const Eigen::Matrix<double, Eigen::Dynamic, 1> &deltaX);
+
+  uint64_t getMinValidStateID() const;
 
   // epipolar measurement used by filters for computing Jacobians
   // https://en.cppreference.com/w/cpp/language/nested_types
