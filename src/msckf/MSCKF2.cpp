@@ -129,6 +129,9 @@ int MSCKF2::marginalizeRedundantFrames(size_t maxClonedStates) {
     bool isValidJacobian =
         featureJacobian(it->second, H_oi, r_oi, R_oi, &involved_cam_state_ids);
     if (!isValidJacobian) {
+      // Do we use epipolar constraints for the marginalized feature
+      // observations when they do not exhibit enough disparity? It is probably
+      // a overkill.
       continue;
     }
 
@@ -179,22 +182,27 @@ int MSCKF2::marginalizeRedundantFrames(size_t maxClonedStates) {
   // remove observations in removed frames
   for (okvis::PointMap::iterator it = landmarksMap_.begin();
        it != landmarksMap_.end();) {
-    std::map<okvis::KeypointIdentifier, uint64_t>& obsMap =
-        it->second.observations;
+    okvis::MapPoint& mapPoint = it->second;
     bool removeAllEpipolarConstraints = false;
-    for (const uint64_t camStateId : rm_cam_state_ids) {
-      std::map<okvis::KeypointIdentifier, uint64_t>::iterator obsIter =
-          std::find_if(obsMap.begin(), obsMap.end(), IsObservedInFrame(camStateId));
-      if (obsIter != obsMap.end()) {
+    std::map<okvis::KeypointIdentifier, uint64_t>::iterator obsIter =
+        mapPoint.observations.begin();
+    for (uint64_t camStateId : rm_cam_state_ids) {
+      while (obsIter != mapPoint.observations.end() &&
+             obsIter->first.frameId < camStateId) {
+        ++obsIter;
+      }
+      while (obsIter != mapPoint.observations.end() &&
+             obsIter->first.frameId == camStateId) {
+        // in case there are dud observations for the
+        // landmark in the same frame
         const KeypointIdentifier& kpi = obsIter->first;
         auto mfp = multiFramePtrMap_.find(kpi.frameId);
-        OKVIS_ASSERT_TRUE(Exception, mfp != multiFramePtrMap_.end(), "frame id not found in frame map!");
         mfp->second->setLandmarkId(kpi.cameraIndex, kpi.keypointIndex, 0);
-        if (obsIter->second != 0u) {
+        if (obsIter->second) {
           mapPtr_->removeResidualBlock(
               reinterpret_cast<::ceres::ResidualBlockId>(obsIter->second));
         } else {
-          if (obsIter == obsMap.begin()) {
+          if (obsIter == mapPoint.observations.begin()) {
             // this is a head obs for epipolar constraints, remove all of them
             removeAllEpipolarConstraints = true;
           }  // else do nothing. This can happen if we removed an epipolar
@@ -202,19 +210,18 @@ int MSCKF2::marginalizeRedundantFrames(size_t maxClonedStates) {
              // been initialized so its observations are not converted to
              // reprojection errors.
         }
-        obsMap.erase(obsIter);
+        obsIter = mapPoint.observations.erase(obsIter);
       }
     }
     if (removeAllEpipolarConstraints) {
-      for (std::map<okvis::KeypointIdentifier, uint64_t>::iterator obsIter = obsMap.begin();
-           obsIter != obsMap.end(); ++obsIter) {
-        if (obsIter->second != 0u) {
+      for (std::map<okvis::KeypointIdentifier, uint64_t>::iterator obsIter =
+               mapPoint.observations.begin();
+           obsIter != mapPoint.observations.end(); ++obsIter) {
+        if (obsIter->second) {
           ::ceres::ResidualBlockId rid =
               reinterpret_cast<::ceres::ResidualBlockId>(obsIter->second);
-
           std::shared_ptr<const okvis::ceres::ErrorInterface> err =
               mapPtr_->errorInterfacePtr(rid);
-
           OKVIS_ASSERT_EQ(Exception, err->residualDim(), 1,
                           "Head obs not associated to a residual means that "
                           "the following are all epipolar constraints");
@@ -223,7 +230,7 @@ int MSCKF2::marginalizeRedundantFrames(size_t maxClonedStates) {
         }
       }
     }
-    if (obsMap.size() == 0u) {
+    if (mapPoint.observations.size() == 0u) {
       mapPtr_->removeParameterBlock(it->first);
       it = landmarksMap_.erase(it);
     } else {
@@ -231,9 +238,30 @@ int MSCKF2::marginalizeRedundantFrames(size_t maxClonedStates) {
     }
   }
 
+  // check
+//  int count = 0;
+//  for (okvis::PointMap::iterator it = landmarksMap_.begin();
+//       it != landmarksMap_.end(); ++it) {
+//    okvis::MapPoint& mapPoint = it->second;
+//    for (uint64_t camStateId : rm_cam_state_ids) {
+//      auto obsIter = std::find_if(mapPoint.observations.begin(),
+//                                  mapPoint.observations.end(),
+//                                  IsObservedInFrame(camStateId));
+//      if (obsIter != mapPoint.observations.end()) {
+//        LOG(INFO) << "persist lmk " << mapPoint.id << " frm " << camStateId
+//                  << " " << obsIter->first.cameraIndex << " "
+//                  << obsIter->first.keypointIndex << " residual "
+//                  << std::hex << obsIter->second;
+//        ++count;
+//      }
+//    }
+//  }
+//  OKVIS_ASSERT_EQ(Exception, count, 0, "found residuals not removed!");
+
   for (const auto &cam_id : rm_cam_state_ids) {
+    auto statesIter = statesMap_.find(cam_id);
     int cam_sequence =
-        std::distance(statesMap_.begin(), statesMap_.find(cam_id));
+        std::distance(statesMap_.begin(), statesIter);
     int cam_state_start =
         startIndexOfClonedStates() + kClonedStateMinimalDimen * cam_sequence;
     int cam_state_end = cam_state_start + kClonedStateMinimalDimen;
@@ -265,9 +293,9 @@ bool MSCKF2::applyMarginalizationStrategy(
     }
     ++rit;
   }
-//  if (removeFrames.size() == 0) {
-//    marginalizeRedundantFrames(numKeyframes + numImuFrames);
-//  }
+  if (removeFrames.size() == 0) {
+    marginalizeRedundantFrames(numKeyframes + numImuFrames);
+  }
 
   // remove features tracked no more
   for (PointMap::iterator pit = landmarksMap_.begin();
@@ -359,8 +387,8 @@ bool MSCKF2::measurementJacobianAIDP(
   get_T_WS(poseId, T_WBj);
   SpeedAndBiases sbj;
   getSpeedAndBias(poseId, 0, sbj);
-
-  Time stateEpoch = statesMap_.at(poseId).timestamp;
+  auto statesIter = statesMap_.find(poseId);
+  Time stateEpoch = statesIter->second.timestamp;
   auto imuMeas = inertialMeasForStates_.findWindow(stateEpoch, half_window_);
   OKVIS_ASSERT_GT(Exception, imuMeas.size(), 0,
                   "the IMU measurement does not exist");
@@ -371,7 +399,7 @@ bool MSCKF2::measurementJacobianAIDP(
   double kpN = obs[1] / imageHeight - 0.5;  // k per N
   const Duration featureTime =
       Duration(tdLatestEstimate + trLatestEstimate * kpN) -
-      statesMap_.at(poseId).tdAtCreation;
+      statesIter->second.tdAtCreation;
 
   // for feature i, estimate $p_B^G(t_{f_i})$, $R_B^G(t_{f_i})$,
   // $v_B^G(t_{f_i})$, and $\omega_{GB}^B(t_{f_i})$ with the corresponding
@@ -432,7 +460,7 @@ bool MSCKF2::measurementJacobianAIDP(
     // compute p_WB, v_WB at (t_{f_i,j}) that use FIRST ESTIMATES of
     // position and velocity, i.e., their linearization point
     Eigen::Matrix<double, 6, 1> posVelFirstEstimate =
-        statesMap_.at(poseId).linearizationPoint;
+        statesIter->second.linearizationPoint;
     lP_T_WB =
         kinematics::Transformation(posVelFirstEstimate.head<3>(), T_WBj.q());
     lP_sb = sbj;
@@ -537,7 +565,8 @@ bool MSCKF2::measurementJacobian(
   SpeedAndBiases sbj;
   getSpeedAndBias(poseId, 0, sbj);
 
-  Time stateEpoch = statesMap_.at(poseId).timestamp;
+  auto statesIter = statesMap_.find(poseId);
+  Time stateEpoch = statesIter->second.timestamp;
   auto imuMeas = inertialMeasForStates_.findWindow(stateEpoch, half_window_);
   OKVIS_ASSERT_GT(Exception, imuMeas.size(), 0,
                   "the IMU measurement does not exist");
@@ -547,7 +576,7 @@ bool MSCKF2::measurementJacobian(
   int extrinsicModelId = camera_rig_.getExtrinsicOptMode(camIdx);
   double kpN = obs[1] / imageHeight - 0.5;  // k per N
   Duration featureTime = Duration(tdLatestEstimate + trLatestEstimate * kpN) -
-                         statesMap_.at(poseId).tdAtCreation;
+                         statesIter->second.tdAtCreation;
 
   // for feature i, estimate $p_B^G(t_{f_i})$, $R_B^G(t_{f_i})$,
   // $v_B^G(t_{f_i})$, and $\omega_{GB}^B(t_{f_i})$ with the corresponding
@@ -604,7 +633,7 @@ bool MSCKF2::measurementJacobian(
     lP_T_WB = T_WBj;
     lP_sb = sbj;
     Eigen::Matrix<double, 6, 1> posVelFirstEstimate =
-        statesMap_.at(poseId).linearizationPoint;
+        statesIter->second.linearizationPoint;
     lP_T_WB =
         kinematics::Transformation(posVelFirstEstimate.head<3>(), lP_T_WB.q());
     lP_sb.head<3>() = posVelFirstEstimate.tail<3>();

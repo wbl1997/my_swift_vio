@@ -940,8 +940,9 @@ bool HybridFilter::computeHxf(const uint64_t hpbid, const MapPoint& mp,
   for (auto itObs = mp.observations.rbegin(), iteObs = mp.observations.rend();
        itObs != iteObs; ++itObs) {
     if (itObs->first.frameId == currFrameId) {
-      // get the keypoint measurement
-      okvis::MultiFramePtr multiFramePtr = multiFramePtrMap_.at(currFrameId);
+      auto multiFrameIter = multiFramePtrMap_.find(currFrameId);
+//      OKVIS_ASSERT_TRUE(Exception, multiFrameIter != multiFramePtrMap_.end(), "multiframe not found!");
+      okvis::MultiFramePtr multiFramePtr = multiFrameIter->second;
       multiFramePtr->getKeypoint(itObs->first.cameraIndex,
                                  itObs->first.keypointIndex, obsInPixel);
 
@@ -1000,8 +1001,8 @@ bool HybridFilter::computeHxf(const uint64_t hpbid, const MapPoint& mp,
 
   SpeedAndBiases sbj;
   getSpeedAndBias(currFrameId, 0, sbj);
-
-  Time stateEpoch = statesMap_.at(currFrameId).timestamp;
+  auto statesIter = statesMap_.find(currFrameId);
+  Time stateEpoch = statesIter->second.timestamp;
   auto imuMeas = inertialMeasForStates_.findWindow(stateEpoch, half_window_);
   OKVIS_ASSERT_GT(Exception, imuMeas.size(), 0,
                   "the IMU measurement does not exist");
@@ -1012,7 +1013,7 @@ bool HybridFilter::computeHxf(const uint64_t hpbid, const MapPoint& mp,
   int extrinsicModelId = camera_rig_.getExtrinsicOptMode(camIdx);
   double kpN = obsInPixel[1] / imageHeight - 0.5;  // k per N
   Duration featureTime = Duration(tdLatestEstimate + trLatestEstimate * kpN) -
-                         statesMap_.at(currFrameId).tdAtCreation;
+                         statesIter->second.tdAtCreation;
 
   // for feature i, estimate $p_B^G(t_{f_i})$, $R_B^G(t_{f_i})$,
   // $v_B^G(t_{f_i})$, and $\omega_{GB}^B(t_{f_i})$ with the corresponding
@@ -1085,7 +1086,7 @@ bool HybridFilter::computeHxf(const uint64_t hpbid, const MapPoint& mp,
     lP_T_WB = T_WBj;
     lP_sb = sbj;
     Eigen::Matrix<double, 6, 1> posVelFirstEstimate =
-        statesMap_.at(currFrameId).linearizationPoint;
+        statesIter->second.linearizationPoint;
     lP_T_WB =
         kinematics::Transformation(posVelFirstEstimate.head<3>(), lP_T_WB.q());
     lP_sb.head<3>() = posVelFirstEstimate.tail<3>();
@@ -1292,8 +1293,8 @@ bool HybridFilter::featureJacobian(
     get_T_WS(poseId, T_WBj);
     SpeedAndBiases sbj;
     getSpeedAndBias(poseId, 0, sbj);
-
-    Time stateEpoch = statesMap_.at(poseId).timestamp;
+    auto statesIter = statesMap_.find(poseId);
+    Time stateEpoch = statesIter->second.timestamp;
     auto imuMeas = inertialMeasForStates_.findWindow(stateEpoch, half_window_);
     OKVIS_ASSERT_GT(Exception, imuMeas.size(), 0,
                     "the IMU measurement does not exist");
@@ -1301,7 +1302,7 @@ bool HybridFilter::featureJacobian(
     uint32_t imageHeight = tempCameraGeometry->imageHeight();
     double kpN = obsInPixel[kale][1] / imageHeight - 0.5;  // k per N
     Duration featureTime = Duration(tdLatestEstimate + trLatestEstimate * kpN) -
-                           statesMap_.at(poseId).tdAtCreation;
+                           statesIter->second.tdAtCreation;
 
     // for feature i, estimate $p_B^G(t_{f_i})$, $R_B^G(t_{f_i})$,
     // $v_B^G(t_{f_i})$, and $\omega_{GB}^B(t_{f_i})$ with the corresponding
@@ -1375,7 +1376,7 @@ bool HybridFilter::featureJacobian(
       lP_T_WB = T_WBj;
       lP_sb = sbj;
       Eigen::Matrix<double, 6, 1> posVelFirstEstimate =
-          statesMap_.at(poseId).linearizationPoint;
+          statesIter->second.linearizationPoint;
       lP_T_WB = kinematics::Transformation(posVelFirstEstimate.head<3>(),
                                            lP_T_WB.q());
       lP_sb.head<3>() = posVelFirstEstimate.tail<3>();
@@ -2315,8 +2316,9 @@ size_t HybridFilter::gatherPoseObservForTriang(
        itObs != iteObs; ++itObs) {
     uint64_t poseId = itObs->first.frameId;
     Eigen::Vector2d measurement;
-    okvis::MultiFramePtr multiFramePtr =
-        multiFramePtrMap_.at(itObs->first.frameId);
+    auto multiFrameIter = multiFramePtrMap_.find(poseId);
+//    OKVIS_ASSERT_TRUE(Exception, multiFrameIter != multiFramePtrMap_.end(), "multiframe not found");
+    okvis::MultiFramePtr multiFramePtr = multiFrameIter->second;
     multiFramePtr->getKeypoint(itObs->first.cameraIndex,
                                itObs->first.keypointIndex, measurement);
     // use the latest estimates for camera intrinsic parameters
@@ -2795,8 +2797,8 @@ bool HybridFilter::EpipolarMeasurement::measurementJacobian(
     // for each state?
     SpeedAndBiases sbj;
     filter_.getSpeedAndBias(poseId, 0, sbj);
-
-    Time stateEpoch = filter_.statesMap_.at(poseId).timestamp;
+    auto statesIter = filter_.statesMap_.find(poseId);
+    Time stateEpoch = statesIter->second.timestamp;
     auto imuMeas =
         filter_.inertialMeasForStates_.findWindow(stateEpoch, filter_.half_window_);
     OKVIS_ASSERT_GT(Exception, imuMeas.size(), 0,
@@ -2805,7 +2807,7 @@ bool HybridFilter::EpipolarMeasurement::measurementJacobian(
     double kpN = obsInPixel2[j][1] / imageHeight_ - 0.5;  // k per N
     dtij_dtr[j] = kpN;
     Duration featureTime = Duration(filter_.tdLatestEstimate + filter_.trLatestEstimate * kpN) -
-                           filter_.statesMap_.at(poseId).tdAtCreation;
+                           statesIter->second.tdAtCreation;
     featureDelay[j] = featureTime.toSec();
     // for feature i, estimate $p_B^G(t_{f_i})$, $R_B^G(t_{f_i})$,
     // $v_B^G(t_{f_i})$, and $\omega_{GB}^B(t_{f_i})$ with the corresponding
@@ -2848,7 +2850,7 @@ bool HybridFilter::EpipolarMeasurement::measurementJacobian(
     Eigen::Vector3d lP_v = sb.head<3>();
     if (FLAGS_use_first_estimate) {
       Eigen::Matrix<double, 6, 1> posVelFirstEstimate =
-          filter_.statesMap_.at(poseId).linearizationPoint;
+          statesIter->second.linearizationPoint;
       lP_T_WB =
           kinematics::Transformation(posVelFirstEstimate.head<3>(), T_WBj.q());
       lP_v = posVelFirstEstimate.tail<3>();
