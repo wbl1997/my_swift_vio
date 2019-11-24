@@ -182,14 +182,15 @@ int MSCKF2::marginalizeRedundantFrames(size_t maxClonedStates) {
     std::map<okvis::KeypointIdentifier, uint64_t>& obsMap =
         it->second.observations;
     bool removeAllEpipolarConstraints = false;
-    for (auto camStateId : rm_cam_state_ids) {
-      auto obsIter = std::find_if(obsMap.begin(), obsMap.end(),
-                                  IsObservedInFrame(camStateId));
+    for (const uint64_t camStateId : rm_cam_state_ids) {
+      std::map<okvis::KeypointIdentifier, uint64_t>::iterator obsIter =
+          std::find_if(obsMap.begin(), obsMap.end(), IsObservedInFrame(camStateId));
       if (obsIter != obsMap.end()) {
         const KeypointIdentifier& kpi = obsIter->first;
-        multiFramePtrMap_.at(kpi.frameId)
-            ->setLandmarkId(kpi.cameraIndex, kpi.keypointIndex, 0);
-        if (obsIter->second) {
+        auto mfp = multiFramePtrMap_.find(kpi.frameId);
+        OKVIS_ASSERT_TRUE(Exception, mfp != multiFramePtrMap_.end(), "frame id not found in frame map!");
+        mfp->second->setLandmarkId(kpi.cameraIndex, kpi.keypointIndex, 0);
+        if (obsIter->second != 0u) {
           mapPtr_->removeResidualBlock(
               reinterpret_cast<::ceres::ResidualBlockId>(obsIter->second));
         } else {
@@ -205,12 +206,11 @@ int MSCKF2::marginalizeRedundantFrames(size_t maxClonedStates) {
       }
     }
     if (removeAllEpipolarConstraints) {
-      std::map<okvis::KeypointIdentifier, uint64_t>& obsMap =
-          it->second.observations;
-      for (auto& obsItem : obsMap) {
-        if (obsItem.second) {
+      for (std::map<okvis::KeypointIdentifier, uint64_t>::iterator obsIter = obsMap.begin();
+           obsIter != obsMap.end(); ++obsIter) {
+        if (obsIter->second != 0u) {
           ::ceres::ResidualBlockId rid =
-              reinterpret_cast<::ceres::ResidualBlockId>(obsItem.second);
+              reinterpret_cast<::ceres::ResidualBlockId>(obsIter->second);
 
           std::shared_ptr<const okvis::ceres::ErrorInterface> err =
               mapPtr_->errorInterfacePtr(rid);
@@ -219,7 +219,7 @@ int MSCKF2::marginalizeRedundantFrames(size_t maxClonedStates) {
                           "Head obs not associated to a residual means that "
                           "the following are all epipolar constraints");
           mapPtr_->removeResidualBlock(rid);
-          obsItem.second = 0u;
+          obsIter->second = 0u;
         }
       }
     }
@@ -265,15 +265,15 @@ bool MSCKF2::applyMarginalizationStrategy(
     }
     ++rit;
   }
-  if (removeFrames.size() == 0) {
-    marginalizeRedundantFrames(numKeyframes + numImuFrames);
-  }
+//  if (removeFrames.size() == 0) {
+//    marginalizeRedundantFrames(numKeyframes + numImuFrames);
+//  }
 
   // remove features tracked no more
   for (PointMap::iterator pit = landmarksMap_.begin();
        pit != landmarksMap_.end();) {
-    if (pit->second.residualizeCase == NotInState_NotTrackedNow) {
-      const MapPoint& mapPoint = pit->second;
+    const MapPoint& mapPoint = pit->second;
+    if (mapPoint.residualizeCase == NotInState_NotTrackedNow) {
       ++mTrackLengthAccumulator[mapPoint.observations.size()];
       for (std::map<okvis::KeypointIdentifier, uint64_t>::const_iterator it =
                mapPoint.observations.begin();
@@ -283,8 +283,9 @@ bool MSCKF2::applyMarginalizationStrategy(
               reinterpret_cast<::ceres::ResidualBlockId>(it->second));
         }
         const KeypointIdentifier& kpi = it->first;
-        multiFramePtrMap_.at(kpi.frameId)
-            ->setLandmarkId(kpi.cameraIndex, kpi.keypointIndex, 0);
+        auto mfp = multiFramePtrMap_.find(kpi.frameId);
+        OKVIS_ASSERT_TRUE(Exception, mfp != multiFramePtrMap_.end(), "frame id not found in frame map!");
+        mfp->second->setLandmarkId(kpi.cameraIndex, kpi.keypointIndex, 0);
       }
       mapPtr_->removeParameterBlock(pit->first);
       pit = landmarksMap_.erase(pit);

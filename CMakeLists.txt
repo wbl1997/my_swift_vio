@@ -103,8 +103,6 @@ LIST(APPEND SOURCEFILES
     src/msckf/CameraSystemCreator.cpp
     src/msckf/FilterHelper.cpp
     src/msckf/HybridFilter.cpp
-    src/msckf/HybridFrameNoncentralAbsoluteAdapter.cpp
-    src/msckf/HybridFrameRelativeAdapter.cpp
     src/msckf/HybridFrontend.cpp
     src/msckf/HybridVio.cpp
     src/msckf/ImuOdometry.cpp

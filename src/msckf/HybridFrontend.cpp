@@ -24,12 +24,13 @@
 #include <okvis/cameras/RadialTangentialDistortion8.hpp>
 
 // Kneip RANSAC
-#include <msckf/HybridFrameAbsolutePoseSacProblem.hpp>
-#include <msckf/HybridFrameRelativePoseSacProblem.hpp>
-#include <msckf/HybridFrameRotationOnlySacProblem.hpp>
+#include <opengv/sac_problems/absolute_pose/FrameAbsolutePoseSacProblem.hpp>
+#include <opengv/sac_problems/relative_pose/FrameRelativePoseSacProblem.hpp>
+#include <opengv/sac_problems/relative_pose/FrameRotationOnlySacProblem.hpp>
+#include <msckf/FrameTranslationOnlySacProblem.hpp>
 
-#include <msckf/HybridFrameNoncentralAbsoluteAdapter.hpp>
-#include <msckf/HybridFrameRelativeAdapter.hpp>
+#include <opengv/absolute_pose/FrameNoncentralAbsoluteAdapter.hpp>
+#include <opengv/relative_pose/FrameRelativeAdapter.hpp>
 
 #include <opengv/sac/Ransac.hpp>
 
@@ -177,66 +178,66 @@ bool HybridFrontend::dataAssociationAndInitialization(
   // first frame? (did do addStates before, so 1 frame minimum in estimator)
   if (estimator.numFrames() > 1) {
     int requiredMatches = 5;
-//    double uncertainMatchFraction = 0;
+    double uncertainMatchFraction = 0;
     bool rotationOnly = false;
 
     // match to last keyframe
-//    TimerSwitchable matchKeyframesTimer("2.4.1 matchToKeyframes");
-//    switch (distortionType) {
-//      case okvis::cameras::NCameraSystem::RadialTangential: {
-//        num3dMatches = matchToKeyframes<
-//            VioFrameMatchingAlgorithm<
-//                okvis::cameras::PinholeCamera<
-//                    okvis::cameras::RadialTangentialDistortion> > >(
-//            estimator, params, framesInOut->id(), rotationOnly, false,
-//            &uncertainMatchFraction);
-//        break;
-//      }
-//      case okvis::cameras::NCameraSystem::Equidistant: {
-//        num3dMatches = matchToKeyframes<
-//            VioFrameMatchingAlgorithm<
-//                okvis::cameras::PinholeCamera<
-//                    okvis::cameras::EquidistantDistortion> > >(
-//            estimator, params, framesInOut->id(), rotationOnly, false,
-//            &uncertainMatchFraction);
-//        break;
-//      }
-//      case okvis::cameras::NCameraSystem::RadialTangential8: {
-//        num3dMatches = matchToKeyframes<
-//            VioFrameMatchingAlgorithm<
-//                okvis::cameras::PinholeCamera<
-//                    okvis::cameras::RadialTangentialDistortion8> > >(
-//            estimator, params, framesInOut->id(), rotationOnly, false,
-//            &uncertainMatchFraction);
-//        break;
-//      }
-//      case okvis::cameras::NCameraSystem::FOV: {
-//        num3dMatches = matchToKeyframes<
-//            VioFrameMatchingAlgorithm<
-//                okvis::cameras::PinholeCamera<
-//                    okvis::cameras::FovDistortion> > >(
-//            estimator, params, framesInOut->id(), rotationOnly, false,
-//            &uncertainMatchFraction);
-//        break;
-//      }
-//      default:
-//        OKVIS_THROW(Exception, "Unsupported distortion type.")
-//        break;
-//    }
-//    matchKeyframesTimer.stop();
-//    if (!isInitialized_) {
+    TimerSwitchable matchKeyframesTimer("2.4.1 matchToKeyframes");
+    switch (distortionType) {
+      case okvis::cameras::NCameraSystem::RadialTangential: {
+        num3dMatches = matchToKeyframes<
+            VioFrameMatchingAlgorithm<
+                okvis::cameras::PinholeCamera<
+                    okvis::cameras::RadialTangentialDistortion> > >(
+            estimator, params, framesInOut->id(), rotationOnly, false,
+            &uncertainMatchFraction);
+        break;
+      }
+      case okvis::cameras::NCameraSystem::Equidistant: {
+        num3dMatches = matchToKeyframes<
+            VioFrameMatchingAlgorithm<
+                okvis::cameras::PinholeCamera<
+                    okvis::cameras::EquidistantDistortion> > >(
+            estimator, params, framesInOut->id(), rotationOnly, false,
+            &uncertainMatchFraction);
+        break;
+      }
+      case okvis::cameras::NCameraSystem::RadialTangential8: {
+        num3dMatches = matchToKeyframes<
+            VioFrameMatchingAlgorithm<
+                okvis::cameras::PinholeCamera<
+                    okvis::cameras::RadialTangentialDistortion8> > >(
+            estimator, params, framesInOut->id(), rotationOnly, false,
+            &uncertainMatchFraction);
+        break;
+      }
+      case okvis::cameras::NCameraSystem::FOV: {
+        num3dMatches = matchToKeyframes<
+            VioFrameMatchingAlgorithm<
+                okvis::cameras::PinholeCamera<
+                    okvis::cameras::FovDistortion> > >(
+            estimator, params, framesInOut->id(), rotationOnly, false,
+            &uncertainMatchFraction);
+        break;
+      }
+      default:
+        OKVIS_THROW(Exception, "Unsupported distortion type.")
+        break;
+    }
+    matchKeyframesTimer.stop();
+    if (!isInitialized_) {
 //      if (!rotationOnly) {
-//        isInitialized_ = true;
-//        LOG(INFO) << "Initialized!";
+        isInitialized_ = true;
+        LOG(INFO) << "Initialized!";
 //      }
-//    }
+    }
 
-//    if (num3dMatches <= requiredMatches) {
-//      LOG(WARNING) << "Tracking failure. Number of 3d2d-matches: " << num3dMatches;
-//    }
+    if (num3dMatches <= requiredMatches) {
+      LOG(WARNING) << "Tracking failure. Number of 3d2d-matches: " << num3dMatches;
+    }
 
-//    // keyframe decision, at the moment only landmarks that match with keyframe are initialised
-//    *asKeyframe = *asKeyframe || doWeNeedANewKeyframe(estimator, framesInOut);
+    // keyframe decision, at the moment only landmarks that match with keyframe are initialised
+    *asKeyframe = *asKeyframe || doWeNeedANewKeyframe(estimator, framesInOut);
 
     // match to last frame
     TimerSwitchable matchToLastFrameTimer("2.4.2 matchToLastFrame");
@@ -279,26 +280,6 @@ bool HybridFrontend::dataAssociationAndInitialization(
         break;
     }
     matchToLastFrameTimer.stop();
-    if (!isInitialized_) {
-//      if (!rotationOnly) {
-        // TODO(jhuai): should check the motion and then initialize the filter
-        // Adding states before proper initialization of a filter like MSCKF
-        // greatly complicates states management.
-        // The following link may hints on solutions.
-        // https://github.com/ethz-asl/okvis/blob/master/okvis_multisensor_processing/src/ThreadedKFVio.cpp#L735
-        isInitialized_ = true;
-        LOG(INFO) << "Frontend initialized!";
-//      }
-    }
-
-    if (num3dMatches <= requiredMatches) {
-      LOG(WARNING) << "Tracking last frame failure. Number of 3d2d-matches: " << num3dMatches;
-    }
-    uint64_t currentFrameId = framesInOut->id();
-    uint64_t lastFrameId = estimator.currentKeyframeId();
-    bool removeOutliers = false;
-    runRansac2d2d(estimator, params, currentFrameId, lastFrameId,
-                  removeOutliers, asKeyframe);
   } else
     *asKeyframe = true;  // first frame needs to be keyframe
 
@@ -521,6 +502,10 @@ int HybridFrontend::matchToKeyframes(
     if (!isInitialized_) {
       runRansac2d2d(estimator, params, currentFrameId, olderFrameId, true,
                     removeOutliers, rotationOnly_tmp);
+    } else if (kfcounter == 1) {
+      bool asKeyframe;
+      runRansac2d2d(estimator, params, currentFrameId, olderFrameId, false,
+                       &asKeyframe);
     }
     if (firstFrame) {
       rotationOnly = rotationOnly_tmp;
@@ -625,10 +610,10 @@ int HybridFrontend::matchToLastFrame(
 
 //   comment the following 4 lines because no keyframe matching is
 //   performed in msckf
-//    if (estimator.isKeyframe(lastFrameId)) {
-//      // already done
-//      return 0;
-//    }
+    if (estimator.isKeyframe(lastFrameId)) {
+      // already done
+      return 0;
+    }
 
   for (size_t im = 0; im < params.nCameraSystem.numCameras(); ++im) {
     MATCHING_ALGORITHM matchingAlgorithm(estimator,
@@ -740,7 +725,7 @@ int HybridFrontend::runRansac3d2d(
   int numInliers = 0;
 
   // absolute pose adapter for Kneip toolchain
-  opengv::absolute_pose::HybridFrameNoncentralAbsoluteAdapter adapter(
+  opengv::absolute_pose::FrameNoncentralAbsoluteAdapter adapter(
       estimator, nCameraSystem, currentFrame);
 
   size_t numCorrespondences = adapter.getNumberCorrespondences();
@@ -749,16 +734,16 @@ int HybridFrontend::runRansac3d2d(
 
   // create a RelativePoseSac problem and RANSAC
   opengv::sac::Ransac<
-      opengv::sac_problems::absolute_pose ::HybridFrameAbsolutePoseSacProblem>
+      opengv::sac_problems::absolute_pose ::FrameAbsolutePoseSacProblem>
       ransac;
   std::shared_ptr<
-      opengv::sac_problems::absolute_pose::HybridFrameAbsolutePoseSacProblem>
+      opengv::sac_problems::absolute_pose::FrameAbsolutePoseSacProblem>
       absposeproblem_ptr(
           new opengv::sac_problems::absolute_pose::
-              HybridFrameAbsolutePoseSacProblem(
+              FrameAbsolutePoseSacProblem(
                   adapter,
                   opengv::sac_problems::absolute_pose::
-                      HybridFrameAbsolutePoseSacProblem::Algorithm::GP3P));
+                      FrameAbsolutePoseSacProblem::Algorithm::GP3P));
   ransac.sac_model_ = absposeproblem_ptr;
   ransac.threshold_ = 9;
   ransac.max_iterations_ = 50;
@@ -817,7 +802,7 @@ int HybridFrontend::runRansac2d2d(
   for (size_t im = 0; im < numCameras; ++im) {
 
     // relative pose adapter for Kneip toolchain
-    opengv::relative_pose::HybridFrameRelativeAdapter adapter(
+    opengv::relative_pose::FrameRelativeAdapter adapter(
         estimator, params.nCameraSystem, olderFrameId, im, currentFrameId, im);
 
     size_t numCorrespondences = adapter.getNumberCorrespondences();
@@ -829,11 +814,11 @@ int HybridFrontend::runRansac2d2d(
 
     // create a RelativePoseSac problem and RANSAC
     typedef opengv::sac_problems::relative_pose::
-        HybridFrameRotationOnlySacProblem HybridFrameRotationOnlySacProblem;
-    opengv::sac::Ransac<HybridFrameRotationOnlySacProblem> rotation_only_ransac;
-    std::shared_ptr<HybridFrameRotationOnlySacProblem>
+        FrameRotationOnlySacProblem FrameRotationOnlySacProblem;
+    opengv::sac::Ransac<FrameRotationOnlySacProblem> rotation_only_ransac;
+    std::shared_ptr<FrameRotationOnlySacProblem>
         rotation_only_problem_ptr(
-            new HybridFrameRotationOnlySacProblem(adapter));
+            new FrameRotationOnlySacProblem(adapter));
     rotation_only_ransac.sac_model_ = rotation_only_problem_ptr;
     rotation_only_ransac.threshold_ = 9;
     rotation_only_ransac.max_iterations_ = 50;
@@ -848,11 +833,11 @@ int HybridFrontend::runRansac2d2d(
 
     // now the rel_pose one:
     typedef opengv::sac_problems::relative_pose::
-        HybridFrameRelativePoseSacProblem HybridFrameRelativePoseSacProblem;
-    opengv::sac::Ransac<HybridFrameRelativePoseSacProblem> rel_pose_ransac;
-    std::shared_ptr<HybridFrameRelativePoseSacProblem> rel_pose_problem_ptr(
-        new HybridFrameRelativePoseSacProblem(
-            adapter, HybridFrameRelativePoseSacProblem::STEWENIUS));
+        FrameRelativePoseSacProblem FrameRelativePoseSacProblem;
+    opengv::sac::Ransac<FrameRelativePoseSacProblem> rel_pose_ransac;
+    std::shared_ptr<FrameRelativePoseSacProblem> rel_pose_problem_ptr(
+        new FrameRelativePoseSacProblem(
+            adapter, FrameRelativePoseSacProblem::STEWENIUS));
     rel_pose_ransac.sac_model_ = rel_pose_problem_ptr;
     rel_pose_ransac.threshold_ = 9;     //(1.0 - cos(0.5/600));
     rel_pose_ransac.max_iterations_ = 50;
@@ -981,7 +966,7 @@ int HybridFrontend::runRansac2d2d(okvis::HybridFilter& estimator,
   RelativeMotionType rmt = UNCERTAIN_MOTION;
   size_t totalInlierNumber = 0;
   bool rotation_only_success = false;
-  bool rel_pose_success = false;
+  bool translation_only_success = false;
   double maxOverlap = 0.0;
   double maxMatchRatio = 0.0;
   std::shared_ptr<okvis::MultiFrame> frameBPtr =
@@ -989,7 +974,7 @@ int HybridFrontend::runRansac2d2d(okvis::HybridFilter& estimator,
   // run relative RANSAC
   for (size_t im = 0; im < numCameras; ++im) {
     // relative pose adapter for Kneip toolchain
-    opengv::relative_pose::HybridFrameRelativeAdapter adapter(
+    opengv::relative_pose::FrameRelativeAdapter adapter(
         estimator, params.nCameraSystem, olderFrameId, im, currentFrameId, im);
     double overlap;
     double matchRatio;
@@ -1008,11 +993,11 @@ int HybridFrontend::runRansac2d2d(okvis::HybridFilter& estimator,
 
     // create a RelativePoseSac problem and RANSAC
     typedef opengv::sac_problems::relative_pose::
-        HybridFrameRotationOnlySacProblem HybridFrameRotationOnlySacProblem;
-    opengv::sac::Ransac<HybridFrameRotationOnlySacProblem> rotation_only_ransac;
-    std::shared_ptr<HybridFrameRotationOnlySacProblem>
+        FrameRotationOnlySacProblem FrameRotationOnlySacProblem;
+    opengv::sac::Ransac<FrameRotationOnlySacProblem> rotation_only_ransac;
+    std::shared_ptr<FrameRotationOnlySacProblem>
         rotation_only_problem_ptr(
-            new HybridFrameRotationOnlySacProblem(adapter));
+            new FrameRotationOnlySacProblem(adapter));
     rotation_only_ransac.sac_model_ = rotation_only_problem_ptr;
     rotation_only_ransac.threshold_ = 9;
     rotation_only_ransac.max_iterations_ = 50;
@@ -1025,28 +1010,37 @@ int HybridFrontend::runRansac2d2d(okvis::HybridFilter& estimator,
     float rotation_only_ratio = static_cast<float>(rotation_only_inliers) /
                                 static_cast<float>(numCorrespondences);
 
-    // now the rel_pose one:
+    // now the translation only one:
+    okvis::kinematics::Transformation T_SaCa, T_SbCb;
+    estimator.getCameraSensorStates(olderFrameId, im, T_SaCa);
+    estimator.getCameraSensorStates(currentFrameId, im, T_SbCb);
+    okvis::kinematics::Transformation T_WSa, T_WSb;
+    estimator.get_T_WS(olderFrameId, T_WSa);
+    estimator.get_T_WS(currentFrameId, T_WSb);
+    adapter.setR12((T_WSa.C() * T_SaCa.C()).transpose() * T_WSb.C() *
+                   T_SbCb.C());
+
     typedef opengv::sac_problems::relative_pose::
-        HybridFrameRelativePoseSacProblem HybridFrameRelativePoseSacProblem;
-    opengv::sac::Ransac<HybridFrameRelativePoseSacProblem> rel_pose_ransac;
-    std::shared_ptr<HybridFrameRelativePoseSacProblem> rel_pose_problem_ptr(
-        new HybridFrameRelativePoseSacProblem(
-            adapter, HybridFrameRelativePoseSacProblem::STEWENIUS));
-    rel_pose_ransac.sac_model_ = rel_pose_problem_ptr;
-    rel_pose_ransac.threshold_ = 9;     //(1.0 - cos(0.5/600));
-    rel_pose_ransac.max_iterations_ = 50;
+        FrameTranslationOnlySacProblem FrameTranslationOnlySacProblem;
+    opengv::sac::Ransac<FrameTranslationOnlySacProblem> translation_only_ransac;
+    std::shared_ptr<FrameTranslationOnlySacProblem> translation_only_problem_ptr(
+        new FrameTranslationOnlySacProblem(adapter));
+
+    translation_only_ransac.sac_model_ = translation_only_problem_ptr;
+    translation_only_ransac.threshold_ = 9;     //(1.0 - cos(0.5/600));
+    translation_only_ransac.max_iterations_ = 50;
 
     // run the ransac
-    rel_pose_ransac.computeModel(0);
+    translation_only_ransac.computeModel(0);
 
     // assess success
-    int rel_pose_inliers = rel_pose_ransac.inliers_.size();
-    float rel_pose_ratio = static_cast<float>(rel_pose_inliers) /
+    int translation_only_inliers = translation_only_ransac.inliers_.size();
+    float translation_only_ratio = static_cast<float>(translation_only_inliers) /
                            static_cast<float>(numCorrespondences);
 
     // decide on success and fill inliers
     std::vector<bool> inliers(numCorrespondences, false);
-    if (rotation_only_ratio > rel_pose_ratio || rotation_only_ratio > 0.8) {
+    if (rotation_only_ratio > translation_only_ratio || rotation_only_ratio > 0.8) {
       if (rotation_only_inliers > 10) {
         rotation_only_success = true;
       }
@@ -1056,13 +1050,13 @@ int HybridFrontend::runRansac2d2d(okvis::HybridFilter& estimator,
         inliers.at(rotation_only_ransac.inliers_.at(k)) = true;
       }
     } else {
-      if (rel_pose_inliers > 10) {
-        rel_pose_success = true;
+      if (translation_only_inliers > 10) {
+        translation_only_success = true;
       }
       rmt = RELATIVE_POSE;
-      totalInlierNumber += rel_pose_inliers;
-      for (size_t k = 0; k < rel_pose_ransac.inliers_.size(); ++k) {
-        inliers.at(rel_pose_ransac.inliers_.at(k)) = true;
+      totalInlierNumber += translation_only_inliers;
+      for (size_t k = 0; k < translation_only_ransac.inliers_.size(); ++k) {
+        inliers.at(translation_only_ransac.inliers_.at(k)) = true;
       }
     }
 
@@ -1070,12 +1064,16 @@ int HybridFrontend::runRansac2d2d(okvis::HybridFilter& estimator,
         ->setRelativeMotion(im, olderFrameId, rmt);
 
     // failure?
-    if (!rotation_only_success && !rel_pose_success) {
+    if (!rotation_only_success && !translation_only_success) {
       LOG(INFO) << "2D-2D RANSAC failed";
       continue;
     } else {
+      okvis::Time olderTime = estimator.timestamp(olderFrameId);
+      okvis::Time currentTime = estimator.timestamp(currentFrameId);
+      okvis::Duration gap = currentTime - olderTime;
       LOG(INFO) << "2D-2D RANSAC "
-                << (rel_pose_success ? "rel pose" : "rot only");
+                << (translation_only_success ? "rel pose" : "rot only")
+                << " frame distance in time " << gap.toSec();
     }
 
     // otherwise: kick out outliers!
@@ -1110,7 +1108,7 @@ int HybridFrontend::runRansac2d2d(okvis::HybridFilter& estimator,
     }
   }
 
-  if (rel_pose_success || rotation_only_success) {
+  if (translation_only_success || rotation_only_success) {
     return totalInlierNumber;
   } else {
     return -1;
