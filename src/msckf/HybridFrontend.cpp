@@ -597,10 +597,6 @@ int HybridFrontend::matchToLastFrame(
     const okvis::VioParameters& params, const uint64_t currentFrameId,
     bool& rotationOnly,
     bool usePoseUncertainty, bool removeOutliers) {
-  int retCtr = 0;
-//  int matches2d2d(0);
-  rotationOnly = true;
-
   if (estimator.numFrames() < 2) {
     // just starting, so yes, we need this as a new keyframe
     return 0;
@@ -608,12 +604,12 @@ int HybridFrontend::matchToLastFrame(
 
   uint64_t lastFrameId = estimator.frameIdByAge(1);
 
-//   comment the following 4 lines because no keyframe matching is
-//   performed in msckf
-    if (estimator.isKeyframe(lastFrameId)) {
-      // already done
-      return 0;
-    }
+  if (estimator.isKeyframe(lastFrameId)) {
+    // already done
+    return 0;
+  }
+
+  int retCtr = 0;
 
   for (size_t im = 0; im < params.nCameraSystem.numCameras(); ++im) {
     MATCHING_ALGORITHM matchingAlgorithm(estimator,
@@ -644,10 +640,8 @@ int HybridFrontend::matchToLastFrame(
 
   // remove outliers
   rotationOnly = false;
-  bool initializePose = false;
-  bool always_on_2dransac = false;
-  if (always_on_2dransac || !isInitialized_)
-    runRansac2d2d(estimator, params, currentFrameId, lastFrameId, initializePose,
+  if (!isInitialized_)
+    runRansac2d2d(estimator, params, currentFrameId, lastFrameId, false,
                   removeOutliers, rotationOnly);
 
   return retCtr;
@@ -873,11 +867,7 @@ int HybridFrontend::runRansac2d2d(
 
     // failure?
     if (!rotation_only_success && !rel_pose_success) {
-      LOG(INFO) << "2D-2D RANSAC failed";
       continue;
-    } else {
-      LOG(INFO) << "2D-2D RANSAC "
-                << (rel_pose_success ? "rel pose" : "rot only");
     }
 
     // otherwise: kick out outliers!
