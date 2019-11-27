@@ -21,6 +21,7 @@
 #include <Eigen/Geometry>
 #include <Eigen/StdVector>
 
+#include <okvis/triangulation/stereo_triangulation.hpp>
 // #include "math_utils.hpp"
 
 namespace msckf_vio {
@@ -357,6 +358,14 @@ bool Feature::checkMotion() const {
   else return false;
 }
 
+static double raySigma() {
+  int kpSize = 8;
+  int fx = 640;
+  double keypointAStdDev = kpSize;
+  keypointAStdDev = 0.8 * keypointAStdDev / 12.0;
+  return sqrt(sqrt(2)) * keypointAStdDev / fx;
+}
+
 bool Feature::initializePosition() {
   // Organize camera poses and feature observations properly.
   std::vector<Eigen::Isometry3d,
@@ -386,13 +395,35 @@ bool Feature::initializePosition() {
     pose = pose.inverse() * T_c0_w;
 
   // Generate initial guess
-  Eigen::Vector3d initial_position(0.0, 0.0, 0.0);
-  generateInitialGuess(cam_poses[cam_poses.size()-1], measurements[0],
-      measurements[measurements.size()-1], initial_position);
-  Eigen::Vector3d solution(
-      initial_position(0)/initial_position(2),
-      initial_position(1)/initial_position(2),
-      1.0/initial_position(2));
+//  Eigen::Vector3d initial_position(0.0, 0.0, 0.0);
+//  generateInitialGuess(cam_poses[cam_poses.size()-1], measurements[0],
+//      measurements[measurements.size()-1], initial_position);
+//  Eigen::Vector3d solution(
+//      initial_position(0)/initial_position(2),
+//      initial_position(1)/initial_position(2),
+//      1.0/initial_position(2));
+
+  // triangulate the point w.r.t the first camera frame as the world frame
+  Eigen::Vector3d obsDir[2];
+  obsDir[0].head<2>() = measurements[0];
+  obsDir[0][2] = 1.0;
+  obsDir[1].head<2>() = measurements[measurements.size()-1];
+  obsDir[1][2] = 1.0;
+  bool isValid;
+  bool isParallel;
+  Eigen::Isometry3d T_c0_ce = cam_poses[cam_poses.size()-1];
+  obsDir[1] = (T_c0_ce.linear().transpose() * obsDir[1]).eval();
+  Eigen::Vector4d homogeneousPoint = okvis::triangulation::triangulateFast(
+      Eigen::Vector3d::Zero(),  // center of A in W coordinates
+      obsDir[0].normalized(),
+      - T_c0_ce.linear().transpose() * T_c0_ce.translation(),  // center of B in W coordinates
+      obsDir[1].normalized(),
+      raySigma(), isValid, isParallel);
+  homogeneousPoint /= homogeneousPoint[3];
+  // landmark position in c0 frame
+  Eigen::Vector3d solution(homogeneousPoint[0] / homogeneousPoint[2],
+                           homogeneousPoint[1] / homogeneousPoint[2],
+                           1.0 / homogeneousPoint[2]);
 
   // Apply Levenberg-Marquart method to solve for the 3d position.
   double lambda = optimization_config.initial_damping;

@@ -62,9 +62,9 @@ void TestGet_X_from_xP_lin()
  * @return
  */
 Eigen::Vector4d Get_X_from_xP_lin(
-    std::vector<Eigen::Vector3d,
+    const std::vector<Eigen::Vector3d,
                 Eigen::aligned_allocator<Eigen::Matrix<double, 3, 1>>>& vV2Xn,
-    std::vector<Sophus::SE3d, Eigen::aligned_allocator<Sophus::SE3d>>& vSE3,
+    const std::vector<Sophus::SE3d, Eigen::aligned_allocator<Sophus::SE3d>>& vSE3,
     Eigen::Matrix<double, Eigen::Dynamic, 1>* pSingular =
         (Eigen::Matrix<double, Eigen::Dynamic, 1>*)(NULL));
 
@@ -80,9 +80,9 @@ Eigen::Vector4d Get_X_from_xP_lin(
  * @return
  */
 Eigen::Vector4d Get_X_from_xP_lin(
-    std::vector<Eigen::Vector3d, Eigen::aligned_allocator<Eigen::Vector3d>>&
+    const std::vector<Eigen::Vector3d, Eigen::aligned_allocator<Eigen::Vector3d>>&
         vV3Xn,
-    std::vector<Sophus::SE3d, Eigen::aligned_allocator<Sophus::SE3d>>& vSE3,
+    const std::vector<Sophus::SE3d, Eigen::aligned_allocator<Sophus::SE3d>>& vSE3,
     bool& isValid, bool& isParallel);
 
 // two view triangulation using mid-point method as discussed in R Hartley,

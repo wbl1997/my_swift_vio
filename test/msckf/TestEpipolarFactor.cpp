@@ -79,7 +79,8 @@ TEST(CeresErrorTerms, EpipolarFactor) {
     std::vector<Eigen::Vector3d, Eigen::aligned_allocator<Eigen::Vector3d>> pC(
         2);
     pC[0] = cameraGeometry0->createRandomVisiblePoint();
-    pC[1] = (two_T_WS[1] * T_SC).inverse() * (two_T_WS[0] * T_SC) * pC[0];
+    okvis::kinematics::Transformation T_C1C0 = (two_T_WS[1] * T_SC).inverse() * (two_T_WS[0] * T_SC);
+    pC[1] = T_C1C0.C() * pC[0] + T_C1C0.r();
     std::vector<Eigen::Vector2d, Eigen::aligned_allocator<Eigen::Vector2d>> ipC(
         2);
     bool projectionOk = true;
@@ -93,7 +94,8 @@ TEST(CeresErrorTerms, EpipolarFactor) {
       }
     }
     if (projectionOk) {
-      allPointW.push_back((two_T_WS[0] * T_SC) * pC[0]);
+      okvis::kinematics::Transformation T_WC0 = two_T_WS[0] * T_SC;
+      allPointW.push_back(T_WC0.C() * pC[0] + T_WC0.r());
       imagePointPairs.push_back(ipC[0]);
       imagePointPairs.push_back(ipC[1]);
       ++numValidPoint;

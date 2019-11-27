@@ -15,9 +15,9 @@ using ceres::Solver;
 #endif
 
 Eigen::Vector4d Get_X_from_xP_lin(
-    std::vector<Eigen::Vector3d, Eigen::aligned_allocator<Eigen::Vector3d>>&
+    const std::vector<Eigen::Vector3d, Eigen::aligned_allocator<Eigen::Vector3d>>&
         vV3Xn,
-    std::vector<Sophus::SE3d, Eigen::aligned_allocator<Sophus::SE3d>>& vSE3,
+    const std::vector<Sophus::SE3d, Eigen::aligned_allocator<Sophus::SE3d>>& vSE3,
     Eigen::Matrix<double, Eigen::Dynamic, 1>* pSingular) {
   assert(vV3Xn.size() == vSE3.size());
   int K = vV3Xn.size();
@@ -38,14 +38,17 @@ Eigen::Vector4d Get_X_from_xP_lin(
   }
   Eigen::JacobiSVD<Eigen::MatrixXd> svdM(A, Eigen::ComputeThinV);
   if (pSingular) *pSingular = svdM.singularValues();
-  Eigen::Vector4d v4Xhomog = svdM.matrixV().col(3);
-  return v4Xhomog;
+  if (svdM.singularValues()[2] < 1e-4) {
+    return svdM.matrixV().col(2);
+  } else {
+    return svdM.matrixV().col(3);
+  }
 }
 
 Eigen::Vector4d Get_X_from_xP_lin(
-    std::vector<Eigen::Vector3d, Eigen::aligned_allocator<Eigen::Vector3d>>&
+    const std::vector<Eigen::Vector3d, Eigen::aligned_allocator<Eigen::Vector3d>>&
         vV3Xn,
-    std::vector<Sophus::SE3d, Eigen::aligned_allocator<Sophus::SE3d>>& vSE3,
+    const std::vector<Sophus::SE3d, Eigen::aligned_allocator<Sophus::SE3d>>& vSE3,
     bool& isValid, bool& isParallel) {
   assert(vV3Xn.size() == vSE3.size());
   int K = vV3Xn.size();
