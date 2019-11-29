@@ -14,93 +14,140 @@
 #include <Eigen/StdVector>
 
 #include <gtest/gtest.h>
-#include <vio/Sample.h>
-#include <msckf/FeatureTriangulation.hpp>
 
+
+#include <msckf/FeatureTriangulation.hpp>
+#include <msckf/SimulationNView.h>
 
 using namespace std;
 using namespace Eigen;
 using namespace msckf_vio;
 
 
-TEST(FeatureInitializeTest, sphereDistribution) {
-  // Set the real feature at the origin of the world frame.
-  Vector3d feature(0.5, 0.0, 0.0);
-
-  // Add 6 camera poses, all of which are able to see the
-  // feature at the origin. For simplicity, the six camera
-  // view are located at the six intersections between a
-  // unit sphere and the coordinate system. And the z axes
-  // of the camera frames are facing the origin.
-  vector<Eigen::Isometry3d, Eigen::aligned_allocator<Eigen::Isometry3d>> cam_poses(6);
-  // Positive x axis.
-  cam_poses[0].linear() << 0.0,  0.0, -1.0,
-    1.0,  0.0,  0.0, 0.0, -1.0,  0.0;
-  cam_poses[0].translation() << 1.0,  0.0,  0.0;
-  // Positive y axis.
-  cam_poses[1].linear() << -1.0,  0.0,  0.0,
-     0.0,  0.0, -1.0, 0.0, -1.0,  0.0;
-  cam_poses[1].translation() << 0.0,  1.0,  0.0;
-  // Negative x axis.
-  cam_poses[2].linear() << 0.0,  0.0,  1.0,
-    -1.0,  0.0,  0.0, 0.0, -1.0,  0.0;
-  cam_poses[2].translation() << -1.0,  0.0,  0.0;
-  // Negative y axis.
-  cam_poses[3].linear() << 1.0,  0.0,  0.0,
-     0.0,  0.0,  1.0, 0.0, -1.0,  0.0;
-  cam_poses[3].translation() << 0.0, -1.0,  0.0;
-  // Positive z axis.
-  cam_poses[4].linear() << 0.0, -1.0,  0.0,
-    -1.0,  0.0,  0.0, 0.0, 0.0, -1.0;
-  cam_poses[4].translation() << 0.0,  0.0,  1.0;
-  // Negative z axis.
-  cam_poses[5].linear() << 1.0,  0.0,  0.0,
-     0.0,  1.0,  0.0, 0.0,  0.0,  1.0;
-  cam_poses[5].translation() << 0.0,  0.0, -1.0;
-
-  // Set the camera states
-  CamStateServer cam_states(6);
-  for (int i = 0; i < 6; ++i) {
-    CAMState new_cam_state;
-    new_cam_state.id = i;
-    new_cam_state.orientation = cam_poses[i].linear().transpose();
-    new_cam_state.position = cam_poses[i].translation();
-    cam_states[new_cam_state.id] = new_cam_state;
-  }
-
-  // Compute measurements.
-  vio::Sample noise_generator;
-  vector<Vector2d, aligned_allocator<Vector2d> > measurements(6);
-  for (int i = 0; i < 6; ++i) {
-    Isometry3d cam_pose_inv = cam_poses[i].inverse();
-    Vector3d p = cam_pose_inv.linear()*feature + cam_pose_inv.translation();
-    double u = p(0) / p(2) + noise_generator.gaussian(0.01);
-    double v = p(1) / p(2) + noise_generator.gaussian(0.01);
-    //double u = p(0) / p(2);
-    //double v = p(1) / p(2);
-    measurements[i] = Vector2d(u, v);
-  }
-
-//  for (int i = 0; i < 6; ++i) {
-//    cout << "pose " << i << ":" << endl;
-//    cout << "orientation: " << endl;
-//    cout << cam_poses[i].linear() << endl;
-//    cout << "translation: "  << endl;
-//    cout << cam_poses[i].translation().transpose() << endl;
-//    cout << "measurement: " << endl;
-//    cout << measurements[i].transpose() << endl;
-//    cout << endl;
-//  }
+TEST(TriangulateRobustLM, sphereDistribution) {
+  simul::SimulationNViewSphere snvs;
 
   // Initialize a feature object.
-  Feature feature_object(measurements, cam_states);
+  Feature feature_object(snvs.obsDirectionsZ1(), snvs.camStates());
   // Compute the 3d position of the feature.
   feature_object.initializePosition();
 
   // Check the difference between the computed 3d
   // feature position and the groud truth.
-  cout << "ground truth position: " << feature.transpose() << endl;
-  cout << "estimated position: " << feature_object.position.transpose() << endl;
-  Eigen::Vector3d error = feature_object.position - feature;
+  Eigen::Vector3d error = feature_object.position - snvs.truePoint().head<3>();
   EXPECT_NEAR(error.norm(), 0, 0.05);
+}
+
+void testInitializeWithStationaryCamera(bool addSidewaysView) {
+  simul::SimulationNViewStatic snvs(addSidewaysView);
+
+  // Initialize a feature object.
+  Feature feature_object(snvs.obsDirectionsZ1(), snvs.camStates());
+  // Compute the 3d position of the feature.
+  feature_object.initializePosition();
+
+  // Check the difference between the computed 3d
+  // feature position and the groud truth.
+  if (addSidewaysView) {
+    Eigen::Vector3d error =
+        feature_object.position - snvs.truePoint().head<3>();
+    EXPECT_NEAR(error.norm(), 0, 0.05);
+  } else {
+    Eigen::Vector3d error =
+        feature_object.position / feature_object.position[2] -
+        snvs.truePoint().head<3>() / snvs.truePoint()[2];
+    EXPECT_NEAR(error.norm(), 0, 0.08);
+  }
+}
+
+TEST(TriangulateRobustLM, StationaryCamera) {
+  testInitializeWithStationaryCamera(false);
+  testInitializeWithStationaryCamera(true);
+}
+
+TEST(TriangulateRobustLM, TwoView) {
+  {
+    simul::SimulationTwoView s2v(0);
+    msckf_vio::Feature feature_object(s2v.obsDirectionsZ1(), s2v.camStates());
+    feature_object.initializePosition();
+    Eigen::Vector4d pointEstimate = s2v.truePoint();
+    for (size_t j = 0; j < s2v.numObservations(); ++j) {
+      Eigen::Vector4d pinC = s2v.T_CW(j) * pointEstimate;
+      pinC /= pinC[2];
+    }
+    pointEstimate.head<3>() = feature_object.position;
+    pointEstimate[3] = 1.0;
+    for (size_t j = 0; j < s2v.numObservations(); ++j) {
+      Eigen::Vector4d pinC = s2v.T_CW(j) * pointEstimate;
+      pinC /= pinC[2];
+    }
+
+    EXPECT_LT((feature_object.position - s2v.truePoint().head<3>()).norm(),
+              0.02);
+  }
+  {
+    simul::SimulationThreeView snv;
+    int numObs = snv.numObservations();
+    msckf_vio::CamStateServer cam_states_all = snv.camStates();
+    msckf_vio::CamStateServer cam_states = {cam_states_all[0],
+                                            cam_states_all[numObs - 1]};
+    std::vector<Eigen::Vector2d, Eigen::aligned_allocator<Eigen::Vector2d>>
+        measurements{snv.obsDirectionZ1(0), snv.obsDirectionZ1(numObs - 1)};
+    msckf_vio::Feature feature_object(measurements, cam_states);
+    feature_object.initializePosition();
+    EXPECT_LT((feature_object.position - snv.truePoint().head<3>()).norm(),
+              0.2);
+  }
+}
+
+TEST(TriangulateRobustLM, Initialization) {
+  simul::SimulationThreeView snv;
+  const int numObs = snv.numObservations();
+  okvis::kinematics::Transformation T_AW(snv.T_CW(0));
+  okvis::kinematics::Transformation T_BW(snv.T_CW(numObs - 1));
+
+  msckf_vio::Feature feature_dummy;
+  Eigen::Vector3d initial_position(0.0, 0.0, 0.0);
+  Eigen::Isometry3d T_C1C0;
+  okvis::kinematics::Transformation T_AB = T_AW * T_BW.inverse();
+  T_C1C0.setIdentity();
+  T_C1C0.linear() = T_AB.C().transpose();
+  T_C1C0.translation() = -T_AB.C().transpose() * T_AB.r();
+  feature_dummy.generateInitialGuess(T_C1C0, snv.obsDirectionZ1(0),
+                                     snv.obsDirectionZ1(numObs - 1),
+                                     initial_position);
+  EXPECT_LT((initial_position - (T_AW * snv.truePoint()).head<3>()).norm(), 0.2);
+}
+
+TEST(TriangulateRobustLM, RotationOnly) {
+  {
+  simul::SimulationTwoView s2v(3);
+  msckf_vio::Feature feature_object(s2v.obsDirectionsZ1(), s2v.camStates());
+  feature_object.initializePosition();
+  EXPECT_LT((feature_object.position.normalized() - s2v.truePoint().head<3>().normalized()).norm(),
+            1e-5);
+  }
+  {
+  simul::SimulationTwoView s2v(4);
+  msckf_vio::Feature feature_object(s2v.obsDirectionsZ1(), s2v.camStates());
+  feature_object.initializePosition();
+  EXPECT_LT((feature_object.position.normalized() - s2v.truePoint().head<3>().normalized()).norm(),
+            1e-5);
+  }
+}
+
+TEST(TriangulateRobustLM, FarPoints) {
+  // See what happens with increasingly far points
+  double distances[] = {3, 3e2, 3e4, 3e8};
+  for (size_t jack = 0; jack < sizeof(distances) / sizeof(distances[0]);
+       ++jack) {
+    double dist = distances[jack];
+    simul::SimulationTwoView stv(5, dist);
+
+    msckf_vio::Feature feature_object(stv.obsDirectionsZ1(), stv.camStates());
+    feature_object.initializePosition();
+
+    EXPECT_LT((feature_object.position - stv.truePoint().head<3>()).norm() / dist,
+              1e-4);
+  }
 }

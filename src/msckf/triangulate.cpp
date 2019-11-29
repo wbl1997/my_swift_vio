@@ -1,8 +1,6 @@
 #include "msckf/triangulate.h"
 #include <iostream>
 
-#define HAVE_CERES
-#ifdef HAVE_CERES
 #include "ceres/ceres.h"  //LM and Dogleg optimization
 #include "ceres/rotation.h"
 #include "glog/logging.h"
@@ -12,7 +10,6 @@ using ceres::CostFunction;
 using ceres::Problem;
 using ceres::Solve;
 using ceres::Solver;
-#endif
 
 Eigen::Vector4d Get_X_from_xP_lin(
     const std::vector<Eigen::Vector3d, Eigen::aligned_allocator<Eigen::Vector3d>>&
@@ -212,7 +209,6 @@ void triangulate_refine_GN(
 #endif
 }
 
-#ifdef HAVE_CERES
 // Templated pinhole camera model for used with Ceres.  The camera is
 // parameterized using 7 parameters: 4 for rotation, 3 for translation, qxyzw,
 // txyz assume observations are at the z=1 image plane Warning: use templated
@@ -342,4 +338,3 @@ void triangulate_refineJ(
   ceres::Solve(options, &problem, &summary);
   //    std::cout << summary.FullReport() << "\n";
 }
-#endif

@@ -21,62 +21,11 @@
 #include <Eigen/Geometry>
 #include <Eigen/StdVector>
 
+#include <msckf/CamState.hpp>
+
 #include <okvis/triangulation/stereo_triangulation.hpp>
-// #include "math_utils.hpp"
 
 namespace msckf_vio {
-
-typedef uint64_t StateIDType;
-struct CAMState {
-  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
-
-  // An unique identifier for the CAM state.
-  StateIDType id;
-
-  // Orientation
-  // Take a vector from the world frame to the camera frame.
-  Eigen::Quaterniond orientation;
-
-  // Position of the camera frame in the world frame.
-  Eigen::Vector3d position;
-
-  CAMState(): id(0u),
-    orientation(1, 0, 0, 0),
-    position(Eigen::Vector3d::Zero()) {}
-
-  CAMState(
-      const StateIDType& new_id,
-      const Eigen::Quaterniond& R_C_W, const Eigen::Vector3d& t_W_C):
-      id(new_id),
-    orientation(R_C_W),
-    position(t_W_C) {}
-
-  CAMState(const CAMState& rhs)
-      : id(rhs.id), orientation(rhs.orientation), position(rhs.position) {}
-
-  CAMState(CAMState&& rhs)
-      : id{std::move(rhs.id)},
-        orientation{std::move(rhs.orientation)},
-        position{std::move(rhs.position)} {}
-
-  CAMState& operator= (const CAMState& rhs) {
-      if (this != &rhs) {
-          id = rhs.id;
-          orientation = rhs.orientation;
-          position = rhs.position;
-      }
-      return *this;
-  }
-  CAMState& operator= (CAMState&& rhs) {
-      std::swap(id, rhs.id);
-      std::swap(orientation, rhs.orientation);
-      std::swap(position, rhs.position);
-      return *this;
-  }
-};
-
-typedef std::vector<CAMState, Eigen::aligned_allocator<
-        CAMState > > CamStateServer;
 
 /*
  * @brief Feature Salient part of an image. Please refer
@@ -411,6 +360,7 @@ bool Feature::initializePosition() {
   obsDir[1][2] = 1.0;
   bool isValid;
   bool isParallel;
+  bool flipped;
   Eigen::Isometry3d T_c0_ce = cam_poses[cam_poses.size()-1];
   obsDir[1] = (T_c0_ce.linear().transpose() * obsDir[1]).eval();
   Eigen::Vector4d homogeneousPoint = okvis::triangulation::triangulateFast(
@@ -418,13 +368,33 @@ bool Feature::initializePosition() {
       obsDir[0].normalized(),
       - T_c0_ce.linear().transpose() * T_c0_ce.translation(),  // center of B in W coordinates
       obsDir[1].normalized(),
-      raySigma(), isValid, isParallel);
+      raySigma(), isValid, isParallel, flipped);
   homogeneousPoint /= homogeneousPoint[3];
-  // landmark position in c0 frame
-  Eigen::Vector3d solution(homogeneousPoint[0] / homogeneousPoint[2],
-                           homogeneousPoint[1] / homogeneousPoint[2],
-                           1.0 / homogeneousPoint[2]);
 
+  // Too large chi2 may be due to wrong association.
+  // But subsequent nonlinear opt may save this case, so we stick with it.
+//  if (!isValid) {
+//      position = T_c0_w.linear()*homogeneousPoint.head<3>() + T_c0_w.translation();
+//      is_initialized = false;
+//      return false;
+//  }
+
+  if (flipped) { // Forward motion causes ambiguity. Let's bail out because
+      // doing nonlinear opt may revert the landmark position to the wrong side.
+      position = T_c0_w.linear()*homogeneousPoint.head<3>() + T_c0_w.translation();
+      is_initialized = true;
+      return true;
+  }
+
+  Eigen::Vector3d solution;  // landmark position in c0 frame
+  const double kMinDepth = 0.1;
+  const double kSceneDepth = 2; // TODO(jhuai): pass average scene depth as a config arg
+  // Very small depths may occur under pure rotation.
+  double invDepth =
+      homogeneousPoint[2] < kMinDepth ? kSceneDepth : homogeneousPoint[2];
+  invDepth = 1.0 / invDepth;
+  solution << homogeneousPoint[0] * invDepth,
+      homogeneousPoint[1] * invDepth, invDepth;
   // Apply Levenberg-Marquart method to solve for the 3d position.
   double lambda = optimization_config.initial_damping;
   int inner_loop_cntr = 0;
