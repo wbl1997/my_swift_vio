@@ -6,11 +6,6 @@ include_directories(${EIGEN_INCLUDE_DIR})
 into
 find_package( Eigen3 REQUIRED )
 include_directories(${EIGEN3_INCLUDE_DIR})
-3, rewrite the package.xml into the standard catkin package.xml using build_depend and run_depend directives. Added tf to Catkin Depends in CMakeLists.txt of okvis_ros
-
+3, rewrote the package.xml into the standard catkin package.xml using build_depend and run_depend directives. Added tf to Catkin Depends in CMakeLists.txt of okvis_ros
 4, changed okvis_ros/config/rviz.rviz to show landmarks and their observations instead of point clouds
-5, changed okvis_ros to msckf in launch files, cmakelists.txt and package.xml, except for source and header files, by using searchmonkey. The target name of okvis libaries like okvis_ceres are not changed, though. This leads to name conflicts when building two packages upon two sets of okvis libraries roughly the same. Because catkin puts all the libraries in the devel/lib folder. To solve this, a dirty and quick approach is to build only one package at a time. For the other ROS package, simply rename its package.xml file.
 
-4. write basic data structures for hybridfilter states, including calibration of imu and camera and between both, making smart states which can perform Oplus, compute Jacobian, etc. follow the existing states in okvis
-5. revise hybridfilter estimator::optimize(), and ::applymarginalizationstrategy(), and do some test on okvis easy dataset
-6. implement IMU back integration in RK4, and write a test that combines forward and backward integration which closes a loop

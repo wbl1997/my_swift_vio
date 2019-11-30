@@ -1188,11 +1188,11 @@ bool HybridFilter::featureJacobian(
       camera_rig_.getCameraGeometry(camIdx);
   int projOptModelId = camera_rig_.getProjectionOptMode(camIdx);
   int extrinsicModelId = camera_rig_.getExtrinsicOptMode(camIdx);
-  bool bSucceeded =
+  TriangulationStatus status =
       triangulateAMapPoint(mp, obsInPixel, frameIds, v4Xhomog, vSigmai,
                            tempCameraGeometry, T_SC0_);
 
-  if (!bSucceeded) {
+  if (!status.triangulationOk) {
     computeHTimer.stop();
     return false;
   }
@@ -2385,7 +2385,7 @@ bool HybridFilter::isPureRotation(const MapPoint& mp) const {
   return relativeMotionTypes[1] == ROTATION_ONLY;
 }
 
-bool HybridFilter::triangulateAMapPoint(
+TriangulationStatus HybridFilter::triangulateAMapPoint(
     const MapPoint& mp,
     std::vector<Eigen::Vector2d, Eigen::aligned_allocator<Eigen::Vector2d>>&
         obsInPixel,
@@ -2406,61 +2406,24 @@ bool HybridFilter::triangulateAMapPoint(
       T_WSs;
   size_t numObs = gatherPoseObservForTriang(mp, cameraGeometry, &frameIds, &T_WSs,
                             &obsDirections, &obsInPixel, &imageNoiseStd);
-  bool triangulated = false;
+  TriangulationStatus status;
   if (numObs < minTrackLength_) {
       triangulateTimer.stop();
-      return false;
+      status.lackObservations = true;
+      return status;
   }
   if (checkDisparity) {
-    if (isPureRotation(mp)) {
-      triangulateTimer.stop();
-      return false;
-    }
-//    if (hasLowDisparity(obsDirections, T_WSs, T_SC0)) {
+//    if (isPureRotation(mp)) {
 //      triangulateTimer.stop();
+//      status.raysParallel = true;
 //      return false;
 //    }
+    if (hasLowDisparity(obsDirections, T_WSs, T_SC0)) {
+      triangulateTimer.stop();
+      status.raysParallel = true;
+      return status;
+    }
   }
-
-  /*{
-    // the SE3 transform from world to camera frame
-    std::vector<Sophus::SE3d, Eigen::aligned_allocator<Sophus::SE3d>> T_CWs;
-    if (anchorSeqId >= 0) {  // use AIDP
-      // Ca will play the role of W in T_CWs
-      okvis::kinematics::Transformation T_WCa = T_WSs.at(anchorSeqId) * T_SC0;
-      for (auto T_WS : T_WSs) {
-        okvis::kinematics::Transformation T_WCi = T_WS * T_SC0;
-        okvis::kinematics::Transformation T_CiW = T_WCi.inverse() * T_WCa;
-        T_CWs.emplace_back(Sophus::SE3d(T_CiW.q(), T_CiW.r()));
-      }
-    } else {
-      for (auto iter = T_WSs.begin(); iter != T_WSs.end(); ++iter) {
-        okvis::kinematics::Transformation T_WCi = *iter * T_SC0;
-        okvis::kinematics::Transformation T_CiW = T_WCi.inverse();
-        T_CWs.emplace_back(Sophus::SE3d(T_CiW.q(), T_CiW.r()));
-      }
-    }
-    // Method 1 estimate point's world position with DLT + gauss newton
-    bool isValid;
-    bool isParallel;
-    v4Xhomog = Get_X_from_xP_lin(obsDirections, T_CWs, isValid, isParallel);
-    if (isValid && !isParallel) {
-      Eigen::Vector3d res = v4Xhomog.head<3>() / v4Xhomog[3];
-      triangulate_refine_GN(obsDirections, T_CWs, res, 5);
-      if (res.lpNorm<Eigen::Infinity>() < 1e6) {
-        v4Xhomog[3] = 1;
-        v4Xhomog.head<3>() = res;
-
-        triangulated = true;
-      } else {
-        triangulated = false;
-      }
-    } else {
-      std::cout << " cannot triangulate pure rotation or infinity points "
-                << v4Xhomog.transpose() << std::endl;
-      triangulated = false;
-    }
-  }*/
 
   {
     msckf_vio::CamStateServer cam_states(obsDirections.size());
@@ -2493,17 +2456,18 @@ bool HybridFilter::triangulateAMapPoint(
     }
 
     msckf_vio::Feature feature(measurements, cam_states);
-    if (!feature.checkMotion() || !feature.initializePosition()) {
-      triangulated = false;
-    } else {
-      v4Xhomog[3] = 1;
-      v4Xhomog.head<3>() = feature.position;
-      triangulated = true;
-    }
+    feature.initializePosition();
+    v4Xhomog[3] = 1;
+    v4Xhomog.head<3>() = feature.position;
+
+    status.triangulationOk = feature.is_initialized;
+    status.chi2Small = feature.is_chi2_small;
+    status.flipped = feature.is_flipped;
+    status.raysParallel = feature.is_parallel;
   }
 
   triangulateTimer.stop();
-  return triangulated;
+  return status;
 }
 
 bool HybridFilter::print(std::ostream& stream) const {

@@ -88,6 +88,63 @@ int FilterHelper::pruneSquareMatrix(int rm_state_start, int rm_state_end,
   return new_cov_dim;
 }
 
+Eigen::MatrixXd FilterHelper::leftNullspaceWithRankCheck(
+    const Eigen::MatrixXd& A, int columnRankHint) {
+  int rank = A.cols();
+  while (A.col(rank - 1).norm() < 1e-4) {
+    rank--;
+  }
+  rank = columnRankHint < rank ? columnRankHint : rank;
+
+  Eigen::HouseholderQR<Eigen::MatrixXd> qr(A.leftCols(rank));
+  Eigen::MatrixXd nullQ = qr.householderQ();
+
+  int rows = A.rows();
+  nullQ = nullQ.block(0, rank, rows, rows - rank).eval();
+  return nullQ;
+}
+
+bool FilterHelper::multiplyLeftNullspaceWithGivens(
+    Eigen::MatrixXd* Hf, Eigen::MatrixXd* Hx,
+    Eigen::Matrix<double, Eigen::Dynamic, 1>* residual, Eigen::MatrixXd* R,
+    int columnRankHint) {
+  int M = Hf->rows();
+  int N = Hf->cols();
+  if (Hf->col(N - 1).norm() < 1e-4) {
+    N--;
+  }
+  N = columnRankHint < N ? columnRankHint : N;
+  Eigen::JacobiRotation<double> Hf_GR;
+  for (int n = 0; n < N; ++n) {
+    for (int m = M - 1; m > n; m--) {
+      // Givens matrix G
+      Hf_GR.makeGivens((*Hf)(m - 1, n), (*Hf)(m, n));
+
+      // Multiply G' to the corresponding lines (m-1,m) in each matrix
+
+      // Hf
+      // Note: we only apply G' to the nonzero cols [n:N-1], which is
+      //       equivalent to applying G' to the entire row [0:N-1].
+      (Hf->block(m - 1, n, 2, N - n)).applyOnTheLeft(0, 1, Hf_GR.adjoint());
+
+      // G'*Hx
+      (Hx->block(m - 1, 0, 2, Hx->cols()))
+          .applyOnTheLeft(0, 1, Hf_GR.adjoint());
+
+      // G'*r
+      (residual->block(m - 1, 0, 2, 1)).applyOnTheLeft(0, 1, Hf_GR.adjoint());
+    }
+  }
+  // remove the zero section
+  int nDOF = M - N;
+  *residual = residual->block(N, 0, nDOF, 1);
+  *Hx = Hx->block(N, 0, nDOF, Hx->cols());
+  // TODO(jhuai): apply Givens to R
+  R->setZero(nDOF, nDOF);
+  R->diagonal().setOnes();
+  return true;
+}
+
 const double FilterHelper::chi2_95percentile[] = {
       0,  // for easy reference at degree 0
       3.841459,   5.991465,   7.814728,   9.487729,  11.070498,  12.591587,  14.067140,  15.507313,  16.918978,  18.307038,

@@ -77,11 +77,127 @@ class SimulationNView {
 
   Eigen::Vector4d truePoint() const { return truePoint_; }
 
+  bool project(int obsIndex, Eigen::Vector2d* xyatz1,
+               Eigen::Matrix<double, 2, 6>* Hx,
+               Eigen::Matrix<double, 2, 3>* Hf) const {
+    return project(T_CWs_[obsIndex], truePoint_, xyatz1, Hx, Hf);
+  }
+
   static double raySigma(int focalLength) {
     int kpSize = 9;
     double keypointAStdDev = kpSize;
     keypointAStdDev = 0.8 * keypointAStdDev / 12.0;
     return sqrt(sqrt(2)) * keypointAStdDev / focalLength;
+  }
+
+  /**
+   * @brief project
+   * @param T_CW
+   * @param landmark
+   * @param xyatz1
+   * @param Hx states are defined such that
+   *     $R_{WC} \approx (I + \theta_{WC}\times) \hat{R}_{WC}$ and
+   *     $t_{WC} = \delta t_{WC} + t_{WC}$
+   *     $h = \hat{h} + \delta h_{1:3}$
+   * @param Hf
+   * @return
+   */
+  static bool project(const okvis::kinematics::Transformation& T_CW,
+                      const Eigen::Vector4d landmark, Eigen::Vector2d* xyatz1,
+                      Eigen::Matrix<double, 2, 6>* Hx,
+                      Eigen::Matrix<double, 2, 3>* Hf) {
+    Eigen::Vector4d pinC = T_CW * landmark;
+    if (pinC[2] / pinC[3] < 0) {
+      return false;
+    }
+    *xyatz1 = pinC.head<2>() / pinC[2];
+    Eigen::Matrix<double, 2, 3> Jh;
+    Jh << pinC[2], 0, -pinC[0], 0, pinC[2], -pinC[1];
+    Jh /= (pinC[2] * pinC[2]);
+    Eigen::Matrix<double, 3, 6> Jx;
+    Eigen::Vector3d t_WC = T_CW.inverse().r();
+    Jx << T_CW.C() * okvis::kinematics::crossMx(landmark.head<3>() -
+                                                landmark[3] * t_WC),
+        -T_CW.C() * landmark[3];
+
+    Eigen::Matrix<double, 3, 4> Jf;
+    Jf = T_CW.T3x4();
+    Eigen::Matrix<double, 4, 3> Jlift =
+        Eigen::Matrix<double, 4, 3>::Identity(4, 3);
+    *Hx = Jh * Jx;
+    *Hf = Jh * Jf * Jlift;
+    return true;
+  }
+
+  static bool projectAIDP(const okvis::kinematics::Transformation& T_WC,
+                          const okvis::kinematics::Transformation& T_WA,
+                      const Eigen::Vector4d ab1rho, Eigen::Vector2d* xyatz1,
+                      Eigen::Matrix<double, 2, 12>* Hx,
+                      Eigen::Matrix<double, 2, 3>* Hf) {
+    Eigen::Vector4d rhopinC = T_WC.inverse() * T_WA * ab1rho;
+    if (rhopinC[2] / rhopinC[3] < 0) {
+      return false;
+    }
+    *xyatz1 = rhopinC.head<2>() / rhopinC[2];
+// TODO(jhuai): compute the Jacobians
+//    Eigen::Matrix<double, 2, 3> Jh;
+//    Jh << rhopinC[2], 0, -rhopinC[0], 0, rhopinC[2], -rhopinC[1];
+//    Jh /= (rhopinC[2] * rhopinC[2]);
+//    Eigen::Matrix<double, 3, 6> Jx;
+//    Eigen::Vector3d t_WC = T_WC.r();
+//    okvis::kinematics::Transformation T_CW = T_WC.inverse();
+//    Jx << T_CW.C() * okvis::kinematics::crossMx(ab1rho.head<3>() -
+//                                                ab1rho[3] * t_WC),
+//        -T_CW.C() * ab1rho[3];
+
+//    Eigen::Matrix<double, 3, 4> Jf;
+//    Jf = T_CW.T3x4();
+//    Eigen::Matrix<double, 4, 3> Jlift =
+//        Eigen::Matrix<double, 4, 3>::Identity(4, 3);
+//    Hx->leftCols(6) = Jh * Jx;
+//    *Hf = Jh * Jf * Jlift;
+    return true;
+  }
+
+  static bool project(const okvis::kinematics::Transformation& T_CW,
+                      const Eigen::Vector4d landmark, Eigen::Vector2d* xyatz1) {
+    Eigen::Vector4d pinC = T_CW * landmark;
+    if (pinC[2] / pinC[3] < 0) {
+      return false;
+    }
+    *xyatz1 = pinC.head<2>() / pinC[2];
+    return true;
+  }
+
+  static bool projectWithNumericDiff(const okvis::kinematics::Transformation& T_CW,
+                      const Eigen::Vector4d landmark, Eigen::Vector2d* xyatz1,
+                      Eigen::Matrix<double, 2, 6>* Hx,
+                      Eigen::Matrix<double, 2, 3>* Hf) {
+    bool projectOk = project(T_CW, landmark, xyatz1);
+    if (!projectOk)
+      return false;
+    Hx->resize(2, 6);
+    Hf->resize(2, 3);
+    okvis::kinematics::Transformation T_WC = T_CW.inverse();
+    Eigen::Matrix<double, 6, 1> delta;
+    Eigen::Vector2d xybar;
+    const double eps = 1e-6;
+    for (int i = 0; i < 6; ++i) {
+      delta.setZero();
+      delta(i) = eps;
+      okvis::kinematics::Transformation T_WC_bar = T_WC;
+      T_WC_bar.oplus(delta);
+      project(T_WC_bar.inverse(), landmark, &xybar);
+      Hx->col(i) = (xybar - *xyatz1) / eps;
+    }
+    Eigen::Vector4d landmarkBar;
+    for (int i = 0; i < 3; ++i) {
+      landmarkBar = landmark;
+      landmarkBar[i] += eps;
+      project(T_CW, landmarkBar, &xybar);
+      Hf->col(i) = (xybar - *xyatz1) / eps;
+    }
+    return true;
   }
 
  protected:
@@ -331,7 +447,7 @@ public:
 
 class SimulationNViewStatic : public SimulationNView {
  public:
-  SimulationNViewStatic(bool addSidewaysView) : SimulationNView(6) {
+  SimulationNViewStatic(bool addSidewaysView, bool addObsNoise) : SimulationNView(6) {
     truePoint_ = Eigen::Vector4d(0.2, 0.5, 1.5, 1.0);
     int nviews = addSidewaysView ? 5 : 6;
     std::vector<Eigen::Isometry3d, Eigen::aligned_allocator<Eigen::Isometry3d>>
@@ -356,8 +472,12 @@ class SimulationNViewStatic : public SimulationNView {
     for (int i = 0; i < nviews; ++i) {
       Eigen::Isometry3d cam_pose_inv = cam_poses[i].inverse();
       Eigen::Vector3d p = cam_pose_inv.linear() * truePoint_.head<3>() + cam_pose_inv.translation();
-      double u = p(0) / p(2) + noise_generator.gaussian(0.01);
-      double v = p(1) / p(2) + noise_generator.gaussian(0.01);
+      double u = p(0) / p(2);
+      double v = p(1) / p(2);
+      if (addObsNoise) {
+        u += noise_generator.gaussian(0.01);
+        v += noise_generator.gaussian(0.01);
+      }
       measurements[i] = Eigen::Vector2d(u, v);
       obsDirections_[i] = Eigen::Vector3d(u, v, 1.0);
     }
@@ -369,8 +489,12 @@ class SimulationNViewStatic : public SimulationNView {
       cam_pose_sideways.translation() << 1.0, 0.0, 0.0;
       Eigen::Isometry3d cam_pose_inv = cam_pose_sideways.inverse();
       Eigen::Vector3d p = cam_pose_inv.linear() * truePoint_.head<3>() + cam_pose_inv.translation();
-      double u = p(0) / p(2) + noise_generator.gaussian(0.01);
-      double v = p(1) / p(2) + noise_generator.gaussian(0.01);
+      double u = p(0) / p(2);
+      double v = p(1) / p(2);
+      if (addObsNoise) {
+        u += noise_generator.gaussian(0.01);
+        v += noise_generator.gaussian(0.01);
+      }
       measurements.push_back(Eigen::Vector2d(u, v));
       obsDirections_[nviews] = Eigen::Vector3d(u, v, 1.0);
       msckf_vio::CAMState new_cam_state;

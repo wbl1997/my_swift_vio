@@ -149,6 +149,7 @@ struct Feature {
   /*
    * @brief InitializePosition Intialize the feature position
    *    based on all current available measurements.
+   *    This function handles points at infinity, rotation only motion.
    * @return The computed 3d position is used to set the position
    *    member variable. Note the resulted position is in world
    *    frame.
@@ -176,6 +177,11 @@ struct Feature {
   // A indicator to show if the 3d postion of the feature
   // has been initialized or not.
   bool is_initialized;
+
+  bool is_chi2_small; // is the chi2 small enough?
+  bool is_parallel; // is the observations rays parallel?
+  // is flipping the landmark position needed? e.g., in case of forward motion.
+  bool is_flipped;
 
   // Optimization configuration for solving the 3d position.
   static OptimizationConfig optimization_config;
@@ -315,6 +321,22 @@ static double raySigma() {
   return sqrt(sqrt(2)) * keypointAStdDev / fx;
 }
 
+static bool isValidSolution(
+    const std::vector<Eigen::Isometry3d,
+                      Eigen::aligned_allocator<Eigen::Isometry3d>>& T_w_ci,
+    const Eigen::Vector3d& pinw) {
+  // Check if the solution is valid. Make sure the feature
+  // is in front of every camera frame observing it.
+  bool is_valid_solution = true;
+  for (const auto& pose : T_w_ci) {
+    Eigen::Vector3d position = pose.linear() * pinw + pose.translation();
+    if (position(2) <= 0) {
+      return false;
+    }
+  }
+  return is_valid_solution;
+}
+
 bool Feature::initializePosition() {
   // Organize camera poses and feature observations properly.
   std::vector<Eigen::Isometry3d,
@@ -358,9 +380,7 @@ bool Feature::initializePosition() {
   obsDir[0][2] = 1.0;
   obsDir[1].head<2>() = measurements[measurements.size()-1];
   obsDir[1][2] = 1.0;
-  bool isValid;
-  bool isParallel;
-  bool flipped;
+
   Eigen::Isometry3d T_c0_ce = cam_poses[cam_poses.size()-1];
   obsDir[1] = (T_c0_ce.linear().transpose() * obsDir[1]).eval();
   Eigen::Vector4d homogeneousPoint = okvis::triangulation::triangulateFast(
@@ -368,27 +388,28 @@ bool Feature::initializePosition() {
       obsDir[0].normalized(),
       - T_c0_ce.linear().transpose() * T_c0_ce.translation(),  // center of B in W coordinates
       obsDir[1].normalized(),
-      raySigma(), isValid, isParallel, flipped);
+      raySigma(), is_chi2_small, is_parallel, is_flipped);
   homogeneousPoint /= homogeneousPoint[3];
+
+  const double kMinDepth = 0.1;
+  const double kSceneDepth = 2; // TODO(jhuai): pass average scene depth as a config arg
 
   // Too large chi2 may be due to wrong association.
   // But subsequent nonlinear opt may save this case, so we stick with it.
-//  if (!isValid) {
+//  if (!is_chi2_small) {
 //      position = T_c0_w.linear()*homogeneousPoint.head<3>() + T_c0_w.translation();
 //      is_initialized = false;
 //      return false;
 //  }
 
-  if (flipped) { // Forward motion causes ambiguity. Let's bail out because
+  if (is_flipped) { // Forward motion causes ambiguity. Let's bail out because
       // doing nonlinear opt may revert the landmark position to the wrong side.
       position = T_c0_w.linear()*homogeneousPoint.head<3>() + T_c0_w.translation();
-      is_initialized = true;
-      return true;
+      is_initialized = isValidSolution(cam_poses, homogeneousPoint.head<3>());
+      return is_initialized;
   }
 
   Eigen::Vector3d solution;  // landmark position in c0 frame
-  const double kMinDepth = 0.1;
-  const double kSceneDepth = 2; // TODO(jhuai): pass average scene depth as a config arg
   // Very small depths may occur under pure rotation.
   double invDepth =
       homogeneousPoint[2] < kMinDepth ? kSceneDepth : homogeneousPoint[2];
@@ -473,25 +494,12 @@ bool Feature::initializePosition() {
   Eigen::Vector3d final_position(solution(0)/solution(2),
       solution(1)/solution(2), 1.0/solution(2));
 
-  // Check if the solution is valid. Make sure the feature
-  // is in front of every camera frame observing it.
-  bool is_valid_solution = true;
-  for (const auto& pose : cam_poses) {
-    Eigen::Vector3d position =
-      pose.linear()*final_position + pose.translation();
-    if (position(2) <= 0) {
-      is_valid_solution = false;
-      break;
-    }
-  }
+  is_initialized = isValidSolution(cam_poses, final_position);
 
   // Convert the feature position to the world frame.
   position = T_c0_w.linear()*final_position + T_c0_w.translation();
 
-  if (is_valid_solution)
-    is_initialized = true;
-
-  return is_valid_solution;
+  return is_initialized;
 }
 } // namespace msckf_vio
 

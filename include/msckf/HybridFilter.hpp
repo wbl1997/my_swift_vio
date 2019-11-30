@@ -41,6 +41,19 @@ enum RetrieveObsSeqType {
     HEAD_TAIL,
 };
 
+struct TriangulationStatus {
+  bool triangulationOk; // True if the landmark is in front of every camera.
+  bool chi2Small;
+  bool raysParallel; // True if rotation compensated observation directions are parallel.
+  bool flipped; // True if the landmark is flipped to be in front of every camera.
+  bool lackObservations; // True if #obs is less than minTrackLength.
+  TriangulationStatus()
+      : triangulationOk(false),
+        chi2Small(false),
+        raysParallel(false),
+        flipped(false) {}
+};
+
 //! The estimator class
 /*!
  The estimator class. This does all the backend work.
@@ -187,7 +200,7 @@ class HybridFilter : public Estimator {
    *    -1 by default meaning that AIDP is not used
    * @return true if triangulation successful
    */
-  bool triangulateAMapPoint(
+  TriangulationStatus triangulateAMapPoint(
       const MapPoint &mp,
       std::vector<Eigen::Vector2d, Eigen::aligned_allocator<Eigen::Vector2d>>
           &obsInPixel,

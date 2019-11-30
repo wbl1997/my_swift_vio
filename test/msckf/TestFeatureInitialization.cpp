@@ -38,8 +38,9 @@ TEST(TriangulateRobustLM, sphereDistribution) {
   EXPECT_NEAR(error.norm(), 0, 0.05);
 }
 
-void testInitializeWithStationaryCamera(bool addSidewaysView) {
-  simul::SimulationNViewStatic snvs(addSidewaysView);
+void testInitializeWithStationaryCamera(bool addSidewaysView,
+                                        bool addObsNoise) {
+  simul::SimulationNViewStatic snvs(addSidewaysView, addObsNoise);
 
   // Initialize a feature object.
   Feature feature_object(snvs.obsDirectionsZ1(), snvs.camStates());
@@ -61,8 +62,10 @@ void testInitializeWithStationaryCamera(bool addSidewaysView) {
 }
 
 TEST(TriangulateRobustLM, StationaryCamera) {
-  testInitializeWithStationaryCamera(false);
-  testInitializeWithStationaryCamera(true);
+  testInitializeWithStationaryCamera(false, true);
+  testInitializeWithStationaryCamera(true, true);
+  testInitializeWithStationaryCamera(false, false);
+  testInitializeWithStationaryCamera(true, false);
 }
 
 TEST(TriangulateRobustLM, TwoView) {

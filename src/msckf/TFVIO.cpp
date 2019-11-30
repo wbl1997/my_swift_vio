@@ -280,10 +280,10 @@ void TFVIO::optimize(size_t /*numIter*/, size_t /*numThreads*/, bool verbose) {
       std::shared_ptr<okvis::cameras::CameraBase> tempCameraGeometry =
           camera_rig_.getCameraGeometry(camIdx);
 
-      bool bSucceeded =
+      TriangulationStatus status =
           triangulateAMapPoint(it->second, obsInPixel, frameIds, v4Xhomog, vRi,
                                tempCameraGeometry, T_SC0_);
-      if (bSucceeded) {
+      if (status.triangulationOk) {
         it->second.quality = 1.0;
         it->second.pointHomog = v4Xhomog;
       } else {

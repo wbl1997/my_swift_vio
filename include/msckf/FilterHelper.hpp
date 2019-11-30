@@ -27,6 +27,13 @@ class FilterHelper {
   static bool gatingTest(const Eigen::MatrixXd& H, const Eigen::VectorXd& r,
                          const Eigen::MatrixXd& R, const Eigen::MatrixXd& cov);
 
+  static Eigen::MatrixXd leftNullspaceWithRankCheck(const Eigen::MatrixXd& A,
+                                                    int columnRankHint);
+
+  static bool multiplyLeftNullspaceWithGivens(
+      Eigen::MatrixXd* Hf, Eigen::MatrixXd* Hx,
+      Eigen::Matrix<double, Eigen::Dynamic, 1>* residual, Eigen::MatrixXd* R,
+      int columnRankHint);
 
   /**
    * Chi-square thresholds based on the DOF of state (chi2(0.95,DOF))

@@ -712,20 +712,17 @@ bool MSCKF2::featureJacobian(const MapPoint &mp, Eigen::MatrixXd &H_oi,
       auto anchorIter = std::find_if(obsMap.begin(), obsMap.end(), IsObservedInFrame(anchorId));
       anchorSeqId = std::distance(obsMap.begin(), anchorIter);
     }
-    bool bSucceeded = triangulateAMapPoint(
+    TriangulationStatus status = triangulateAMapPoint(
         mp, obsInPixel, frameIds, v4Xhomog, vRi, tempCameraGeometry, T_SC0_,
         anchorSeqId, FLAGS_msckf_use_epipolar_constraint);
 
-    if (!bSucceeded) {
+    if (!status.triangulationOk) {
       computeHTimer.stop();
       return false;
     }
 
     Eigen::Vector4d ab1rho = v4Xhomog;
-    if (ab1rho[2] <= 0) {  // negative depth
-      computeHTimer.stop();
-      return false;
-    }
+    CHECK_GT(ab1rho[2], 0) << "Negative depth in anchor frame";
     ab1rho /= ab1rho[2];  //[\alpha = X/Z, \beta= Y/Z, 1, \rho=1/Z] in the
                           // anchor frame
     // transform from the body frame at the anchor frame epoch to the world frame
@@ -808,8 +805,9 @@ bool MSCKF2::featureJacobian(const MapPoint &mp, Eigen::MatrixXd &H_oi,
       Ri(saga2 + 1, saga2 + 1) = vRi[saga2 + 1] * vRi[saga2 + 1];
     }
 
-    Eigen::MatrixXd nullQ = vio::nullspace(H_fi);  // 2nx(2n-3), n==numValidObs
-
+    int columnRankHf = status.raysParallel ? 2 : 3;
+    // 2nx(2n-CR), n==numValidObs
+    Eigen::MatrixXd nullQ = FilterHelper::leftNullspaceWithRankCheck(H_fi, columnRankHf);
     r_oi.noalias() = nullQ.transpose() * ri;
     H_oi.noalias() = nullQ.transpose() * H_xi;
     R_oi = nullQ.transpose() * (Ri * nullQ).eval();
@@ -822,10 +820,10 @@ bool MSCKF2::featureJacobian(const MapPoint &mp, Eigen::MatrixXd &H_oi,
     return true;
   } else {
     // The landmark is expressed with Euclidean coordinates in the global frame
-    bool bSucceeded = triangulateAMapPoint(mp, obsInPixel, frameIds, v4Xhomog,
+    TriangulationStatus status = triangulateAMapPoint(mp, obsInPixel, frameIds, v4Xhomog,
                                            vRi, tempCameraGeometry, T_SC0_, -1,
                                            FLAGS_msckf_use_epipolar_constraint);
-    if (!bSucceeded) {
+    if (!status.triangulationOk) {
       computeHTimer.stop();
       return false;
     }
@@ -919,7 +917,9 @@ bool MSCKF2::featureJacobian(const MapPoint &mp, Eigen::MatrixXd &H_oi,
       Ri(saga2 + 1, saga2 + 1) *= (vRi[saga2 + 1] * vRi[saga2 + 1]);
     }
 
-    Eigen::MatrixXd nullQ = vio::nullspace(H_fi);  // 2nx(2n-3), n==numValidObs
+    int columnRankHf = status.raysParallel ? 2 : 3;
+    // 2nx(2n-CR), n==numValidObs
+    Eigen::MatrixXd nullQ = FilterHelper::leftNullspaceWithRankCheck(H_fi, columnRankHf);
 
     r_oi.noalias() = nullQ.transpose() * ri;
     H_oi.noalias() = nullQ.transpose() * H_xi;
@@ -1129,10 +1129,10 @@ void MSCKF2::optimize(size_t /*numIter*/, size_t /*numThreads*/, bool verbose) {
       std::shared_ptr<okvis::cameras::CameraBase> tempCameraGeometry =
           camera_rig_.getCameraGeometry(camIdx);
 
-      bool bSucceeded =
+      TriangulationStatus status =
           triangulateAMapPoint(it->second, obsInPixel, frameIds, v4Xhomog, vRi,
                                tempCameraGeometry, T_SC0_);
-      if (bSucceeded) {
+      if (status.triangulationOk) {
         it->second.quality = 1.0;
         it->second.pointHomog = v4Xhomog;
       } else {
