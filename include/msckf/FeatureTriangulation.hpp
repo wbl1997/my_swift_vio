@@ -393,6 +393,9 @@ bool Feature::initializePosition() {
 
   const double kMinDepth = 0.1;
   const double kSceneDepth = 2; // TODO(jhuai): pass average scene depth as a config arg
+  // Very small depths may occur under pure rotation.
+  homogeneousPoint[2] = homogeneousPoint[2] < kMinDepth ? kSceneDepth : homogeneousPoint[2];
+  double invDepth = 1.0 / homogeneousPoint[2];
 
   // Too large chi2 may be due to wrong association.
   // But subsequent nonlinear opt may save this case, so we stick with it.
@@ -410,10 +413,7 @@ bool Feature::initializePosition() {
   }
 
   Eigen::Vector3d solution;  // landmark position in c0 frame
-  // Very small depths may occur under pure rotation.
-  double invDepth =
-      homogeneousPoint[2] < kMinDepth ? kSceneDepth : homogeneousPoint[2];
-  invDepth = 1.0 / invDepth;
+
   solution << homogeneousPoint[0] * invDepth,
       homogeneousPoint[1] * invDepth, invDepth;
   // Apply Levenberg-Marquart method to solve for the 3d position.
