@@ -98,8 +98,17 @@ class IMUOdometry {
       const Eigen::Matrix<double, 27, 1>& vTgTsTa, const okvis::Time& t_start,
       const okvis::Time& t_end);
 
-  // this function only changed intermediate members of IMUErrorModel
-  static void interpolateInertialData(const okvis::ImuMeasurementDeque& imuMeas,
+  /**
+   * @brief interpolateInertialData linearly interpolate inertial readings
+   *     at queryTime given imuMeas
+   * @param imuMeas has size greater than 0
+   * @param iem The intermediate members of iem may be changed.
+   * @param queryTime
+   * @param queryValue
+   * @return false if interpolation is impossible, e.g., in the case of
+   *     extrapolation or empty imuMeas
+   */
+  static bool interpolateInertialData(const okvis::ImuMeasurementDeque& imuMeas,
                                       IMUErrorModel<double>& iem,
                                       const okvis::Time& queryTime,
                                       okvis::ImuMeasurement& queryValue);

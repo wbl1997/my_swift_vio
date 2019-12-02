@@ -47,7 +47,7 @@ int IMUOdometry::propagation(
   //    "first entry of imu meas is smaller than start time for integration,
   //    examine the data if there are large laps in IMU data and possibly
   //    enlarge temporal_imu_data_overlap!");
-  if (!(imuMeasurements.back().timeStamp >= t_end))
+  if (imuMeasurements.back().timeStamp < t_end)
     return -1;  // nothing to do...
 
   // initial condition at sensor frame SO
@@ -957,7 +957,7 @@ int IMUOdometry::propagationBackward(
                     "time in backward mode"
                  << imuMeasurements.front().timeStamp << " " << t_end;
   }
-  if (!(imuMeasurements.back().timeStamp >= time))
+  if (imuMeasurements.back().timeStamp < time)
     return -1;  // nothing to do...
 
   // initial condition at sensor frame SO
@@ -1269,19 +1269,29 @@ int IMUOdometry::propagationBackward_RungeKutta(
   return numUsedImuMeasurements;
 }
 
-// linear interpolation
-void IMUOdometry::interpolateInertialData(
+bool IMUOdometry::interpolateInertialData(
     const okvis::ImuMeasurementDeque& imuMeas, IMUErrorModel<double>& iem,
     const okvis::Time& queryTime, okvis::ImuMeasurement& queryValue) {
   auto iterLeft = imuMeas.begin(), iterRight = imuMeas.end();
   OKVIS_ASSERT_TRUE_DBG(Exception, iterLeft->timeStamp <= queryTime,
                         "Imu measurements has wrong timestamps");
+  if (imuMeas.back().timeStamp < queryTime) {
+    // The cause is requesting for inertial data that have not been added to the estimator.
+    // The frontend only waits until frame time + temporal_imu_data_overlap for each frame
+    // which does not acconting for time offset.
+    // When inertial data for a feature in the most recent frame are requested,
+    // the feature's observation time may exceed the latest available IMU data.
+    LOG(WARNING) << "Using the gyro value at " << imuMeas.back().timeStamp.toSec()
+                 << " instead of the requested at " << queryTime.toSec();
+    queryValue = imuMeas.back();
+    return false;
+  }
   for (auto iter = imuMeas.begin(); iter != imuMeas.end(); ++iter) {
     if (iter->timeStamp < queryTime) {
       iterLeft = iter;
     } else if (iter->timeStamp == queryTime) {
       queryValue = *iter;
-      return;
+      return true;
     } else {
       iterRight = iter;
       break;
@@ -1298,10 +1308,10 @@ void IMUOdometry::interpolateInertialData(
                             iterLeft->measurement.accelerometers) *
                                ratio +
                            iterLeft->measurement.accelerometers;
-
   iem.estimate(omega_S0, acc_S0);
   queryValue.measurement.gyroscopes = iem.w_est;
   queryValue.measurement.accelerometers = iem.a_est;
+  return true;
 }
 
 // copied from ImuError.cpp of okvis and corrected by huai

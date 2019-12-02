@@ -45,8 +45,6 @@ TFVIO::TFVIO() {}
 
 TFVIO::~TFVIO() {}
 
-// Applies the dropping/marginalization strategy according to Michael A.
-// Shelley's MS thesis
 bool TFVIO::applyMarginalizationStrategy(
     size_t /*numKeyframes*/, size_t /*numImuFrames*/,
     okvis::MapPointVector& /*removedLandmarks*/) {
@@ -62,19 +60,21 @@ bool TFVIO::applyMarginalizationStrategy(
   // remove features tracked no more
   for (PointMap::iterator pit = landmarksMap_.begin();
        pit != landmarksMap_.end();) {
-    if (pit->second.residualizeCase == NotInState_NotTrackedNow) {
-      ceres::Map::ResidualBlockCollection residuals =
-          mapPtr_->residuals(pit->first);
-      ++mTrackLengthAccumulator[residuals.size()];
-      for (size_t r = 0; r < residuals.size(); ++r) {
-        std::shared_ptr<ceres::ReprojectionErrorBase> reprojectionError =
-            std::dynamic_pointer_cast<ceres::ReprojectionErrorBase>(
-                residuals[r].errorInterfacePtr);
-        OKVIS_ASSERT_TRUE(Exception, reprojectionError,
-                          "Wrong index of reprojection error");
-        removeObservation(residuals[r].residualBlockId);
+    const MapPoint& mapPoint = pit->second;
+    if (mapPoint.residualizeCase == NotInState_NotTrackedNow) {
+      ++mTrackLengthAccumulator[mapPoint.observations.size()];
+      for (std::map<okvis::KeypointIdentifier, uint64_t>::const_iterator it =
+               mapPoint.observations.begin();
+           it != mapPoint.observations.end(); ++it) {
+        if (it->second) {
+          mapPtr_->removeResidualBlock(
+              reinterpret_cast<::ceres::ResidualBlockId>(it->second));
+        }
+        const KeypointIdentifier& kpi = it->first;
+        auto mfp = multiFramePtrMap_.find(kpi.frameId);
+        OKVIS_ASSERT_TRUE(Exception, mfp != multiFramePtrMap_.end(), "frame id not found in frame map!");
+        mfp->second->setLandmarkId(kpi.cameraIndex, kpi.keypointIndex, 0);
       }
-
       mapPtr_->removeParameterBlock(pit->first);
       pit = landmarksMap_.erase(pit);
     } else {

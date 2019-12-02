@@ -23,7 +23,6 @@ PreconditionedEkfUpdater::computeCorrection(
     const Eigen::Matrix<double, Eigen::Dynamic, 1> &r_q,
     const Eigen::MatrixXd &R_q,
     const Eigen::Matrix<double, Eigen::Dynamic, 1> *prev_deltaX) {
-  // Calculate Kalman gain
   Eigen::MatrixXd Py = T_H *
                            cov_ref_.block(okvis::ceres::ode::OdoErrorStateDim,
                                           okvis::ceres::ode::OdoErrorStateDim,

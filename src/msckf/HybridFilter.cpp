@@ -3002,8 +3002,9 @@ bool HybridFilter::featureJacobianEpipolar(
   int projOptModelId = camera_rig_.getProjectionOptMode(camIdx);
   for (size_t j = 0; j < numFeatures; ++j) {
       double pixelNoiseStd = imagePointNoiseStds[2 * j];
-      bool projectOk = obsDirectionJacobian(obsDirections[j], tempCameraGeometry, projOptModelId,
-                             pixelNoiseStd, &dfj_dXcam[j], &cov_fij[j]);
+      bool projectOk = obsDirectionJacobian(
+          obsDirections[j], tempCameraGeometry, projOptModelId, pixelNoiseStd,
+          &dfj_dXcam[j], &cov_fij[j]);
       projectStatus[j]= projectOk;
   }
   removeUnsetElements<uint64_t>(&frameIds, projectStatus);
