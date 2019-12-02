@@ -1281,8 +1281,8 @@ bool IMUOdometry::interpolateInertialData(
     // which does not acconting for time offset.
     // When inertial data for a feature in the most recent frame are requested,
     // the feature's observation time may exceed the latest available IMU data.
-    LOG(WARNING) << "Using the gyro value at " << imuMeas.back().timeStamp.toSec()
-                 << " instead of the requested at " << queryTime.toSec();
+    LOG(WARNING) << "Using the gyro value at " << imuMeas.back().timeStamp
+                 << " instead of the requested at " << queryTime;
     queryValue = imuMeas.back();
     return false;
   }

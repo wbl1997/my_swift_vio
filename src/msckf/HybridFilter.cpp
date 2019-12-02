@@ -2426,7 +2426,9 @@ TriangulationStatus HybridFilter::triangulateAMapPoint(
   }
 
   {
-    msckf_vio::CamStateServer cam_states(obsDirections.size());
+    std::vector<okvis::kinematics::Transformation,
+                Eigen::aligned_allocator<okvis::kinematics::Transformation>>
+        cam_states(obsDirections.size());
     std::vector<Eigen::Vector2d, Eigen::aligned_allocator<Eigen::Vector2d>>
         measurements(obsDirections.size());
     int jack = 0;
@@ -2441,20 +2443,15 @@ TriangulationStatus HybridFilter::triangulateAMapPoint(
       int joel = 0;
       for (auto T_WS : T_WSs) {
         okvis::kinematics::Transformation T_WCi = T_WS * T_SC0;
-        okvis::kinematics::Transformation T_CaCi = T_CaW * T_WCi;
-        cam_states[joel].orientation = T_CaCi.q().conjugate();
-        cam_states[joel].position = T_CaCi.r();
+        cam_states[joel] = T_CaW * T_WCi;
         ++joel;
       }
     } else {
       int joel = 0;
       for (auto iter = T_WSs.begin(); iter != T_WSs.end(); ++iter, ++joel) {
-        okvis::kinematics::Transformation T_WCi = *iter * T_SC0;
-        cam_states[joel].orientation = T_WCi.q().conjugate();
-        cam_states[joel].position = T_WCi.r();
+        cam_states[joel] = *iter * T_SC0;
       }
     }
-
     msckf_vio::Feature feature(measurements, cam_states);
     feature.initializePosition();
     v4Xhomog[3] = 1;

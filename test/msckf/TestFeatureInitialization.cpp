@@ -91,9 +91,12 @@ TEST(TriangulateRobustLM, TwoView) {
   {
     simul::SimulationThreeView snv;
     int numObs = snv.numObservations();
-    msckf_vio::CamStateServer cam_states_all = snv.camStates();
-    msckf_vio::CamStateServer cam_states = {cam_states_all[0],
-                                            cam_states_all[numObs - 1]};
+    std::vector<okvis::kinematics::Transformation,
+                Eigen::aligned_allocator<okvis::kinematics::Transformation>>
+        cam_states_all = snv.camStates();
+    std::vector<okvis::kinematics::Transformation,
+                Eigen::aligned_allocator<okvis::kinematics::Transformation>>
+        cam_states = {cam_states_all[0], cam_states_all[numObs - 1]};
     std::vector<Eigen::Vector2d, Eigen::aligned_allocator<Eigen::Vector2d>>
         measurements{snv.obsDirectionZ1(0), snv.obsDirectionZ1(numObs - 1)};
     msckf_vio::Feature feature_object(measurements, cam_states);
@@ -111,11 +114,9 @@ TEST(TriangulateRobustLM, Initialization) {
 
   msckf_vio::Feature feature_dummy;
   Eigen::Vector3d initial_position(0.0, 0.0, 0.0);
-  Eigen::Isometry3d T_C1C0;
+
   okvis::kinematics::Transformation T_AB = T_AW * T_BW.inverse();
-  T_C1C0.setIdentity();
-  T_C1C0.linear() = T_AB.C().transpose();
-  T_C1C0.translation() = -T_AB.C().transpose() * T_AB.r();
+  okvis::kinematics::Transformation T_C1C0 = T_AB.inverse();
   feature_dummy.generateInitialGuess(T_C1C0, snv.obsDirectionZ1(0),
                                      snv.obsDirectionZ1(numObs - 1),
                                      initial_position);

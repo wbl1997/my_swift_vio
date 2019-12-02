@@ -1,8 +1,6 @@
 #ifndef INCLUDE_MSCKF_SIMULATION_NVIEW_H_
 #define INCLUDE_MSCKF_SIMULATION_NVIEW_H_
 
-#include <msckf/CamState.hpp>
-
 #include <okvis/kinematics/Transformation.hpp>
 
 #include <sophus/se3.hpp>
@@ -63,14 +61,14 @@ class SimulationNView {
     return se3_CWs;
   }
 
-  msckf_vio::CamStateServer camStates() const {
-    msckf_vio::CamStateServer cam_states(T_CWs_.size());
+  std::vector<okvis::kinematics::Transformation,
+              Eigen::aligned_allocator<okvis::kinematics::Transformation>>
+  camStates() const {
+    std::vector<okvis::kinematics::Transformation,
+                Eigen::aligned_allocator<okvis::kinematics::Transformation>>
+        cam_states(T_CWs_.size());
     for (size_t i = 0; i < T_CWs_.size(); ++i) {
-      msckf_vio::CAMState new_cam_state;
-      new_cam_state.id = i;
-      new_cam_state.orientation = T_CWs_[i].C();
-      new_cam_state.position = -T_CWs_[i].C().transpose() * T_CWs_[i].r();
-      cam_states[new_cam_state.id] = new_cam_state;
+      cam_states[i] = T_CWs_[i].inverse();
     }
     return cam_states;
   }
@@ -415,13 +413,7 @@ public:
     cam_poses[5].translation() << 0.0, 0.0, -1.0;
 
     // Set the camera states
-    msckf_vio::CamStateServer cam_states(6);
     for (int i = 0; i < 6; ++i) {
-      msckf_vio::CAMState new_cam_state;
-      new_cam_state.id = i;
-      new_cam_state.orientation = cam_poses[i].linear().transpose();
-      new_cam_state.position = cam_poses[i].translation();
-      cam_states[new_cam_state.id] = new_cam_state;
       T_CWs_[i] = okvis::kinematics::Transformation(
           cam_poses[i].translation(),
           Eigen::Quaterniond(cam_poses[i].linear())).inverse();
@@ -453,14 +445,8 @@ class SimulationNViewStatic : public SimulationNView {
     std::vector<Eigen::Isometry3d, Eigen::aligned_allocator<Eigen::Isometry3d>>
         cam_poses(nviews);
     // Set the camera states
-    msckf_vio::CamStateServer cam_states(nviews);
     for (int i = 0; i < nviews; ++i) {
       cam_poses[i].setIdentity();
-      msckf_vio::CAMState new_cam_state;
-      new_cam_state.id = i;
-      new_cam_state.orientation = cam_poses[i].linear().transpose();
-      new_cam_state.position = cam_poses[i].translation();
-      cam_states[new_cam_state.id] = new_cam_state;
       T_CWs_[i] = okvis::kinematics::Transformation(
           cam_poses[i].translation(),
           Eigen::Quaterniond(cam_poses[i].linear())).inverse();
@@ -497,11 +483,6 @@ class SimulationNViewStatic : public SimulationNView {
       }
       measurements.push_back(Eigen::Vector2d(u, v));
       obsDirections_[nviews] = Eigen::Vector3d(u, v, 1.0);
-      msckf_vio::CAMState new_cam_state;
-      new_cam_state.id = nviews;
-      new_cam_state.orientation = cam_pose_sideways.linear().transpose();
-      new_cam_state.position = cam_pose_sideways.translation();
-      cam_states.push_back(new_cam_state);
       T_CWs_[nviews] = okvis::kinematics::Transformation(
           cam_pose_sideways.translation(),
           Eigen::Quaterniond(cam_pose_sideways.linear())).inverse();

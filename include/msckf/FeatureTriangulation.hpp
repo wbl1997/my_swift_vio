@@ -21,11 +21,18 @@
 #include <Eigen/Geometry>
 #include <Eigen/StdVector>
 
-#include <msckf/CamState.hpp>
-
+#include <okvis/kinematics/Transformation.hpp>
 #include <okvis/triangulation/stereo_triangulation.hpp>
 
 namespace msckf_vio {
+
+namespace {
+template <class T>
+const T clamp(const T& v, const T& lo, const T& hi) {
+  assert(!(hi < lo));
+  return (v < lo) ? lo : (hi < v) ? hi : v;
+}
+}  // namespace
 
 /*
  * @brief Feature Salient part of an image. Please refer
@@ -36,7 +43,10 @@ namespace msckf_vio {
 struct Feature {
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
   typedef uint64_t FeatureIDType;
-
+  typedef std::vector<
+      okvis::kinematics::Transformation,
+      Eigen::aligned_allocator<okvis::kinematics::Transformation>>
+      CamStateServer;
   /*
    * @brief OptimizationConfig Configuration parameters
    *    for 3d feature position optimization.
@@ -91,13 +101,6 @@ struct Feature {
   }
 
   /*
-   * @param cam_states: A vector containing the camera poses.
-   */
-  inline void setCamStates(const CamStateServer& cam_states_in) {
-    cam_states = cam_states_in;
-  }
-
-  /*
    * @brief cost Compute the cost of the camera observations
    * @param T_c0_c1 A rigid body transformation takes
    *    a vector in c0 frame to ci frame.
@@ -105,7 +108,7 @@ struct Feature {
    * @param z The ith measurement of the feature j in ci frame.
    * @return e The cost of this observation.
    */
-  inline void cost(const Eigen::Isometry3d& T_c0_ci,
+  inline void cost(const okvis::kinematics::Transformation& T_c0_ci,
       const Eigen::Vector3d& x, const Eigen::Vector2d& z,
       double& e) const;
 
@@ -119,7 +122,7 @@ struct Feature {
    * @return r The computed residual.
    * @return w Weight induced by huber kernel.
    */
-  inline void jacobian(const Eigen::Isometry3d& T_c0_ci,
+  inline void jacobian(const okvis::kinematics::Transformation& T_c0_ci,
       const Eigen::Vector3d& x, const Eigen::Vector2d& z,
       Eigen::Matrix<double, 2, 3>& J, Eigen::Vector2d& r,
       double& w) const;
@@ -134,7 +137,7 @@ struct Feature {
    * @return p: Computed feature position in c1 frame.
    */
   inline void generateInitialGuess(
-      const Eigen::Isometry3d& T_c1_c2, const Eigen::Vector2d& z1,
+      const okvis::kinematics::Transformation& T_c1_c2, const Eigen::Vector2d& z1,
       const Eigen::Vector2d& z2, Eigen::Vector3d& p) const;
 
   /*
@@ -194,7 +197,7 @@ typedef std::map<FeatureIDType, Feature, std::less<int>,
         std::pair<const FeatureIDType, Feature> > > MapServer;
 
 
-void Feature::cost(const Eigen::Isometry3d& T_c0_ci,
+void Feature::cost(const okvis::kinematics::Transformation& T_c0_ci,
     const Eigen::Vector3d& x, const Eigen::Vector2d& z,
     double& e) const {
   // Compute hi1, hi2, and hi3 as Equation (37).
@@ -202,8 +205,8 @@ void Feature::cost(const Eigen::Isometry3d& T_c0_ci,
   const double& beta = x(1);
   const double& rho = x(2);
 
-  Eigen::Vector3d h = T_c0_ci.linear()*
-    Eigen::Vector3d(alpha, beta, 1.0) + rho*T_c0_ci.translation();
+  Eigen::Vector3d h = T_c0_ci.C()*
+    Eigen::Vector3d(alpha, beta, 1.0) + rho*T_c0_ci.r();
   double& h1 = h(0);
   double& h2 = h(1);
   double& h3 = h(2);
@@ -216,7 +219,7 @@ void Feature::cost(const Eigen::Isometry3d& T_c0_ci,
   return;
 }
 
-void Feature::jacobian(const Eigen::Isometry3d& T_c0_ci,
+void Feature::jacobian(const okvis::kinematics::Transformation& T_c0_ci,
     const Eigen::Vector3d& x, const Eigen::Vector2d& z,
     Eigen::Matrix<double, 2, 3>& J, Eigen::Vector2d& r,
     double& w) const {
@@ -226,16 +229,16 @@ void Feature::jacobian(const Eigen::Isometry3d& T_c0_ci,
   const double& beta = x(1);
   const double& rho = x(2);
 
-  Eigen::Vector3d h = T_c0_ci.linear()*
-    Eigen::Vector3d(alpha, beta, 1.0) + rho*T_c0_ci.translation();
+  Eigen::Vector3d h = T_c0_ci.C()*
+    Eigen::Vector3d(alpha, beta, 1.0) + rho*T_c0_ci.r();
   double& h1 = h(0);
   double& h2 = h(1);
   double& h3 = h(2);
 
   // Compute the Jacobian.
   Eigen::Matrix3d W;
-  W.leftCols<2>() = T_c0_ci.linear().leftCols<2>();
-  W.rightCols<1>() = T_c0_ci.translation();
+  W.leftCols<2>() = T_c0_ci.C().leftCols<2>();
+  W.rightCols<1>() = T_c0_ci.r();
 
   J.row(0) = 1/h3*W.row(0) - h1/(h3*h3)*W.row(2);
   J.row(1) = 1/h3*W.row(1) - h2/(h3*h3)*W.row(2);
@@ -255,18 +258,18 @@ void Feature::jacobian(const Eigen::Isometry3d& T_c0_ci,
 }
 
 void Feature::generateInitialGuess(
-    const Eigen::Isometry3d& T_c1_c2, const Eigen::Vector2d& z1,
+    const okvis::kinematics::Transformation& T_c1_c2, const Eigen::Vector2d& z1,
     const Eigen::Vector2d& z2, Eigen::Vector3d& p) const {
   // Construct a least square problem to solve the depth.
-  Eigen::Vector3d m = T_c1_c2.linear() * Eigen::Vector3d(z1(0), z1(1), 1.0);
+  Eigen::Vector3d m = T_c1_c2.C() * Eigen::Vector3d(z1(0), z1(1), 1.0);
 
   Eigen::Vector2d A(0.0, 0.0);
   A(0) = m(0) - z2(0)*m(2);
   A(1) = m(1) - z2(1)*m(2);
 
   Eigen::Vector2d b(0.0, 0.0);
-  b(0) = z2(0)*T_c1_c2.translation()(2) - T_c1_c2.translation()(0);
-  b(1) = z2(1)*T_c1_c2.translation()(2) - T_c1_c2.translation()(1);
+  b(0) = z2(0)*T_c1_c2.r()(2) - T_c1_c2.r()(0);
+  b(1) = z2(1)*T_c1_c2.r()(2) - T_c1_c2.r()(1);
 
   // Solve for the depth.
   double depth = (A.transpose() * A).inverse() * A.transpose() * b;
@@ -277,31 +280,23 @@ void Feature::generateInitialGuess(
 }
 
 bool Feature::checkMotion() const {
-  Eigen::Isometry3d first_cam_pose;
-  first_cam_pose.linear() = cam_states.front().orientation.toRotationMatrix().transpose();
-  first_cam_pose.translation() =
-    cam_states.front().position;
-
-  Eigen::Isometry3d last_cam_pose;
-  last_cam_pose.linear() =
-      cam_states.back().orientation.toRotationMatrix().transpose();
-  last_cam_pose.translation() =
-    cam_states.back().position;
+  okvis::kinematics::Transformation first_cam_pose = cam_states.front();
+  okvis::kinematics::Transformation last_cam_pose = cam_states.back();
 
   // Get the direction of the feature when it is first observed.
   // This direction is represented in the world frame.
   Eigen::Vector3d feature_direction(
       observations.front()(0),
       observations.front()(1), 1.0);
-  feature_direction = feature_direction / feature_direction.norm();
-  feature_direction = first_cam_pose.linear()*feature_direction;
+  feature_direction.normalize();
+  feature_direction = first_cam_pose.C()*feature_direction;
 
   // Compute the translation between the first frame
   // and the last frame. We assume the first frame and
   // the last frame will provide the largest motion to
   // speed up the checking process.
-  Eigen::Vector3d translation = last_cam_pose.translation() -
-    first_cam_pose.translation();
+  Eigen::Vector3d translation = last_cam_pose.r() -
+    first_cam_pose.r();
   double parallel_translation =
     translation.transpose()*feature_direction;
   Eigen::Vector3d orthogonal_translation = translation -
@@ -322,14 +317,14 @@ static double raySigma() {
 }
 
 static bool isValidSolution(
-    const std::vector<Eigen::Isometry3d,
-                      Eigen::aligned_allocator<Eigen::Isometry3d>>& T_w_ci,
+    const std::vector<okvis::kinematics::Transformation,
+                      Eigen::aligned_allocator<okvis::kinematics::Transformation>>& T_w_ci,
     const Eigen::Vector3d& pinw) {
   // Check if the solution is valid. Make sure the feature
   // is in front of every camera frame observing it.
   bool is_valid_solution = true;
   for (const auto& pose : T_w_ci) {
-    Eigen::Vector3d position = pose.linear() * pinw + pose.translation();
+    Eigen::Vector3d position = pose.C() * pinw + pose.r();
     if (position(2) <= 0) {
       return false;
     }
@@ -339,29 +334,16 @@ static bool isValidSolution(
 
 bool Feature::initializePosition() {
   // Organize camera poses and feature observations properly.
-  std::vector<Eigen::Isometry3d,
-    Eigen::aligned_allocator<Eigen::Isometry3d> > cam_poses(0);
-  std::vector<Eigen::Vector2d,
-    Eigen::aligned_allocator<Eigen::Vector2d> > measurements(0);
-  int obs_index = 0;
-  for (std::vector<Eigen::Vector2d, Eigen::aligned_allocator<
-       Eigen::Vector2d>>::const_iterator iter = observations.begin();
-       iter != observations.end(); ++iter, ++obs_index) {
-    // Add the measurement.
-    measurements.push_back(*iter);
-
-    // This camera pose will take a vector from this camera frame
-    // to the world frame.
-    Eigen::Isometry3d cam0_pose;
-    cam0_pose.linear() = cam_states[obs_index].orientation.toRotationMatrix().transpose();
-    cam0_pose.translation() = cam_states[obs_index].position;
-    cam_poses.push_back(cam0_pose);
-  }
+  std::vector<okvis::kinematics::Transformation,
+    Eigen::aligned_allocator<okvis::kinematics::Transformation> > cam_poses =
+      cam_states;
+  const std::vector<Eigen::Vector2d,
+    Eigen::aligned_allocator<Eigen::Vector2d> > &measurements = observations;
 
   // All camera poses should be modified such that it takes a
   // vector from the first camera frame in the buffer to this
   // camera frame.
-  Eigen::Isometry3d T_c0_w = cam_poses[0];
+  okvis::kinematics::Transformation T_c0_w = cam_poses[0];
   for (auto& pose : cam_poses)
     pose = pose.inverse() * T_c0_w;
 
@@ -381,18 +363,19 @@ bool Feature::initializePosition() {
   obsDir[1].head<2>() = measurements[measurements.size()-1];
   obsDir[1][2] = 1.0;
 
-  Eigen::Isometry3d T_c0_ce = cam_poses[cam_poses.size()-1];
-  obsDir[1] = (T_c0_ce.linear().transpose() * obsDir[1]).eval();
+  okvis::kinematics::Transformation T_c0_ce = cam_poses[cam_poses.size()-1];
+  obsDir[1] = (T_c0_ce.C().transpose() * obsDir[1]).eval();
   Eigen::Vector4d homogeneousPoint = okvis::triangulation::triangulateFast(
       Eigen::Vector3d::Zero(),  // center of A in W coordinates
       obsDir[0].normalized(),
-      - T_c0_ce.linear().transpose() * T_c0_ce.translation(),  // center of B in W coordinates
+      - T_c0_ce.C().transpose() * T_c0_ce.r(),  // center of B in W coordinates
       obsDir[1].normalized(),
       raySigma(), is_chi2_small, is_parallel, is_flipped);
   homogeneousPoint /= homogeneousPoint[3];
 
   const double kMinDepth = 0.1;
   const double kSceneDepth = 2; // TODO(jhuai): pass average scene depth as a config arg
+  const double kMaxDepth = 1e4;
   // Very small depths may occur under pure rotation.
   homogeneousPoint[2] = homogeneousPoint[2] < kMinDepth ? kSceneDepth : homogeneousPoint[2];
   double invDepth = 1.0 / homogeneousPoint[2];
@@ -497,7 +480,7 @@ bool Feature::initializePosition() {
   is_initialized = isValidSolution(cam_poses, final_position);
 
   // Convert the feature position to the world frame.
-  position = T_c0_w.linear()*final_position + T_c0_w.translation();
+  position = T_c0_w.C()*final_position + T_c0_w.r();
 
   return is_initialized;
 }
