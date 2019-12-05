@@ -59,13 +59,18 @@ struct Feature {
     int outer_loop_max_iteration;
     int inner_loop_max_iteration;
 
+    double min_depth;
+    double max_depth; // 10 is recommended for indoor, 1000 for outdoor
+
     OptimizationConfig():
       translation_threshold(0.2),
       huber_epsilon(0.01),
       estimation_precision(5e-7),
       initial_damping(1e-3),
       outer_loop_max_iteration(10),
-      inner_loop_max_iteration(10) {
+      inner_loop_max_iteration(10),
+      min_depth(0.1),
+      max_depth(1000) {
       return;
     }
   };
@@ -161,6 +166,7 @@ struct Feature {
    */
   inline bool initializePosition();
 
+  inline static void setMaxDepth(double maxDepth);
 
   // An unique identifier for the feature.
   // In case of long time running, the variable
@@ -373,11 +379,11 @@ bool Feature::initializePosition() {
       raySigma(), is_chi2_small, is_parallel, is_flipped);
   homogeneousPoint /= homogeneousPoint[3];
 
-  const double kMinDepth = 0.1;
-  const double kSceneDepth = 2; // TODO(jhuai): pass average scene depth as a config arg
-  const double kMaxDepth = 1e4;
+  // This value should be dependent on the max allowed scene depth
   // Very small depths may occur under pure rotation.
-  homogeneousPoint[2] = homogeneousPoint[2] < kMinDepth ? kSceneDepth : homogeneousPoint[2];
+  homogeneousPoint[2] = homogeneousPoint[2] < optimization_config.min_depth
+                            ? optimization_config.min_depth
+                            : homogeneousPoint[2];
   double invDepth = 1.0 / homogeneousPoint[2];
 
   // Too large chi2 may be due to wrong association.
@@ -388,15 +394,14 @@ bool Feature::initializePosition() {
 //      return false;
 //  }
 
-  if (is_flipped) { // Forward motion causes ambiguity. Let's bail out because
-      // doing nonlinear opt may revert the landmark position to the wrong side.
-      position = T_c0_w.linear()*homogeneousPoint.head<3>() + T_c0_w.translation();
-      is_initialized = isValidSolution(cam_poses, homogeneousPoint.head<3>());
-      return is_initialized;
-  }
+//  if (is_flipped) { // Forward motion causes ambiguity. Let's bail out because
+//      // doing nonlinear opt may revert the landmark position to the wrong side.
+//      position = T_c0_w.C()*homogeneousPoint.head<3>() + T_c0_w.r();
+//      is_initialized = isValidSolution(cam_poses, homogeneousPoint.head<3>());
+//      return is_initialized;
+//  }
 
   Eigen::Vector3d solution;  // landmark position in c0 frame
-
   solution << homogeneousPoint[0] * invDepth,
       homogeneousPoint[1] * invDepth, invDepth;
   // Apply Levenberg-Marquart method to solve for the 3d position.
@@ -472,6 +477,8 @@ bool Feature::initializePosition() {
       optimization_config.outer_loop_max_iteration &&
       delta_norm > optimization_config.estimation_precision);
 
+  // clamp the depth to avoid numerical issues
+  solution(2) = clamp(solution(2), 1/optimization_config.max_depth, 1/optimization_config.min_depth);
   // Covert the feature position from inverse depth
   // representation to its 3d coordinate.
   Eigen::Vector3d final_position(solution(0)/solution(2),
@@ -483,6 +490,10 @@ bool Feature::initializePosition() {
   position = T_c0_w.C()*final_position + T_c0_w.r();
 
   return is_initialized;
+}
+
+void Feature::setMaxDepth(double maxDepth) {
+  optimization_config.max_depth = maxDepth;
 }
 } // namespace msckf_vio
 

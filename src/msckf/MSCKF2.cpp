@@ -11,6 +11,7 @@
 #include <okvis/MultiFrame.hpp>
 
 #include <msckf/EuclideanParamBlock.hpp>
+#include <msckf/FeatureTriangulation.hpp>
 #include <msckf/FilterHelper.hpp>
 #include <msckf/ImuOdometry.h>
 #include <msckf/PreconditionedEkfUpdater.h>
@@ -1107,6 +1108,12 @@ void MSCKF2::optimize(size_t /*numIter*/, size_t /*numThreads*/, bool verbose) {
     updateLandmarksTimer.start();
     retrieveEstimatesOfConstants();  // do this because states are just updated
     minValidStateID = getMinValidStateID();
+
+    okvis::kinematics::Transformation T_WSc;
+    get_T_WS(currentFrameId(), T_WSc);
+    okvis::kinematics::Transformation T_CcW = (T_WSc * T_SC0_).inverse();
+    slamStats_.startUpdatingSceneDepth();
+
     for (auto it = landmarksMap_.begin(); it != landmarksMap_.end();
          ++it) {
       if (it->second.residualizeCase ==
@@ -1135,10 +1142,16 @@ void MSCKF2::optimize(size_t /*numIter*/, size_t /*numThreads*/, bool verbose) {
       if (status.triangulationOk) {
         it->second.quality = 1.0;
         it->second.pointHomog = v4Xhomog;
+        if (!status.raysParallel && !status.flipped) {
+          Eigen::Vector4d hpA = T_CcW * v4Xhomog;
+          slamStats_.addLandmarkDepth(hpA[2]);
+        }
       } else {
         it->second.quality = 0.0;
       }
     }
+    slamStats_.finishUpdatingSceneDepth();
+//    LOG(INFO) << "median scene depth " << slamStats_.medianSceneDepth();
     updateLandmarksTimer.stop();
   }
 

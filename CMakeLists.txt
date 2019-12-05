@@ -107,6 +107,7 @@ LIST(APPEND SOURCEFILES
     src/msckf/HybridVio.cpp
     src/msckf/ImuOdometry.cpp
     src/msckf/ImuSimulator.cpp
+    src/msckf/MotionAndStructureStats.cpp
     src/msckf/MSCKF2.cpp
     src/msckf/PreconditionedEkfUpdater.cpp
     src/msckf/SimulationFrontend.cpp

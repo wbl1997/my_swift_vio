@@ -25,8 +25,9 @@
 #include <okvis/Estimator.hpp>
 #include <okvis/timing/Timer.hpp>
 
-#include <msckf/ImuOdometry.h>
 #include <msckf/CameraRig.hpp>
+#include <msckf/ImuOdometry.h>
+#include <msckf/MotionAndStructureStats.h>
 
 #include <vio/CsvReader.h>
 #include <vio/ImuErrorModel.h>
@@ -453,12 +454,10 @@ class HybridFilter : public Estimator {
   static const size_t maxTrackLength_ = 12;
   // i.e., max cloned states in the cov matrix
 
-
-
   std::vector<size_t>
       mTrackLengthAccumulator;  // histogram of the track lengths, start from
                                 // 0,1,2, to a fixed number
-
+  msckf::MotionAndStructureStats slamStats_;
   double trackingRate_;
   // Threshold for determine keyframes
   double translationThreshold_;
