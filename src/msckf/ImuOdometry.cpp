@@ -35,20 +35,20 @@ int IMUOdometry::propagation(
     LOG(WARNING)
         << "IMU front meas timestamp is greater than start integration time "
         << imuMeasurements.front().timeStamp << " " << time;
-    okvis::Time nowTime = time;
   }
 
-  if (FLAGS_use_first_estimate && covariance) {
-    OKVIS_ASSERT_TRUE(Exception, linearizationPointAtTStart,
-                      "If the covariance and Jacobians are to be computed with "
-                      "the first estimates, please specify it");
+  OKVIS_ASSERT_TRUE(
+      Exception,
+      !(FLAGS_use_first_estimate && covariance) || linearizationPointAtTStart,
+      "If the covariance and Jacobians are to be computed with "
+      "the first estimates, please specify it");
+
+  if (imuMeasurements.back().timeStamp < t_end) {
+    LOG(WARNING) << "Imu last reading has an epoch "
+                 << imuMeasurements.back().timeStamp
+                 << " less than propagation right target " << t_end;
+    return -1;
   }
-  //    OKVIS_ASSERT_LT(Exception, imuMeasurements.front().timeStamp, time,
-  //    "first entry of imu meas is smaller than start time for integration,
-  //    examine the data if there are large laps in IMU data and possibly
-  //    enlarge temporal_imu_data_overlap!");
-  if (imuMeasurements.back().timeStamp < t_end)
-    return -1;  // nothing to do...
 
   // initial condition at sensor frame SO
   const Eigen::Vector3d r_0 = T_WS.r();
@@ -1272,15 +1272,11 @@ int IMUOdometry::propagationBackward_RungeKutta(
 bool IMUOdometry::interpolateInertialData(
     const okvis::ImuMeasurementDeque& imuMeas, IMUErrorModel<double>& iem,
     const okvis::Time& queryTime, okvis::ImuMeasurement& queryValue) {
+  OKVIS_ASSERT_GT(Exception, imuMeas.size(), 0u, "not enough imu meas!");
   auto iterLeft = imuMeas.begin(), iterRight = imuMeas.end();
   OKVIS_ASSERT_TRUE_DBG(Exception, iterLeft->timeStamp <= queryTime,
                         "Imu measurements has wrong timestamps");
   if (imuMeas.back().timeStamp < queryTime) {
-    // The cause is requesting for inertial data that have not been added to the estimator.
-    // The frontend only waits until frame time + temporal_imu_data_overlap for each frame
-    // which does not acconting for time offset.
-    // When inertial data for a feature in the most recent frame are requested,
-    // the feature's observation time may exceed the latest available IMU data.
     LOG(WARNING) << "Using the gyro value at " << imuMeas.back().timeStamp
                  << " instead of the requested at " << queryTime;
     queryValue = imuMeas.back();

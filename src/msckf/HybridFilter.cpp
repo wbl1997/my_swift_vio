@@ -180,8 +180,15 @@ bool HybridFilter::addStates(okvis::MultiFramePtr multiFrame,
     Eigen::Matrix<double, ceres::ode::OdoErrorStateDim,
                   ceres::ode::OdoErrorStateDim>
         F_tot;
-
+    F_tot.setIdentity();
     int numUsedImuMeasurements = -1;
+    okvis::Time latestImuEpoch = imuMeasurements.back().timeStamp;
+    okvis::Time propagationTargetTime = correctedStateTime;
+    if (latestImuEpoch < correctedStateTime) {
+      propagationTargetTime = latestImuEpoch;
+      LOG(WARNING) << "Latest IMU readings does not extend to corrected state "
+                      "time. Is temporal_imu_data_overlap too small?";
+    }
     if (FLAGS_use_first_estimate) {
       /// use latest estimate to propagate pose, speed and bias, and first
       /// estimate to propagate covariance and Jacobian
@@ -191,16 +198,15 @@ bool HybridFilter::addStates(okvis::MultiFramePtr multiFrame,
       IMUErrorModel<double> tempIEM(speedAndBias.tail<6>(), vTgTsTa);
       numUsedImuMeasurements = IMUOdometry::propagation(
           imuMeasurements, imuParametersVec_.at(0), T_WS, tempV_WS, tempIEM,
-          startTime, correctedStateTime, &Pkm1, &F_tot, &lP);
+          startTime, propagationTargetTime, &Pkm1, &F_tot, &lP);
       speedAndBias.head<3>() = tempV_WS;
     } else {
       /// use latest estimate to propagate pose, speed and bias, and covariance
       if (FLAGS_use_RK4) {
         // method 1 RK4 a little bit more accurate but 4 times slower
-        F_tot.setIdentity();
         numUsedImuMeasurements = IMUOdometry::propagation_RungeKutta(
             imuMeasurements, imuParametersVec_.at(0), T_WS, speedAndBias,
-            vTgTsTa, startTime, correctedStateTime, &Pkm1, &F_tot);
+            vTgTsTa, startTime, propagationTargetTime, &Pkm1, &F_tot);
       } else {
         // method 2, i.e., adapt the imuError::propagation function of okvis by
         // the msckf derivation in Michael Andrew Shelley
@@ -208,7 +214,7 @@ bool HybridFilter::addStates(okvis::MultiFramePtr multiFrame,
         IMUErrorModel<double> tempIEM(speedAndBias.tail<6>(), vTgTsTa);
         numUsedImuMeasurements = IMUOdometry::propagation(
             imuMeasurements, imuParametersVec_.at(0), T_WS, tempV_WS, tempIEM,
-            startTime, correctedStateTime, &Pkm1, &F_tot);
+            startTime, propagationTargetTime, &Pkm1, &F_tot);
         speedAndBias.head<3>() = tempV_WS;
       }
     }
@@ -3025,7 +3031,7 @@ bool HybridFilter::featureJacobianEpipolar(
           : 1.0;
 
   std::vector<std::pair<int, int>> featurePairs =
-      TwoViewPair::getFramePairs(numValidDirectionJac, TwoViewPair::FIXED_MIDDLE);
+      TwoViewPair::getFramePairs(numValidDirectionJac, TwoViewPair::FIXED_HEAD_RECEDING_TAIL);
   const int numConstraints = featurePairs.size();
   int featureVariableDimen = Hi->cols();
   Hi->resize(numConstraints, Eigen::NoChange);

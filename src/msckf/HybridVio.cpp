@@ -33,9 +33,15 @@ msckf_vio::Feature::OptimizationConfig msckf_vio::Feature::optimization_config;
 namespace okvis {
 
 static const int max_camera_input_queue_size = 10;
-// overlap of imu data before and after two consecutive frames
-// [seconds] if too large, frame consumer loop will be blocked for too long
-// by waiting for imu meas
+
+// overlap of imu data before and after two consecutive frames [seconds] if too
+// large, frame consumer loop will be blocked for too long by waiting for imu
+// meas.
+// The frontend waits until frame time + lastOptimizedTimeDelay_ +
+// temporal_imu_data_overlap for each frame.
+// When inertial data for a feature in the most recent frame are requested, the
+// feature's observation time may exceed the latest available IMU data, so
+// temporal_imu_data_overlap should be greater than frame readout time.
 static const okvis::Duration temporal_imu_data_overlap(0.02);
 
 #ifdef USE_MOCK
@@ -106,12 +112,10 @@ void HybridVio::init() {
   frontend_.setBriskDetectionMaximumKeypoints(
       parameters_.optimization.maxNoKeypoints);
 
-  // s.t. last_timestamp_ - overlap >= 0 (since okvis::time(-0.02)
-  // returns big number)
+  // half_window is added s.t. last_timestamp_ - overlap >= 0
+  // since okvis::time(-0.02) returns a big number.
   lastOptimizedStateTimestamp_ = okvis::Time(0.0) + HybridFilter::half_window_;
   lastOptimizedTimeDelay_ = okvis::Duration(parameters_.imu.td0);
-  // s.t. last_timestamp_ - overlap >= 0 (since okvis::time(-0.02)
-  // returns big number)
   lastAddedStateTimestamp_ = okvis::Time(0.0) + HybridFilter::half_window_;
 
   estimator_->addImu(parameters_.imu);
@@ -389,7 +393,7 @@ void HybridVio::frameConsumerLoop(size_t cameraIndex) {
 
     // -- get relevant imu messages for new state
     okvis::Time imuDataEndTime =
-        multiFrame->timestamp() + temporal_imu_data_overlap;
+        multiFrame->timestamp() + lastTimeDelay + temporal_imu_data_overlap;
     okvis::Time imuDataBeginTime = lastTimestamp - HybridFilter::half_window_;
 
     OKVIS_ASSERT_TRUE_DBG(Exception, imuDataBeginTime < imuDataEndTime,
@@ -504,7 +508,13 @@ void HybridVio::matchingLoop() {
 
     prepareToAddStateTimer.start();
     // -- get relevant imu messages for new state
-    okvis::Time imuDataEndTime = frame->timestamp() + temporal_imu_data_overlap;
+    okvis::Duration lastTimeDelay;
+    {
+      std::lock_guard<std::mutex> lock(lastState_mutex_);
+      lastTimeDelay = lastOptimizedTimeDelay_;
+    }
+    okvis::Time imuDataEndTime = frame->timestamp() + lastTimeDelay +
+                                 temporal_imu_data_overlap;
     okvis::Time imuDataBeginTime =
         lastAddedStateTimestamp_ - HybridFilter::half_window_;
     if (imuDataBeginTime.toSec() == 0.0) {  // first state not yet added
