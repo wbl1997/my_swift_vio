@@ -15,7 +15,11 @@ DEFINE_double(max_inc_tol, 2,
 namespace okvis {
 PreconditionedEkfUpdater::PreconditionedEkfUpdater(const Eigen::MatrixXd &cov,
                                                    int variable_dim)
-    : cov_ref_(cov), cov_dim_(cov_ref_.rows()), variable_dim_(variable_dim) {}
+    : cov_ref_(cov), cov_dim_(cov_ref_.rows()), variable_dim_(variable_dim) {
+  if (!cov_ref_.allFinite()) {
+    std::cout << "Input cov not finite\n";
+  }
+}
 
 Eigen::Matrix<double, Eigen::Dynamic, 1>
 PreconditionedEkfUpdater::computeCorrection(
@@ -78,7 +82,19 @@ PreconditionedEkfUpdater::computeCorrection(
                                             okvis::ceres::ode::OdoErrorStateDim,
                                             variable_dim_));
   }
-  if (std::isnan(deltaX(0)) || std::isnan(deltaX(1))) {
+  if (!deltaX.allFinite()) {
+    std::cout << "allfinite? KScaled " << KScaled_.allFinite() << " rqScaled "
+              << rqScaled.allFinite() << " SVec1 " << SVecI.allFinite()
+              << " T_H " << T_H.allFinite() << " cov_ref block a "
+              << cov_ref_
+                     .block(0, okvis::ceres::ode::OdoErrorStateDim, cov_dim_,
+                            variable_dim_)
+                     .allFinite()
+              << " block b "
+              << cov_ref_.block(okvis::ceres::ode::OdoErrorStateDim,
+                                okvis::ceres::ode::OdoErrorStateDim,
+                                variable_dim_, variable_dim_).allFinite()
+              << " R_q " << R_q.allFinite() << std::endl;
     OKVIS_ASSERT_TRUE(Exception, false, "nan in kalman filter");
   }
 
@@ -108,6 +124,10 @@ void PreconditionedEkfUpdater::updateCovariance(
     std::cout << "Warn: negative entry in cov diagonal\n"
               << cov_ptr->diagonal().transpose() << std::endl;
     cov_ptr->diagonal() = cov_ptr->diagonal().cwiseAbs();
+  }
+  if (!cov_ptr->allFinite()) {
+    std::cout << "allFinite? PyScaled " << PyScaled_.allFinite() << " KScaled "
+              << KScaled_.allFinite() << "\n";
   }
 }
 

@@ -502,7 +502,7 @@ int HybridFrontend::matchToKeyframes(
     if (!isInitialized_) {
       runRansac2d2d(estimator, params, currentFrameId, olderFrameId, true,
                     removeOutliers, rotationOnly_tmp);
-    } else if (kfcounter == 1) {
+    } else if (kfcounter == 0) {
       bool asKeyframe;
       runRansac2d2d(estimator, params, currentFrameId, olderFrameId, false,
                        &asKeyframe);
@@ -1027,6 +1027,9 @@ int HybridFrontend::runRansac2d2d(okvis::HybridFilter& estimator,
     int translation_only_inliers = translation_only_ransac.inliers_.size();
     float translation_only_ratio = static_cast<float>(translation_only_inliers) /
                            static_cast<float>(numCorrespondences);
+    // TODO(jhuai): assess the distribution of inliers,
+    // so that we can determine the motion type more accurately
+    // successful ransac should have evenly distributed inliers, esp for rotation only
 
     // decide on success and fill inliers
     std::vector<bool> inliers(numCorrespondences, false);
@@ -1057,14 +1060,15 @@ int HybridFrontend::runRansac2d2d(okvis::HybridFilter& estimator,
     if (!rotation_only_success && !translation_only_success) {
       LOG(INFO) << "2D-2D RANSAC failed";
       continue;
-    } else {
-      okvis::Time olderTime = estimator.timestamp(olderFrameId);
-      okvis::Time currentTime = estimator.timestamp(currentFrameId);
-      okvis::Duration gap = currentTime - olderTime;
-      LOG(INFO) << "2D-2D RANSAC "
-                << (translation_only_success ? "rel pose" : "rot only")
-                << " frame distance in time " << gap.toSec();
     }
+//    else {
+//      okvis::Time olderTime = estimator.timestamp(olderFrameId);
+//      okvis::Time currentTime = estimator.timestamp(currentFrameId);
+//      okvis::Duration gap = currentTime - olderTime;
+//      LOG(INFO) << "2D-2D RANSAC "
+//                << (translation_only_success ? "rel pose" : "rot only")
+//                << " frame distance in time " << gap.toSec();
+//    }
 
     // otherwise: kick out outliers!
     std::shared_ptr<okvis::MultiFrame> multiFrame = estimator.multiFrame(
