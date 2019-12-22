@@ -3026,9 +3026,8 @@ bool HybridFilter::featureJacobianEpipolar(
   size_t trackLength = mp.observations.size();
   double headObsCovModifier[2] = {1.0, 1.0};
   headObsCovModifier[0] =
-      seqType == HEAD_TAIL
-          ? (static_cast<double>(trackLength - minTrackLength_ + 2u))
-          : 1.0;
+      seqType == LATEST_TWO
+          ? 1.0 : (static_cast<double>(trackLength - minTrackLength_ + 2u));
 
   std::vector<std::pair<int, int>> featurePairs =
       TwoViewPair::getFramePairs(numValidDirectionJac, TwoViewPair::FIXED_HEAD_RECEDING_TAIL);
