@@ -34,6 +34,8 @@ ENDIF()
 
 message(STATUS "Building MSCKF with ${CMAKE_BUILD_TYPE}")
 
+option (BUILD_MSCKF_TESTS "Builds all gtests" ON)
+
 set(OKVIS_SOURCE_PATH okvis)
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS}  -Wall -O3 -march=native ")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -O3 -march=native")
@@ -218,7 +220,7 @@ list(APPEND TEST_SRC_FILES
 #  target_link_libraries(${PROJECT_TEST_NAME} ${PROJECT_NAME} gtest gmock pthread)
 #endif()
 
-if(BUILD_TESTS)
+if(BUILD_MSCKF_TESTS)
 # The below lines cause tr1 not found issue in Ubuntu 16.04
 #  if(APPLE)
 #    add_definitions(-DGTEST_HAS_TR1_TUPLE=1)

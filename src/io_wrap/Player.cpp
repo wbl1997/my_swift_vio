@@ -104,8 +104,6 @@ void Player::Run() {
   mbFinished.store(true);
 }
 
-enum VIOStage { NotInitialized = 0, Initializing, Initialized };
-
 // A better implementation is given here.
 // https://stackoverflow.com/questions/216823/whats-the-best-way-to-trim-stdstring
 std::string removeTrailingSlash(const std::string &path) {
