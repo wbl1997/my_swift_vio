@@ -35,8 +35,9 @@
 #include <opengv/sac/Ransac.hpp>
 
 DEFINE_int32(feature_tracking_method, 0,
-             "0 default okvis brisk matching, "
-             "1 KLT");
+             "0 default okvis brisk keyframe and back-to-back frame matching, "
+             "1 KLT back-to-back frame matching, "
+             "2 brisk back-to-back frame matching");
 
 /// \brief okvis Main namespace of this package.
 namespace okvis {
@@ -115,8 +116,9 @@ bool HybridFrontend::dataAssociationAndInitialization(
                       "mixed frame types are not supported yet");
   }
   int num3dMatches = 0;
+  // always set asKeyframe true for back-to-back feature tracking methods
   if (FLAGS_feature_tracking_method == 1) {
-    *asKeyframe = estimator.numFrames() <= 1;
+    *asKeyframe = true;
     int requiredMatches = 5;
     bool rotationOnly = false;
     // match to last frame
@@ -167,11 +169,13 @@ bool HybridFrontend::dataAssociationAndInitialization(
     if (num3dMatches <= requiredMatches) {
       LOG(WARNING) << "Tracking last frame failure. Number of 3d2d-matches: " << num3dMatches;
     }
-    uint64_t currentFrameId = framesInOut->id();
-    uint64_t lastFrameId = estimator.currentKeyframeId();
-    bool removeOutliers = false;
-    runRansac2d2d(estimator, params, currentFrameId, lastFrameId,
-                  removeOutliers, asKeyframe);
+    if (estimator.numFrames() > 1) {
+        uint64_t currentFrameId = framesInOut->id();
+        uint64_t lastFrameId = estimator.currentKeyframeId();
+        bool removeOutliers = false;
+        runRansac2d2d(estimator, params, currentFrameId, lastFrameId,
+                      removeOutliers, asKeyframe);
+    }
     return true;
   }
 
@@ -181,6 +185,7 @@ bool HybridFrontend::dataAssociationAndInitialization(
     double uncertainMatchFraction = 0;
     bool rotationOnly = false;
 
+    if (FLAGS_feature_tracking_method == 0) {
     // match to last keyframe
     TimerSwitchable matchKeyframesTimer("2.4.1 matchToKeyframes");
     switch (distortionType) {
@@ -238,7 +243,20 @@ bool HybridFrontend::dataAssociationAndInitialization(
 
     // keyframe decision, at the moment only landmarks that match with keyframe are initialised
     *asKeyframe = *asKeyframe || doWeNeedANewKeyframe(estimator, framesInOut);
-
+    } else {
+        if (!isInitialized_) {
+    //      if (!rotationOnly) {
+            // TODO(jhuai): should check the motion and then initialize the filter
+            // Adding states before proper initialization of a filter like MSCKF
+            // greatly complicates states management.
+            // The following link may hints on solutions.
+            // https://github.com/ethz-asl/okvis/blob/master/okvis_multisensor_processing/src/ThreadedKFVio.cpp#L735
+            isInitialized_ = true;
+            LOG(INFO) << "Frontend initialized!";
+    //      }
+        }
+        *asKeyframe = true;
+    }
     // match to last frame
     TimerSwitchable matchToLastFrameTimer("2.4.2 matchToLastFrame");
     switch (distortionType) {
@@ -280,6 +298,9 @@ bool HybridFrontend::dataAssociationAndInitialization(
         break;
     }
     matchToLastFrameTimer.stop();
+    if (num3dMatches <= requiredMatches) {
+      LOG(WARNING) << "Tracking last frame failure. Number of 3d2d-matches: " << num3dMatches;
+    }
   } else
     *asKeyframe = true;  // first frame needs to be keyframe
 
@@ -604,7 +625,8 @@ int HybridFrontend::matchToLastFrame(
 
   uint64_t lastFrameId = estimator.frameIdByAge(1);
 
-  if (estimator.isKeyframe(lastFrameId)) {
+  if (FLAGS_feature_tracking_method == 0 &&
+      estimator.isKeyframe(lastFrameId)) {
     // already done
     return 0;
   }
