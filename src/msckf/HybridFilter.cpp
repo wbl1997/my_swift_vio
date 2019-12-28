@@ -356,8 +356,14 @@ bool HybridFilter::addStates(okvis::MultiFramePtr multiFrame,
                                    ceres::Map::Parameterization::Trivial);
         cameraInfos.at(CameraSensorStates::Intrinsics).id = id;
       } else {
-        cameraInfos.at(CameraSensorStates::Intrinsics).exists = false;
-        cameraInfos.at(CameraSensorStates::Intrinsics).id = 0u;
+        Eigen::VectorXd optProjIntrinsics = allIntrinsics.head<4>();
+        std::shared_ptr<okvis::ceres::EuclideanParamBlock>
+            projIntrinsicParamBlockPtr(new okvis::ceres::EuclideanParamBlock(
+                optProjIntrinsics, id, correctedStateTime, 4));
+        mapPtr_->addParameterBlock(projIntrinsicParamBlockPtr,
+                                   ceres::Map::Parameterization::Trivial);
+        cameraInfos.at(CameraSensorStates::Intrinsics).id = id;
+        mapPtr_->setParameterBlockConstant(id);
       }
       id = IdProvider::instance().newId();
       const int distortionDim = camera_rig_.getDistortionDimen(i);
