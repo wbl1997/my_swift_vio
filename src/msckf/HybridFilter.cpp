@@ -43,7 +43,9 @@ DEFINE_double(
     "Enlarge the image observation noise covariance by this multiplier.");
 
 DEFINE_double(sigma_keypoint_size, 8.0,
-              "The keypoint size for checking low disparity");
+              "The keypoint size for checking low disparity. Lower this value"
+              " from reference 8.0 to achieve the effect of fiber-reinforced"
+              " concrete for MSCKF.");
 
 /// \brief okvis Main namespace of this package.
 namespace okvis {

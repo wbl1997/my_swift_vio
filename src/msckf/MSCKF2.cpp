@@ -126,7 +126,6 @@ int MSCKF2::marginalizeRedundantFrames(size_t maxClonedStates) {
     Eigen::Matrix<double, Eigen::Dynamic, 1> r_oi;  //(nObsDim, 1)
     Eigen::MatrixXd R_oi;                           //(nObsDim, nObsDim)
 
-    // TODO(jhuai): do we consider the two view constraints here?
     bool isValidJacobian =
         featureJacobian(it->second, H_oi, r_oi, R_oi, &involved_cam_state_ids);
     if (!isValidJacobian) {
