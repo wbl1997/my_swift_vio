@@ -73,7 +73,7 @@ then clone the repository from github into your catkin workspace (assuming msckf
 
 ```
 cd msckf_ws/src
-git clone --recursive https://JzHuai0108@bitbucket.org/JzHuai0108/msckf2.git
+git clone --recursive https://JzHuai0108@bitbucket.org/JzHuai0108/msckf.git
 ```
 
 ## Build the project
