@@ -32,13 +32,8 @@ This is a catkin package that wraps the pure CMake project.
 
 You will need to install the following dependencies,
 
-* ROS (currently supported: hydro, kinetic and jade). Read the instructions in 
-  http://wiki.ros.org/kinetic/Installation/Ubuntu. You will need the additional 
-  package pcl-ros as (assuming kinetic)
-
-```
-sudo apt-get install ros-kinetic-pcl-ros
-```
+* ROS (currently supported: hydro, jade, kinetic, and melodic). 
+Read the ROS installation [instructions](http://wiki.ros.org/melodic/Installation/Ubuntu).
 
 * google-glog + gflags,
 
@@ -50,8 +45,23 @@ sudo apt-get install libgoogle-glog-dev
 
 ```
 sudo apt-get install libatlas-base-dev libeigen3-dev libsuitesparse-dev 
-sudo apt-get install libopencv-dev libboost-dev libboost-filesystem-dev
+sudo apt-get install libboost-dev libboost-filesystem-dev
 ```
+
+* catkin tools
+```
+sudo apt-get install python-catkin-tools
+```
+
+* gtest and gmock
+
+ros melodic will install the source files for the following three packages by default: googletest libgtest-dev google-mock.
+The googletest package includes source for both googletest and googlemock.
+The two modules can be installed by using cmake within the googletest package source directory as 
+done in [here](https://github.com/JzHuai0108/docker-headless-vnc-container/blob/master/src/ubuntu/install/gtest.sh)
+Currently both gtest and gmock are installed in the /usr/lib directory for convenience,
+as both vio_common and msckf depend on them.
+
 * vio_common
 
 ```
@@ -97,27 +107,7 @@ cd ../..
 init_linter_git_hooks
 ```
 
-## Run gtests
-
-* Both gtest and gmock are required. 
-They can be installed with the below instructions. 
-More info about installation can be found [here](https://www.eriksmistad.no/getting-started-with-google-test-on-ubuntu/).
-
-
-```
-sudo apt-get install libgtest-dev google-mock
-cd /usr/src/gtest
-sudo cmake CMakeLists.txt
-sudo make
-# copy or symlink libgtest.a and libgtest_main.a to your /usr/lib folder
-sudo cp *.a /usr/lib
-
-cd /usr/src/gmock
-sudo cmake CMakeLists.txt
-sudo make
-# copy or symlink libgmock.a and libgmock_main.a to your /usr/lib folder
-sudo cp *.a /usr/lib
-```
+## Run tests
 
 * To run all tests,
 ```
@@ -160,7 +150,7 @@ catkin build msckf vio_common -DUSE_ROS=ON
 To begin with, open QtCreator, assuming msckf_ws is the workspace dir,
 
 ```
-source msckf_ws/devel/setup.zsh
+source /opt/ros/melodic/setup.bash # or .zsh depending on the terminal shell
 /opt/Qt/Tools/QtCreator/bin/qtcreator
 ```
 
@@ -182,10 +172,23 @@ and two options are given, "Overwrite Changes in CMake" and
 "Apply Changes to Project" with the former being the default one. 
 To avoid building the project anew with every project opening later on,
 the overwrite option is recommended.
+
 QtCreator may not find cmake files for libraries like roscpp, 
 set the path like /opt/ros/kinetic/share/roscpp/cmake. Doing similar changes for other not found ros libraries.
 
 To enable debug mode, in the Build option panel, set CMake Build Type to Debug.
+
+Then set CMake Build Key BUILD_GTEST=OFF, BUILD_GMOCK=OFF because their libs are installed in /usr/lib in the installing prerequisite packages step.
+Also set CATKIN_ENABLE_TESTING=OFF because it will cause the below error for gtest and gmock.
+
+```
+CMake Error at /opt/ros/melodic/share/catkin/cmake/test/gtest.cmake:343 (set_target_properties):
+  set_target_properties Can not find target to add properties to: gtest
+Call Stack (most recent call first):
+  /opt/ros/melodic/share/catkin/cmake/all.cmake:164 (include)
+  /opt/ros/melodic/share/catkin/cmake/catkinConfig.cmake:20 (include)
+  CMakeLists.txt:46 (find_package)
+```
 
 To start debugging, add commandline arguments in the Run option panel, then press the Run icon.
 
@@ -196,11 +199,11 @@ To start debugging, add commandline arguments in the Run option panel, then pres
 Parameters through command line
 |  Command line arguments | Description | Default |
 |---|---|---|
-|  estimator_algorithm | 0 OKVIS, 1 MSCKF, 2 triangulation-free (TF) VIO | 1 |
+|  estimator_algorithm | 0 OKVIS, 4 MSCKF, 5 triangulation-free (TF) VIO | 4 |
 |  load_input_option |  0 subscribe to rostopics, 1 load video and IMU csv |  1 |
 | dump_output_option | 0 publish to rostopics, 1 save nav states to csv, 3 save nav states and calibration parameters to csv. 0 and others do not work simultaneously | 3 |
 | use_AIDP | true, anchored inverse depth parameterization; false, Euclidean. AIDP is preferred. | true |
-| feature_tracking_method | 0 BRISK brute force in OKVIS with 3d2d RANSAC, 1 KLT. KLT is very experimental. | 0 |
+| feature_tracking_method | 0 BRISK brute force in OKVIS with 3d2d RANSAC, 1 KLT back-to-back, 2 BRISK back-to-back | 0 |
 | use_IEKF | true iterated EKF, false EKF. For filters only | false |
 | max_inc_tol | the maximum infinity norm of the filter correction. 10.0 for outdoors, 2.0 for indoors, though its value should be insensitive | 2.0 |
 | head_tail | Use the fixed head and receding tail observations or the entire feature track to compose two-view constraints in TF_VIO | false |

@@ -17,7 +17,7 @@
 #include <okvis/ceres/ImuError.hpp>
 
 DEFINE_int32(
-    estimator_algorithm, 1,
+    estimator_algorithm, 4,
     "0 and 1 for okvis optimization paired with ThreadedKFVio. "
     "0 okvis original estimator, 1 general estimator.\n"
     "4 for msckf, 5 for triangulation free vio, 6 for pavio, "
