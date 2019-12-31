@@ -356,9 +356,6 @@ bool MSCKF2::measurementJacobianAIDP(
   // current frame, Ba refers to body frame associated with the anchor frame,
   // f_i is the feature in consideration
 
-  okvis::kinematics::Transformation T_GA =
-      T_WBa * T_SC0_;  // anchor frame to global frame
-
   Eigen::Vector2d imagePoint;  // projected pixel coordinates of the point
                                // ${z_u, z_v}$ in pixel units
   Eigen::Matrix2Xd
@@ -398,6 +395,7 @@ bool MSCKF2::measurementJacobianAIDP(
   int extrinsicModelId = camera_rig_.getExtrinsicOptMode(camIdx);
   const double tdEstimate = camera_rig_.getTimeDelay(camIdx);
   const double trEstimate = camera_rig_.getReadoutTime(camIdx);
+  const okvis::kinematics::Transformation T_SC0 = camera_rig_.getCameraExtrinsic(camIdx);
   double kpN = obs[1] / imageHeight - 0.5;  // k per N
   const Duration featureTime =
       Duration(tdEstimate + trEstimate * kpN) -
@@ -436,9 +434,10 @@ bool MSCKF2::measurementJacobianAIDP(
 
   IMUOdometry::interpolateInertialData(imuMeas, iem, stateEpoch + featureTime,
                                        interpolatedInertialData);
-
+  okvis::kinematics::Transformation T_GA =
+      T_WBa * T_SC0;  // anchor frame to global frame
   okvis::kinematics::Transformation T_CA =
-      (T_WB * T_SC0_).inverse() * T_GA;  // anchor frame to current camera frame
+      (T_WB * T_SC0).inverse() * T_GA;  // anchor frame to current camera frame
   Eigen::Vector3d pfiinC = (T_CA * ab1rho).head<3>();
 
   cameras::CameraBase::ProjectionStatus status = tempCameraGeometry->project(
@@ -483,14 +482,14 @@ bool MSCKF2::measurementJacobianAIDP(
 
   double rho = ab1rho[3];
   okvis::kinematics::Transformation T_BcA = lP_T_WB.inverse() * T_GA;
-  J_td = pointJacobian3 * T_SC0_.C().transpose() *
+  J_td = pointJacobian3 * T_SC0.C().transpose() *
          (okvis::kinematics::crossMx((T_BcA * ab1rho).head<3>()) *
               interpolatedInertialData.measurement.gyroscopes -
           T_WB.C().transpose() * lP_sb.head<3>() * rho);
   J_tr = J_td * kpN;
   Eigen::MatrixXd dpC_dExtrinsic;
   Eigen::Matrix3d R_CfCa = T_CA.C();
-  ExtrinsicModel_dpC_dExtrinsic(extrinsicModelId, pfiinC, T_SC0_.C().transpose(),
+  ExtrinsicModel_dpC_dExtrinsic(extrinsicModelId, pfiinC, T_SC0.C().transpose(),
                                 &dpC_dExtrinsic, &R_CfCa, &ab1rho);
   ProjectionOptKneadIntrinsicJacobian(projOptModelId, &intrinsicsJacobian);
   if (dpC_dExtrinsic.size() == 0) {
@@ -506,13 +505,13 @@ bool MSCKF2::measurementJacobianAIDP(
   factorJ_XBj << -rho * Eigen::Matrix3d::Identity(),
       okvis::kinematics::crossMx(pfinG - lP_T_WB.r() * rho),
       -rho * Eigen::Matrix3d::Identity() * featureTime.toSec();
-  J_XBj = pointJacobian3 * (T_WB.C() * T_SC0_.C()).transpose() * factorJ_XBj;
+  J_XBj = pointJacobian3 * (T_WB.C() * T_SC0.C()).transpose() * factorJ_XBj;
 
   factorJ_XBa.topLeftCorner<3, 3>() = rho * Eigen::Matrix3d::Identity();
   factorJ_XBa.block<3, 3>(0, 3) =
-      -okvis::kinematics::crossMx(T_WBa.C() * (T_SC0_ * ab1rho).head<3>());
+      -okvis::kinematics::crossMx(T_WBa.C() * (T_SC0 * ab1rho).head<3>());
   factorJ_XBa.block<3, 3>(0, 6) = Eigen::Matrix3d::Zero();
-  J_XBa = pointJacobian3 * (T_WB.C() * T_SC0_.C()).transpose() * factorJ_XBa;
+  J_XBa = pointJacobian3 * (T_WB.C() * T_SC0.C()).transpose() * factorJ_XBa;
 
   H_x->setZero();
   const int minCamParamDim = cameraParamsMinimalDimen();
@@ -578,6 +577,7 @@ bool MSCKF2::measurementJacobian(
   int extrinsicModelId = camera_rig_.getExtrinsicOptMode(camIdx);
   const double tdEstimate = camera_rig_.getTimeDelay(camIdx);
   const double trEstimate = camera_rig_.getReadoutTime(camIdx);
+  const okvis::kinematics::Transformation T_SC0 = camera_rig_.getCameraExtrinsic(camIdx);
   double kpN = obs[1] / imageHeight - 0.5;  // k per N
   Duration featureTime = Duration(tdEstimate + trEstimate * kpN) -
                          statesIter->second.tdAtCreation;
@@ -617,7 +617,7 @@ bool MSCKF2::measurementJacobian(
 
   IMUOdometry::interpolateInertialData(imuMeas, iem, stateEpoch + featureTime,
                                        interpolatedInertialData);
-  kinematics::Transformation T_CW = (T_WB * T_SC0_).inverse();
+  kinematics::Transformation T_CW = (T_WB * T_SC0).inverse();
   Eigen::Vector3d pfiinC = (T_CW * v4Xhomog).head<3>();
   cameras::CameraBase::ProjectionStatus status = tempCameraGeometry->project(
       pfiinC, &imagePoint, &pointJacobian3, &intrinsicsJacobian);
@@ -655,13 +655,13 @@ bool MSCKF2::measurementJacobian(
     lP_sb.head<3>() = tempV_WS;
   }
 
-  J_td = pointJacobian3 * T_SC0_.C().transpose() *
+  J_td = pointJacobian3 * T_SC0.C().transpose() *
          (okvis::kinematics::crossMx((lP_T_WB.inverse() * v4Xhomog).head<3>()) *
               interpolatedInertialData.measurement.gyroscopes -
           T_WB.C().transpose() * lP_sb.head<3>());
   J_tr = J_td * kpN;
   Eigen::MatrixXd dpC_dExtrinsic;
-  ExtrinsicModel_dpC_dExtrinsic(extrinsicModelId, pfiinC, T_SC0_.C().transpose(),
+  ExtrinsicModel_dpC_dExtrinsic(extrinsicModelId, pfiinC, T_SC0.C().transpose(),
                                 &dpC_dExtrinsic, nullptr, nullptr);
   ProjectionOptKneadIntrinsicJacobian(projOptModelId, &intrinsicsJacobian);
   if (dpC_dExtrinsic.size() == 0) {
@@ -688,7 +688,7 @@ bool MSCKF2::featureJacobian(const MapPoint &mp, Eigen::MatrixXd &H_oi,
   const int camIdx = 0;
   std::shared_ptr<okvis::cameras::CameraBase> tempCameraGeometry =
       camera_rig_.getCameraGeometry(camIdx);
-
+  const okvis::kinematics::Transformation T_SC0 = camera_rig_.getCameraExtrinsic(camIdx);
   // dimension of variables used in computing feature Jacobians, including
   // camera intrinsics and all cloned states except the most recent one
   // in which the marginalized observations should never occur.
@@ -717,7 +717,7 @@ bool MSCKF2::featureJacobian(const MapPoint &mp, Eigen::MatrixXd &H_oi,
       anchorSeqId = std::distance(obsMap.begin(), anchorIter);
     }
     TriangulationStatus status = triangulateAMapPoint(
-        mp, obsInPixel, frameIds, v4Xhomog, vRi, tempCameraGeometry, T_SC0_,
+        mp, obsInPixel, frameIds, v4Xhomog, vRi, tempCameraGeometry, T_SC0,
         anchorSeqId, FLAGS_msckf_use_epipolar_constraint);
 
     if (!status.triangulationOk) {
@@ -825,7 +825,7 @@ bool MSCKF2::featureJacobian(const MapPoint &mp, Eigen::MatrixXd &H_oi,
   } else {
     // The landmark is expressed with Euclidean coordinates in the global frame
     TriangulationStatus status = triangulateAMapPoint(mp, obsInPixel, frameIds, v4Xhomog,
-                                           vRi, tempCameraGeometry, T_SC0_, -1,
+                                           vRi, tempCameraGeometry, T_SC0, -1,
                                            FLAGS_msckf_use_epipolar_constraint);
     if (!status.triangulationOk) {
       computeHTimer.stop();
@@ -1110,11 +1110,13 @@ void MSCKF2::optimize(size_t /*numIter*/, size_t /*numThreads*/, bool verbose) {
   {
     updateLandmarksTimer.start();
     retrieveEstimatesOfConstants(); // refresh since states are just updated.
+    const int camIdx = 0;
+    const okvis::kinematics::Transformation T_SC0 = camera_rig_.getCameraExtrinsic(camIdx);
     minValidStateID = getMinValidStateID();
 
     okvis::kinematics::Transformation T_WSc;
     get_T_WS(currentFrameId(), T_WSc);
-    okvis::kinematics::Transformation T_CcW = (T_WSc * T_SC0_).inverse();
+    okvis::kinematics::Transformation T_CcW = (T_WSc * T_SC0).inverse();
     slamStats_.startUpdatingSceneDepth();
 
     for (auto it = landmarksMap_.begin(); it != landmarksMap_.end();
@@ -1141,7 +1143,7 @@ void MSCKF2::optimize(size_t /*numIter*/, size_t /*numThreads*/, bool verbose) {
 
       TriangulationStatus status =
           triangulateAMapPoint(it->second, obsInPixel, frameIds, v4Xhomog, vRi,
-                               tempCameraGeometry, T_SC0_);
+                               tempCameraGeometry, T_SC0);
       if (status.triangulationOk) {
         it->second.quality = 1.0;
         it->second.pointHomog = v4Xhomog;

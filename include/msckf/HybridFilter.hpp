@@ -425,9 +425,6 @@ class HybridFilter : public Estimator {
       mStateID2CovID_;  // maps state id to the ordered cloned states in the
                         // covariance matrix
 
-  // transformation from the camera frame to the sensor frame
-  kinematics::Transformation T_SC0_;
-
   Eigen::Matrix<double, 27, 1> vTGTSTA_;
   IMUErrorModel<double> iem_;
 

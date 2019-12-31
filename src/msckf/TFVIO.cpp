@@ -262,6 +262,8 @@ void TFVIO::optimize(size_t /*numIter*/, size_t /*numThreads*/, bool verbose) {
   {
     updateLandmarksTimer.start();
     retrieveEstimatesOfConstants(); // refresh since states are just updated.
+    const int camIdx = 0;
+    const okvis::kinematics::Transformation T_SC0 = camera_rig_.getCameraExtrinsic(camIdx);
     minValidStateID = getMinValidStateID();
     for (auto it = landmarksMap_.begin(); it != landmarksMap_.end(); ++it) {
       if (it->second.residualizeCase == NotInState_NotTrackedNow) continue;
@@ -282,7 +284,7 @@ void TFVIO::optimize(size_t /*numIter*/, size_t /*numThreads*/, bool verbose) {
 
       TriangulationStatus status =
           triangulateAMapPoint(it->second, obsInPixel, frameIds, v4Xhomog, vRi,
-                               tempCameraGeometry, T_SC0_);
+                               tempCameraGeometry, T_SC0);
       if (status.triangulationOk) {
         it->second.quality = 1.0;
         it->second.pointHomog = v4Xhomog;
