@@ -428,9 +428,6 @@ class HybridFilter : public Estimator {
   // transformation from the camera frame to the sensor frame
   kinematics::Transformation T_SC0_;
 
-  double tdLatestEstimate;
-  double trLatestEstimate;
-
   Eigen::Matrix<double, 27, 1> vTGTSTA_;
   IMUErrorModel<double> iem_;
 

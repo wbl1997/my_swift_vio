@@ -903,15 +903,19 @@ void HybridFilter::retrieveEstimatesOfConstants() {
   getSensorStateEstimateAs<ceres::EuclideanParamBlock>(
       currFrameId, camIdx, SensorStates::Camera, CameraSensorStates::Distortion,
       distortionCoeffs);
-
   camera_rig_.setCameraIntrinsics(camIdx, projectionIntrinsic, distortionCoeffs);
 
+  double tdEstimate;
   getSensorStateEstimateAs<ceres::CameraTimeParamBlock>(
       currFrameId, camIdx, SensorStates::Camera, CameraSensorStates::TD,
-      tdLatestEstimate);
+      tdEstimate);
+  camera_rig_.setTimeDelay(camIdx, tdEstimate);
+
+  double trEstimate;
   getSensorStateEstimateAs<ceres::CameraTimeParamBlock>(
       currFrameId, camIdx, SensorStates::Camera, CameraSensorStates::TR,
-      trLatestEstimate);
+      trEstimate);
+  camera_rig_.setReadoutTime(camIdx, trEstimate);
 
   Eigen::Matrix<double, 9, 1> vSM;
   getSensorStateEstimateAs<ceres::ShapeMatrixParamBlock>(
@@ -924,7 +928,7 @@ void HybridFilter::retrieveEstimatesOfConstants() {
       currFrameId, 0, SensorStates::Imu, ImuSensorStates::TA, vSM);
   vTGTSTA_.tail<9>() = vSM;
 
-  // we do not set bg and ba here because
+  // we do not set bg and ba here because each pose may have different bg and ba. So
   // every time iem_ is used, resetBgBa is called
   iem_ = IMUErrorModel<double>(Eigen::Matrix<double, 6, 1>::Zero(), vTGTSTA_);
 }
@@ -1025,8 +1029,10 @@ bool HybridFilter::computeHxf(const uint64_t hpbid, const MapPoint& mp,
   uint32_t imageHeight = camera_rig_.getCameraGeometry(camIdx)->imageHeight();
   int projOptModelId = camera_rig_.getProjectionOptMode(camIdx);
   int extrinsicModelId = camera_rig_.getExtrinsicOptMode(camIdx);
+  const double tdEstimate = camera_rig_.getTimeDelay(camIdx);
+  const double trEstimate = camera_rig_.getReadoutTime(camIdx);
   double kpN = obsInPixel[1] / imageHeight - 0.5;  // k per N
-  Duration featureTime = Duration(tdLatestEstimate + trLatestEstimate * kpN) -
+  Duration featureTime = Duration(tdEstimate + trEstimate * kpN) -
                          statesIter->second.tdAtCreation;
 
   // for feature i, estimate $p_B^G(t_{f_i})$, $R_B^G(t_{f_i})$,
@@ -1200,8 +1206,12 @@ bool HybridFilter::featureJacobian(
   const int camIdx = 0;
   std::shared_ptr<okvis::cameras::CameraBase> tempCameraGeometry =
       camera_rig_.getCameraGeometry(camIdx);
+  uint32_t imageHeight = tempCameraGeometry->imageHeight();
   int projOptModelId = camera_rig_.getProjectionOptMode(camIdx);
   int extrinsicModelId = camera_rig_.getExtrinsicOptMode(camIdx);
+  const double tdEstimate = camera_rig_.getTimeDelay(camIdx);
+  const double trEstimate = camera_rig_.getReadoutTime(camIdx);
+
   TriangulationStatus status =
       triangulateAMapPoint(mp, obsInPixel, frameIds, v4Xhomog, vSigmai,
                            tempCameraGeometry, T_SC0_);
@@ -1313,9 +1323,8 @@ bool HybridFilter::featureJacobian(
     OKVIS_ASSERT_GT(Exception, imuMeas.size(), 0,
                     "the IMU measurement does not exist");
 
-    uint32_t imageHeight = tempCameraGeometry->imageHeight();
     double kpN = obsInPixel[kale][1] / imageHeight - 0.5;  // k per N
-    Duration featureTime = Duration(tdLatestEstimate + trLatestEstimate * kpN) -
+    Duration featureTime = Duration(tdEstimate + trEstimate * kpN) -
                            statesIter->second.tdAtCreation;
 
     // for feature i, estimate $p_B^G(t_{f_i})$, $R_B^G(t_{f_i})$,
@@ -2032,8 +2041,7 @@ void HybridFilter::optimize(size_t /*numIter*/, size_t /*numThreads*/,
     vH_o.clear();
     vR_o.clear();
 
-    retrieveEstimatesOfConstants();  // do this because states are just
-                                     // updated
+    retrieveEstimatesOfConstants();  // refresh since states are just updated.
 
     size_t totalObsDim = 0;  // total dimensions of all features' observations
     const size_t numCamPoseStates =
@@ -2762,7 +2770,8 @@ bool HybridFilter::EpipolarMeasurement::measurementJacobian(
       omega_WBtij;
   double dtij_dtr[2];
   double featureDelay[2];
-
+  const double tdEstimate = filter_.camera_rig_.getTimeDelay(camIdx_);
+  const double trEstimate = filter_.camera_rig_.getReadoutTime(camIdx_);
   for (int j = 0; j < 2; ++j) {
     ImuMeasurement interpolatedInertialData;
     uint64_t poseId = frameId2[j];
@@ -2781,7 +2790,7 @@ bool HybridFilter::EpipolarMeasurement::measurementJacobian(
 
     double kpN = obsInPixel2[j][1] / imageHeight_ - 0.5;  // k per N
     dtij_dtr[j] = kpN;
-    Duration featureTime = Duration(filter_.tdLatestEstimate + filter_.trLatestEstimate * kpN) -
+    Duration featureTime = Duration(tdEstimate + trEstimate * kpN) -
                            statesIter->second.tdAtCreation;
     featureDelay[j] = featureTime.toSec();
     // for feature i, estimate $p_B^G(t_{f_i})$, $R_B^G(t_{f_i})$,

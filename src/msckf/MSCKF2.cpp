@@ -396,9 +396,11 @@ bool MSCKF2::measurementJacobianAIDP(
   uint32_t imageHeight = camera_rig_.getCameraGeometry(camIdx)->imageHeight();
   int projOptModelId = camera_rig_.getProjectionOptMode(camIdx);
   int extrinsicModelId = camera_rig_.getExtrinsicOptMode(camIdx);
+  const double tdEstimate = camera_rig_.getTimeDelay(camIdx);
+  const double trEstimate = camera_rig_.getReadoutTime(camIdx);
   double kpN = obs[1] / imageHeight - 0.5;  // k per N
   const Duration featureTime =
-      Duration(tdLatestEstimate + trLatestEstimate * kpN) -
+      Duration(tdEstimate + trEstimate * kpN) -
       statesIter->second.tdAtCreation;
 
   // for feature i, estimate $p_B^G(t_{f_i})$, $R_B^G(t_{f_i})$,
@@ -574,8 +576,10 @@ bool MSCKF2::measurementJacobian(
   uint32_t imageHeight = camera_rig_.getCameraGeometry(camIdx)->imageHeight();
   int projOptModelId = camera_rig_.getProjectionOptMode(camIdx);
   int extrinsicModelId = camera_rig_.getExtrinsicOptMode(camIdx);
+  const double tdEstimate = camera_rig_.getTimeDelay(camIdx);
+  const double trEstimate = camera_rig_.getReadoutTime(camIdx);
   double kpN = obs[1] / imageHeight - 0.5;  // k per N
-  Duration featureTime = Duration(tdLatestEstimate + trLatestEstimate * kpN) -
+  Duration featureTime = Duration(tdEstimate + trEstimate * kpN) -
                          statesIter->second.tdAtCreation;
 
   // for feature i, estimate $p_B^G(t_{f_i})$, $R_B^G(t_{f_i})$,
@@ -1105,7 +1109,7 @@ void MSCKF2::optimize(size_t /*numIter*/, size_t /*numThreads*/, bool verbose) {
   // state)
   {
     updateLandmarksTimer.start();
-    retrieveEstimatesOfConstants();  // do this because states are just updated
+    retrieveEstimatesOfConstants(); // refresh since states are just updated.
     minValidStateID = getMinValidStateID();
 
     okvis::kinematics::Transformation T_WSc;

@@ -261,7 +261,7 @@ void TFVIO::optimize(size_t /*numIter*/, size_t /*numThreads*/, bool verbose) {
   // state)
   {
     updateLandmarksTimer.start();
-    retrieveEstimatesOfConstants();  // do this because states are just updated
+    retrieveEstimatesOfConstants(); // refresh since states are just updated.
     minValidStateID = getMinValidStateID();
     for (auto it = landmarksMap_.begin(); it != landmarksMap_.end(); ++it) {
       if (it->second.residualizeCase == NotInState_NotTrackedNow) continue;
