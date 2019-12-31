@@ -342,7 +342,7 @@ class HybridFilter : public Estimator {
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW
     EpipolarMeasurement(
         const HybridFilter& filter,
-        const std::shared_ptr<okvis::cameras::CameraBase> tempCameraGeometry,
+        const uint32_t imageHeight,
         int camIdx, int extrinsicModelId, int minExtrinsicDim, int minProjDim,
         int minDistortDim);
 
@@ -374,7 +374,6 @@ class HybridFilter : public Estimator {
 
    private:
     const HybridFilter& filter_;
-    const std::shared_ptr<okvis::cameras::CameraBase> tempCameraGeometry_;
     const int camIdx_;
     const uint32_t imageHeight_;
     const int extrinsicModelId_;

@@ -2710,13 +2710,12 @@ okvis::Time HybridFilter::removeState(uint64_t stateId) {
 
 HybridFilter::EpipolarMeasurement::EpipolarMeasurement(
     const HybridFilter& filter,
-    const std::shared_ptr<okvis::cameras::CameraBase> tempCameraGeometry,
+    const uint32_t imageHeight,
     int camIdx, int extrinsicModelId, int minExtrinsicDim, int minProjDim,
     int minDistortDim)
     : filter_(filter),
-      tempCameraGeometry_(tempCameraGeometry),
       camIdx_(camIdx),
-      imageHeight_(tempCameraGeometry_->imageHeight()),
+      imageHeight_(imageHeight),
       extrinsicModelId_(extrinsicModelId),
       minExtrinsicDim_(minExtrinsicDim),
       minProjDim_(minProjDim),
@@ -3068,7 +3067,8 @@ bool HybridFilter::featureJacobianEpipolar(
   const int minProjDim = camera_rig_.getMinimalProjectionDimen(camIdx);
   const int minDistortDim = camera_rig_.getDistortionDimen(camIdx);
 
-  EpipolarMeasurement epiMeas(*this, tempCameraGeometry, camIdx, extrinsicModelId,
+  EpipolarMeasurement epiMeas(*this, tempCameraGeometry->imageHeight(),
+                              camIdx, extrinsicModelId,
                               minExtrinsicDim, minProjDim, minDistortDim);
   for (int count = 0; count < numConstraints; ++count) {
     const std::pair<int, int>& feature_pair = featurePairs[count];
