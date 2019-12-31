@@ -351,7 +351,6 @@ void Publisher::setOdometry(const okvis::kinematics::Transformation &T_WS,
 void Publisher::setPoints(const okvis::MapPointVector &pointsMatched,
                           const okvis::MapPointVector &pointsUnmatched,
                           const okvis::MapPointVector &pointsTransferred) {
-  // Huai{
   pointsMatched2_.clear();
   pointsMatched2_ = pointsMatched;
   pointsMatched_.points.clear();
@@ -428,10 +427,10 @@ void Publisher::setPoints(const okvis::MapPointVector &pointsMatched,
     pointsTransferred_.points.back().x = point[0] / point[3];
     pointsTransferred_.points.back().y = point[1] / point[3];
     pointsTransferred_.points.back().z = point[2] / point[3];
-    /*float intensity =*/
+    /*float intensity =
         std::min(parameters_.publishing.maxLandmarkQuality,
                  static_cast<float>(pointsTransferred[i].quality)) /
-        parameters_.publishing.maxLandmarkQuality;
+        parameters_.publishing.maxLandmarkQuality; */
     pointsTransferred_.colors.push_back(std_msgs::ColorRGBA());
     pointsTransferred_.colors.back().r = 1.0;  // intensity;
     pointsTransferred_.colors.back().g = 0;    // intensity;
@@ -444,7 +443,6 @@ void Publisher::setPoints(const okvis::MapPointVector &pointsMatched,
   pointsTransferred_.header.seq = ctr2_++;
 
   pointsTransferred_.header.stamp = _t;
-  // }Huai
 }
 
 // Publish the pose.
