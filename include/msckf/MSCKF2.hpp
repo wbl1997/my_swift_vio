@@ -72,7 +72,7 @@ class MSCKF2 : public HybridFilter {
 
   bool measurementJacobianAIDP(
       const Eigen::Vector4d& ab1rho,
-      const std::shared_ptr<okvis::cameras::CameraBase> tempCameraGeometry,
+      std::shared_ptr<const okvis::cameras::CameraBase> tempCameraGeometry,
       const Eigen::Vector2d& obs, uint64_t poseId, int camIdx,
       uint64_t anchorId, const okvis::kinematics::Transformation& T_WBa,
       Eigen::Matrix<double, 2, Eigen::Dynamic>* H_x,
@@ -80,7 +80,7 @@ class MSCKF2 : public HybridFilter {
 
   bool measurementJacobian(
       const Eigen::Vector4d& v4Xhomog,
-      const std::shared_ptr<okvis::cameras::CameraBase> tempCameraGeometry,
+      std::shared_ptr<const okvis::cameras::CameraBase> tempCameraGeometry,
       const Eigen::Vector2d& obs, uint64_t poseId, int camIdx,
       Eigen::Matrix<double, 2, Eigen::Dynamic>* J_Xc,
       Eigen::Matrix<double, 2, 9>* J_XBj, Eigen::Matrix<double, 2, 3>* J_pfi,

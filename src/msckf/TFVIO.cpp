@@ -279,7 +279,7 @@ void TFVIO::optimize(size_t /*numIter*/, size_t /*numThreads*/, bool verbose) {
       std::vector<double> vRi;  // std noise in pixels
       Eigen::Vector4d v4Xhomog;
       const int camIdx = 0;
-      std::shared_ptr<okvis::cameras::CameraBase> tempCameraGeometry =
+      std::shared_ptr<const okvis::cameras::CameraBase> tempCameraGeometry =
           camera_rig_.getCameraGeometry(camIdx);
 
       TriangulationStatus status =

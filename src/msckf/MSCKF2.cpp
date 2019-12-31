@@ -344,7 +344,7 @@ bool MSCKF2::applyMarginalizationStrategy(
 
 bool MSCKF2::measurementJacobianAIDP(
     const Eigen::Vector4d& ab1rho,
-    const std::shared_ptr<okvis::cameras::CameraBase> tempCameraGeometry,
+    std::shared_ptr<const okvis::cameras::CameraBase> tempCameraGeometry,
     const Eigen::Vector2d& obs,
     uint64_t poseId, int camIdx,
     uint64_t anchorId, const okvis::kinematics::Transformation& T_WBa,
@@ -536,7 +536,7 @@ bool MSCKF2::measurementJacobianAIDP(
 
 bool MSCKF2::measurementJacobian(
     const Eigen::Vector4d& v4Xhomog,
-    const std::shared_ptr<okvis::cameras::CameraBase> tempCameraGeometry,
+    std::shared_ptr<const okvis::cameras::CameraBase> tempCameraGeometry,
     const Eigen::Vector2d& obs,
     uint64_t poseId,
     int camIdx, Eigen::Matrix<double, 2, Eigen::Dynamic>* J_Xc,
@@ -686,7 +686,7 @@ bool MSCKF2::featureJacobian(const MapPoint &mp, Eigen::MatrixXd &H_oi,
                         Eigen::MatrixXd &R_oi,
                         const std::vector<uint64_t>* involvedFrameIds) const {
   const int camIdx = 0;
-  std::shared_ptr<okvis::cameras::CameraBase> tempCameraGeometry =
+  std::shared_ptr<const okvis::cameras::CameraBase> tempCameraGeometry =
       camera_rig_.getCameraGeometry(camIdx);
   const okvis::kinematics::Transformation T_SC0 = camera_rig_.getCameraExtrinsic(camIdx);
   // dimension of variables used in computing feature Jacobians, including
@@ -1138,7 +1138,7 @@ void MSCKF2::optimize(size_t /*numIter*/, size_t /*numThreads*/, bool verbose) {
       std::vector<double> vRi;  // std noise in pixels
       Eigen::Vector4d v4Xhomog;
       const int camIdx = 0;
-      std::shared_ptr<okvis::cameras::CameraBase> tempCameraGeometry =
+      std::shared_ptr<const okvis::cameras::CameraBase> tempCameraGeometry =
           camera_rig_.getCameraGeometry(camIdx);
 
       TriangulationStatus status =

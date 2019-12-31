@@ -1082,7 +1082,7 @@ bool HybridFilter::computeHxf(const uint64_t hpbid, const MapPoint& mp,
   okvis::kinematics::Transformation T_CA =
       (T_WB * T_SC0).inverse() * T_GA;  // anchor frame to current camera frame
   Eigen::Vector3d pfiinC = (T_CA * ab1rho).head<3>();
-  std::shared_ptr<okvis::cameras::CameraBase> tempCameraGeometry =
+  std::shared_ptr<const okvis::cameras::CameraBase> tempCameraGeometry =
       camera_rig_.getCameraGeometry(camIdx);
   cameras::CameraBase::ProjectionStatus status = tempCameraGeometry->project(
       pfiinC, &imagePoint, &pointJacobian3, &intrinsicsJacobian);
@@ -1208,7 +1208,7 @@ bool HybridFilter::featureJacobian(
                                    // frame expressed in [X,Y,Z,W],
   // representing either an ordinary point or a ray, e.g., a point at infinity
   const int camIdx = 0;
-  std::shared_ptr<okvis::cameras::CameraBase> tempCameraGeometry =
+  std::shared_ptr<const okvis::cameras::CameraBase> tempCameraGeometry =
       camera_rig_.getCameraGeometry(camIdx);
   uint32_t imageHeight = tempCameraGeometry->imageHeight();
   int projOptModelId = camera_rig_.getProjectionOptMode(camIdx);
@@ -2298,7 +2298,7 @@ int HybridFilter::getCameraExtrinsicOptType(size_t cameraIdx) const {
 // private stuff
 size_t HybridFilter::gatherPoseObservForTriang(
     const MapPoint& mp,
-    const std::shared_ptr<cameras::CameraBase> cameraGeometry,
+    std::shared_ptr<const cameras::CameraBase> cameraGeometry,
     std::vector<uint64_t>* frameIds,
     std::vector<okvis::kinematics::Transformation,
                 Eigen::aligned_allocator<okvis::kinematics::Transformation>>*
@@ -2416,7 +2416,7 @@ TriangulationStatus HybridFilter::triangulateAMapPoint(
         obsInPixel,
     std::vector<uint64_t>& frameIds, Eigen::Vector4d& v4Xhomog,
     std::vector<double>& imageNoiseStd,
-    const std::shared_ptr<cameras::CameraBase> cameraGeometry,
+    std::shared_ptr<const cameras::CameraBase> cameraGeometry,
     const kinematics::Transformation& T_SC0, int anchorSeqId,
     bool checkDisparity) const {
   triangulateTimer.start();
@@ -2991,7 +2991,7 @@ bool HybridFilter::featureJacobianEpipolar(
     Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic>* Ri,
     RetrieveObsSeqType seqType) const {
   const int camIdx = 0;
-  std::shared_ptr<okvis::cameras::CameraBase> tempCameraGeometry =
+  std::shared_ptr<const okvis::cameras::CameraBase> tempCameraGeometry =
       camera_rig_.getCameraGeometry(camIdx);
   // head and tail observations for this feature point
   std::vector<Eigen::Vector2d, Eigen::aligned_allocator<Eigen::Vector2d>>

@@ -196,7 +196,7 @@ void computeErrors(
     const okvis::kinematics::Transformation& T_WS,
     const Eigen::Vector3d& v_WS_true,
     const okvis::ImuSensorReadings& ref_measurement,
-    const std::shared_ptr<const okvis::cameras::CameraBase> ref_camera_geometry,
+    std::shared_ptr<const okvis::cameras::CameraBase> ref_camera_geometry,
     const int projOptModelId, Eigen::Vector3d* normalizedError,
     Eigen::VectorXd* rmsError) {
   int projOptModelDim = okvis::ProjectionOptGetMinimalDim(projOptModelId);

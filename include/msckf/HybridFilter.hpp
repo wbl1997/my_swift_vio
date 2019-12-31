@@ -154,7 +154,7 @@ class HybridFilter : public Estimator {
    */
   size_t gatherPoseObservForTriang(
       const MapPoint &mp,
-      const std::shared_ptr<cameras::CameraBase> cameraGeometry,
+      std::shared_ptr<const cameras::CameraBase> cameraGeometry,
       std::vector<uint64_t> *frameIds,
       std::vector<okvis::kinematics::Transformation,
                   Eigen::aligned_allocator<okvis::kinematics::Transformation>>
@@ -207,7 +207,7 @@ class HybridFilter : public Estimator {
           &obsInPixel,
       std::vector<uint64_t> &frameIds, Eigen::Vector4d &v4Xhomog,
       std::vector<double> &vSigmai,
-      const std::shared_ptr<okvis::cameras::CameraBase> cameraGeometry,
+      std::shared_ptr<const okvis::cameras::CameraBase> cameraGeometry,
       const okvis::kinematics::Transformation &T_SC0, int anchorSeqId = -1,
       bool checkDisparity = false) const;
   /**

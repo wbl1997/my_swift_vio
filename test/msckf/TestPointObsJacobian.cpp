@@ -46,7 +46,7 @@ void computeFeatureMeasJacobian(okvis::cameras::NCameraSystem::DistortionType di
   okvis::Time t0(5, 0);
   okvis::ImuMeasurementDeque imuMeasurements = createImuMeasurements(t0);
 
-  std::shared_ptr<okvis::cameras::CameraBase> tempCameraGeometry;
+  std::shared_ptr<const okvis::cameras::CameraBase> tempCameraGeometry;
   if (distortionId == okvis::cameras::NCameraSystem::DistortionType::FOV) {
     tempCameraGeometry.reset(
         new okvis::cameras::PinholeCamera<okvis::cameras::FovDistortion>(
