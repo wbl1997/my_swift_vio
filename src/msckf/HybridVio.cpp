@@ -777,9 +777,9 @@ void HybridVio::optimizationLoop() {
             estimator_->getCameraSensorStates(frame_pairs->id(), i, T_SCA);
             result.vector_of_T_SCi.emplace_back(T_SCA);
           }
-          estimator_->getImuAugmentedStatesEstimate(&result.vTgTsTa_);
-          estimator_->getCameraCalibrationEstimate(result.vfckptdr_);
-          estimator_->getVariance(result.vVariance_);
+          estimator_->getImuAugmentedStatesEstimate(&result.imuExtraParams_);
+          estimator_->getCameraCalibrationEstimate(result.cameraParams_);
+          estimator_->getStateVariance(&result.stateVariance_);
         } else {
           result.onlyPublishLandmarks = true;
         }
@@ -877,8 +877,8 @@ void HybridVio::publisherLoop() {
       else if (fullStateCallbackWithAllCalibration_)
         fullStateCallbackWithAllCalibration_(
             result.stamp, result.T_WS, result.speedAndBiases, result.omega_S,
-            result.frameIdInSource, result.opt_T_SCi_coeffs, result.vTgTsTa_,
-            result.vfckptdr_, result.vVariance_);
+            result.frameIdInSource, result.opt_T_SCi_coeffs, result.imuExtraParams_,
+            result.cameraParams_, result.stateVariance_);
     }
     if (landmarksCallback_ && !result.landmarksVector.empty())
       // TODO(gohlp): why two maps?

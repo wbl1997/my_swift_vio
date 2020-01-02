@@ -53,7 +53,7 @@ namespace okvis {
 // Constructor if a ceres map is already available.
 HybridFilter::HybridFilter(std::shared_ptr<okvis::ceres::Map> mapPtr)
     : Estimator(mapPtr),
-      minValidStateID(0),
+      minValidStateId_(0),
       triangulateTimer("3.1.1.1 triangulateAMapPoint", true),
       computeHTimer("3.1.1 featureJacobian", true),
       computeKalmanGainTimer("3.1.2 computeKalmanGain", true),
@@ -65,7 +65,7 @@ HybridFilter::HybridFilter(std::shared_ptr<okvis::ceres::Map> mapPtr)
 // The default constructor.
 HybridFilter::HybridFilter()
     : Estimator(),
-      minValidStateID(0),
+      minValidStateId_(0),
       triangulateTimer("3.1.1.1 triangulateAMapPoint", true),
       computeHTimer("3.1.1 featureJacobian", true),
       computeKalmanGainTimer("3.1.2 computeKalmanGain", true),
@@ -448,6 +448,7 @@ bool HybridFilter::addStates(okvis::MultiFramePtr multiFrame,
   inertialMeasForStates_.push_back(imuMeasurements);
 
   addCovForClonedStates();
+  updateCovarianceIndex();
   return true;
 }
 
@@ -579,9 +580,6 @@ void HybridFilter::addCovForClonedStates() {
   covariance_ = covarianceAugmented;
 }
 
-
-
-
 // Applies the dropping/marginalization strategy, i.e., state management,
 // according to Li and Mourikis RSS 12 optimization based thesis
 bool HybridFilter::applyMarginalizationStrategy(
@@ -637,9 +635,8 @@ bool HybridFilter::applyMarginalizationStrategy(
       /// change anchor pose for features whose anchor is not in states
       /// anymore
       if (residualizeCase == InState_TrackedNow) {
-        if (pit->second.anchorStateId < minValidStateID) {
+        if (pit->second.anchorStateId < minValidStateId_) {
           uint64_t currFrameId = currentFrameId();
-
           okvis::kinematics::Transformation
               T_GBa;  // transform from the body frame at the anchor frame
                       // epoch to the global frame
@@ -784,14 +781,13 @@ bool HybridFilter::applyMarginalizationStrategy(
   std::vector<uint64_t> paremeterBlocksToBeMarginalized;
   std::vector<uint64_t> removeFrames;
   std::cout << "selecting which states to remove " << std::endl;
-  std::cout << "min valid state Id " << minValidStateID
+  std::cout << "min valid state Id " << minValidStateId_
             << " oldest and latest stateid " << statesMap_.begin()->first << " "
             << statesMap_.rbegin()->first << std::endl;
   // std::map<uint64_t, States>::reverse_iterator
   for (auto rit = statesMap_.rbegin(); rit != statesMap_.rend();) {
-    if (rit->first < minValidStateID) {
+    if (rit->first < minValidStateId_) {
       removeFrames.push_back(rit->first);
-
       rit->second.global[GlobalStates::T_WS].exists =
           false;  // remember we removed
       rit->second.sensors.at(SensorStates::Imu)
@@ -853,23 +849,20 @@ bool HybridFilter::applyMarginalizationStrategy(
 void HybridFilter::updateImuRig() {
   Eigen::VectorXd extraParams;
   getImuAugmentedStatesEstimate(&extraParams);
-  vTGTSTA_ = extraParams;
-  // we do not set bg and ba here because each pose may have different bg and ba. So
-  // every time iem_ is used, resetBgBa is called
-  iem_ = IMUErrorModel<double>(Eigen::Matrix<double, 6, 1>::Zero(), vTGTSTA_);
-  imu_rig_.setImuAugmentedEuclideanParams(0, vTGTSTA_);
+  imu_rig_.setImuAugmentedEuclideanParams(0, extraParams);
 }
 
-void HybridFilter::retrieveEstimatesOfConstants() {  
+void HybridFilter::updateCovarianceIndex() {
   mStateID2CovID_.clear();
   int nCovIndex = 0;
-
   // note the statesMap_ is an ordered map!
   for (auto iter = statesMap_.begin(); iter != statesMap_.end(); ++iter) {
     mStateID2CovID_[iter->first] = nCovIndex;
     ++nCovIndex;
   }
+}
 
+void HybridFilter::updateSensorRigs() {
   const int camIdx = 0;
   const uint64_t currFrameId = currentFrameId();
   okvis::kinematics::Transformation T_SC0;
@@ -1014,22 +1007,21 @@ bool HybridFilter::computeHxf(const uint64_t hpbid, const MapPoint& mp,
 
   kinematics::Transformation T_WB = T_WBj;
   SpeedAndBiases sb = sbj;
-  IMUErrorModel<double> iem(iem_);
-  iem.resetBgBa(sb.tail<6>());
 
+  Eigen::Matrix<double, 27, 1> vTGTSTA = imu_rig_.getImuAugmentedEuclideanParams();
+  IMUErrorModel<double> iem(sb.tail<6>(), vTGTSTA);
   if (FLAGS_use_RK4) {
     if (featureTime >= Duration()) {
       IMUOdometry::propagation_RungeKutta(imuMeas, imuParametersVec_.at(0),
-                                          T_WB, sb, vTGTSTA_, stateEpoch,
+                                          T_WB, sb, vTGTSTA, stateEpoch,
                                           stateEpoch + featureTime);
     } else {
       IMUOdometry::propagationBackward_RungeKutta(
-          imuMeas, imuParametersVec_.at(0), T_WB, sb, vTGTSTA_, stateEpoch,
+          imuMeas, imuParametersVec_.at(0), T_WB, sb, vTGTSTA, stateEpoch,
           stateEpoch + featureTime);
     }
   } else {
     Eigen::Vector3d tempV_WS = sb.head<3>();
-
     if (featureTime >= Duration()) {
       IMUOdometry::propagation(
           imuMeas, imuParametersVec_.at(0), T_WB, tempV_WS, iem, stateEpoch,
@@ -1306,16 +1298,16 @@ bool HybridFilter::featureJacobian(
 
     kinematics::Transformation T_WB = T_WBj;
     SpeedAndBiases sb = sbj;
-    IMUErrorModel<double> iem(iem_);
-    iem.resetBgBa(sb.tail<6>());
+    Eigen::Matrix<double, 27, 1> vTGTSTA = imu_rig_.getImuAugmentedEuclideanParams();
+    IMUErrorModel<double> iem(sb.tail<6>(), vTGTSTA);
     if (FLAGS_use_RK4) {
       if (featureTime >= Duration()) {
         IMUOdometry::propagation_RungeKutta(imuMeas, imuParametersVec_.at(0),
-                                            T_WB, sb, vTGTSTA_, stateEpoch,
+                                            T_WB, sb, vTGTSTA, stateEpoch,
                                             stateEpoch + featureTime);
       } else {
         IMUOdometry::propagationBackward_RungeKutta(
-            imuMeas, imuParametersVec_.at(0), T_WB, sb, vTGTSTA_, stateEpoch,
+            imuMeas, imuParametersVec_.at(0), T_WB, sb, vTGTSTA, stateEpoch,
             stateEpoch + featureTime);
       }
     } else {
@@ -1657,9 +1649,8 @@ void HybridFilter::updateStates(
   trParamBlockPtr->parameters()[0] += deltaX[camParamIndex];
   camParamIndex += 1;
 
-  // Update augmented states except for the last one which is the current
-  // state already updated this section assumes that the statesMap is an
-  // ordered map
+  // Update cloned states except for the last one, the current state,
+  // which is already updated early on.
   size_t jack = 0;
   auto finalIter = statesMap_.end();
   --finalIter;
@@ -1714,6 +1705,8 @@ void HybridFilter::updateStates(
   OKVIS_ASSERT_EQ_DBG(Exception, aStart + 3, (size_t)deltaX.rows(),
                       "deltaX size not equal to what's' expected.");
   updateStatesTimer.stop();
+
+  updateSensorRigs();
 }
 
 void HybridFilter::optimize(size_t /*numIter*/, size_t /*numThreads*/,
@@ -1750,9 +1743,6 @@ void HybridFilter::optimize(size_t /*numIter*/, size_t /*numThreads*/,
       startIndexOfClonedStates() +
           kClonedStateMinimalDimen * statesMap_.size() + 3 * mInCovLmIds.size(),
       "Inconsistent covDim and number of states");
-
-  // prepare intermediate variables for computing Jacobians
-  retrieveEstimatesOfConstants();
 
   int numCamPosePointStates = cameraParamPoseAndLandmarkMinimalDimen();
   size_t dimH_o[2] = {0, numCamPosePointStates - 3 * mInCovLmIds.size() - 9};
@@ -1850,7 +1840,6 @@ void HybridFilter::optimize(size_t /*numIter*/, size_t /*numThreads*/,
       vR_i.push_back(R_i);
       ++nInStateFeatures;
     }
-
   }  // every landmark
 
   if (dimH_o[0] + 2 * nInStateFeatures > 0) {
@@ -2019,7 +2008,6 @@ void HybridFilter::optimize(size_t /*numIter*/, size_t /*numThreads*/,
     vH_o.clear();
     vR_o.clear();
 
-    retrieveEstimatesOfConstants();  // refresh since states are just updated.
     const int camIdx = 0;
     const okvis::kinematics::Transformation T_SC0 = camera_rig_.getCameraExtrinsic(camIdx);
     size_t totalObsDim = 0;  // total dimensions of all features' observations
@@ -2209,11 +2197,11 @@ void HybridFilter::optimize(size_t /*numIter*/, size_t /*numThreads*/,
     }
   }
 
-  /// update minValidStateID for removing old states
+  /// update minValidStateId_ for removing old states
   /// also update landmark positions which is only necessary when
   /// (1) landmark coordinates are used to predict the points projection in
   /// new frames OR (2) to visualize the points
-  minValidStateID = currFrameId;
+  minValidStateId_ = currFrameId;
   for (auto it = landmarksMap_.begin(); it != landmarksMap_.end();
        ++it) {
     ResidualizeCase residualizeCase = it->second.residualizeCase;
@@ -2228,10 +2216,8 @@ void HybridFilter::optimize(size_t /*numIter*/, size_t /*numThreads*/,
         continue;
 
       auto itObs = it->second.observations.begin();
-      if (itObs->first.frameId <
-          minValidStateID)  // this assume that it->second.observations is an
-                            // ordered map
-        minValidStateID = itObs->first.frameId;
+      if (itObs->first.frameId < minValidStateId_)
+        minValidStateId_ = itObs->first.frameId;
     } else { // SLAM features
       it->second.quality = 1.0;
       // note this is position in the anchor frame
@@ -2626,10 +2612,10 @@ void HybridFilter::getImuAugmentedStatesEstimate(
   extraParams->segment<9>(18) = sm;
 }
 
-void HybridFilter::getVariance(
-    Eigen::Matrix<double, Eigen::Dynamic, 1>& variances) const {
+void HybridFilter::getStateVariance(
+    Eigen::Matrix<double, Eigen::Dynamic, 1>* variances) const {
   const int dim = startIndexOfClonedStates();
-  variances = covariance_.topLeftCorner(dim, dim).diagonal();
+  *variances = covariance_.topLeftCorner(dim, dim).diagonal();
 }
 
 void HybridFilter::setKeyframeRedundancyThresholds(double dist, double angle,
@@ -2754,17 +2740,17 @@ bool HybridFilter::EpipolarMeasurement::measurementJacobian(
 
     kinematics::Transformation T_WB = T_WBj;
     SpeedAndBiases sb = sbj;
-    IMUErrorModel<double> iem(filter_.iem_);
-    iem.resetBgBa(sb.tail<6>());
+    Eigen::Matrix<double, 27, 1> vTGTSTA = filter_.imu_rig_.getImuAugmentedEuclideanParams();
+    IMUErrorModel<double> iem(sb.tail<6>(), vTGTSTA);
     if (FLAGS_use_RK4) {
       if (featureTime >= Duration()) {
         IMUOdometry::propagation_RungeKutta(
-            imuMeas, filter_.imuParametersVec_.at(0), T_WB, sb, filter_.vTGTSTA_,
+            imuMeas, filter_.imuParametersVec_.at(0), T_WB, sb, vTGTSTA,
             stateEpoch, stateEpoch + featureTime);
       } else {
         IMUOdometry::propagationBackward_RungeKutta(
             imuMeas, filter_.imuParametersVec_.at(0), T_WB, sb,
-            filter_.vTGTSTA_, stateEpoch, stateEpoch + featureTime);
+            vTGTSTA, stateEpoch, stateEpoch + featureTime);
       }
     } else {
       Eigen::Vector3d tempV_WS = sb.head<3>();
@@ -3050,7 +3036,7 @@ bool HybridFilter::featureJacobianEpipolar(
   return true;
 }
 
-uint64_t HybridFilter::getMinValidStateID() const {
+uint64_t HybridFilter::getMinValidStateId() const {
   uint64_t min_state_id = statesMap_.rbegin()->first;
   for (auto it = landmarksMap_.begin(); it != landmarksMap_.end();
        ++it) {

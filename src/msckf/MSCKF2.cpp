@@ -173,6 +173,7 @@ int MSCKF2::marginalizeRedundantFrames(size_t maxClonedStates) {
     updateCovarianceTimer.stop();
   }
 
+  // sanity check
   for (const auto &cam_id : rm_cam_state_ids) {
     int cam_sequence =
         std::distance(statesMap_.begin(), statesMap_.find(cam_id));
@@ -270,15 +271,10 @@ int MSCKF2::marginalizeRedundantFrames(size_t maxClonedStates) {
                                     &covariance_);
     removeState(cam_id);
   }
+  updateCovarianceIndex();
 
-  mStateID2CovID_.clear();
-  int nCovIndex = 0;
-  for (auto iter = statesMap_.begin(); iter != statesMap_.end(); ++iter) {
-    mStateID2CovID_[iter->first] = nCovIndex;
-    ++nCovIndex;
-  }
   uint64_t firstStateId = statesMap_.begin()->first;
-  minValidStateID = std::min(minValidStateID, firstStateId);
+  minValidStateId_ = std::min(minValidStateId_, firstStateId);
   return rm_cam_state_ids.size();
 }
 
@@ -288,7 +284,7 @@ bool MSCKF2::applyMarginalizationStrategy(
   std::vector<uint64_t> removeFrames;
   std::map<uint64_t, States>::reverse_iterator rit = statesMap_.rbegin();
   while (rit != statesMap_.rend()) {
-    if (rit->first < minValidStateID) {
+    if (rit->first < minValidStateId_) {
       removeFrames.push_back(rit->second.id);
     }
     ++rit;
@@ -338,7 +334,7 @@ bool MSCKF2::applyMarginalizationStrategy(
   CHECK_NE(finishIndex, covariance_.rows())
       << "Never remove the covariance of the lastest state";
   FilterHelper::pruneSquareMatrix(startIndex, finishIndex, &covariance_);
-
+  updateCovarianceIndex();
   return true;
 }
 
@@ -406,16 +402,16 @@ bool MSCKF2::measurementJacobianAIDP(
   // states' LATEST ESTIMATES and imu measurements
   kinematics::Transformation T_WB = T_WBj;
   SpeedAndBiases sb = sbj;
-  IMUErrorModel<double> iem(iem_);
-  iem.resetBgBa(sb.tail<6>());
+  Eigen::Matrix<double, 27, 1> vTGTSTA = imu_rig_.getImuAugmentedEuclideanParams();
+  IMUErrorModel<double> iem(sb.tail<6>(), vTGTSTA);
   if (FLAGS_use_RK4) {
     if (featureTime >= Duration()) {
       IMUOdometry::propagation_RungeKutta(imuMeas, imuParametersVec_.at(0),
-                                          T_WB, sb, vTGTSTA_, stateEpoch,
+                                          T_WB, sb, vTGTSTA, stateEpoch,
                                           stateEpoch + featureTime);
     } else {
       IMUOdometry::propagationBackward_RungeKutta(
-          imuMeas, imuParametersVec_.at(0), T_WB, sb, vTGTSTA_, stateEpoch,
+          imuMeas, imuParametersVec_.at(0), T_WB, sb, vTGTSTA, stateEpoch,
           stateEpoch + featureTime);
     }
   } else {
@@ -588,16 +584,16 @@ bool MSCKF2::measurementJacobian(
 
   kinematics::Transformation T_WB = T_WBj;
   SpeedAndBiases sb = sbj;
-  IMUErrorModel<double> iem(iem_);
-  iem.resetBgBa(sb.tail<6>());
+  Eigen::Matrix<double, 27, 1> vTGTSTA = imu_rig_.getImuAugmentedEuclideanParams();
+  IMUErrorModel<double> iem(sb.tail<6>(), vTGTSTA);
   if (FLAGS_use_RK4) {
     if (featureTime >= Duration()) {
       IMUOdometry::propagation_RungeKutta(imuMeas, imuParametersVec_.at(0),
-                                          T_WB, sb, vTGTSTA_, stateEpoch,
+                                          T_WB, sb, vTGTSTA, stateEpoch,
                                           stateEpoch + featureTime);
     } else {
       IMUOdometry::propagationBackward_RungeKutta(
-          imuMeas, imuParametersVec_.at(0), T_WB, sb, vTGTSTA_, stateEpoch,
+          imuMeas, imuParametersVec_.at(0), T_WB, sb, vTGTSTA, stateEpoch,
           stateEpoch + featureTime);
     }
   } else {
@@ -1009,7 +1005,6 @@ void MSCKF2::optimize(size_t /*numIter*/, size_t /*numThreads*/, bool verbose) {
       Exception,
       covariance_.rows() - startIndexOfClonedStates(),
       (int)(kClonedStateMinimalDimen * statesMap_.size()), "Inconsistent covDim and number of states");
-  retrieveEstimatesOfConstants();
 
   // mark tracks of features that are not tracked in current frame
   int numTracked = 0;
@@ -1049,9 +1044,7 @@ void MSCKF2::optimize(size_t /*numIter*/, size_t /*numThreads*/, bool verbose) {
       Eigen::Matrix<double, Eigen::Dynamic, 1> r_q;
       int numResiduals = computeStackedJacobianAndResidual(&T_H, &r_q, &R_q);
       if (numResiduals == 0) {
-        // update minValidStateID, so that these old
-        // frames are removed later
-        minValidStateID = getMinValidStateID();
+        minValidStateId_ = getMinValidStateId();
         return;  // no need to optimize
       }
 
@@ -1088,9 +1081,7 @@ void MSCKF2::optimize(size_t /*numIter*/, size_t /*numThreads*/, bool verbose) {
     Eigen::Matrix<double, Eigen::Dynamic, 1> r_q;
     int numResiduals = computeStackedJacobianAndResidual(&T_H, &r_q, &R_q);
     if (numResiduals == 0) {
-      // update minValidStateID, so that these old
-      // frames are removed later
-      minValidStateID = getMinValidStateID();
+      minValidStateId_ = getMinValidStateId();
       return;  // no need to optimize
     }
     PreconditionedEkfUpdater pceu(covariance_, featureVariableDimen);
@@ -1099,7 +1090,6 @@ void MSCKF2::optimize(size_t /*numIter*/, size_t /*numThreads*/, bool verbose) {
         pceu.computeCorrection(T_H, r_q, R_q);
     computeKalmanGainTimer.stop();
     updateStates(deltaX);
-
     updateCovarianceTimer.start();
     pceu.updateCovariance(&covariance_);
     updateCovarianceTimer.stop();
@@ -1109,10 +1099,9 @@ void MSCKF2::optimize(size_t /*numIter*/, size_t /*numThreads*/, bool verbose) {
   // state)
   {
     updateLandmarksTimer.start();
-    retrieveEstimatesOfConstants(); // refresh since states are just updated.
     const int camIdx = 0;
     const okvis::kinematics::Transformation T_SC0 = camera_rig_.getCameraExtrinsic(camIdx);
-    minValidStateID = getMinValidStateID();
+    minValidStateId_ = getMinValidStateId();
 
     okvis::kinematics::Transformation T_WSc;
     get_T_WS(currentFrameId(), T_WSc);

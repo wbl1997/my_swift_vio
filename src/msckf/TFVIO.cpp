@@ -51,7 +51,7 @@ bool TFVIO::applyMarginalizationStrategy(
   std::vector<uint64_t> removeFrames;
   std::map<uint64_t, States>::reverse_iterator rit = statesMap_.rbegin();
   while (rit != statesMap_.rend()) {
-    if (rit->first < minValidStateID) {
+    if (rit->first < minValidStateId_) {
       removeFrames.push_back(rit->second.id);
     }
     ++rit;
@@ -98,7 +98,7 @@ bool TFVIO::applyMarginalizationStrategy(
   CHECK_NE(finishIndex, covariance_.rows())
       << "Never remove the covariance of the lastest state";
   FilterHelper::pruneSquareMatrix(startIndex, finishIndex, &covariance_);
-
+  updateCovarianceIndex();
   return true;
 }
 
@@ -167,7 +167,6 @@ void TFVIO::optimize(size_t /*numIter*/, size_t /*numThreads*/, bool verbose) {
   OKVIS_ASSERT_EQ(Exception, covariance_.rows() - startIndexOfClonedStates(),
                   (int)(kClonedStateMinimalDimen * statesMap_.size()),
                   "Inconsistent covDim and number of states");
-  retrieveEstimatesOfConstants();
 
   // mark tracks of features that are not tracked in current frame
   int numTracked = 0;
@@ -208,9 +207,7 @@ void TFVIO::optimize(size_t /*numIter*/, size_t /*numThreads*/, bool verbose) {
       Eigen::Matrix<double, Eigen::Dynamic, 1> r_q;
       int numResiduals = computeStackedJacobianAndResidual(&T_H, &r_q, &R_q);
       if (numResiduals == 0) {
-        // update minValidStateID, so that these old
-        // frames are removed later
-        minValidStateID = getMinValidStateID();
+        minValidStateId_ = getMinValidStateId();
         return;  // no need to optimize
       }
 
@@ -240,9 +237,7 @@ void TFVIO::optimize(size_t /*numIter*/, size_t /*numThreads*/, bool verbose) {
     Eigen::Matrix<double, Eigen::Dynamic, 1> r_q;
     int numResiduals = computeStackedJacobianAndResidual(&T_H, &r_q, &R_q);
     if (numResiduals == 0) {
-      // update minValidStateID, so that these old
-      // frames are removed later
-      minValidStateID = getMinValidStateID();
+      minValidStateId_ = getMinValidStateId();
       return;  // no need to optimize
     }
     PreconditionedEkfUpdater pceu(covariance_, featureVariableDimen);
@@ -251,7 +246,6 @@ void TFVIO::optimize(size_t /*numIter*/, size_t /*numThreads*/, bool verbose) {
         pceu.computeCorrection(T_H, r_q, R_q);
     computeKalmanGainTimer.stop();
     updateStates(deltaX);
-
     updateCovarianceTimer.start();
     pceu.updateCovariance(&covariance_);
     updateCovarianceTimer.stop();
@@ -261,10 +255,9 @@ void TFVIO::optimize(size_t /*numIter*/, size_t /*numThreads*/, bool verbose) {
   // state)
   {
     updateLandmarksTimer.start();
-    retrieveEstimatesOfConstants(); // refresh since states are just updated.
     const int camIdx = 0;
     const okvis::kinematics::Transformation T_SC0 = camera_rig_.getCameraExtrinsic(camIdx);
-    minValidStateID = getMinValidStateID();
+    minValidStateId_ = getMinValidStateId();
     for (auto it = landmarksMap_.begin(); it != landmarksMap_.end(); ++it) {
       if (it->second.residualizeCase == NotInState_NotTrackedNow) continue;
       // this happens with a just inserted landmark without triangulation.

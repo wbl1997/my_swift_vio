@@ -277,10 +277,10 @@ class HybridFilter : public Estimator {
   void getImuAugmentedStatesEstimate(Eigen::Matrix<double, Eigen::Dynamic, 1>* extraParams) const;
 
   /**
-   * @brief get variance for nav, imu, camera extrinsic, intrinsic, td, tr
+   * @brief get variance for nav state (p,q,v), imu(bg ba etc), camera extrinsic, intrinsic, td, tr
    * @param variances
    */
-  void getVariance(Eigen::Matrix<double, Eigen::Dynamic, 1> &variances) const;
+  void getStateVariance(Eigen::Matrix<double, Eigen::Dynamic, 1>* variances) const;
 
   virtual void setKeyframeRedundancyThresholds(double dist, double angle,
                                        double trackingRate,
@@ -326,14 +326,14 @@ class HybridFilter : public Estimator {
   static const int kClonedStateMinimalDimen = 9;
 
  protected:
-  // set latest estimates to intermediate variables for the assumed constant
-  // states which are commonly used in computing Jacobians of all feature
-  // observations
-  void retrieveEstimatesOfConstants();
+
+  // using latest state estimates set imu_rig_ and camera_rig_ which are then
+  // used in computing Jacobians of all feature observations
+  void updateSensorRigs();
 
   void updateStates(const Eigen::Matrix<double, Eigen::Dynamic, 1> &deltaX);
 
-  uint64_t getMinValidStateID() const;
+  uint64_t getMinValidStateId() const;
 
   void addImuAugmentedStates(const okvis::Time stateTime, int imu_id,
                              SpecificSensorStatesContainer* imuInfo);
@@ -343,6 +343,8 @@ class HybridFilter : public Estimator {
    * @param
    */
   void updateImuRig();
+
+  void updateCovarianceIndex();
 
   /**
    * @brief updateImuAugmentedStates update states with correction.
@@ -436,15 +438,10 @@ class HybridFilter : public Estimator {
   /// ... \pi{B_{N-1}} following Li icra 2014 x_B = [^{G}p_B] ^{G}q_B ^{G}v_B
   /// b_g b_a]
 
-  std::map<uint64_t, int>
-      mStateID2CovID_;  // maps state id to the ordered cloned states in the
-                        // covariance matrix
-
-  Eigen::Matrix<double, 27, 1> vTGTSTA_;
-  IMUErrorModel<double> iem_;
+  std::map<uint64_t, int> mStateID2CovID_;  // maps state id to the ordered cloned states in the covariance matrix
 
   // minimum of the ids of the states that have tracked features
-  uint64_t minValidStateID;
+  uint64_t minValidStateId_;
 
   mutable okvis::timing::Timer triangulateTimer;
   mutable okvis::timing::Timer computeHTimer;

@@ -266,12 +266,9 @@ class HybridVio : public VioInterface {
                                 ///< that only the landmarks should be published
     int frameIdInSource;
     bool isKeyframe;
-    Eigen::Matrix<double, Eigen::Dynamic, 1>
-        vTgTsTa_;  ///< entries of Tg Ts Ta in row major order
-    Eigen::Matrix<double, Eigen::Dynamic, 1>
-        vfckptdr_;  ///< camera calibration parameters, projection intrinsics, distortion intrinsics, td, tr
-    Eigen::Matrix<double, Eigen::Dynamic, 1>
-        vVariance_;  ///< variance of nav, imu, cam extrinsic, intrinsic, td tr parameters
+    Eigen::Matrix<double, Eigen::Dynamic, 1> imuExtraParams_;
+    Eigen::Matrix<double, Eigen::Dynamic, 1> cameraParams_;  ///< camera projection intrinsic parameters, distortion, time delay, readout time
+    Eigen::Matrix<double, Eigen::Dynamic, 1> stateVariance_;  ///< variance of nav, imu, cam extrinsic, intrinsic, td tr parameters
   };
 
   /// @name State variables
