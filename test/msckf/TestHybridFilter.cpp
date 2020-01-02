@@ -245,25 +245,10 @@ void computeErrors(
   index += 3;
 
   if (isFilter) {
-    Eigen::Matrix<double, 9, 1> Tg_est;
-    estimator->getSensorStateEstimateAs<okvis::ceres::ShapeMatrixParamBlock>(
-        currFrameId, 0, okvis::HybridFilter::SensorStates::Imu,
-        okvis::HybridFilter::ImuSensorStates::TG, Tg_est);
-
-    rmsError->segment<9>(index) = (Tg_est - eye).cwiseAbs2();
-    index += 9;
-    Eigen::Matrix<double, 9, 1> Ts_est;
-    estimator->getSensorStateEstimateAs<okvis::ceres::ShapeMatrixParamBlock>(
-        currFrameId, 0, okvis::HybridFilter::SensorStates::Imu,
-        okvis::HybridFilter::ImuSensorStates::TS, Ts_est);
-    rmsError->segment<9>(index) = Ts_est.cwiseAbs2();
-    index += 9;
-    Eigen::Matrix<double, 9, 1> Ta_est;
-    estimator->getSensorStateEstimateAs<okvis::ceres::ShapeMatrixParamBlock>(
-        currFrameId, 0, okvis::HybridFilter::SensorStates::Imu,
-        okvis::HybridFilter::ImuSensorStates::TA, Ta_est);
-    rmsError->segment<9>(index) = (Ta_est - eye).cwiseAbs2();
-    index += 9;
+    Eigen::Matrix<double, 27, 1> extraParamDeviation =
+        estimator->computeImuAugmentedParamsError();
+    rmsError->segment<27>(index) = extraParamDeviation.cwiseAbs2();
+    index += 27;
   } else {
     rmsError->segment<27>(index).setZero();
     index += 27;

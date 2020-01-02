@@ -777,7 +777,7 @@ void HybridVio::optimizationLoop() {
             estimator_->getCameraSensorStates(frame_pairs->id(), i, T_SCA);
             result.vector_of_T_SCi.emplace_back(T_SCA);
           }
-          estimator_->getTgTsTaEstimate(result.vTgTsTa_);
+          estimator_->getImuAugmentedStatesEstimate(&result.vTgTsTa_);
           estimator_->getCameraCalibrationEstimate(result.vfckptdr_);
           estimator_->getVariance(result.vVariance_);
         } else {

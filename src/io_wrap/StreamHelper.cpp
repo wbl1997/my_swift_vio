@@ -1,7 +1,7 @@
 #include "io_wrap/StreamHelper.hpp"
 #include "msckf/CameraRig.hpp"
 #include "msckf/ExtrinsicModels.hpp"
-#include "msckf/ImuRig.hpp"
+#include "msckf/ImuModels.hpp"
 #include "msckf/ProjParamOptModels.hpp"
 
 DEFINE_string(datafile_separator, ",",

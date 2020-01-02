@@ -267,14 +267,14 @@ class HybridFilter : public Estimator {
    * @param vfckptdr
    * @return the last pose id
    */
-  uint64_t getCameraCalibrationEstimate(Eigen::Matrix<double, Eigen::Dynamic, 1> &vfckptdr);
+  uint64_t getCameraCalibrationEstimate(Eigen::Matrix<double, Eigen::Dynamic, 1> &vfckptdr) const;
+
   /**
-   * @brief getTgTsTaEstimate, get the lastest estimate of Tg Ts Ta with entries
-   * in row major order
-   * @param vTGTSTA
-   * @return the last pose id
+   * @brief getImuAugmentedStatesEstimate get the lastest estimate of IMU augmented params.
+   * @param extraParams excluding biases.
+   * @return
    */
-  uint64_t getTgTsTaEstimate(Eigen::Matrix<double, Eigen::Dynamic, 1> &vTGTSTA);
+  void getImuAugmentedStatesEstimate(Eigen::Matrix<double, Eigen::Dynamic, 1>* extraParams) const;
 
   /**
    * @brief get variance for nav, imu, camera extrinsic, intrinsic, td, tr
@@ -308,17 +308,17 @@ class HybridFilter : public Estimator {
 
   inline int cameraParamsMinimalDimen() const {
     const int camIdx = 0;
-    return camera_rig_.getCameraParamsMininalDimen(camIdx);
+    return camera_rig_.getCameraParamsMinimalDim(camIdx);
   }
 
   inline int startIndexOfClonedStates() const {
     const int camIdx = 0;
-    return ceres::ode::OdoErrorStateDim +
-           camera_rig_.getCameraParamsMininalDimen(camIdx);
+    return okvis::ceres::ode::NavErrorStateDim + imu_rig_.getImuParamsMinimalDim(0) +
+           camera_rig_.getCameraParamsMinimalDim(camIdx);
   }
 
   inline int startIndexOfCameraParams() const {
-    return ceres::ode::OdoErrorStateDim;
+    return okvis::ceres::ode::NavErrorStateDim + imu_rig_.getImuParamsMinimalDim(0);
   }
 
   // error state: \delta p, \alpha for q, \delta v
@@ -334,6 +334,22 @@ class HybridFilter : public Estimator {
   void updateStates(const Eigen::Matrix<double, Eigen::Dynamic, 1> &deltaX);
 
   uint64_t getMinValidStateID() const;
+
+  void addImuAugmentedStates(const okvis::Time stateTime, int imu_id,
+                             SpecificSensorStatesContainer* imuInfo);
+
+  /**
+   * @brief updateImuRig update imu_rig_ from states.
+   * @param
+   */
+  void updateImuRig();
+
+  /**
+   * @brief updateImuAugmentedStates update states with correction.
+   * @param stateInQuestion
+   * @param deltaAugmentedParams
+   */
+  void updateImuAugmentedStates(const States& stateInQuestion, const Eigen::VectorXd deltaAugmentedParams);
 
   // epipolar measurement used by filters for computing Jacobians
   // https://en.cppreference.com/w/cpp/language/nested_types

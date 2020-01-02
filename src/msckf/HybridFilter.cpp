@@ -78,6 +78,58 @@ HybridFilter::~HybridFilter() {
   LOG(INFO) << "Destructing HybridFilter";
 }
 
+void HybridFilter::addImuAugmentedStates(const okvis::Time stateTime,
+                                         int imu_id,
+                                         SpecificSensorStatesContainer* imuInfo) {
+  imuInfo->at(ImuSensorStates::TG).exists = true;
+  imuInfo->at(ImuSensorStates::TS).exists = true;
+  imuInfo->at(ImuSensorStates::TA).exists = true;
+  // In MSCKF, use the same block for those parameters that are assumed
+  // constant and updated in the filter
+  if (statesMap_.size() > 1) {
+    std::map<uint64_t, States>::reverse_iterator lastElementIterator =
+        statesMap_.rbegin();
+    lastElementIterator++;
+    imuInfo->at(ImuSensorStates::TG).id =
+        lastElementIterator->second.sensors.at(SensorStates::Imu)
+            .at(imu_id)
+            .at(ImuSensorStates::TG)
+            .id;
+    imuInfo->at(ImuSensorStates::TS).id =
+        lastElementIterator->second.sensors.at(SensorStates::Imu)
+            .at(imu_id)
+            .at(ImuSensorStates::TS)
+            .id;
+    imuInfo->at(ImuSensorStates::TA).id =
+        lastElementIterator->second.sensors.at(SensorStates::Imu)
+            .at(imu_id)
+            .at(ImuSensorStates::TA)
+            .id;
+  } else {
+    Eigen::Matrix<double, 27, 1> vTgTsTa = imu_rig_.getImuAugmentedEuclideanParams();
+    Eigen::Matrix<double, 9, 1> TG = vTgTsTa.head<9>();
+    uint64_t id = IdProvider::instance().newId();
+    std::shared_ptr<ceres::ShapeMatrixParamBlock> tgBlockPtr(
+        new ceres::ShapeMatrixParamBlock(TG, id, stateTime));
+    mapPtr_->addParameterBlock(tgBlockPtr, ceres::Map::Trivial);
+    imuInfo->at(ImuSensorStates::TG).id = id;
+
+    const Eigen::Matrix<double, 9, 1> TS = vTgTsTa.segment<9>(9);
+    id = IdProvider::instance().newId();
+    std::shared_ptr<okvis::ceres::ShapeMatrixParamBlock> tsBlockPtr(
+        new okvis::ceres::ShapeMatrixParamBlock(TS, id, stateTime));
+    mapPtr_->addParameterBlock(tsBlockPtr, ceres::Map::Trivial);
+    imuInfo->at(ImuSensorStates::TS).id = id;
+
+    Eigen::Matrix<double, 9, 1> TA = vTgTsTa.tail<9>();
+    id = IdProvider::instance().newId();
+    std::shared_ptr<okvis::ceres::ShapeMatrixParamBlock> taBlockPtr(
+        new okvis::ceres::ShapeMatrixParamBlock(TA, id, stateTime));
+    mapPtr_->addParameterBlock(taBlockPtr, ceres::Map::Trivial);
+    imuInfo->at(ImuSensorStates::TA).id = id;
+  }
+}
+
 bool HybridFilter::addStates(okvis::MultiFramePtr multiFrame,
                              const okvis::ImuMeasurementDeque& imuMeasurements,
                              bool asKeyframe) {
@@ -87,9 +139,6 @@ bool HybridFilter::addStates(okvis::MultiFramePtr multiFrame,
   okvis::Duration tdEstimate;
   okvis::Time correctedStateTime;  // time of current multiFrame corrected with
                                    // current td estimate
-
-  Eigen::Matrix<double, 27, 1> vTgTsTa;
-
   if (statesMap_.empty()) {
     // in case this is the first frame ever, let's initialize the pose:
     tdEstimate.fromSec(imuParametersVec_.at(0).td0);
@@ -110,11 +159,6 @@ bool HybridFilter::addStates(okvis::MultiFramePtr multiFrame,
     speedAndBias.head<3>() = pvstd_.v_WS;
     speedAndBias.segment<3>(3) = imuParametersVec_.at(0).g0;
     speedAndBias.segment<3>(6) = imuParametersVec_.at(0).a0;
-
-    vTgTsTa.head<9>() = imuParametersVec_.at(0).Tg0;
-    vTgTsTa.segment<9>(9) = imuParametersVec_.at(0).Ts0;
-    vTgTsTa.tail<9>() = imuParametersVec_.at(0).Ta0;
-
   } else {
     // get the previous states
     uint64_t T_WS_id = statesMap_.rbegin()->second.id;
@@ -145,33 +189,7 @@ bool HybridFilter::addStates(okvis::MultiFramePtr multiFrame,
                             ->estimate());
     correctedStateTime = multiFrame->timestamp() + tdEstimate;
 
-    uint64_t shapeMatrix_id = statesMap_.rbegin()
-                                  ->second.sensors.at(SensorStates::Imu)
-                                  .at(0)
-                                  .at(ImuSensorStates::TG)
-                                  .id;
-    vTgTsTa.head<9>() = std::static_pointer_cast<ceres::ShapeMatrixParamBlock>(
-                            mapPtr_->parameterBlockPtr(shapeMatrix_id))
-                            ->estimate();
-
-    shapeMatrix_id = statesMap_.rbegin()
-                         ->second.sensors.at(SensorStates::Imu)
-                         .at(0)
-                         .at(ImuSensorStates::TS)
-                         .id;
-    vTgTsTa.segment<9>(9) =
-        std::static_pointer_cast<ceres::ShapeMatrixParamBlock>(
-            mapPtr_->parameterBlockPtr(shapeMatrix_id))
-            ->estimate();
-
-    shapeMatrix_id = statesMap_.rbegin()
-                         ->second.sensors.at(SensorStates::Imu)
-                         .at(0)
-                         .at(ImuSensorStates::TA)
-                         .id;
-    vTgTsTa.tail<9>() = std::static_pointer_cast<ceres::ShapeMatrixParamBlock>(
-                            mapPtr_->parameterBlockPtr(shapeMatrix_id))
-                            ->estimate();
+    Eigen::Matrix<double, 27, 1> vTgTsTa = imu_rig_.getImuAugmentedEuclideanParams(0);
 
     // propagate pose, speedAndBias, and covariance
     okvis::Time startTime = statesMap_.rbegin()->second.timestamp;
@@ -272,11 +290,6 @@ bool HybridFilter::addStates(okvis::MultiFramePtr multiFrame,
   multiFramePtrMap_.insert(
       std::pair<uint64_t, okvis::MultiFramePtr>(states.id, multiFrame));
 
-  // the following will point to the last states:
-  std::map<uint64_t, States>::reverse_iterator lastElementIterator =
-      statesMap_.rbegin();
-  lastElementIterator++;
-
   OKVIS_ASSERT_EQ_DBG(Exception, extrinsicsEstimationParametersVec_.size(), 1,
                       "Only one camera is supported.");
   OKVIS_ASSERT_EQ_DBG(Exception, imuParametersVec_.size(), 1,
@@ -294,6 +307,10 @@ bool HybridFilter::addStates(okvis::MultiFramePtr multiFrame,
     // constant and updated in the filter
     if (statesMap_.size() > 1) {
       // use the same block...
+      // the following will point to the last states:
+      std::map<uint64_t, States>::reverse_iterator lastElementIterator =
+          statesMap_.rbegin();
+      lastElementIterator++;
       cameraInfos.at(CameraSensorStates::T_SCi).id =
           lastElementIterator->second.sensors.at(SensorStates::Camera)
               .at(i)
@@ -413,50 +430,7 @@ bool HybridFilter::addStates(okvis::MultiFramePtr multiFrame,
     mapPtr_->addParameterBlock(speedAndBiasParameterBlock);
     imuInfo.at(ImuSensorStates::SpeedAndBias).id = id;
 
-    imuInfo.at(ImuSensorStates::TG).exists = true;
-    imuInfo.at(ImuSensorStates::TS).exists = true;
-    imuInfo.at(ImuSensorStates::TA).exists = true;
-    // In MSCKF, use the same block for those parameters that are assumed
-    // constant and updated in the filter
-    if (statesMap_.size() > 1) {
-      // use the same block...
-      imuInfo.at(ImuSensorStates::TG).id =
-          lastElementIterator->second.sensors.at(SensorStates::Imu)
-              .at(i)
-              .at(ImuSensorStates::TG)
-              .id;
-      imuInfo.at(ImuSensorStates::TS).id =
-          lastElementIterator->second.sensors.at(SensorStates::Imu)
-              .at(i)
-              .at(ImuSensorStates::TS)
-              .id;
-      imuInfo.at(ImuSensorStates::TA).id =
-          lastElementIterator->second.sensors.at(SensorStates::Imu)
-              .at(i)
-              .at(ImuSensorStates::TA)
-              .id;
-    } else {
-      Eigen::Matrix<double, 9, 1> TG = vTgTsTa.head<9>();
-      uint64_t id = IdProvider::instance().newId();
-      std::shared_ptr<ceres::ShapeMatrixParamBlock> tgBlockPtr(
-          new ceres::ShapeMatrixParamBlock(TG, id, correctedStateTime));
-      mapPtr_->addParameterBlock(tgBlockPtr, ceres::Map::Trivial);
-      imuInfo.at(ImuSensorStates::TG).id = id;
-
-      const Eigen::Matrix<double, 9, 1> TS = vTgTsTa.segment<9>(9);
-      id = IdProvider::instance().newId();
-      std::shared_ptr<okvis::ceres::ShapeMatrixParamBlock> tsBlockPtr(
-          new okvis::ceres::ShapeMatrixParamBlock(TS, id, correctedStateTime));
-      mapPtr_->addParameterBlock(tsBlockPtr, ceres::Map::Trivial);
-      imuInfo.at(ImuSensorStates::TS).id = id;
-
-      Eigen::Matrix<double, 9, 1> TA = vTgTsTa.tail<9>();
-      id = IdProvider::instance().newId();
-      std::shared_ptr<okvis::ceres::ShapeMatrixParamBlock> taBlockPtr(
-          new okvis::ceres::ShapeMatrixParamBlock(TA, id, correctedStateTime));
-      mapPtr_->addParameterBlock(taBlockPtr, ceres::Map::Trivial);
-      imuInfo.at(ImuSensorStates::TA).id = id;
-    }
+    addImuAugmentedStates(correctedStateTime, i, &imuInfo);
 
     statesMap_.rbegin()
         ->second.sensors.at(SensorStates::Imu)
@@ -876,7 +850,15 @@ bool HybridFilter::applyMarginalizationStrategy(
   return true;
 }
 
-
+void HybridFilter::updateImuRig() {
+  Eigen::VectorXd extraParams;
+  getImuAugmentedStatesEstimate(&extraParams);
+  vTGTSTA_ = extraParams;
+  // we do not set bg and ba here because each pose may have different bg and ba. So
+  // every time iem_ is used, resetBgBa is called
+  iem_ = IMUErrorModel<double>(Eigen::Matrix<double, 6, 1>::Zero(), vTGTSTA_);
+  imu_rig_.setImuAugmentedEuclideanParams(0, vTGTSTA_);
+}
 
 void HybridFilter::retrieveEstimatesOfConstants() {  
   mStateID2CovID_.clear();
@@ -919,20 +901,7 @@ void HybridFilter::retrieveEstimatesOfConstants() {
       trEstimate);
   camera_rig_.setReadoutTime(camIdx, trEstimate);
 
-  Eigen::Matrix<double, 9, 1> vSM;
-  getSensorStateEstimateAs<ceres::ShapeMatrixParamBlock>(
-      currFrameId, 0, SensorStates::Imu, ImuSensorStates::TG, vSM);
-  vTGTSTA_.head<9>() = vSM;
-  getSensorStateEstimateAs<ceres::ShapeMatrixParamBlock>(
-      currFrameId, 0, SensorStates::Imu, ImuSensorStates::TS, vSM);
-  vTGTSTA_.segment<9>(9) = vSM;
-  getSensorStateEstimateAs<ceres::ShapeMatrixParamBlock>(
-      currFrameId, 0, SensorStates::Imu, ImuSensorStates::TA, vSM);
-  vTGTSTA_.tail<9>() = vSM;
-
-  // we do not set bg and ba here because each pose may have different bg and ba. So
-  // every time iem_ is used, resetBgBa is called
-  iem_ = IMUErrorModel<double>(Eigen::Matrix<double, 6, 1>::Zero(), vTGTSTA_);
+  updateImuRig();
 }
 
 // assume the rolling shutter camera reads data row by row, and rows are
@@ -1532,6 +1501,39 @@ bool HybridFilter::featureJacobian(
   return true;
 }
 
+void HybridFilter::updateImuAugmentedStates(const States& stateInQuestion, const Eigen::VectorXd deltaAugmentedParams) {
+  const int imuIdx = 0;
+  uint64_t TGId = stateInQuestion.sensors.at(SensorStates::Imu)
+                      .at(imuIdx)
+                      .at(ImuSensorStates::TG)
+                      .id;
+  std::shared_ptr<ceres::ShapeMatrixParamBlock> tgParamBlockPtr =
+      std::static_pointer_cast<ceres::ShapeMatrixParamBlock>(
+          mapPtr_->parameterBlockPtr(TGId));
+  Eigen::Matrix<double, 9, 1> sm = tgParamBlockPtr->estimate();
+  tgParamBlockPtr->setEstimate(sm + deltaAugmentedParams.head<9>());
+
+  uint64_t TSId = stateInQuestion.sensors.at(SensorStates::Imu)
+                      .at(imuIdx)
+                      .at(ImuSensorStates::TS)
+                      .id;
+  std::shared_ptr<ceres::ShapeMatrixParamBlock> tsParamBlockPtr =
+      std::static_pointer_cast<ceres::ShapeMatrixParamBlock>(
+          mapPtr_->parameterBlockPtr(TSId));
+  sm = tsParamBlockPtr->estimate();
+  tsParamBlockPtr->setEstimate(sm + deltaAugmentedParams.segment<9>(9));
+
+  uint64_t TAId = stateInQuestion.sensors.at(SensorStates::Imu)
+                      .at(imuIdx)
+                      .at(ImuSensorStates::TA)
+                      .id;
+  std::shared_ptr<ceres::ShapeMatrixParamBlock> taParamBlockPtr =
+      std::static_pointer_cast<ceres::ShapeMatrixParamBlock>(
+          mapPtr_->parameterBlockPtr(TAId));
+  sm = taParamBlockPtr->estimate();
+  taParamBlockPtr->setEstimate(sm + deltaAugmentedParams.segment<9>(18));
+}
+
 void HybridFilter::updateStates(
     const Eigen::Matrix<double, Eigen::Dynamic, 1>& deltaX) {
   updateStatesTimer.start();
@@ -1579,35 +1581,8 @@ void HybridFilter::updateStates(
   SpeedAndBiases sb = sbParamBlockPtr->estimate();
   sbParamBlockPtr->setEstimate(sb + deltaX.segment<9>(6));
 
-  uint64_t TGId = stateInQuestion.sensors.at(SensorStates::Imu)
-                      .at(imuIdx)
-                      .at(ImuSensorStates::TG)
-                      .id;
-  std::shared_ptr<ceres::ShapeMatrixParamBlock> tgParamBlockPtr =
-      std::static_pointer_cast<ceres::ShapeMatrixParamBlock>(
-          mapPtr_->parameterBlockPtr(TGId));
-  Eigen::Matrix<double, 9, 1> sm = tgParamBlockPtr->estimate();
-  tgParamBlockPtr->setEstimate(sm + deltaX.segment<9>(15));
-
-  uint64_t TSId = stateInQuestion.sensors.at(SensorStates::Imu)
-                      .at(imuIdx)
-                      .at(ImuSensorStates::TS)
-                      .id;
-  std::shared_ptr<ceres::ShapeMatrixParamBlock> tsParamBlockPtr =
-      std::static_pointer_cast<ceres::ShapeMatrixParamBlock>(
-          mapPtr_->parameterBlockPtr(TSId));
-  sm = tsParamBlockPtr->estimate();
-  tsParamBlockPtr->setEstimate(sm + deltaX.segment<9>(24));
-
-  uint64_t TAId = stateInQuestion.sensors.at(SensorStates::Imu)
-                      .at(imuIdx)
-                      .at(ImuSensorStates::TA)
-                      .id;
-  std::shared_ptr<ceres::ShapeMatrixParamBlock> taParamBlockPtr =
-      std::static_pointer_cast<ceres::ShapeMatrixParamBlock>(
-          mapPtr_->parameterBlockPtr(TAId));
-  sm = taParamBlockPtr->estimate();
-  taParamBlockPtr->setEstimate(sm + deltaX.segment<9>(33));
+  updateImuAugmentedStates(
+        stateInQuestion, deltaX.segment(15, imu_rig_.getAugmentedMinimalDim(0)));
 
   // update camera sensor states
   int camParamIndex = startIndexOfCameraParams();
@@ -2496,51 +2471,10 @@ bool HybridFilter::print(std::ostream& stream) const {
   Estimator::print(stream);
   Eigen::IOFormat SpaceInitFmt(Eigen::StreamPrecision, Eigen::DontAlignCols,
                                " ", " ", "", "", "", "");
-  // imu sensor states
-  const int imuIdx = 0;
   const States stateInQuestion = statesMap_.rbegin()->second;
-  if (stateInQuestion.sensors.at(SensorStates::Imu)
-          .at(imuIdx)
-          .at(ImuSensorStates::TG)
-          .exists) {
-    uint64_t TGId = stateInQuestion.sensors.at(SensorStates::Imu)
-                        .at(imuIdx)
-                        .at(ImuSensorStates::TG)
-                        .id;
-    std::shared_ptr<ceres::ShapeMatrixParamBlock> tgParamBlockPtr =
-        std::static_pointer_cast<ceres::ShapeMatrixParamBlock>(
-            mapPtr_->parameterBlockPtr(TGId));
-    Eigen::Matrix<double, 9, 1> sm = tgParamBlockPtr->estimate();
-    stream << " " << sm.transpose().format(SpaceInitFmt);
-  }
-  if (stateInQuestion.sensors.at(SensorStates::Imu)
-          .at(imuIdx)
-          .at(ImuSensorStates::TS)
-          .exists) {
-    uint64_t TSId = stateInQuestion.sensors.at(SensorStates::Imu)
-                        .at(imuIdx)
-                        .at(ImuSensorStates::TS)
-                        .id;
-    std::shared_ptr<ceres::ShapeMatrixParamBlock> tsParamBlockPtr =
-        std::static_pointer_cast<ceres::ShapeMatrixParamBlock>(
-            mapPtr_->parameterBlockPtr(TSId));
-    Eigen::Matrix<double, 9, 1> sm = tsParamBlockPtr->estimate();
-    stream << " " << sm.transpose().format(SpaceInitFmt);
-  }
-  if (stateInQuestion.sensors.at(SensorStates::Imu)
-          .at(imuIdx)
-          .at(ImuSensorStates::TA)
-          .exists) {
-    uint64_t TAId = stateInQuestion.sensors.at(SensorStates::Imu)
-                        .at(imuIdx)
-                        .at(ImuSensorStates::TA)
-                        .id;
-    std::shared_ptr<ceres::ShapeMatrixParamBlock> taParamBlockPtr =
-        std::static_pointer_cast<ceres::ShapeMatrixParamBlock>(
-            mapPtr_->parameterBlockPtr(TAId));
-    Eigen::Matrix<double, 9, 1> sm = taParamBlockPtr->estimate();
-    stream << " " << sm.transpose().format(SpaceInitFmt);
-  }
+  Eigen::Matrix<double, Eigen::Dynamic, 1> extraParams;
+  getImuAugmentedStatesEstimate(&extraParams);
+  stream << " " << extraParams.transpose().format(SpaceInitFmt);
 
   // camera sensor states
   const int camIdx = 0;
@@ -2629,7 +2563,7 @@ void HybridFilter::printTrackLengthHistogram(std::ostream& stream) const {
 }
 
 uint64_t HybridFilter::getCameraCalibrationEstimate(
-    Eigen::Matrix<double, Eigen::Dynamic, 1>& vfckptdr) {
+    Eigen::Matrix<double, Eigen::Dynamic, 1>& vfckptdr) const {
   const int camIdx = 0;
   const uint64_t poseId = statesMap_.rbegin()->first;
   Eigen::VectorXd intrinsic;
@@ -2656,21 +2590,40 @@ uint64_t HybridFilter::getCameraCalibrationEstimate(
   return poseId;
 }
 
-uint64_t HybridFilter::getTgTsTaEstimate(
-    Eigen::Matrix<double, Eigen::Dynamic, 1>& vTGTSTA) {
-  vTGTSTA.resize(27, 1);
-  const uint64_t poseId = statesMap_.rbegin()->first;
-  Eigen::Matrix<double, 9, 1> vSM;
-  getSensorStateEstimateAs<ceres::ShapeMatrixParamBlock>(
-      poseId, 0, SensorStates::Imu, ImuSensorStates::TG, vSM);
-  vTGTSTA.head<9>() = vSM;
-  getSensorStateEstimateAs<ceres::ShapeMatrixParamBlock>(
-      poseId, 0, SensorStates::Imu, ImuSensorStates::TS, vSM);
-  vTGTSTA.segment<9>(9) = vSM;
-  getSensorStateEstimateAs<ceres::ShapeMatrixParamBlock>(
-      poseId, 0, SensorStates::Imu, ImuSensorStates::TA, vSM);
-  vTGTSTA.tail<9>() = vSM;
-  return poseId;
+void HybridFilter::getImuAugmentedStatesEstimate(
+    Eigen::Matrix<double, Eigen::Dynamic, 1>* extraParams) const {
+  const int imuIdx = 0;
+  extraParams->resize(imu_rig_.getAugmentedDim(0), 1);
+  const States stateInQuestion = statesMap_.rbegin()->second;
+  uint64_t TGId = stateInQuestion.sensors.at(SensorStates::Imu)
+                      .at(imuIdx)
+                      .at(ImuSensorStates::TG)
+                      .id;
+  std::shared_ptr<ceres::ShapeMatrixParamBlock> tgParamBlockPtr =
+      std::static_pointer_cast<ceres::ShapeMatrixParamBlock>(
+          mapPtr_->parameterBlockPtr(TGId));
+  Eigen::Matrix<double, 9, 1> sm = tgParamBlockPtr->estimate();
+  extraParams->head<9>() = sm;
+
+  uint64_t TSId = stateInQuestion.sensors.at(SensorStates::Imu)
+                      .at(imuIdx)
+                      .at(ImuSensorStates::TS)
+                      .id;
+  std::shared_ptr<ceres::ShapeMatrixParamBlock> tsParamBlockPtr =
+      std::static_pointer_cast<ceres::ShapeMatrixParamBlock>(
+          mapPtr_->parameterBlockPtr(TSId));
+  sm = tsParamBlockPtr->estimate();
+  extraParams->segment<9>(9) = sm;
+
+  uint64_t TAId = stateInQuestion.sensors.at(SensorStates::Imu)
+                      .at(imuIdx)
+                      .at(ImuSensorStates::TA)
+                      .id;
+  std::shared_ptr<ceres::ShapeMatrixParamBlock> taParamBlockPtr =
+      std::static_pointer_cast<ceres::ShapeMatrixParamBlock>(
+          mapPtr_->parameterBlockPtr(TAId));
+  sm = taParamBlockPtr->estimate();
+  extraParams->segment<9>(18) = sm;
 }
 
 void HybridFilter::getVariance(
