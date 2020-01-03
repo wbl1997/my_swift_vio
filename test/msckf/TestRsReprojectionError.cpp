@@ -102,8 +102,6 @@ void setupPoseOptProblem(bool perturbPose, bool rollingShutter,
   std::string extrinsicOptModelName = "P_SC_Q_SC";
 
   int projOptModelId = okvis::ProjectionOptNameToId(projOptModelName);
-  int extrinsicOptModelId =
-      okvis::ExtrinsicModelNameToId(extrinsicOptModelName);
 
   Eigen::VectorXd projIntrinsics;
   okvis::ProjectionOptGlobalToLocal(projOptModelId, intrinsicParams,

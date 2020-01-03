@@ -389,7 +389,7 @@ bool MSCKF2::measurementJacobianAIDP(
   uint32_t imageHeight = camera_rig_.getCameraGeometry(camIdx)->imageHeight();
   int projOptModelId = camera_rig_.getProjectionOptMode(camIdx);
   int extrinsicModelId = camera_rig_.getExtrinsicOptMode(camIdx);
-  const double tdEstimate = camera_rig_.getTimeDelay(camIdx);
+  const double tdEstimate = camera_rig_.getImageDelay(camIdx);
   const double trEstimate = camera_rig_.getReadoutTime(camIdx);
   const okvis::kinematics::Transformation T_SC0 = camera_rig_.getCameraExtrinsic(camIdx);
   double kpN = obs[1] / imageHeight - 0.5;  // k per N
@@ -571,7 +571,7 @@ bool MSCKF2::measurementJacobian(
   uint32_t imageHeight = camera_rig_.getCameraGeometry(camIdx)->imageHeight();
   int projOptModelId = camera_rig_.getProjectionOptMode(camIdx);
   int extrinsicModelId = camera_rig_.getExtrinsicOptMode(camIdx);
-  const double tdEstimate = camera_rig_.getTimeDelay(camIdx);
+  const double tdEstimate = camera_rig_.getImageDelay(camIdx);
   const double trEstimate = camera_rig_.getReadoutTime(camIdx);
   const okvis::kinematics::Transformation T_SC0 = camera_rig_.getCameraExtrinsic(camIdx);
   double kpN = obs[1] / imageHeight - 0.5;  // k per N

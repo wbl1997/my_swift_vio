@@ -1,5 +1,3 @@
-
-
 #include <msckf/HybridFilter.hpp>
 
 #include <glog/logging.h>
@@ -141,7 +139,7 @@ bool HybridFilter::addStates(okvis::MultiFramePtr multiFrame,
                                    // current td estimate
   if (statesMap_.empty()) {
     // in case this is the first frame ever, let's initialize the pose:
-    tdEstimate.fromSec(imuParametersVec_.at(0).td0);
+    tdEstimate.fromSec(camera_rig_.getImageDelay(0));
     correctedStateTime = multiFrame->timestamp() + tdEstimate;
 
     if (pvstd_.initWithExternalSource_) {
@@ -342,12 +340,6 @@ bool HybridFilter::addStates(okvis::MultiFramePtr multiFrame,
               .at(CameraSensorStates::TR)
               .id;
     } else {
-      // initialize the camera geometry
-      const cameras::NCameraSystem& camSystem = multiFrame->GetCameraSystem();
-      camera_rig_.addCamera(multiFrame->T_SC(i), camSystem.cameraGeometry(i),
-                            imageReadoutTime_, tdEstimate.toSec(),
-                            camSystem.projOptRep(i),
-                            camSystem.extrinsicOptRep(i));
       const okvis::kinematics::Transformation T_SC =
           camera_rig_.getCameraExtrinsic(i);
 
@@ -396,7 +388,7 @@ bool HybridFilter::addStates(okvis::MultiFramePtr multiFrame,
 
       id = IdProvider::instance().newId();
       std::shared_ptr<okvis::ceres::CameraTimeParamBlock> tdParamBlockPtr(
-          new okvis::ceres::CameraTimeParamBlock(camera_rig_.getTimeDelay(i),
+          new okvis::ceres::CameraTimeParamBlock(camera_rig_.getImageDelay(i),
                                                  id, correctedStateTime));
       mapPtr_->addParameterBlock(tdParamBlockPtr,
                                  ceres::Map::Parameterization::Trivial);
@@ -886,7 +878,7 @@ void HybridFilter::updateSensorRigs() {
   getSensorStateEstimateAs<ceres::CameraTimeParamBlock>(
       currFrameId, camIdx, SensorStates::Camera, CameraSensorStates::TD,
       tdEstimate);
-  camera_rig_.setTimeDelay(camIdx, tdEstimate);
+  camera_rig_.setImageDelay(camIdx, tdEstimate);
 
   double trEstimate;
   getSensorStateEstimateAs<ceres::CameraTimeParamBlock>(
@@ -993,7 +985,7 @@ bool HybridFilter::computeHxf(const uint64_t hpbid, const MapPoint& mp,
   uint32_t imageHeight = camera_rig_.getCameraGeometry(camIdx)->imageHeight();
   int projOptModelId = camera_rig_.getProjectionOptMode(camIdx);
   int extrinsicModelId = camera_rig_.getExtrinsicOptMode(camIdx);
-  const double tdEstimate = camera_rig_.getTimeDelay(camIdx);
+  const double tdEstimate = camera_rig_.getImageDelay(camIdx);
   const double trEstimate = camera_rig_.getReadoutTime(camIdx);
   const okvis::kinematics::Transformation T_SC0 = camera_rig_.getCameraExtrinsic(camIdx);
 
@@ -1174,7 +1166,7 @@ bool HybridFilter::featureJacobian(
   uint32_t imageHeight = tempCameraGeometry->imageHeight();
   int projOptModelId = camera_rig_.getProjectionOptMode(camIdx);
   int extrinsicModelId = camera_rig_.getExtrinsicOptMode(camIdx);
-  const double tdEstimate = camera_rig_.getTimeDelay(camIdx);
+  const double tdEstimate = camera_rig_.getImageDelay(camIdx);
   const double trEstimate = camera_rig_.getReadoutTime(camIdx);
   const okvis::kinematics::Transformation T_SC0 = camera_rig_.getCameraExtrinsic(camIdx);
 
@@ -2241,7 +2233,7 @@ void HybridFilter::optimize(size_t /*numIter*/, size_t /*numThreads*/,
 }
 
 // getters
-bool HybridFilter::getTimeDelay(uint64_t poseId, int camIdx,
+bool HybridFilter::getImageDelay(uint64_t poseId, int camIdx,
                                 okvis::Duration* td) const {
   double tdd;
   if (!getSensorStateEstimateAs<ceres::CameraTimeParamBlock>(
@@ -2711,7 +2703,7 @@ bool HybridFilter::EpipolarMeasurement::measurementJacobian(
       omega_WBtij;
   double dtij_dtr[2];
   double featureDelay[2];
-  const double tdEstimate = filter_.camera_rig_.getTimeDelay(camIdx_);
+  const double tdEstimate = filter_.camera_rig_.getImageDelay(camIdx_);
   const double trEstimate = filter_.camera_rig_.getReadoutTime(camIdx_);
   for (int j = 0; j < 2; ++j) {
     ImuMeasurement interpolatedInertialData;

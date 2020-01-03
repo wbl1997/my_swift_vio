@@ -37,7 +37,7 @@ static const int max_camera_input_queue_size = 10;
 // overlap of imu data before and after two consecutive frames [seconds] if too
 // large, frame consumer loop will be blocked for too long by waiting for imu
 // meas.
-// The frontend waits until frame time + lastOptimizedTimeDelay_ +
+// The frontend waits until frame time + lastOptimizedImageDelay_ +
 // temporal_imu_data_overlap for each frame.
 // When inertial data for a feature in the most recent frame are requested, the
 // feature's observation time may exceed the latest available IMU data, so
@@ -115,15 +115,15 @@ void HybridVio::init() {
   // half_window is added s.t. last_timestamp_ - overlap >= 0
   // since okvis::time(-0.02) returns a big number.
   lastOptimizedStateTimestamp_ = okvis::Time(0.0) + HybridFilter::half_window_;
-  lastOptimizedTimeDelay_ = okvis::Duration(parameters_.imu.td0);
+  lastOptimizedImageDelay_ = okvis::Duration(parameters_.nCameraSystem.cameraGeometry(0)->imageDelay());
   lastAddedStateTimestamp_ = okvis::Time(0.0) + HybridFilter::half_window_;
 
   estimator_->addImu(parameters_.imu);
+  estimator_->addCameraSystem(parameters_.nCameraSystem);
   for (size_t i = 0; i < numCameras_; ++i) {
     // parameters_.camera_extrinsics is never set (default 0's)...
     // do they ever change?
-    estimator_->addCamera(parameters_.camera_extrinsics,
-                          parameters_.sensors_information.imageReadoutTime);
+    estimator_->addCameraParameterStds(parameters_.camera_extrinsics);
     cameraMeasurementsReceived_.emplace_back(
           std::shared_ptr<threadsafe::ThreadSafeQueue<std::shared_ptr<okvis::CameraMeasurement> > >
           (new threadsafe::ThreadSafeQueue<std::shared_ptr<okvis::CameraMeasurement> >()));
@@ -379,7 +379,7 @@ void HybridVio::frameConsumerLoop(size_t cameraIndex) {
     okvis::kinematics::Transformation T_WS;
     okvis::Time lastTimestamp;
     okvis::SpeedAndBiases speedAndBiases;
-    okvis::Duration lastTimeDelay;
+    okvis::Duration lastImageDelay;
     // copy last state variables
     {
       waitForStateVariablesMutexTimer.start();
@@ -388,12 +388,12 @@ void HybridVio::frameConsumerLoop(size_t cameraIndex) {
       T_WS = lastOptimized_T_WS_;
       speedAndBiases = lastOptimizedSpeedAndBiases_;
       lastTimestamp = lastOptimizedStateTimestamp_;
-      lastTimeDelay = lastOptimizedTimeDelay_;
+      lastImageDelay = lastOptimizedImageDelay_;
     }
 
     // -- get relevant imu messages for new state
     okvis::Time imuDataEndTime =
-        multiFrame->timestamp() + lastTimeDelay + temporal_imu_data_overlap;
+        multiFrame->timestamp() + lastImageDelay + temporal_imu_data_overlap;
     okvis::Time imuDataBeginTime = lastTimestamp - HybridFilter::half_window_;
 
     OKVIS_ASSERT_TRUE_DBG(Exception, imuDataBeginTime < imuDataEndTime,
@@ -436,7 +436,7 @@ void HybridVio::frameConsumerLoop(size_t cameraIndex) {
         lastOptimizedSpeedAndBiases_.segment<3>(3) = imu_params_.g0;
         lastOptimizedSpeedAndBiases_.segment<3>(6) = imu_params_.a0;
         lastOptimizedStateTimestamp_ = multiFrame->timestamp();
-        lastOptimizedTimeDelay_ = okvis::Duration(parameters_.imu.td0);
+        lastOptimizedImageDelay_ = okvis::Duration(parameters_.nCameraSystem.cameraGeometry(0)->imageDelay());
       }
       OKVIS_ASSERT_TRUE_DBG(Exception, success,
           "pose could not be initialized from imu measurements.");
@@ -448,8 +448,8 @@ void HybridVio::frameConsumerLoop(size_t cameraIndex) {
       // get old T_WS
       propagationTimer.start();
       okvis::ceres::ImuError::propagation(imuData, parameters_.imu, T_WS,
-                                          speedAndBiases, lastTimestamp + lastTimeDelay,
-                                          multiFrame->timestamp() + lastTimeDelay);
+                                          speedAndBiases, lastTimestamp + lastImageDelay,
+                                          multiFrame->timestamp() + lastImageDelay);
       propagationTimer.stop();
     }
     okvis::kinematics::Transformation T_WC = T_WS
@@ -508,12 +508,12 @@ void HybridVio::matchingLoop() {
 
     prepareToAddStateTimer.start();
     // -- get relevant imu messages for new state
-    okvis::Duration lastTimeDelay;
+    okvis::Duration lastImageDelay;
     {
       std::lock_guard<std::mutex> lock(lastState_mutex_);
-      lastTimeDelay = lastOptimizedTimeDelay_;
+      lastImageDelay = lastOptimizedImageDelay_;
     }
-    okvis::Time imuDataEndTime = frame->timestamp() + lastTimeDelay +
+    okvis::Time imuDataEndTime = frame->timestamp() + lastImageDelay +
                                  temporal_imu_data_overlap;
     okvis::Time imuDataBeginTime =
         lastAddedStateTimestamp_ - HybridFilter::half_window_;
@@ -759,7 +759,7 @@ void HybridVio::optimizationLoop() {
         estimator_->get_T_WS(frame_pairs->id(), lastOptimized_T_WS_);
         estimator_->getSpeedAndBias(frame_pairs->id(), 0,
                                    lastOptimizedSpeedAndBiases_);
-        estimator_->getTimeDelay(frame_pairs->id(), 0, &lastOptimizedTimeDelay_);
+        estimator_->getImageDelay(frame_pairs->id(), 0, &lastOptimizedImageDelay_);
         lastOptimizedStateTimestamp_ = frame_pairs->timestamp();
         int frameIdInSource = -1;
         bool isKF= false;

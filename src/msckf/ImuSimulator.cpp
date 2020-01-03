@@ -592,7 +592,7 @@ double RoundedSquare::getPeriodRemainder(const okvis::Time time) {
 void initImuNoiseParams(
     okvis::ImuParameters* imuParameters, bool addPriorNoise,
     double sigma_bg, double sigma_ba, double std_Ta_elem,
-    double sigma_td, bool fixImuInternalParams) {
+    bool fixImuInternalParams) {
   imuParameters->g = 9.81;
   imuParameters->a_max = 1000.0;
   imuParameters->g_max = 1000.0;
@@ -642,8 +642,6 @@ void initImuNoiseParams(
         vio::Sample::gaussian(imuParameters->sigma_TSElement, 9);
     imuParameters->Ta0 =
         eye + vio::Sample::gaussian(imuParameters->sigma_TAElement, 9);
-    imuParameters->td0 =
-        vio::gauss_rand(0, sigma_td);
   } else {
     imuParameters->a0.setZero();
     imuParameters->g0.setZero();
@@ -651,7 +649,6 @@ void initImuNoiseParams(
     imuParameters->Tg0 = eye;
     imuParameters->Ts0.setZero();
     imuParameters->Ta0 = eye;
-    imuParameters->td0 = 0;
   }
 }
 

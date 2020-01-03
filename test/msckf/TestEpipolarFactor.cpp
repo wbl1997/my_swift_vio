@@ -12,7 +12,6 @@
 
 #include <okvis/cameras/EquidistantDistortion.hpp>
 #include <okvis/cameras/PinholeCamera.hpp>
-#include <okvis/ceres/PoseLocalParameterization.hpp>
 #include <okvis/ceres/PoseParameterBlock.hpp>
 #include <okvis/ceres/SpeedAndBiasParameterBlock.hpp>
 
@@ -33,7 +32,7 @@ TEST(CeresErrorTerms, EpipolarFactor) {
 
   okvis::ImuParameters imuParameters;
   imu::initImuNoiseParams(&imuParameters, addPriorNoise, bg_std, ba_std, Ta_std,
-                          sigma_td, FLAGS_zero_imu_intrinsic_param_noise);
+                          FLAGS_zero_imu_intrinsic_param_noise);
 
   std::shared_ptr<imu::CircularSinusoidalTrajectory> cst;
   cst.reset(new imu::RoundedSquare(imuParameters.rate,
@@ -64,6 +63,7 @@ TEST(CeresErrorTerms, EpipolarFactor) {
   std::shared_ptr<okvis::cameras::CameraBase> cameraGeometry0;
   std::shared_ptr<okvis::cameras::NCameraSystem> cameraSystem0;
   csc.createNominalCameraSystem(&cameraGeometry0, &cameraSystem0);
+  cameraGeometry0->setImageDelay(vio::gauss_rand(0, sigma_td));
 
   // create the camera visible landmarks, compute their observations in two
   // views
@@ -149,8 +149,6 @@ TEST(CeresErrorTerms, EpipolarFactor) {
 
     // add parameter blocks
     uint64_t id = 1u;
-    ::ceres::LocalParameterization* poseLocalParameterization(
-        new okvis::ceres::PoseLocalParameterization);  // do not need to delete
     okvis::ceres::PoseParameterBlock poseParameterBlock0(two_T_WS[0], id++,
                                                          twoTimes[0]);
     okvis::ceres::PoseParameterBlock poseParameterBlock1(two_T_WS[1], id++,

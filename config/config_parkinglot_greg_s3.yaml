@@ -10,12 +10,12 @@ cameras:
         distortion_coefficients: [0.08, -0.12, 0, 0],
         distortion_type: radialtangential,
         focal_length: [1567.30, 1568.4],
-        principal_point: [944.0, 516.8]}
+        principal_point: [944.0, 516.8],
+        image_readout_time: 0.033}
 
 
 camera_params:
     camera_rate: 10 # just to manage the expectations of when there should be frames arriving
-    image_readout_time: 0.033 # how long does it take to read out one image? in secs    
     sigma_absolute_translation: 2e-2 # The standard deviation of the camera extrinsics translation, e.g. 1.0e-10 for online-calib [m].
     sigma_absolute_orientation: 0 # The standard deviation of the camera extrinsics orientation, e.g. 1.0e-3 for online-calib [rad].
     sigma_c_relative_translation: 0 # The std. dev. of the cam. extr. transl. change between frames, e.g. 1.0e-6 for adaptive online calib (not less for numerics) [m].

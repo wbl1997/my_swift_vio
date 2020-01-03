@@ -68,7 +68,7 @@ class CameraSystemCreator {
     fcNoise.tail<2>() *= cameraNoiseParams.sigma_principal_point;
     Eigen::Matrix<double, 4, 1> kpNoise = vio::Sample::gaussian(1, 4);
     for (int jack = 0; jack < 4; ++jack) {
-      kpNoise[jack] *= cameraNoiseParams.sigma_distortion[jack];
+      kpNoise[jack] = std::fabs(kpNoise[jack]) * cameraNoiseParams.sigma_distortion[jack];
     }
     Eigen::Vector3d p_CBNoise;
     for (int jack = 0; jack < 3; ++jack) {
@@ -86,13 +86,16 @@ class CameraSystemCreator {
     refCameraGeometry->getIntrinsics(projDistortIntrinsics);
     cameraGeometry->reset(new okvis::cameras::PinholeCamera<
                           okvis::cameras::RadialTangentialDistortion>(
-        refCameraGeometry->imageWidth(), refCameraGeometry->imageHeight(),
-        projDistortIntrinsics[0] + fcNoise[0],
-        projDistortIntrinsics[1] + fcNoise[1],
-        projDistortIntrinsics[2] + fcNoise[2],
-        projDistortIntrinsics[3] + fcNoise[3],
-        okvis::cameras::RadialTangentialDistortion(kpNoise[0], kpNoise[1],
-                                                   kpNoise[2], kpNoise[3])));
+                            refCameraGeometry->imageWidth(), refCameraGeometry->imageHeight(),
+                            projDistortIntrinsics[0] + fcNoise[0],
+                            projDistortIntrinsics[1] + fcNoise[1],
+                            projDistortIntrinsics[2] + fcNoise[2],
+                            projDistortIntrinsics[3] + fcNoise[3],
+                            okvis::cameras::RadialTangentialDistortion(kpNoise[0], kpNoise[1],
+                            kpNoise[2], kpNoise[3]),
+                            vio::gauss_rand(0, cameraNoiseParams.sigma_td),
+                            std::fabs(vio::gauss_rand(0, cameraNoiseParams.sigma_tr))
+                            ));
     cameraSystem->reset(new okvis::cameras::NCameraSystem);
     (*cameraSystem)
         ->addCamera(

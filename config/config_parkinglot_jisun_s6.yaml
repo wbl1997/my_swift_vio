@@ -10,11 +10,11 @@ cameras:
         distortion_coefficients: [0, 0, 0, 0],
         distortion_type: radialtangential,
         focal_length: [1441.935, 1441.935],
-        principal_point: [960, 540]}
+        principal_point: [960, 540],
+        image_readout_time: 0.033}
 
 camera_params:
     camera_rate: 25
-    image_readout_time: 0.033
     sigma_absolute_translation: 2.0e-2
     sigma_absolute_orientation: 0.0 # The standard deviation of the camera extrinsics orientation, e.g. 1.0e-3 for online-calib [rad].
     sigma_c_relative_translation: 0.0 # The std. dev. of the cam. extr. transl. change between frames, e.g. 1.0e-6 for adaptive online calib (not less for numerics) [m].

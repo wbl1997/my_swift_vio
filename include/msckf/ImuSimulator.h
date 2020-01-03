@@ -338,7 +338,7 @@ struct TestSetting {
 void initImuNoiseParams(
     okvis::ImuParameters* imuParameters, bool addPriorNoise,
     double sigma_bg, double sigma_ba, double std_Ta_elem,
-    double sigma_td, bool fixImuInternalParams);
+    bool fixImuInternalParams);
 
 } // namespace imu
 #endif

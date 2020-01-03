@@ -126,7 +126,7 @@ class HybridFilter : public Estimator {
   /// @name Getters
   ///\{
 
-  bool getTimeDelay(uint64_t poseId, int camIdx, okvis::Duration *td) const;
+  bool getImageDelay(uint64_t poseId, int camIdx, okvis::Duration *td) const;
 
   int getCameraExtrinsicOptType(size_t cameraIdx) const;
 

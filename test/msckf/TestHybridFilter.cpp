@@ -84,14 +84,14 @@ void initCameraNoiseParams(
   if (fixCameraInteranlParams) {
     cameraNoiseParams->sigma_focal_length = 0;
     cameraNoiseParams->sigma_principal_point = 0;
-    cameraNoiseParams->sigma_distortion << 0, 0, 0, 0, 0;  /// k1, k2, p1, p2, [k3]
+    cameraNoiseParams->sigma_distortion.resize(5, 0);
     cameraNoiseParams->sigma_td = 0;
     cameraNoiseParams->sigma_tr = 0;
   } else {
     cameraNoiseParams->sigma_focal_length = 5;
     cameraNoiseParams->sigma_principal_point = 5;
-    cameraNoiseParams->sigma_distortion << 5e-2, 1e-2, 1e-3, 1e-3,
-        1e-3;  /// k1, k2, p1, p2, [k3]
+    cameraNoiseParams->sigma_distortion =
+        std::vector<double>{5e-2, 1e-2, 1e-3, 1e-3, 1e-3};
     cameraNoiseParams->sigma_td = 5e-3;
     cameraNoiseParams->sigma_tr = 5e-3;
   }
@@ -485,7 +485,6 @@ void testHybridFilterSinusoid(const std::string& outputPath,
     okvis::ImuParameters imuParameters;
     imu::initImuNoiseParams(&imuParameters, cases[c].addPriorNoise, 5e-3,
                             ba_std, Ta_std,
-                            extrinsicsEstimationParameters.sigma_td,
                             FLAGS_zero_imu_intrinsic_param_noise);
 
     okvis::InitialPVandStd pvstd;
@@ -589,10 +588,6 @@ void testHybridFilterSinusoid(const std::string& outputPath,
       debugStream << headerLine << std::endl;
     }
 
-    double trNoisy(0);
-    if (cases[c].addPriorNoise)
-      trNoisy = vio::gauss_rand(0, extrinsicsEstimationParameters.sigma_tr);
-
     std::shared_ptr<okvis::Estimator> estimator;
     okvis::VisualConstraints constraintScheme(okvis::OnlyReprojectionErrors);
     switch (FLAGS_estimator_algorithm) {
@@ -622,11 +617,12 @@ void testHybridFilterSinusoid(const std::string& outputPath,
                                        60, constraintScheme,
                                        bVerbose ? pointFile : "");
 
-    estimator->addCamera(extrinsicsEstimationParameters, trNoisy);
+
     estimator->addImu(imuParameters);
+    estimator->addCameraSystem(*cameraSystem2); // init a noisy camera system in the estimator
+    estimator->addCameraParameterStds(extrinsicsEstimationParameters);
 
     std::vector<uint64_t> multiFrameIds;
-
     size_t kale = 0;  // imu data counter
     bool bStarted = false;
     int frameCount = -1;               // number of frames used in estimator
@@ -644,11 +640,15 @@ void testHybridFilterSinusoid(const std::string& outputPath,
         okvis::kinematics::Transformation T_WS(ref_T_WS_list[kale]);
         // assemble a multi-frame
         std::shared_ptr<okvis::MultiFrame> mf(new okvis::MultiFrame);
-        mf->setId(okvis::IdProvider::instance().newId());
+        uint64_t id = okvis::IdProvider::instance().newId();
+        mf->setId(id);
+
         mf->setTimestamp(*iter);
+        // The reference cameraSystem will be used for triangulating landmarks in
+        // the frontend which provides observations to the estimator.
+        mf->resetCameraSystemAndFrames(*cameraSystem0);
 
         // reference ID will be and stay the first frame added.
-        uint64_t id = mf->id();
         multiFrameIds.push_back(id);
 
         okvis::Time currentKFTime = *iter;
@@ -658,10 +658,9 @@ void testHybridFilterSinusoid(const std::string& outputPath,
             imuDataBeginTime, imuDataEndTime, imuMeasurements, nullptr);
         bool asKeyframe = true;
         // add it in the window to create a new time instance
-        if (bStarted == false) {
+        if (!bStarted) {
           bStarted = true;
           frameCount = 0;
-          mf->resetCameraSystemAndFrames(*cameraSystem2);
           okvis::kinematics::Transformation truePose =
               cst->computeGlobalPose(*iter);
           Eigen::Vector3d p_WS = truePose.r();
@@ -677,18 +676,19 @@ void testHybridFilterSinusoid(const std::string& outputPath,
           }
           estimator->resetInitialPVandStd(pvstd);
           estimator->addStates(mf, imuSegment, asKeyframe);
-
           if (isFilteringMethod(FLAGS_estimator_algorithm)) {
+            const int kDistortionCoeffDim =
+                okvis::cameras::RadialTangentialDistortion::NumDistortionIntrinsics;
+            const int kNavImuCamParamDim = okvis::ceres::ode::NavErrorStateDim +
+                okvis::ImuModelGetMinimalDim(okvis::ImuModelNameToId(imuParameters.model_type)) +
+                2 + kDistortionCoeffDim +
+                okvis::ExtrinsicModelGetMinimalDim(extrinsicModelId) +
+                okvis::ProjectionOptGetMinimalDim(projOptModelId);
             ASSERT_EQ(estimator->getEstimatedVariableMinimalDim(),
-                      57 +
-                          okvis::ExtrinsicModelGetMinimalDim(extrinsicModelId) +
-                          okvis::ProjectionOptGetMinimalDim(projOptModelId))
+                      kNavImuCamParamDim + okvis::HybridFilter::kClonedStateMinimalDimen)
                 << "Initial cov with one cloned state has a wrong dim";
           }
         } else {
-          // the cameraSystem will be used for triangulating landmarks in
-          // the frontend which add observations to the estimator
-          mf->resetCameraSystemAndFrames(*cameraSystem0);
           estimator->addStates(mf, imuSegment, asKeyframe);
           ++frameCount;
         }

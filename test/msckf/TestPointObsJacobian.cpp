@@ -39,6 +39,7 @@ okvis::ImuMeasurementDeque createImuMeasurements(okvis::Time t0) {
 }
 
 void computeFeatureMeasJacobian(okvis::cameras::NCameraSystem::DistortionType distortionId) {
+  double imageDelay = 0.0;
   double trNoisy = 0.033;
   std::shared_ptr<okvis::ceres::Map> mapPtr(new okvis::ceres::Map);
   okvis::MSCKF2 estimator(mapPtr);
@@ -50,13 +51,13 @@ void computeFeatureMeasJacobian(okvis::cameras::NCameraSystem::DistortionType di
   if (distortionId == okvis::cameras::NCameraSystem::DistortionType::FOV) {
     tempCameraGeometry.reset(
         new okvis::cameras::PinholeCamera<okvis::cameras::FovDistortion>(
-            752, 480, 350, 360, 378, 238, okvis::cameras::FovDistortion(0.9)));
+            752, 480, 350, 360, 378, 238, okvis::cameras::FovDistortion(0.9), imageDelay, trNoisy));
   } else if (distortionId ==
              okvis::cameras::NCameraSystem::DistortionType::RadialTangential) {
     tempCameraGeometry.reset(new okvis::cameras::PinholeCamera<
                              okvis::cameras::RadialTangentialDistortion>(
         752, 480, 350, 360, 378, 238,
-        okvis::cameras::RadialTangentialDistortion(0.10, 0.00, 0.000, 0.000)));
+        okvis::cameras::RadialTangentialDistortion(0.10, 0.00, 0.000, 0.000), imageDelay, trNoisy));
   }
 
   std::shared_ptr<okvis::cameras::NCameraSystem> cameraSystem(
@@ -83,12 +84,14 @@ void computeFeatureMeasJacobian(okvis::cameras::NCameraSystem::DistortionType di
   extrinsicsEstimationParameters.sigma_focal_length = 0.01;
   extrinsicsEstimationParameters.sigma_principal_point = 0.01;
   // k1, k2, p1, p2, [k3]
-  extrinsicsEstimationParameters.sigma_distortion << 1E-3, 1E-4, 1E-4, 1E-4,
-      1E-5;
-  extrinsicsEstimationParameters.sigma_td = 1E-4;
-  extrinsicsEstimationParameters.sigma_tr = 1E-4;
+  extrinsicsEstimationParameters.sigma_distortion =
+      std::vector<double>{1e-3, 1e-4, 1e-4, 1e-4, 1e-5};
+  extrinsicsEstimationParameters.sigma_td = 1e-4;
+  extrinsicsEstimationParameters.sigma_tr = 1e-4;
 
-  estimator.addCamera(extrinsicsEstimationParameters, trNoisy);
+  estimator.addCameraParameterStds(extrinsicsEstimationParameters);
+  estimator.addCameraSystem(*cameraSystem);
+
   // set the imu parameters
   okvis::ImuParameters imuParameters;
   imuParameters.a0.setZero();
