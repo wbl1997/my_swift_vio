@@ -441,7 +441,10 @@ void testHybridFilterSinusoid(const std::string& outputPath,
 
   std::string projOptModelName = "FIXED";
   std::string extrinsicModelName = "FIXED";
-
+  if (FLAGS_add_prior_noise) {
+    projOptModelName = "FXY_CXY";
+    extrinsicModelName = "P_CB";
+  }
   for (int run = 0; run < runs; ++run) {
     bVerbose = successRuns == 0;
     filterTimer.start();
