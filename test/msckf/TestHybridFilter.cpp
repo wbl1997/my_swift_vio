@@ -330,7 +330,7 @@ void check_tail_mse(
   index += 9;
   EXPECT_LT(mse_tail.segment<9>(index).norm(), std::pow(5e-3, 2)) << "Ta MSE";
   index += 9;
-  EXPECT_LT(mse_tail.segment<3>(index).norm(), std::pow(0.04, 2)) << "p_CS MSE";
+  EXPECT_LT(mse_tail.segment<3>(index).norm(), std::pow(0.04, 2)) << "p_CB MSE";
   index += 3;
   int projIntrinsicDim = okvis::ProjectionOptGetMinimalDim(projOptModelId);
   EXPECT_LT(mse_tail.segment(index, projIntrinsicDim).norm(), std::pow(1, 2)) << "fxy cxy MSE";

@@ -57,22 +57,13 @@ struct TriangulationStatus {
 
 //! The estimator class
 /*!
- The estimator class. This does all the backend work.
+ The estimator class does all the backend work.
  Frames:
  W: World
- B: Body, usu. tied to S and denoted by S in this codebase
  C: Camera
- S: Sensor (IMU), S frame is defined such that its rotation component is
-     fixed to the nominal value of R_SC0 and its origin is at the
-     accelerometer intersection as discussed in Huai diss. In this case, the
-     remaining misalignment between the conventional IMU frame (A) and the C
-     frame will be absorbed into T_a, the IMU accelerometer misalignment matrix
-
-     w_m = T_g * w_B + T_s * a_B + b_w + n_w
-     a_m = T_a * a_B + b_a + n_a = S * M * R_AB * a_B + b_a + n_a
-
-     The conventional IMU frame has origin at the accelerometers intersection
-     and x-axis aligned with accelerometer x.
+ S: Sensor (IMU)
+ B: Body, defined by the IMU model, e.g., Imu_BG_BA, usually defined close to S.
+ Its relation to the camera frame is modeled by the extrinsic model, e.g., Extrinsic_p_CB.
  */
 class HybridFilter : public Estimator {
  public:
@@ -382,7 +373,21 @@ class HybridFilter : public Estimator {
         const std::vector<Eigen::Matrix3d,
                           Eigen::aligned_allocator<Eigen::Matrix3d>> &cov_fj,
         const std::vector<int> &index_vec);
-
+    /**
+     * @brief measurementJacobian
+     *     The Jacobians for state variables except for states related to time
+     *     can be computed with automatic differentiation.
+     * z = h(X, n) \\
+     * X = \hat{X} \oplus \delta \chi \\
+     * e.g., R = exp(\delta \theta)\hat{R}\\
+     * r = z - h(\hat{X}, 0) = J_x \delta \chi + J_n n \\
+     * J_x = \lim_{\delta \chi \rightarrow 0} \frac{h(\hat{x}\oplus\delta\chi) - h(\hat{x})}{\delta \chi}
+     * The last equation can be used in ceres AutoDifferentiate function for computing the Jacobian.
+     * @param H_xjk
+     * @param H_fjk
+     * @param residual
+     * @return
+     */
     bool measurementJacobian(
         Eigen::Matrix<double, 1, Eigen::Dynamic> *H_xjk,
         std::vector<Eigen::Matrix<double, 1, 3>,

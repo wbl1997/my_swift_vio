@@ -15,10 +15,10 @@ Eigen::Vector3d worldToImage(const Eigen::Vector4d& xyz1,
     return pC;
 }
 
-TEST(MSCKF2, ExtrinsicJacobianP_CS) {
+TEST(MSCKF2, ExtrinsicJacobianP_CB) {
 
 }
 
-TEST(MSCKF2, ExtrinsicJacobianP_SC_R_SC) {
+TEST(MSCKF2, ExtrinsicJacobianP_BC_R_BC) {
 
 }

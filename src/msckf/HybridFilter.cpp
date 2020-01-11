@@ -340,13 +340,13 @@ bool HybridFilter::addStates(okvis::MultiFramePtr multiFrame,
               .at(CameraSensorStates::TR)
               .id;
     } else {
-      const okvis::kinematics::Transformation T_SC =
+      const okvis::kinematics::Transformation T_BC =
           camera_rig_.getCameraExtrinsic(i);
 
       uint64_t id = IdProvider::instance().newId();
       std::shared_ptr<okvis::ceres::PoseParameterBlock>
           extrinsicsParameterBlockPtr(new okvis::ceres::PoseParameterBlock(
-              T_SC, id, correctedStateTime));
+              T_BC, id, correctedStateTime));
       mapPtr_->addParameterBlock(extrinsicsParameterBlockPtr,
                                  ceres::Map::Pose6d);
       cameraInfos.at(CameraSensorStates::T_SCi).id = id;
@@ -635,13 +635,13 @@ bool HybridFilter::applyMarginalizationStrategy(
           get_T_WS(pit->second.anchorStateId, T_GBa);
           okvis::kinematics::Transformation T_GBc;
           get_T_WS(currFrameId, T_GBc);
-          okvis::kinematics::Transformation T_SC;
+          okvis::kinematics::Transformation T_BC;
           const int camIdx = 0;
-          getCameraSensorStates(currFrameId, camIdx, T_SC);
+          getCameraSensorStates(currFrameId, camIdx, T_BC);
 
           okvis::kinematics::Transformation T_GA =
-              T_GBa * T_SC;  // anchor camera frame to global frame
-          okvis::kinematics::Transformation T_GC = T_GBc * T_SC;
+              T_GBa * T_BC;  // anchor camera frame to global frame
+          okvis::kinematics::Transformation T_GC = T_GBc * T_BC;
 
           std::shared_ptr<okvis::ceres::HomogeneousPointParameterBlock> hppb =
               std::static_pointer_cast<
@@ -857,9 +857,9 @@ void HybridFilter::updateCovarianceIndex() {
 void HybridFilter::updateSensorRigs() {
   const int camIdx = 0;
   const uint64_t currFrameId = currentFrameId();
-  okvis::kinematics::Transformation T_SC0;
-  getCameraSensorStates(currFrameId, camIdx, T_SC0);
-  camera_rig_.setCameraExtrinsic(camIdx, T_SC0);
+  okvis::kinematics::Transformation T_BC0;
+  getCameraSensorStates(currFrameId, camIdx, T_BC0);
+  camera_rig_.setCameraExtrinsic(camIdx, T_BC0);
 
   Eigen::Matrix<double, Eigen::Dynamic, 1> projectionIntrinsic;
   if (camera_rig_.getMinimalProjectionDimen(camIdx) > 0) {
@@ -987,7 +987,7 @@ bool HybridFilter::computeHxf(const uint64_t hpbid, const MapPoint& mp,
   int extrinsicModelId = camera_rig_.getExtrinsicOptMode(camIdx);
   const double tdEstimate = camera_rig_.getImageDelay(camIdx);
   const double trEstimate = camera_rig_.getReadoutTime(camIdx);
-  const okvis::kinematics::Transformation T_SC0 = camera_rig_.getCameraExtrinsic(camIdx);
+  const okvis::kinematics::Transformation T_BC0 = camera_rig_.getCameraExtrinsic(camIdx);
 
   double kpN = obsInPixel[1] / imageHeight - 0.5;  // k per N
   Duration featureTime = Duration(tdEstimate + trEstimate * kpN) -
@@ -1033,7 +1033,7 @@ bool HybridFilter::computeHxf(const uint64_t hpbid, const MapPoint& mp,
   okvis::kinematics::Transformation T_GA(
       mp.p_BA_G + T_WBa.r(), mp.q_GA);  // anchor frame to global frame
   okvis::kinematics::Transformation T_CA =
-      (T_WB * T_SC0).inverse() * T_GA;  // anchor frame to current camera frame
+      (T_WB * T_BC0).inverse() * T_GA;  // anchor frame to current camera frame
   Eigen::Vector3d pfiinC = (T_CA * ab1rho).head<3>();
   std::shared_ptr<const okvis::cameras::CameraBase> tempCameraGeometry =
       camera_rig_.getCameraGeometry(camIdx);
@@ -1084,14 +1084,14 @@ bool HybridFilter::computeHxf(const uint64_t hpbid, const MapPoint& mp,
   okvis::kinematics::Transformation T_BcA =
       lP_T_WB.inverse() *
       T_GA;  // anchor frame to the body frame associated with current frame
-  J_td = pointJacobian3 * T_SC0.C().transpose() *
+  J_td = pointJacobian3 * T_BC0.C().transpose() *
          (okvis::kinematics::crossMx((T_BcA * ab1rho).head<3>()) *
               interpolatedInertialData.measurement.gyroscopes -
           T_WB.C().transpose() * lP_sb.head<3>() * rho);
   J_tr = J_td * kpN;
   Eigen::MatrixXd dpC_dExtrinsic;
   Eigen::Matrix3d R_CfCa = T_CA.C();
-  ExtrinsicModel_dpC_dExtrinsic(extrinsicModelId, pfiinC, T_SC0.C().transpose(),
+  ExtrinsicModel_dpC_dExtrinsic(extrinsicModelId, pfiinC, T_BC0.C().transpose(),
                                 &dpC_dExtrinsic, &R_CfCa, &ab1rho);
   ProjectionOptKneadIntrinsicJacobian(projOptModelId, &intrinsicsJacobian);
   if (dpC_dExtrinsic.size() == 0) {
@@ -1109,13 +1109,13 @@ bool HybridFilter::computeHxf(const uint64_t hpbid, const MapPoint& mp,
   factorJ_XBj << -rho * Eigen::Matrix3d::Identity(),
       okvis::kinematics::crossMx(pfinG - lP_T_WB.r() * rho),
       -rho * Eigen::Matrix3d::Identity() * featureTime.toSec();
-  J_XBj = pointJacobian3 * (T_WB.C() * T_SC0.C()).transpose() * factorJ_XBj;
+  J_XBj = pointJacobian3 * (T_WB.C() * T_BC0.C()).transpose() * factorJ_XBj;
 
   factorJ_XBa.topLeftCorner<3, 3>() = rho * Eigen::Matrix3d::Identity();
   factorJ_XBa.block<3, 3>(0, 3) =
-      -okvis::kinematics::crossMx(T_WBa.C() * (T_SC0 * ab1rho).head<3>());
+      -okvis::kinematics::crossMx(T_WBa.C() * (T_BC0 * ab1rho).head<3>());
   factorJ_XBa.block<3, 3>(0, 6) = Eigen::Matrix3d::Zero();
-  J_XBa = pointJacobian3 * (T_WB.C() * T_SC0.C()).transpose() * factorJ_XBa;
+  J_XBa = pointJacobian3 * (T_WB.C() * T_BC0.C()).transpose() * factorJ_XBa;
 
   H_x.resize(2, cameraParamPoseAndLandmarkMinimalDimen() - 3 * mInCovLmIds.size());
   H_x.setZero();
@@ -1168,11 +1168,11 @@ bool HybridFilter::featureJacobian(
   int extrinsicModelId = camera_rig_.getExtrinsicOptMode(camIdx);
   const double tdEstimate = camera_rig_.getImageDelay(camIdx);
   const double trEstimate = camera_rig_.getReadoutTime(camIdx);
-  const okvis::kinematics::Transformation T_SC0 = camera_rig_.getCameraExtrinsic(camIdx);
+  const okvis::kinematics::Transformation T_BC0 = camera_rig_.getCameraExtrinsic(camIdx);
 
   TriangulationStatus status =
       triangulateAMapPoint(mp, obsInPixel, frameIds, v4Xhomog, vSigmai,
-                           tempCameraGeometry, T_SC0);
+                           tempCameraGeometry, T_BC0);
 
   if (!status.triangulationOk) {
     computeHTimer.stop();
@@ -1205,7 +1205,7 @@ bool HybridFilter::featureJacobian(
       T_WBa;  // transform from the body frame at the anchor frame epoch to
               // the world frame
   get_T_WS(anchorId, T_WBa);
-  okvis::kinematics::Transformation T_GA = T_WBa * T_SC0;  // anchor frame to global frame
+  okvis::kinematics::Transformation T_GA = T_WBa * T_BC0;  // anchor frame to global frame
 
   ab1rho = T_GA.inverse() * v4Xhomog;
   if (ab1rho[2] < 0) {
@@ -1321,7 +1321,7 @@ bool HybridFilter::featureJacobian(
                                          interpolatedInertialData);
 
     okvis::kinematics::Transformation T_CA =
-        (T_WB * T_SC0).inverse() * T_GA;  // anchor frame to current camera frame
+        (T_WB * T_BC0).inverse() * T_GA;  // anchor frame to current camera frame
     Eigen::Vector3d pfiinC = (T_CA * ab1rho).head<3>();
 
     cameras::CameraBase::ProjectionStatus status = tempCameraGeometry->project(
@@ -1376,14 +1376,14 @@ bool HybridFilter::featureJacobian(
 
     double rho = ab1rho[3];
     okvis::kinematics::Transformation T_BcA = lP_T_WB.inverse() * T_GA;
-    J_td = pointJacobian3 * T_SC0.C().transpose() *
+    J_td = pointJacobian3 * T_BC0.C().transpose() *
            (okvis::kinematics::crossMx((T_BcA * ab1rho).head<3>()) *
                 interpolatedInertialData.measurement.gyroscopes -
             T_WB.C().transpose() * lP_sb.head<3>() * rho);
     J_tr = J_td * kpN;
     Eigen::MatrixXd dpC_dExtrinsic;
     Eigen::Matrix3d R_CfCa = T_CA.C();
-    ExtrinsicModel_dpC_dExtrinsic(extrinsicModelId, pfiinC, T_SC0.C().transpose(),
+    ExtrinsicModel_dpC_dExtrinsic(extrinsicModelId, pfiinC, T_BC0.C().transpose(),
                                   &dpC_dExtrinsic, &R_CfCa, &ab1rho);
     ProjectionOptKneadIntrinsicJacobian(projOptModelId, &intrinsicsJacobian);
     if (dpC_dExtrinsic.size() == 0) {
@@ -1400,13 +1400,13 @@ bool HybridFilter::featureJacobian(
     factorJ_XBj << -rho * Eigen::Matrix3d::Identity(),
         okvis::kinematics::crossMx(pfinG - lP_T_WB.r() * rho),
         -rho * Eigen::Matrix3d::Identity() * featureTime.toSec();
-    J_XBj = pointJacobian3 * (T_WB.C() * T_SC0.C()).transpose() * factorJ_XBj;
+    J_XBj = pointJacobian3 * (T_WB.C() * T_BC0.C()).transpose() * factorJ_XBj;
 
     factorJ_XBa.topLeftCorner<3, 3>() = rho * Eigen::Matrix3d::Identity();
     factorJ_XBa.block<3, 3>(0, 3) =
-        -okvis::kinematics::crossMx(T_WBa.C() * (T_SC0 * ab1rho).head<3>());
+        -okvis::kinematics::crossMx(T_WBa.C() * (T_BC0 * ab1rho).head<3>());
     factorJ_XBa.block<3, 3>(0, 6) = Eigen::Matrix3d::Zero();
-    J_XBa = pointJacobian3 * (T_WB.C() * T_SC0.C()).transpose() * factorJ_XBa;
+    J_XBa = pointJacobian3 * (T_WB.C() * T_BC0.C()).transpose() * factorJ_XBa;
 
     H_x.setZero();
     H_x.topLeftCorner(2, minCamParamDim) = J_Xc;
@@ -1583,13 +1583,13 @@ void HybridFilter::updateStates(
         std::static_pointer_cast<ceres::PoseParameterBlock>(
             mapPtr_->parameterBlockPtr(extrinsicId));
 
-    kinematics::Transformation T_SC0 = extrinsicParamBlockPtr->estimate();
-    Eigen::Vector3d t_SC;
-    Eigen::Quaterniond q_SC;
-    ExtrinsicModelUpdateState(extrinsicOptModelId, T_SC0.r(), T_SC0.q(),
+    kinematics::Transformation T_BC0 = extrinsicParamBlockPtr->estimate();
+    Eigen::Vector3d t_BC;
+    Eigen::Quaterniond q_BC;
+    ExtrinsicModelUpdateState(extrinsicOptModelId, T_BC0.r(), T_BC0.q(),
                               deltaX.segment(camParamIndex, minExtrinsicDim),
-                              &t_SC, &q_SC);
-    extrinsicParamBlockPtr->setEstimate(kinematics::Transformation(t_SC, q_SC));
+                              &t_BC, &q_BC);
+    extrinsicParamBlockPtr->setEstimate(kinematics::Transformation(t_BC, q_BC));
     camParamIndex += minExtrinsicDim;
   }
 
@@ -2001,7 +2001,7 @@ void HybridFilter::optimize(size_t /*numIter*/, size_t /*numThreads*/,
     vR_o.clear();
 
     const int camIdx = 0;
-    const okvis::kinematics::Transformation T_SC0 = camera_rig_.getCameraExtrinsic(camIdx);
+    const okvis::kinematics::Transformation T_BC0 = camera_rig_.getCameraExtrinsic(camIdx);
     size_t totalObsDim = 0;  // total dimensions of all features' observations
     const size_t numCamPoseStates =
         numCamPosePointStates - 3 * mInCovLmIds.size();
@@ -2050,7 +2050,7 @@ void HybridFilter::optimize(size_t /*numIter*/, size_t /*numThreads*/,
             T_GBa;  // transform from the body frame at the anchor frame epoch
                     // to the world frame
         get_T_WS(currFrameId, T_GBa);
-        okvis::kinematics::Transformation T_GA = T_GBa * T_SC0;  // anchor frame to global frame
+        okvis::kinematics::Transformation T_GA = T_GBa * T_BC0;  // anchor frame to global frame
 
         // update members of the map point
         pit->second.anchorStateId = currFrameId;
@@ -2330,7 +2330,7 @@ bool HybridFilter::hasLowDisparity(
     const std::vector<
         okvis::kinematics::Transformation,
         Eigen::aligned_allocator<okvis::kinematics::Transformation>>& T_WSs,
-    const kinematics::Transformation& T_SC0) const {
+    const kinematics::Transformation& T_BC0) const {
   Eigen::VectorXd intrinsics;
   camera_rig_.getCameraGeometry(0)->getIntrinsics(intrinsics);
   double focalLength = intrinsics[0];
@@ -2339,8 +2339,8 @@ bool HybridFilter::hasLowDisparity(
   double raySigma = fourthRoot2 * keypointAStdDev / focalLength;
   Eigen::Vector3d rayA_inA = obsDirections.front().normalized();
   Eigen::Vector3d rayB_inB = obsDirections.back().normalized();
-  Eigen::Vector3d rayB_inA = (T_WSs.front().C() * T_SC0.C()).transpose() *
-                             T_WSs.back().C() * T_SC0.C() * rayB_inB;
+  Eigen::Vector3d rayB_inA = (T_WSs.front().C() * T_BC0.C()).transpose() *
+                             T_WSs.back().C() * T_BC0.C() * rayB_inB;
   return okvis::triangulation::hasLowDisparity(rayA_inA, rayB_inB, rayB_inA,
                                                raySigma);
 }
@@ -2370,7 +2370,7 @@ TriangulationStatus HybridFilter::triangulateAMapPoint(
     std::vector<uint64_t>& frameIds, Eigen::Vector4d& v4Xhomog,
     std::vector<double>& imageNoiseStd,
     std::shared_ptr<const cameras::CameraBase> cameraGeometry,
-    const kinematics::Transformation& T_SC0, int anchorSeqId,
+    const kinematics::Transformation& T_BC0, int anchorSeqId,
     bool checkDisparity) const {
   triangulateTimer.start();
 
@@ -2396,7 +2396,7 @@ TriangulationStatus HybridFilter::triangulateAMapPoint(
 //      status.raysParallel = true;
 //      return false;
 //    }
-    if (hasLowDisparity(obsDirections, T_WSs, T_SC0)) {
+    if (hasLowDisparity(obsDirections, T_WSs, T_BC0)) {
       triangulateTimer.stop();
       status.raysParallel = true;
       return status;
@@ -2417,17 +2417,17 @@ TriangulationStatus HybridFilter::triangulateAMapPoint(
     if (anchorSeqId >= 0) {  // use AIDP
       // Ca will play the role of W
       okvis::kinematics::Transformation T_CaW =
-          (T_WSs.at(anchorSeqId) * T_SC0).inverse();
+          (T_WSs.at(anchorSeqId) * T_BC0).inverse();
       int joel = 0;
       for (auto T_WS : T_WSs) {
-        okvis::kinematics::Transformation T_WCi = T_WS * T_SC0;
+        okvis::kinematics::Transformation T_WCi = T_WS * T_BC0;
         cam_states[joel] = T_CaW * T_WCi;
         ++joel;
       }
     } else {
       int joel = 0;
       for (auto iter = T_WSs.begin(); iter != T_WSs.end(); ++iter, ++joel) {
-        cam_states[joel] = *iter * T_SC0;
+        cam_states[joel] = *iter * T_BC0;
       }
     }
     msckf_vio::Feature feature(measurements, cam_states);
@@ -2463,10 +2463,10 @@ bool HybridFilter::print(std::ostream& stream) const {
   std::shared_ptr<ceres::PoseParameterBlock> extrinsicParamBlockPtr =
       std::static_pointer_cast<ceres::PoseParameterBlock>(
           mapPtr_->parameterBlockPtr(extrinsicId));
-  kinematics::Transformation T_SC0 = extrinsicParamBlockPtr->estimate();
+  kinematics::Transformation T_BC0 = extrinsicParamBlockPtr->estimate();
   std::string extrinsicValues;
   ExtrinsicModelToParamsValueString(camera_rig_.getExtrinsicOptMode(camIdx),
-                                    T_SC0, " ", &extrinsicValues);
+                                    T_BC0, " ", &extrinsicValues);
   stream << " " << extrinsicValues;
 
   const int minProjectionDim = camera_rig_.getMinimalProjectionDimen(camIdx);
@@ -2787,11 +2787,11 @@ bool HybridFilter::EpipolarMeasurement::measurementJacobian(
   }
 
   // compute residual
-  okvis::kinematics::Transformation T_SC0 = filter_.camera_rig_.getCameraExtrinsic(camIdx_);
+  okvis::kinematics::Transformation T_BC0 = filter_.camera_rig_.getCameraExtrinsic(camIdx_);
   okvis::kinematics::Transformation T_Ctij_Ctik =
-      (T_WBtij[0] * T_SC0).inverse() * (T_WBtij[1] * T_SC0);
+      (T_WBtij[0] * T_BC0).inverse() * (T_WBtij[1] * T_BC0);
   okvis::kinematics::Transformation lP_T_Ctij_Ctik =
-      (lP_T_WBtij[0] * T_SC0).inverse() * (lP_T_WBtij[1] * T_SC0);
+      (lP_T_WBtij[0] * T_BC0).inverse() * (lP_T_WBtij[1] * T_BC0);
   EpipolarJacobian epj(T_Ctij_Ctik.C(), T_Ctij_Ctik.r(), obsDirection2[0],
                        obsDirection2[1]);
   *residual = -epj.evaluate();  // observation is 0
@@ -2805,7 +2805,7 @@ bool HybridFilter::EpipolarMeasurement::measurementJacobian(
   Eigen::Matrix<double, 1, 3> de_dtheta_Ctij_Ctik, de_dt_Ctij_Ctik;
   epj_lp.de_dtheta_CjCk(&de_dtheta_Ctij_Ctik);
   epj_lp.de_dt_CjCk(&de_dt_Ctij_Ctik);
-  RelativeMotionJacobian rmj_lp(T_SC0, lP_T_WBtij[0], lP_T_WBtij[1]);
+  RelativeMotionJacobian rmj_lp(T_BC0, lP_T_WBtij[0], lP_T_WBtij[1]);
   Eigen::Matrix<double, 3, 3> dtheta_dtheta_BC;
   Eigen::Matrix<double, 3, 3> dp_dtheta_BC;
   Eigen::Matrix<double, 3, 3> dp_dt_BC;
@@ -2813,7 +2813,7 @@ bool HybridFilter::EpipolarMeasurement::measurementJacobian(
 
   Eigen::Matrix<double, 1, Eigen::Dynamic> de_dExtrinsic;
   switch (extrinsicModelId_) {
-    case Extrinsic_p_SC_q_SC::kModelId:
+    case Extrinsic_p_BC_q_BC::kModelId:
       rmj_lp.dtheta_dtheta_BC(&dtheta_dtheta_BC);
       rmj_lp.dp_dtheta_BC(&dp_dtheta_BC);
       rmj_lp.dp_dt_BC(&dp_dt_BC);
@@ -2822,7 +2822,7 @@ bool HybridFilter::EpipolarMeasurement::measurementJacobian(
       de_dExtrinsic.tail<3>() = de_dt_Ctij_Ctik * dp_dtheta_BC +
                                 de_dtheta_Ctij_Ctik * dtheta_dtheta_BC;
       break;
-    case Extrinsic_p_CS::kModelId:
+    case Extrinsic_p_CB::kModelId:
       rmj_lp.dp_dt_CB(&dp_dt_CB);
       de_dExtrinsic = de_dt_Ctij_Ctik * dp_dt_CB;
       break;

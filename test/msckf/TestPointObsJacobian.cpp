@@ -74,7 +74,7 @@ void computeFeatureMeasJacobian(
       new okvis::kinematics::Transformation(matT_SC0));
 
   cameraSystem->addCamera(
-      T_SC_0, tempCameraGeometry, distortionId, "FXY_CXY", "P_CS");
+      T_SC_0, tempCameraGeometry, distortionId, "FXY_CXY", "P_CB");
 
   // add sensors
   // some parameters on how to do the online estimation:

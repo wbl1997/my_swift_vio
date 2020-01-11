@@ -566,15 +566,15 @@ void Publisher::csvSaveFullStateWithExtrinsicsAsCallback(
                 << FLAGS_datafile_separator << speedAndBiases[7]
                 << FLAGS_datafile_separator << speedAndBiases[8];
       for (size_t i = 0; i < extrinsics.size(); ++i) {
-        Eigen::Vector3d p_SCi = extrinsics[i].r();
-        Eigen::Quaterniond q_SCi = extrinsics[i].q();
-        *csvFile_ << FLAGS_datafile_separator << p_SCi[0]
-                  << FLAGS_datafile_separator << p_SCi[1]
-                  << FLAGS_datafile_separator << p_SCi[2]
-                  << FLAGS_datafile_separator << q_SCi.x()
-                  << FLAGS_datafile_separator << q_SCi.y()
-                  << FLAGS_datafile_separator << q_SCi.z()
-                  << FLAGS_datafile_separator << q_SCi.w();
+        Eigen::Vector3d p_BCi = extrinsics[i].r();
+        Eigen::Quaterniond q_BCi = extrinsics[i].q();
+        *csvFile_ << FLAGS_datafile_separator << p_BCi[0]
+                  << FLAGS_datafile_separator << p_BCi[1]
+                  << FLAGS_datafile_separator << p_BCi[2]
+                  << FLAGS_datafile_separator << q_BCi.x()
+                  << FLAGS_datafile_separator << q_BCi.y()
+                  << FLAGS_datafile_separator << q_BCi.z()
+                  << FLAGS_datafile_separator << q_BCi.w();
       }
 
       *csvFile_ << std::endl;
@@ -625,9 +625,9 @@ void Publisher::csvSaveFullStateWithAllCalibrationAsCallback(
 
       for (size_t i = 0; i < extrinsics.size(); ++i) {
         int n = extrinsics[i].size();
-        const Eigen::VectorXd& T_SC_coeffs = extrinsics[i];
+        const Eigen::VectorXd& T_BC_coeffs = extrinsics[i];
         for (int jack = 0; jack < n; ++jack) {
-          *csvFile_ << FLAGS_datafile_separator << T_SC_coeffs[jack];
+          *csvFile_ << FLAGS_datafile_separator << T_BC_coeffs[jack];
         }
       }
 

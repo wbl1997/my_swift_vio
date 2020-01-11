@@ -99,7 +99,7 @@ void setupPoseOptProblem(bool perturbPose, bool rollingShutter,
   }
 
   std::string projOptModelName = "FXY_CXY";
-  std::string extrinsicOptModelName = "P_SC_Q_SC";
+  std::string extrinsicOptModelName = "P_BC_Q_BC";
 
   int projOptModelId = okvis::ProjectionOptNameToId(projOptModelName);
 
@@ -195,7 +195,7 @@ void setupPoseOptProblem(bool perturbPose, bool rollingShutter,
     ::ceres::CostFunction* cost_function(
         new okvis::ceres::RsReprojectionError<DistortedPinholeCameraGeometry,
                                               okvis::ProjectionOptFXY_CXY,
-                                              okvis::Extrinsic_p_SC_q_SC>(
+                                              okvis::Extrinsic_p_BC_q_BC>(
             cameraGeometry, frameId, kp, information, imuMeasDeque, T_SC,
             stateEpoch, tdAtCreation, gravity));
     allCostFunctions.emplace_back(cost_function);
@@ -297,10 +297,10 @@ void setupPoseOptProblem(bool perturbPose, bool rollingShutter,
 
     okvis::ceres::RsReprojectionError<DistortedPinholeCameraGeometry,
                                       okvis::ProjectionOptFXY_CXY,
-                                      okvis::Extrinsic_p_SC_q_SC>* costFuncPtr =
+                                      okvis::Extrinsic_p_BC_q_BC>* costFuncPtr =
         static_cast<okvis::ceres::RsReprojectionError<
             DistortedPinholeCameraGeometry, okvis::ProjectionOptFXY_CXY,
-            okvis::Extrinsic_p_SC_q_SC>*>(cost_function);
+            okvis::Extrinsic_p_BC_q_BC>*>(cost_function);
 
     costFuncPtr->EvaluateWithMinimalJacobians(parameters, residuals.data(),
                                               jacobians, jacobiansMinimal);

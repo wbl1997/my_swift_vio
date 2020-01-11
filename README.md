@@ -215,14 +215,14 @@ Remark: set sigma_{param} to zero to disable estimating "param" in filtering met
 
 | Configuration parameters | Description | Default |
 |---|---|---|
-| extrinsic_opt_mode | For MSCKF and TF_VIO. "P_CS", estimate camera extrinsic translation, used with IMU TgTsTa 27 dim model [2]; "P_SC_R_SC", estimate camera extrinsics, used with say IMU BgBa model; "", fixed camera extrinsics | "" |
+| extrinsic_opt_mode | For MSCKF and TF_VIO. "P_CB", estimate camera extrinsic translation, used with IMU TgTsTa 27 dim model [2]; "P_BC_R_BC", estimate camera extrinsics, used with say IMU BgBa model; "", fixed camera extrinsics | "" |
 | projection_opt_mode | For MSCKF and TF_VIO. "FXY_CXY", estimate fx fy cx cy; "FX_CXY", estimate fx=fy, cx, cy; "FX", estimate fx=fy; "", camera projection intrinsic parameters are fixed | "" |
 | down_scale | divide up the configured image width, image height, fx, fy, cx, cy by this divisor | 1 |
 | distortion_type | "radialtangential", "equidistant", "radialtangential8", "fov" | REQUIRED |
 | camera_rate | For processing data loaded from a video and an IMU csv, it determines the play speed. For debug mode, half of the normal camera rate is recommended, e.g., 15 Hz | 30 for Release, 15 for Debug |
 | image_readout_time | time to read out an entire frame, i.e., the rolling shutter skew. 0 for global shutter, ~0.030 for rolling shutter | 0 |
 | sigma_absolute_translation | The standard deviation [m] of the camera extrinsics translation. With OKVIS, e.g. 1.0e-10 for online-calib; With MSCKF or TF_VIO, 5e-2 for online extrinsic translation calib, 0 to fix the translation. |  0 |
-| sigma_absolute_orientation | The standard deviation [rad] of the camera extrinsics orientation. With OKVIS, e.g. 1.0e-3 for online-calib; With MSCKF or TF_VIO and extrinsic_opt_mode is "P_SC_R_SC", 5e-2 for online extrinsic orientation calib, 0 to fix the extrinsic orientation | 0 |
+| sigma_absolute_orientation | The standard deviation [rad] of the camera extrinsics orientation. With OKVIS, e.g. 1.0e-3 for online-calib; With MSCKF or TF_VIO and extrinsic_opt_mode is "P_BC_R_BC", 5e-2 for online extrinsic orientation calib, 0 to fix the extrinsic orientation | 0 |
 | sigma_c_relative_translation | For OKVIS only, the std. dev. [m] of the cam. extr. transl. change between frames, e.g. 1.0e-6 for adaptive online calib (not less for numerics) | 0 |
 | sigma_c_relative_orientation | For OKVIS only, the std. dev. [rad] of the cam. extr. orient. change between frames, e.g. 1.0e-6 for adaptive online calib (not less for numerics) | 0 |
 | timestamp_tolerance | stereo frame out-of-sync tolerance [s] | 0.2/camera_rate, e.g., 0.005 |

@@ -54,7 +54,7 @@ TEST(CeresErrorTerms, EpipolarFactor) {
 
   // create camera geometry
   std::string projOptModelName = "FXY_CXY";
-  std::string extrinsicModelName = "P_CS";
+  std::string extrinsicModelName = "P_CB";
   int cameraOrientation = 0;
   simul::CameraSystemCreator csc(cameraOrientation, projOptModelName,
                                  extrinsicModelName);
@@ -142,7 +142,7 @@ TEST(CeresErrorTerms, EpipolarFactor) {
 
     ::ceres::CostFunction* epiFactor =
         new okvis::ceres::EpipolarFactor<DistortedPinholeCameraGeometry,
-                                         okvis::Extrinsic_p_SC_q_SC,
+                                         okvis::Extrinsic_p_BC_q_BC,
                                          okvis::ProjectionOptFXY_CXY>(
             cameraGeometryArg, j + 100, measurement12, covariance12,
             imuMeasCanopy, T_SC, twoTimes, tdAtCreation2, sb2, imuParameters.g);
@@ -212,10 +212,10 @@ TEST(CeresErrorTerms, EpipolarFactor) {
                                   de_dtd.data()};
 
     okvis::ceres::EpipolarFactor<DistortedPinholeCameraGeometry,
-                                 okvis::Extrinsic_p_SC_q_SC,
+                                 okvis::Extrinsic_p_BC_q_BC,
                                  okvis::ProjectionOptFXY_CXY>* costFuncPtr =
         static_cast<okvis::ceres::EpipolarFactor<DistortedPinholeCameraGeometry,
-                                                 okvis::Extrinsic_p_SC_q_SC,
+                                                 okvis::Extrinsic_p_BC_q_BC,
                                                  okvis::ProjectionOptFXY_CXY>*>(
             epiFactor);
     costFuncPtr->EvaluateWithMinimalJacobians(parameters, &residual, jacobians,
