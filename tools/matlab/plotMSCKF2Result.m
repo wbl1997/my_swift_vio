@@ -11,13 +11,13 @@ if ~exist('export_fig_path','var')
     export_fig_path = input('path of export_fig:', 's');
 end
 if isempty(export_fig_path)
-    export_fig_path = '/media/jhuai/Seagate/jhuai/export_fig/';
+    export_fig_path = '/media/jhuai/Seagate/jhuai/tools/export_fig/';
 end
 if ~exist('voicebox_path','var')
     voicebox_path = input('path of voicebox:', 's');
 end
 if isempty(voicebox_path)
-    voicebox_path = '/media/jhuai/Seagate/jhuai/doctoral_work/ekfmonoslam/voicebox';
+    voicebox_path = '/media/jhuai/Seagate/jhuai/tools/voicebox/';
 end
 addpath(export_fig_path);
 addpath(voicebox_path);
