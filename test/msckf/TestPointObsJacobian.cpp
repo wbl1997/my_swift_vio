@@ -38,7 +38,11 @@ okvis::ImuMeasurementDeque createImuMeasurements(okvis::Time t0) {
   return imuMeasurements;
 }
 
-void computeFeatureMeasJacobian(okvis::cameras::NCameraSystem::DistortionType distortionId) {
+void computeFeatureMeasJacobian(
+    okvis::cameras::NCameraSystem::DistortionType distortionId,
+    const Eigen::Vector2d& expectedObservation,
+    const Eigen::Matrix<double, 2, 3>& expectedJpoint,
+    const Eigen::MatrixXd& expectedJstates) {
   double imageDelay = 0.0;
   double trNoisy = 0.033;
   std::shared_ptr<okvis::ceres::Map> mapPtr(new okvis::ceres::Map);
@@ -51,13 +55,15 @@ void computeFeatureMeasJacobian(okvis::cameras::NCameraSystem::DistortionType di
   if (distortionId == okvis::cameras::NCameraSystem::DistortionType::FOV) {
     tempCameraGeometry.reset(
         new okvis::cameras::PinholeCamera<okvis::cameras::FovDistortion>(
-            752, 480, 350, 360, 378, 238, okvis::cameras::FovDistortion(0.9), imageDelay, trNoisy));
+            752, 480, 350, 360, 378, 238, okvis::cameras::FovDistortion(0.9),
+            imageDelay, trNoisy));
   } else if (distortionId ==
              okvis::cameras::NCameraSystem::DistortionType::RadialTangential) {
     tempCameraGeometry.reset(new okvis::cameras::PinholeCamera<
                              okvis::cameras::RadialTangentialDistortion>(
-        752, 480, 350, 360, 378, 238,
-        okvis::cameras::RadialTangentialDistortion(0.10, 0.00, 0.000, 0.000), imageDelay, trNoisy));
+                             752, 480, 350, 360, 378, 238,
+                             okvis::cameras::RadialTangentialDistortion(0.10, 0.00, 0.000, 0.000),
+                             imageDelay, trNoisy));
   }
 
   std::shared_ptr<okvis::cameras::NCameraSystem> cameraSystem(
@@ -161,31 +167,37 @@ void computeFeatureMeasJacobian(okvis::cameras::NCameraSystem::DistortionType di
   Eigen::Vector2d residual;
 
   Eigen::Vector4d ab1rho;
-  ab1rho << 0.2, -0.3, 1, 1.0;
-
-  Eigen::Vector2d obs(100, -150);
+  ab1rho << 0.4, 0.3, 1.0, 0.3;
 
   uint64_t poseId = estimator.oldestFrameId();
   const int camIdx = 0;
-  uint64_t anchorId = estimator.currentFrameId();
+  uint64_t anchorId = estimator.frameIdByAge(1);
   std::cout << "poseId " << poseId << " anchorId " << anchorId << std::endl;
   okvis::kinematics::Transformation T_WBa(Eigen::Vector3d(0, 0, 1),
                                           Eigen::Quaterniond(1, 0, 0, 0));
   bool result = estimator.measurementJacobianAIDP(
-      ab1rho, tempCameraGeometry, obs, poseId, camIdx, anchorId, T_WBa, &H_x,
+      ab1rho, tempCameraGeometry, expectedObservation, poseId, camIdx, anchorId, T_WBa, &H_x,
       &J_pfi, &residual);
-  std::cout << "H_x\n" << H_x << std::endl;
-  std::cout << "J_pfi\n" << J_pfi << std::endl;
-  std::cout << "residual\n" << residual << std::endl;
+//  std::cout << "H_x\n" << H_x << std::endl;
+  EXPECT_TRUE(J_pfi.isApprox(expectedJpoint, 1e-6));
+  EXPECT_TRUE(residual.isMuchSmallerThan(1.0, 1e-4));
   EXPECT_TRUE(result);
 }
 
-
 TEST(MSCKF2, MeasurementJacobian) {
-    computeFeatureMeasJacobian(okvis::cameras::NCameraSystem::DistortionType::RadialTangential);
-    try {
-      computeFeatureMeasJacobian(okvis::cameras::NCameraSystem::DistortionType::FOV);
-    } catch (...) {
-      std::cout << "Error occurred!\n";
-    }
+  Eigen::Vector2d expectedObservation(360.4815, 238.0);
+  Eigen::Matrix<double, 2, 3> expectedJpoint;
+  expectedJpoint << 350.258, 9.93345e-11, -525.386, 1.02593e-10, 360.084, -360.084;
+  Eigen::MatrixXd expectedJstates;
+  computeFeatureMeasJacobian(okvis::cameras::NCameraSystem::DistortionType::RadialTangential,
+                             expectedObservation, expectedJpoint, expectedJstates);
+  try {
+    expectedObservation = Eigen::Vector2d(359.214, 238.0);
+    expectedJpoint << 374.828, -3.30823e-10, -562.241,
+                      -3.39825e-10, 386.137, -386.137;
+    computeFeatureMeasJacobian(okvis::cameras::NCameraSystem::DistortionType::FOV,
+                               expectedObservation, expectedJpoint, expectedJstates);
+  } catch (...) {
+    std::cout << "Error occurred!\n";
+  }
 }

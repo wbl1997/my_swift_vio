@@ -69,7 +69,22 @@ class MSCKF2 : public HybridFilter {
 
   virtual void optimize(size_t numIter, size_t numThreads = 1,
                         bool verbose = false) final;
-
+  /**
+   * @brief measurementJacobianAIDP
+   * @warning Both poseId and anchorId are older than the latest frame Id.
+   * @param ab1rho
+   * @param tempCameraGeometry
+   * @param obs
+   * @param poseId
+   * @param camIdx
+   * @param anchorId
+   * @param T_WBa
+   * @param H_x Jacobians of the image observation relative to the camera parameters and cloned states.
+   *     It ought to be allocated in advance.
+   * @param J_pfi Jacobian of the image observation relative to [\alpha, \beta, \rho].
+   * @param residual
+   * @return
+   */
   bool measurementJacobianAIDP(
       const Eigen::Vector4d& ab1rho,
       std::shared_ptr<const okvis::cameras::CameraBase> tempCameraGeometry,
