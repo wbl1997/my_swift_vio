@@ -168,7 +168,7 @@ TEST(TriangulateFastVsDlt, FarPoints) {
 
     EXPECT_LT((v4Xhomog2 - v4Xhomog).head<3>().norm(), 2e-4);
     EXPECT_TRUE(isValid);
-    if (jack >= 1) {
+    if (jack >= 2) {
       EXPECT_TRUE(isParallel);
     } else {
       EXPECT_FALSE(isParallel);

@@ -73,20 +73,13 @@ TEST(TriangulateRobustLM, TwoView) {
     simul::SimulationTwoView s2v(0);
     msckf_vio::Feature feature_object(s2v.obsDirectionsZ1(), s2v.camStates());
     feature_object.initializePosition();
-    Eigen::Vector4d pointEstimate = s2v.truePoint();
-    for (size_t j = 0; j < s2v.numObservations(); ++j) {
-      Eigen::Vector4d pinC = s2v.T_CW(j) * pointEstimate;
-      pinC /= pinC[2];
-    }
+    Eigen::Vector4d truePoint = s2v.truePoint();
+
+    Eigen::Vector4d pointEstimate;
     pointEstimate.head<3>() = feature_object.position;
     pointEstimate[3] = 1.0;
-    for (size_t j = 0; j < s2v.numObservations(); ++j) {
-      Eigen::Vector4d pinC = s2v.T_CW(j) * pointEstimate;
-      pinC /= pinC[2];
-    }
-
-    EXPECT_LT((feature_object.position - s2v.truePoint().head<3>()).norm(),
-              0.02);
+    EXPECT_TRUE((feature_object.position / feature_object.position[2]).isApprox(
+          truePoint.head<3>() / truePoint[2], 5e-3));
   }
   {
     simul::SimulationThreeView snv;
@@ -150,8 +143,13 @@ TEST(TriangulateRobustLM, FarPoints) {
 
     msckf_vio::Feature feature_object(stv.obsDirectionsZ1(), stv.camStates());
     feature_object.initializePosition();
-
-    EXPECT_LT((feature_object.position - stv.truePoint().head<3>()).norm() / dist,
-              1e-4);
+    if (dist < 1000) {
+      EXPECT_LT((feature_object.position - stv.truePoint().head<3>()).norm() / dist,
+                1e-4);
+    } else {
+      EXPECT_LT((feature_object.position / feature_object.position[2] -
+                stv.truePoint().head<3>() / stv.truePoint()[2]).norm(),
+                1e-4);
+    }
   }
 }
