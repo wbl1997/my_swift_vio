@@ -103,8 +103,8 @@ TEST(CeresErrorTerms, EpipolarFactor) {
   }
   LOG(INFO) << "Found " << numValidPoint << " visible in both views out of "
             << attempts << " tries.";
-  std::shared_ptr<const DistortedPinholeCameraGeometry> cameraGeometryArg =
-      std::static_pointer_cast<const DistortedPinholeCameraGeometry>(
+  std::shared_ptr<DistortedPinholeCameraGeometry> cameraGeometryArg =
+      std::static_pointer_cast<DistortedPinholeCameraGeometry>(
           cameraGeometry0);
   // create epipolar constraints from two view measurements and imu meas
   for (int j = 0; j < numValidPoint; ++j) {
