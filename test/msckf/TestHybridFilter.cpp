@@ -59,21 +59,18 @@ DEFINE_bool(
     "bias, imu misalignment matrices, extrinsic parameters, camera projection "
     "and distortion intrinsic parameters, td, tr");
 
-DEFINE_bool(
-    zero_camera_intrinsic_param_noise, false,
-    "set the noise of camera intrinsic parameters (including projection and "
-    "distortion and time offset and readout time) to zeros in order to fix "
-    "camera intrinsic parameters");
-
-DEFINE_bool(
-    zero_imu_intrinsic_param_noise, false,
-    "set the noise of IMU intrinsic parameters (including misalignment shape "
-    "matrices) to zeros in order to fix IMU intrinsic parameters");
-
 DECLARE_bool(use_mahalanobis);
 DECLARE_int32(estimator_algorithm);
 DECLARE_bool(msckf_use_epipolar_constraint);
 
+/**
+ * @brief initCameraNoiseParams
+ * @param cameraNoiseParams
+ * @param sigma_abs_position
+ * @param fixCameraInteranlParams If true, set the noise of camera intrinsic
+ *     parameters (including projection and distortion and time offset and
+ *     readout time) to zeros in order to fix camera intrinsic parameters in estimator.
+ */
 void initCameraNoiseParams(
     okvis::ExtrinsicsEstimationParameters* cameraNoiseParams,
     double sigma_abs_position, bool fixCameraInteranlParams) {
@@ -450,7 +447,7 @@ void testHybridFilterSinusoid(const std::string& outputPath,
     filterTimer.start();
 
     srand((unsigned int)time(0)); // comment out to make tests deterministic
-    imu::TestSetting cases[] = {imu::TestSetting(true, FLAGS_add_prior_noise, true, true)};
+    imu::TestSetting cases[] = {imu::TestSetting(true, FLAGS_add_prior_noise, false, true, true)};
     size_t c = 0;
     LOG(INFO) << "Run " << run << " " << cases[c].print() << " algo " << estimatorLabel;
 
@@ -480,17 +477,20 @@ void testHybridFilterSinusoid(const std::string& outputPath,
     double pCB_std = 2e-2;
     double ba_std = 2e-2;
     double Ta_std = 5e-3;
-
+    bool zeroCameraIntrinsicParamNoise = !cases[c].addSystemError;
+    bool zeroImuIntrinsicParamNoise = !cases[c].addSystemError;
     okvis::ExtrinsicsEstimationParameters extrinsicsEstimationParameters;
     initCameraNoiseParams(&extrinsicsEstimationParameters, pCB_std,
-                          FLAGS_zero_camera_intrinsic_param_noise);
+                          zeroCameraIntrinsicParamNoise);
 
     okvis::ImuParameters imuParameters;
-    imu::initImuNoiseParams(&imuParameters, cases[c].addPriorNoise, 5e-3,
+    imu::initImuNoiseParams(&imuParameters, cases[c].addPriorNoise,
+                            cases[c].addSystemError,
+                            5e-3,
                             ba_std, Ta_std,
-                            FLAGS_zero_imu_intrinsic_param_noise);
+                            zeroImuIntrinsicParamNoise);
 
-    okvis::InitialPVandStd pvstd;
+    okvis::InitialNavState pvstd;
     pvstd.std_p_WS = Eigen::Vector3d(1e-8, 1e-8, 1e-8);
     pvstd.std_q_WS = Eigen::Vector3d(1e-8, 1e-8, 1e-8);
     pvstd.std_v_WS = Eigen::Vector3d(5e-2, 5e-2, 5e-2);
@@ -570,7 +570,7 @@ void testHybridFilterSinusoid(const std::string& outputPath,
     // camera system used for initilizing the estimator
     std::shared_ptr<okvis::cameras::CameraBase> cameraGeometry2;
     std::shared_ptr<okvis::cameras::NCameraSystem> cameraSystem2;
-    if (cases[c].addPriorNoise) {
+    if (cases[c].addSystemError) {
       csc.createNoisyCameraSystem(&cameraGeometry2, &cameraSystem2,
                                   extrinsicsEstimationParameters);
     } else {
@@ -668,16 +668,17 @@ void testHybridFilterSinusoid(const std::string& outputPath,
               cst->computeGlobalPose(*iter);
           Eigen::Vector3d p_WS = truePose.r();
           Eigen::Vector3d v_WS = cst->computeGlobalLinearVelocity(*iter);
+          if (cases[c].addPriorNoise) {
+            //                p_WS += 0.1*Eigen::Vector3d::Random();
+            v_WS += vio::Sample::gaussian(1, 3).cwiseProduct(pvstd.std_v_WS);
+          }
+
           pvstd.initWithExternalSource_ = true;
           pvstd.p_WS = p_WS;
           pvstd.q_WS = truePose.q();
           pvstd.v_WS = v_WS;
 
-          if (cases[c].addPriorNoise) {
-            //                p_WS += 0.1*Eigen::Vector3d::Random();
-            v_WS += vio::Sample::gaussian(1, 3).cwiseProduct(pvstd.std_v_WS);
-          }
-          estimator->resetInitialPVandStd(pvstd);
+          estimator->resetInitialNavState(pvstd);
           estimator->addStates(mf, imuSegment, asKeyframe);
           if (isFilteringMethod(FLAGS_estimator_algorithm)) {
             const int kDistortionCoeffDim =
@@ -785,7 +786,9 @@ void testHybridFilterSinusoid(const std::string& outputPath,
       LOG(INFO) << "Run and last added frame " << run << " " << frameCount << " "
                 << e.what();
       // revert the accumulated errors and delete the corresponding file
-      if (debugStream.is_open()) debugStream.close();
+      if (debugStream.is_open()) {
+          debugStream.close();
+      }
 //      unlink(outputFile.c_str());
     }
     double elapsedTime = filterTimer.stop();

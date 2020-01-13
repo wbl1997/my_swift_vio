@@ -134,7 +134,7 @@ void computeFeatureMeasJacobian(
   R_WS << 1, 0, 0, 0, 1, 0, 0, 0, 1;
   Eigen::Quaterniond q_WS = Eigen::Quaterniond(R_WS);
 
-  okvis::InitialPVandStd pvstd;
+  okvis::InitialNavState pvstd;
   pvstd.initWithExternalSource_ = true;
   pvstd.p_WS = p_WS;
   pvstd.q_WS = Eigen::Quaterniond(q_WS);
@@ -142,7 +142,7 @@ void computeFeatureMeasJacobian(
   pvstd.std_p_WS = Eigen::Vector3d(1e-2, 1e-2, 1e-2);
   pvstd.std_v_WS = Eigen::Vector3d(1e-1, 1e-1, 1e-1);
   pvstd.std_q_WS = Eigen::Vector3d(5e-2, 5e-2, 5e-2);
-  estimator.resetInitialPVandStd(pvstd);
+  estimator.resetInitialNavState(pvstd);
 
   for (int k = 0; k < 3; ++k) {
     okvis::Time currentKFTime = t0 + okvis::Duration(0.5 * k + 0.5);

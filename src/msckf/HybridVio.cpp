@@ -89,8 +89,8 @@ HybridVio::HybridVio(okvis::VioParameters &parameters)
       estimator_.reset(new okvis::HybridFilter());
       break;
   }
-  estimator_->resetInitialPVandStd(
-      InitialPVandStd(parameters.initialState));
+  estimator_->resetInitialNavState(
+      InitialNavState(parameters.initialState));
   msckf_vio::Feature::optimization_config.translation_threshold =
       parameters.optimization.triangulationTranslationThreshold;
   msckf_vio::Feature::optimization_config.max_depth =

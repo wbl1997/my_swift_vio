@@ -15,8 +15,6 @@
 #include <okvis/ceres/PoseParameterBlock.hpp>
 #include <okvis/ceres/SpeedAndBiasParameterBlock.hpp>
 
-DECLARE_bool(zero_imu_intrinsic_param_noise);
-
 TEST(CeresErrorTerms, EpipolarFactor) {
   typedef okvis::cameras::PinholeCamera<
       okvis::cameras::RadialTangentialDistortion>
@@ -25,14 +23,15 @@ TEST(CeresErrorTerms, EpipolarFactor) {
   bool rollingShutter = true;
   // create two view geometry poses, imu meas, from a simulation trajectory
   bool addPriorNoise = false;
+  bool addSystemError = false;
   double bg_std = 5e-3;
   double ba_std = 2e-2;
   double Ta_std = 5e-3;
   double sigma_td = 5e-3;
-
+  bool zeroImuIntrinsicParamNoise = !addSystemError;
   okvis::ImuParameters imuParameters;
-  imu::initImuNoiseParams(&imuParameters, addPriorNoise, bg_std, ba_std, Ta_std,
-                          FLAGS_zero_imu_intrinsic_param_noise);
+  imu::initImuNoiseParams(&imuParameters, addPriorNoise, addSystemError,
+                          bg_std, ba_std, Ta_std, zeroImuIntrinsicParamNoise);
 
   std::shared_ptr<imu::CircularSinusoidalTrajectory> cst;
   cst.reset(new imu::RoundedSquare(imuParameters.rate,

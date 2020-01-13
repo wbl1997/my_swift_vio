@@ -310,21 +310,27 @@ public:
 Eigen::Matrix2d rotMat2d(double theta);
 
 struct TestSetting {
-  bool addImuNoise;
-  bool addPriorNoise;
-  bool addImageNoise;
-  bool useImageObservs;
+  bool addImuNoise; ///< add noise to IMU readings?
+  bool addPriorNoise; ///< add noise to the prior position, quaternion, velocity, bias in gyro, bias in accelerometer?
+  bool addSystemError; ///< add system error to IMU on scale and misalignment and g-sensitivity and to camera on projection and distortion parameters?
+  bool addImageNoise; ///< add noise to image measurements in pixels?
+  bool useImageObservs; ///< use image observations in an estimator?
   TestSetting(bool _addImuNoise = true, bool _addPriorNoise = true,
+              bool _addSystemError = false,
               bool _addImageNoise = true, bool _useImageObservs = true)
       : addImuNoise(_addImuNoise),
         addPriorNoise(_addPriorNoise),
+        addSystemError(_addSystemError),
         addImageNoise(_addImageNoise),
         useImageObservs(_useImageObservs) {}
   std::string print() {
-    return "addImuNoise " + std::to_string((int)addImuNoise) +
-           " addPriorNoise " + std::to_string((int)addPriorNoise) +
-           " addImageNoise " + std::to_string((int)addImageNoise) +
-           " useImageObservs " + std::to_string((int)useImageObservs);
+    std::stringstream ss;
+    ss << "addImuNoise " << addImuNoise <<
+          " addPriorNoise " << addPriorNoise <<
+          " addSystemError " << addSystemError <<
+          " addImageNoise " << addImageNoise <<
+          " useImageObservs " << useImageObservs;
+    return ss.str();
   }
 };
 
@@ -332,11 +338,17 @@ struct TestSetting {
  * @brief initImuNoiseParams
  * @param imuParameters
  * @param addPriorNoise
+ * @param addSystemError
  * @param sigma_bg std dev of initial gyroscope bias.
  * @param sigma_ba std dev of initial accelerometer bias.
+ * @param std_Ta_elem
+ * @param fixImuInternalParams If true, set the noise of IMU intrinsic
+ *     parameters (including misalignment shape matrices) to zeros in order
+ *     to fix IMU intrinsic parameters in estimator.
  */
 void initImuNoiseParams(
     okvis::ImuParameters* imuParameters, bool addPriorNoise,
+    bool addSystemError,
     double sigma_bg, double sigma_ba, double std_Ta_elem,
     bool fixImuInternalParams);
 
