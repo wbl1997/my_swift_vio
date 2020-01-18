@@ -304,7 +304,7 @@ void setupPoseOptProblem(bool perturbPose, bool rollingShutter,
 
     costFuncPtr->EvaluateWithMinimalJacobians(parameters, residuals.data(),
                                               jacobians, jacobiansMinimal);
-    costFuncPtr->EvaluateWithMinimalJacobiansAutoDiff(
+    costFuncPtr->EvaluateWithMinimalJacobiansGlobalAutoDiff(
         parameters, residuals_auto.data(), jacobiansAD, jacobiansMinimalAD);
 
     if (i % 20 == 0) {

@@ -692,35 +692,150 @@ bool MSCKF2::featureJacobian(
       camera_rig_.getDistortionType(camIdx);
   int projOptModelId = camera_rig_.getProjectionOptMode(camIdx);
   int extrinsicModelId = camera_rig_.getExtrinsicOptMode(camIdx);
+  int imuModelId = imu_rig_.getModelId(0);
   std::shared_ptr<okvis::ceres::ErrorInterface> observationError;
+
+#ifndef POINT_LANDMARK_MODEL_CHAIN_CASE
+#define POINT_LANDMARK_MODEL_CHAIN_CASE(                                     \
+    CameraObservationModel, ImuModel, ExtrinsicModel, CameraGeometry,        \
+    ProjectionIntrinsicModel, PointLandmarkModel)                            \
+  case PointLandmarkModel::kModelId:                                         \
+    observationError.reset(new okvis::ceres::CameraObservationModel<         \
+                           CameraGeometry, ProjectionIntrinsicModel,         \
+                           ExtrinsicModel, PointLandmarkModel, ImuModel>()); \
+    break;
+#endif
+
+#ifndef PROJECTION_INTRINSIC_MODEL_CHAIN_CASE
+#define PROJECTION_INTRINSIC_MODEL_CHAIN_CASE(                               \
+    CameraObservationModel, ImuModel, ExtrinsicModel, CameraGeometry,        \
+    ProjectionIntrinsicModel)                                                \
+  case ProjectionIntrinsicModel::kModelId:                                   \
+    switch (landmarkModelId) {                                               \
+      POINT_LANDMARK_MODEL_CHAIN_CASE(                                       \
+          CameraObservationModel, ImuModel, ExtrinsicModel, CameraGeometry,  \
+          ProjectionIntrinsicModel, msckf::HomogeneousPointParameterization) \
+      POINT_LANDMARK_MODEL_CHAIN_CASE(                                       \
+          CameraObservationModel, ImuModel, ExtrinsicModel, CameraGeometry,  \
+          ProjectionIntrinsicModel, msckf::InverseDepthParameterization)     \
+      POINT_LANDMARK_MODEL_CHAIN_CASE(                                       \
+          CameraObservationModel, ImuModel, ExtrinsicModel, CameraGeometry,  \
+          ProjectionIntrinsicModel, msckf::ParallaxAngleParameterization)    \
+      default:                                                               \
+        MODEL_DOES_NOT_EXIST_EXCEPTION                                       \
+        break;                                                               \
+    }                                                                        \
+    break;
+#endif
+
+#ifndef DISTORTION_MODEL_CHAIN_CASE
+#define DISTORTION_MODEL_CHAIN_CASE(CameraObservationModel, ImuModel,       \
+                                    ExtrinsicModel, CameraGeometry)         \
+  switch (projOptModelId) {                                                 \
+    PROJECTION_INTRINSIC_MODEL_CHAIN_CASE(CameraObservationModel, ImuModel, \
+                                          ExtrinsicModel, CameraGeometry,   \
+                                          ProjectionOptFXY_CXY)             \
+    PROJECTION_INTRINSIC_MODEL_CHAIN_CASE(CameraObservationModel, ImuModel, \
+                                          ExtrinsicModel, CameraGeometry,   \
+                                          ProjectionOptFX_CXY)              \
+    PROJECTION_INTRINSIC_MODEL_CHAIN_CASE(CameraObservationModel, ImuModel, \
+                                          ExtrinsicModel, CameraGeometry,   \
+                                          ProjectionOptFX)                  \
+    default:                                                                \
+      MODEL_DOES_NOT_APPLY_EXCEPTION                                        \
+      break;                                                                \
+  }                                                                         \
+  break;
+#endif
+
+#ifndef EXTRINSIC_MODEL_CHAIN_CASE
+#define EXTRINSIC_MODEL_CHAIN_CASE(CameraObservationModel, ImuModel,      \
+                                   ExtrinsicModel)                        \
+  case ExtrinsicModel::kModelId:                                          \
+    switch (distortionType) {                                             \
+      case okvis::cameras::NCameraSystem::Equidistant:                    \
+        DISTORTION_MODEL_CHAIN_CASE(                                      \
+            CameraObservationModel, ImuModel, ExtrinsicModel,             \
+            okvis::cameras::PinholeCamera<                                \
+                okvis::cameras::EquidistantDistortion>)                   \
+      case okvis::cameras::NCameraSystem::RadialTangential:               \
+        DISTORTION_MODEL_CHAIN_CASE(                                      \
+            CameraObservationModel, ImuModel, ExtrinsicModel,             \
+            okvis::cameras::PinholeCamera<                                \
+                okvis::cameras::RadialTangentialDistortion>)              \
+      case okvis::cameras::NCameraSystem::RadialTangential8:              \
+        DISTORTION_MODEL_CHAIN_CASE(                                      \
+            CameraObservationModel, ImuModel, ExtrinsicModel,             \
+            okvis::cameras::PinholeCamera<                                \
+                okvis::cameras::RadialTangentialDistortion8>)             \
+      case okvis::cameras::NCameraSystem::FOV:                            \
+        DISTORTION_MODEL_CHAIN_CASE(                                      \
+            CameraObservationModel, ImuModel, ExtrinsicModel,             \
+            okvis::cameras::PinholeCamera<okvis::cameras::FovDistortion>) \
+      default:                                                            \
+        MODEL_DOES_NOT_APPLY_EXCEPTION                                    \
+        break;                                                            \
+    }                                                                     \
+    break;
+#endif
+
+#ifndef IMU_MODEL_CHAIN_CASE
+#define IMU_MODEL_CHAIN_CASE(CameraObservationModel, ImuModel)     \
+  case ImuModel::kModelId:                                         \
+    switch (extrinsicModelId) {                                    \
+      EXTRINSIC_MODEL_CHAIN_CASE(CameraObservationModel, ImuModel, \
+                                 Extrinsic_p_CB)                   \
+      EXTRINSIC_MODEL_CHAIN_CASE(CameraObservationModel, ImuModel, \
+                                 Extrinsic_p_BC_q_BC)              \
+      default:                                                     \
+        MODEL_DOES_NOT_APPLY_EXCEPTION                             \
+        break;                                                     \
+    }                                                              \
+    break;
+#endif
+
+#ifndef CAMERA_OBSERVATION_MODEL_CASE
+#define CAMERA_OBSERVATION_MODEL_CASE(CameraObservationModel)         \
+  switch (imuModelId) {                                               \
+    IMU_MODEL_CHAIN_CASE(CameraObservationModel, Imu_BG_BA)           \
+    IMU_MODEL_CHAIN_CASE(CameraObservationModel, Imu_BG_BA_TG_TS_TA)  \
+    IMU_MODEL_CHAIN_CASE(CameraObservationModel, ScaledMisalignedImu) \
+    default:                                                          \
+      MODEL_DOES_NOT_EXIST_EXCEPTION                                  \
+      break;                                                          \
+  }                                                                   \
+  break;
+#endif
+
   switch (residualModelId) {
     case okvis::cameras::kReprojectionErrorId:
-#define DISTORTION_MODEL_CASE(CameraGeometry) \
-  switch (projOptModelId) { \
-    case ProjectionOptFXY_CXY::kModelId: \
-      observationError.reset( \
-          new okvis::ceres::RsReprojectionError<CameraGeometry, ProjectionOptFXY_CXY, Extrinsic_p_CB, okvis::ceres::HomogeneousPointParameterBlock, Imu_BG_BA>()); \
-      break; \
-  }
-
-      switch (distortionType) {
-        DISTORTION_MODEL_NO_NODISTORTION_SWITCH_CASES
-      }
-
-      break;
+      CAMERA_OBSERVATION_MODEL_CASE(RsReprojectionError)
     case okvis::cameras::kTangentDistanceId:
-
       break;
     case okvis::cameras::kChordalDistanceId:
-
       break;
     default:
+      MODEL_DOES_NOT_EXIST_EXCEPTION
       break;
   }
 
+#undef CAMERA_OBSERVATION_MODEL_CASE
+#undef IMU_MODEL_CHAIN_CASE
+#undef EXTRINSIC_MODEL_CHAIN_CASE
+#undef DISTORTION_MODEL_CHAIN_CASE
+#undef PROJECTION_INTRINSIC_MODEL_CHAIN_CASE
+#undef POINT_LANDMARK_MODEL_CHAIN_CASE
+
+  // compute Jacobians with the error model
 //  for (int i = 0; i < numObservations; ++i) {
-//    observationError->EvaluateWithMinimalJacobian();
+//    observationError->reset();
+//    observationError->EvaluateWithMinimalJacobians();
 //  }
+  // stack the Jacobians
+
+  // nullify the feature Jacobian matrix
+
+  // set H_o, r_o
   return true;
 }
 

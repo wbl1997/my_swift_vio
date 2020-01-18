@@ -101,14 +101,11 @@ class MSCKF2 : public HybridFilter {
       Eigen::Matrix<double, 2, 9>* J_XBj, Eigen::Matrix<double, 2, 3>* J_pfi,
       Eigen::Vector2d* residual) const;
 
- private:
-
   bool featureJacobian(
       const MapPoint& mp, Eigen::MatrixXd& H_oi,
       Eigen::Matrix<double, Eigen::Dynamic, 1>& r_oi, Eigen::MatrixXd& R_oi,
       int landmarkParameterization, int ResidualModel,
       const std::vector<uint64_t>* involved_frame_ids) const;
-
 
   /**
    * @brief compute the marginalized Jacobian for a feature i's
@@ -129,6 +126,7 @@ class MSCKF2 : public HybridFilter {
                   Eigen::MatrixXd& R_oi,
                   const std::vector<uint64_t>* involved_frame_ids=nullptr) const;
 
+private:
   int computeStackedJacobianAndResidual(
       Eigen::MatrixXd* T_H, Eigen::Matrix<double, Eigen::Dynamic, 1>* r_q,
       Eigen::MatrixXd* R_q) const;
