@@ -53,7 +53,7 @@ class SimulationFrontend {
    */
   int dataAssociationAndInitialization(
       okvis::Estimator& estimator, okvis::kinematics::Transformation& T_WS_ref,
-      std::shared_ptr<okvis::cameras::NCameraSystem> cameraSystemRef,
+      std::shared_ptr<const okvis::cameras::NCameraSystem> cameraSystemRef,
       std::shared_ptr<okvis::MultiFrame> framesInOut, bool* asKeyframe);
 
   ///@}
@@ -150,6 +150,43 @@ class SimulationFrontend {
       const okvis::kinematics::Transformation& T_WSp_ref,
       const okvis::kinematics::Transformation& T_WSc_ref,
       const std::vector<LandmarkKeypointMatch>& landmarkMatches) const;
+};
+
+/**
+ * @brief initCameraNoiseParams
+ * @param cameraNoiseParams
+ * @param sigma_abs_position
+ * @param fixCameraInteranlParams If true, set the noise of camera intrinsic
+ *     parameters (including projection and distortion and time offset and
+ *     readout time) to zeros in order to fix camera intrinsic parameters in estimator.
+ */
+void initCameraNoiseParams(
+    okvis::ExtrinsicsEstimationParameters* cameraNoiseParams,
+    double sigma_abs_position, bool fixCameraInteranlParams);
+
+struct TestSetting {
+  bool addImuNoise; ///< add noise to IMU readings?
+  bool addPriorNoise; ///< add noise to the prior position, quaternion, velocity, bias in gyro, bias in accelerometer?
+  bool addSystemError; ///< add system error to IMU on scale and misalignment and g-sensitivity and to camera on projection and distortion parameters?
+  bool addImageNoise; ///< add noise to image measurements in pixels?
+  bool useImageObservs; ///< use image observations in an estimator?
+  TestSetting(bool _addImuNoise = true, bool _addPriorNoise = true,
+              bool _addSystemError = false,
+              bool _addImageNoise = true, bool _useImageObservs = true)
+      : addImuNoise(_addImuNoise),
+        addPriorNoise(_addPriorNoise),
+        addSystemError(_addSystemError),
+        addImageNoise(_addImageNoise),
+        useImageObservs(_useImageObservs) {}
+  std::string print() {
+    std::stringstream ss;
+    ss << "addImuNoise " << addImuNoise <<
+          " addPriorNoise " << addPriorNoise <<
+          " addSystemError " << addSystemError <<
+          " addImageNoise " << addImageNoise <<
+          " useImageObservs " << useImageObservs;
+    return ss.str();
+  }
 };
 
 }  // namespace okvis

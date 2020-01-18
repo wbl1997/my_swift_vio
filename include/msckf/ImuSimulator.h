@@ -212,12 +212,12 @@ class CircularSinusoidalTrajectory {
 
   // $a_{WB}^W$, applied force
   virtual Eigen::Vector3d computeGlobalLinearAcceleration(
-      const okvis::Time time);
+      const okvis::Time time) const;
   // $v_{WB}^W$
-  virtual Eigen::Vector3d computeGlobalLinearVelocity(const okvis::Time time);
+  virtual Eigen::Vector3d computeGlobalLinearVelocity(const okvis::Time time) const;
   // $T_{WB}$
   virtual okvis::kinematics::Transformation computeGlobalPose(
-      const okvis::Time time);
+      const okvis::Time time) const;
 };
 
 // Yarn torus
@@ -231,12 +231,12 @@ class TorusTrajectory : public CircularSinusoidalTrajectory {
   TorusTrajectory(double imuFreq, Eigen::Vector3d ginw);
   virtual ~TorusTrajectory() {}
   virtual Eigen::Vector3d computeGlobalLinearAcceleration(
-      const okvis::Time time);
+      const okvis::Time time) const;
 
-  virtual Eigen::Vector3d computeGlobalLinearVelocity(const okvis::Time time);
+  virtual Eigen::Vector3d computeGlobalLinearVelocity(const okvis::Time time) const;
 
   virtual okvis::kinematics::Transformation computeGlobalPose(
-      const okvis::Time time);
+      const okvis::Time time) const;
 };
 
 // Yarn ball
@@ -250,12 +250,12 @@ class SphereTrajectory : public CircularSinusoidalTrajectory {
   virtual Eigen::Vector3d computeGlobalAngularRate(const okvis::Time time);
 
   virtual Eigen::Vector3d computeGlobalLinearAcceleration(
-      const okvis::Time time);
+      const okvis::Time time) const;
 
-  virtual Eigen::Vector3d computeGlobalLinearVelocity(const okvis::Time time);
+  virtual Eigen::Vector3d computeGlobalLinearVelocity(const okvis::Time time) const;
 
   virtual okvis::kinematics::Transformation computeGlobalPose(
-      const okvis::Time time);
+      const okvis::Time time) const;
 };
 
 // planar motion with constant velocity magnitude
@@ -270,12 +270,12 @@ public:
   virtual Eigen::Vector3d computeGlobalAngularRate(const okvis::Time time);
 
   virtual Eigen::Vector3d computeGlobalLinearAcceleration(
-      const okvis::Time time);
+      const okvis::Time time) const;
 
-  virtual Eigen::Vector3d computeGlobalLinearVelocity(const okvis::Time time);
+  virtual Eigen::Vector3d computeGlobalLinearVelocity(const okvis::Time time) const;
 
   virtual okvis::kinematics::Transformation computeGlobalPose(
-      const okvis::Time time);
+      const okvis::Time time) const;
 
   std::vector<double> getEndEpochs() { return endEpochs_; }
 
@@ -283,11 +283,11 @@ public:
 
   // decide time slot, endEpochs_[j-1] < time_into_period <= endEpochs_[j]
   void decideTimeSlot(double time_into_period, size_t* j,
-                      double* time_into_slot);
+                      double* time_into_slot) const ;
 
   void initDataStructures();
 
-  double getPeriodRemainder(const okvis::Time time);
+  double getPeriodRemainder(const okvis::Time time) const;
 
   okvis::Time startEpoch_; // reference time to start the motion
 
@@ -309,31 +309,6 @@ public:
 
 Eigen::Matrix2d rotMat2d(double theta);
 
-struct TestSetting {
-  bool addImuNoise; ///< add noise to IMU readings?
-  bool addPriorNoise; ///< add noise to the prior position, quaternion, velocity, bias in gyro, bias in accelerometer?
-  bool addSystemError; ///< add system error to IMU on scale and misalignment and g-sensitivity and to camera on projection and distortion parameters?
-  bool addImageNoise; ///< add noise to image measurements in pixels?
-  bool useImageObservs; ///< use image observations in an estimator?
-  TestSetting(bool _addImuNoise = true, bool _addPriorNoise = true,
-              bool _addSystemError = false,
-              bool _addImageNoise = true, bool _useImageObservs = true)
-      : addImuNoise(_addImuNoise),
-        addPriorNoise(_addPriorNoise),
-        addSystemError(_addSystemError),
-        addImageNoise(_addImageNoise),
-        useImageObservs(_useImageObservs) {}
-  std::string print() {
-    std::stringstream ss;
-    ss << "addImuNoise " << addImuNoise <<
-          " addPriorNoise " << addPriorNoise <<
-          " addSystemError " << addSystemError <<
-          " addImageNoise " << addImageNoise <<
-          " useImageObservs " << useImageObservs;
-    return ss.str();
-  }
-};
-
 /**
  * @brief initImuNoiseParams
  * @param imuParameters
@@ -351,6 +326,21 @@ void initImuNoiseParams(
     bool addSystemError,
     double sigma_bg, double sigma_ba, double std_Ta_elem,
     bool fixImuInternalParams);
+
+/**
+ * @brief addImuNoise
+ * @param imuParameters
+ * @param imuMeasurements as input original perfect imu measurement,
+ *     as output imu measurements with added bias and noise
+ * @param trueBiases output added biases
+ * @param inertialStream
+ */
+void addImuNoise(const okvis::ImuParameters& imuParameters,
+                 okvis::ImuMeasurementDeque* imuMeasurements,
+                 okvis::ImuMeasurementDeque* trueBiases,
+                 double gyroAccelNoiseFactor,
+                 double gyroAccelBiasNoiseFactor,
+                 std::ofstream* inertialStream);
 
 } // namespace imu
 #endif

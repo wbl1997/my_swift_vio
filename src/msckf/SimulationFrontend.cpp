@@ -129,6 +129,30 @@ void addLandmarkNoise(
     iter->head<3>() = iter->head<3>() + Eigen::Vector3d::Random() * axisSigma;
   }
 }
+
+void initCameraNoiseParams(
+    okvis::ExtrinsicsEstimationParameters* cameraNoiseParams,
+    double sigma_abs_position, bool fixCameraInteranlParams) {
+  cameraNoiseParams->sigma_absolute_translation = sigma_abs_position;
+  cameraNoiseParams->sigma_absolute_orientation = 0;
+  cameraNoiseParams->sigma_c_relative_translation = 0;
+  cameraNoiseParams->sigma_c_relative_orientation = 0;
+  if (fixCameraInteranlParams) {
+    cameraNoiseParams->sigma_focal_length = 0;
+    cameraNoiseParams->sigma_principal_point = 0;
+    cameraNoiseParams->sigma_distortion.resize(5, 0);
+    cameraNoiseParams->sigma_td = 0;
+    cameraNoiseParams->sigma_tr = 0;
+  } else {
+    cameraNoiseParams->sigma_focal_length = 5;
+    cameraNoiseParams->sigma_principal_point = 5;
+    cameraNoiseParams->sigma_distortion =
+        std::vector<double>{5e-2, 1e-2, 1e-3, 1e-3, 1e-3};
+    cameraNoiseParams->sigma_td = 5e-3;
+    cameraNoiseParams->sigma_tr = 5e-3;
+  }
+}
+
 // Constructor.
 SimulationFrontend::SimulationFrontend(
     size_t numCameras, bool addImageNoise,
@@ -146,7 +170,7 @@ SimulationFrontend::SimulationFrontend(
 
 int SimulationFrontend::dataAssociationAndInitialization(
     okvis::Estimator& estimator, okvis::kinematics::Transformation& T_WS_ref,
-    std::shared_ptr<okvis::cameras::NCameraSystem> cameraSystemRef,
+    std::shared_ptr<const okvis::cameras::NCameraSystem> cameraSystemRef,
     std::shared_ptr<okvis::MultiFrame> framesInOut, bool* asKeyframe) {
   // find distortion type
   okvis::cameras::NCameraSystem::DistortionType distortionType =

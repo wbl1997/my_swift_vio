@@ -116,6 +116,7 @@ LIST(APPEND SOURCEFILES
     src/msckf/TFVIO.cpp
     src/msckf/TwoViewPair.cpp
     src/msckf/VioFrameMatchingAlgorithm.cpp
+    src/msckf/VioTestSystemBuilder.cpp
     src/msckf/numeric_ceres_residual_Jacobian.cpp
     src/msckf/triangulate.cpp
     src/msckf/triangulateFast.cpp
@@ -191,6 +192,7 @@ list(APPEND TEST_SRC_FILES
     test/msckf/TestEuclideanParamError.cpp
     test/msckf/TestExtrinsicJacobian.cpp
     test/msckf/TestFeatureInitialization.cpp
+    test/msckf/TestFeatureJacobian.cpp
     test/msckf/TestFilterHelper.cpp
     test/msckf/TestHybridFilter.cpp
     test/msckf/TestImuOdometry.cpp
