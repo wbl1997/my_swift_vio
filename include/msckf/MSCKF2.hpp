@@ -103,6 +103,13 @@ class MSCKF2 : public HybridFilter {
 
  private:
 
+  bool featureJacobian(
+      const MapPoint& mp, Eigen::MatrixXd& H_oi,
+      Eigen::Matrix<double, Eigen::Dynamic, 1>& r_oi, Eigen::MatrixXd& R_oi,
+      int landmarkParameterization, int ResidualModel,
+      const std::vector<uint64_t>* involved_frame_ids) const;
+
+
   /**
    * @brief compute the marginalized Jacobian for a feature i's
    * track assume the number of observations of the map points is at least two

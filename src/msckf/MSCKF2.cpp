@@ -3,6 +3,7 @@
 #include <glog/logging.h>
 
 #include <okvis/assert_macros.hpp>
+#include <okvis/cameras/PinholeCamera.hpp>
 #include <okvis/ceres/PoseError.hpp>
 #include <okvis/ceres/PoseParameterBlock.hpp>
 #include <okvis/ceres/RelativePoseError.hpp>
@@ -14,7 +15,10 @@
 #include <msckf/FeatureTriangulation.hpp>
 #include <msckf/FilterHelper.hpp>
 #include <msckf/ImuOdometry.h>
+#include <msckf/PointLandmark.hpp>
+#include <msckf/PointLandmarkModels.hpp>
 #include <msckf/PreconditionedEkfUpdater.h>
+#include <msckf/RsReprojectionError.hpp>
 #include <msckf/triangulate.h>
 #include <msckf/triangulateFast.hpp>
 
@@ -672,6 +676,51 @@ bool MSCKF2::measurementJacobian(
       -Eigen::Matrix3d::Identity() * featureTime.toSec();
 
   (*J_XBj) = (*J_pfi) * factorJ_XBj;
+  return true;
+}
+
+bool MSCKF2::featureJacobian(
+    const MapPoint& mp, Eigen::MatrixXd& H_oi,
+    Eigen::Matrix<double, Eigen::Dynamic, 1>& r_oi, Eigen::MatrixXd& R_oi,
+    int landmarkModelId, int residualModelId,
+    const std::vector<uint64_t>* involved_frame_ids) const {
+  msckf::PointLandmark landmark(landmarkModelId);
+  landmark.initializePointLandmark(mp);
+
+  const int camIdx = 0;
+  okvis::cameras::NCameraSystem::DistortionType distortionType =
+      camera_rig_.getDistortionType(camIdx);
+  int projOptModelId = camera_rig_.getProjectionOptMode(camIdx);
+  int extrinsicModelId = camera_rig_.getExtrinsicOptMode(camIdx);
+  std::shared_ptr<okvis::ceres::ErrorInterface> observationError;
+  switch (residualModelId) {
+    case okvis::cameras::kReprojectionErrorId:
+#define DISTORTION_MODEL_CASE(CameraGeometry) \
+  switch (projOptModelId) { \
+    case ProjectionOptFXY_CXY::kModelId: \
+      observationError.reset( \
+          new okvis::ceres::RsReprojectionError<CameraGeometry, ProjectionOptFXY_CXY, Extrinsic_p_CB, okvis::ceres::HomogeneousPointParameterBlock, Imu_BG_BA>()); \
+      break; \
+  }
+
+      switch (distortionType) {
+        DISTORTION_MODEL_NO_NODISTORTION_SWITCH_CASES
+      }
+
+      break;
+    case okvis::cameras::kTangentDistanceId:
+
+      break;
+    case okvis::cameras::kChordalDistanceId:
+
+      break;
+    default:
+      break;
+  }
+
+//  for (int i = 0; i < numObservations; ++i) {
+//    observationError->EvaluateWithMinimalJacobian();
+//  }
   return true;
 }
 
