@@ -69,7 +69,6 @@ void VioTestSystemBuilder::createVioSystem(
   circularSinusoidalTrajectory->getTrueInertialMeasurements(
       tStart - okvis::Duration(1), tEnd + okvis::Duration(1), imuMeasurements_);
 
-  okvis::InitialNavState initialNavState_;
   initialNavState_.std_p_WS = Eigen::Vector3d(1e-8, 1e-8, 1e-8);
   initialNavState_.std_q_WS = Eigen::Vector3d(1e-8, 1e-8, 1e-8);
   initialNavState_.std_v_WS = Eigen::Vector3d(5e-2, 5e-2, 5e-2);
