@@ -43,10 +43,15 @@ namespace okvis {
 
 MSCKF2::MSCKF2(std::shared_ptr<okvis::ceres::Map> mapPtr)
     : HybridFilter(mapPtr),
-      useEpipolarConstraint_(FLAGS_estimator_algorithm == 6) {}
+      useEpipolarConstraint_(FLAGS_estimator_algorithm == 6),
+      cameraObservationModelId_(0),
+      landmarkModelId_(0) {}
 
 // The default constructor.
-MSCKF2::MSCKF2() : useEpipolarConstraint_(FLAGS_estimator_algorithm == 6) {}
+MSCKF2::MSCKF2()
+    : useEpipolarConstraint_(FLAGS_estimator_algorithm == 6),
+      cameraObservationModelId_(0),
+      landmarkModelId_(0) {}
 
 MSCKF2::~MSCKF2() {}
 
@@ -844,6 +849,10 @@ bool MSCKF2::featureJacobian(const MapPoint &mp, Eigen::MatrixXd &H_oi,
                         Eigen::Matrix<double, Eigen::Dynamic, 1> &r_oi,
                         Eigen::MatrixXd &R_oi,
                         const std::vector<uint64_t>* involvedFrameIds) const {
+  if (landmarkModelId_ != 0 || cameraObservationModelId_ != 0) {
+    return featureJacobian(mp, H_oi, r_oi, R_oi, landmarkModelId_,
+                           cameraObservationModelId_, involvedFrameIds);
+  }
   const int camIdx = 0;
   std::shared_ptr<const okvis::cameras::CameraBase> tempCameraGeometry =
       camera_rig_.getCameraGeometry(camIdx);
@@ -883,7 +892,8 @@ bool MSCKF2::featureJacobian(const MapPoint &mp, Eigen::MatrixXd &H_oi,
       computeHTimer.stop();
       return false;
     }
-
+    CHECK_NE(statesMap_.rbegin()->first, frameIds.back())
+        << "The landmark should not be observed by the latest frame in MSCKF.";
     Eigen::Vector4d ab1rho = v4Xhomog;
     CHECK_GT(ab1rho[2], 0) << "Negative depth in anchor frame";
     ab1rho /= ab1rho[2];  //[\alpha = X/Z, \beta= Y/Z, 1, \rho=1/Z] in the
@@ -990,6 +1000,8 @@ bool MSCKF2::featureJacobian(const MapPoint &mp, Eigen::MatrixXd &H_oi,
       computeHTimer.stop();
       return false;
     }
+    CHECK_NE(statesMap_.rbegin()->first, frameIds.back())
+        << "The landmark should not be observed by the latest frame in MSCKF.";
 
     // containers of the above Jacobians for all observations of a mappoint
     const int cameraParamsDimen = cameraParamsMinimalDimen();

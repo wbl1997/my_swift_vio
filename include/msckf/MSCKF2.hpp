@@ -101,6 +101,14 @@ class MSCKF2 : public HybridFilter {
       Eigen::Matrix<double, 2, 9>* J_XBj, Eigen::Matrix<double, 2, 3>* J_pfi,
       Eigen::Vector2d* residual) const;
 
+  void setLandmarkModel(int landmarkModelId) {
+    landmarkModelId_ = landmarkModelId;
+  }
+
+  void setCameraObservationModel(int cameraObservationModelId) {
+    cameraObservationModelId_ = cameraObservationModelId;
+  }
+
   bool featureJacobian(
       const MapPoint& mp, Eigen::MatrixXd& H_oi,
       Eigen::Matrix<double, Eigen::Dynamic, 1>& r_oi, Eigen::MatrixXd& R_oi,
@@ -108,8 +116,9 @@ class MSCKF2 : public HybridFilter {
       const std::vector<uint64_t>* involved_frame_ids) const;
 
   /**
-   * @brief compute the marginalized Jacobian for a feature i's
-   * track assume the number of observations of the map points is at least two
+   * @brief compute the marginalized Jacobian for a feature i's track.
+   * @warning The map point is not observed in the latest frame.
+   * @warning The number of observations of the map points is at least two.
    * @param hpbid homogeneous point parameter block id of the map point
    * @param mp mappoint
    * @param r_oi residuals
@@ -140,6 +149,10 @@ private:
 
   // use epipolar constraints in case of low disparity or triangulation failure?
   bool useEpipolarConstraint_;
+
+  int cameraObservationModelId_; // see CameraRig.hpp
+
+  int landmarkModelId_; // see PointLandmarkModels.hpp
 
   // minimum number of culled frames in each prune frame state
   // step if cloned states size hit maxClonedStates_
