@@ -34,21 +34,6 @@
 //imuParameters.sigma_gw_c = 3.0e-6;
 //imuParameters.sigma_aw_c = 2.0e-5;
 
-DEFINE_double(
-    sim_ga_noise_factor, 0.5,
-    "multiply the accelerometer and gyro noise root PSD by this reduction "
-    "factor in generating noise.\n"
-    "As a result, the std for noises used in covariance propagation is "
-    "slightly larger than the std used in sampling noises.\n"
-    "This is necessary because the process model involves many other error"
-    " sources other than the modeled noises.\n"
-    "Optimization based estimators typically requires a smaller value, e.g., 0.2");
-
-DEFINE_double(
-    sim_ga_bias_noise_factor, 0.5,
-    "multiply the accelerometer and gyro BIAS noise root PSD by this reduction "
-    "factor in generating noise.\n");
-
 DEFINE_bool(
     add_prior_noise, true,
     "add noise to initial states, including velocity, gyro bias, accelerometer "
@@ -57,7 +42,6 @@ DEFINE_bool(
 
 DECLARE_bool(use_mahalanobis);
 DECLARE_int32(estimator_algorithm);
-DECLARE_bool(msckf_use_epipolar_constraint);
 
 typedef boost::iterator_range<std::vector<std::pair<double, double>>::iterator>
     HistogramType;
@@ -113,11 +97,9 @@ void computeErrors(
   deltaPose << delta, alpha;
   Eigen::MatrixXd covariance;
   bool isFilter = isFilteringMethod(FLAGS_estimator_algorithm);
-  if (isFilter) {
-    estimator->computeCovariance(&covariance);
-  } else {
-    covariance = Eigen::Matrix<double, 6, 6>::Identity();
-  }
+
+  estimator->computeCovariance(&covariance);
+
   (*normalizedError)[0] =
       delta.transpose() * covariance.topLeftCorner<3, 3>().inverse() * delta;
   (*normalizedError)[1] =
@@ -248,15 +230,6 @@ void check_tail_nees(const Eigen::Vector3d &nees_tail) {
   EXPECT_LT(nees_tail[2], 10) << "Pose NEES";
 }
 
-okvis::Optimization initOptimizationConfig() {
-  okvis::Optimization optConfig;
-  optConfig.translationThreshold = 0.4;
-  optConfig.rotationThreshold = 0.2618;
-  optConfig.trackingRateThreshold = 0.5;
-  optConfig.minTrackLength = 3u;
-  return optConfig;
-}
-
 std::map<int, std::string> estimatorIdToLabel{
   {0, "OKVIS"},
   {1, "General"},
@@ -350,7 +323,9 @@ void testHybridFilterSinusoid(const std::string& outputPath,
     filterTimer.start();
 
     srand((unsigned int)time(0)); // comment out to make tests deterministic
-    okvis::TestSetting cases[] = {okvis::TestSetting(true, FLAGS_add_prior_noise, false, true, true)};
+    okvis::TestSetting cases[] = {
+        okvis::TestSetting(true, FLAGS_add_prior_noise, false, true, true,
+        0.5, 0.5, FLAGS_estimator_algorithm)};
     size_t c = 0;
     LOG(INFO) << "Run " << run << " " << cases[c].print() << " algo " << estimatorLabel;
 
@@ -483,7 +458,7 @@ void testHybridFilterSinusoid(const std::string& outputPath,
         size_t maxIterations = 10u;
         size_t numThreads = 2u;
         estimator->optimize(maxIterations, numThreads, false);
-        okvis::Optimization sharedOptConfig = initOptimizationConfig();
+        okvis::Optimization sharedOptConfig;
         estimator->setKeyframeRedundancyThresholds(
             sharedOptConfig.translationThreshold,
             sharedOptConfig.rotationThreshold,

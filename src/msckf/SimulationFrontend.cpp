@@ -19,8 +19,6 @@
 #include <okvis/cameras/RadialTangentialDistortion.hpp>
 #include <okvis/cameras/RadialTangentialDistortion8.hpp>
 
-DECLARE_int32(estimator_algorithm);
-
 /// \brief okvis Main namespace of this package.
 namespace okvis {
 

@@ -170,21 +170,51 @@ struct TestSetting {
   bool addSystemError; ///< add system error to IMU on scale and misalignment and g-sensitivity and to camera on projection and distortion parameters?
   bool addImageNoise; ///< add noise to image measurements in pixels?
   bool useImageObservs; ///< use image observations in an estimator?
-  TestSetting(bool _addImuNoise = true, bool _addPriorNoise = true,
+
+//  "multiply the accelerometer and gyro noise root PSD by this reduction "
+//  "factor in generating noise.\n"
+//  "As a result, the std for noises used in covariance propagation is "
+//  "slightly larger than the std used in sampling noises.\n"
+//  "This is necessary because the process model involves many other error"
+//  " sources other than the modeled noises.\n"
+//  "Optimization based estimators typically requires a smaller value, e.g., 0.2");
+  double sim_ga_noise_factor;
+
+//  "multiply the accelerometer and gyro BIAS noise root PSD by this reduction "
+//  "factor in generating noise.\n");
+  double sim_ga_bias_noise_factor;
+
+  int32_t estimator_algorithm;
+
+  TestSetting(bool _addImuNoise = true,
+              bool _addPriorNoise = true,
               bool _addSystemError = false,
-              bool _addImageNoise = true, bool _useImageObservs = true)
+              bool _addImageNoise = true,
+              bool _useImageObservs = true,
+              double _sim_ga_noise_factor = 0.5,
+              double _sim_ga_bias_noise_factor = 0.5,
+              int32_t _estimator_algorithm = 4)
       : addImuNoise(_addImuNoise),
         addPriorNoise(_addPriorNoise),
         addSystemError(_addSystemError),
         addImageNoise(_addImageNoise),
-        useImageObservs(_useImageObservs) {}
+        useImageObservs(_useImageObservs),
+        sim_ga_noise_factor(_sim_ga_noise_factor),
+        sim_ga_bias_noise_factor(_sim_ga_bias_noise_factor),
+        estimator_algorithm(_estimator_algorithm) {
+
+  }
+
   std::string print() {
     std::stringstream ss;
     ss << "addImuNoise " << addImuNoise <<
           " addPriorNoise " << addPriorNoise <<
           " addSystemError " << addSystemError <<
           " addImageNoise " << addImageNoise <<
-          " useImageObservs " << useImageObservs;
+          " useImageObservs " << useImageObservs <<
+          " sim_ga_noise_factor " << sim_ga_noise_factor <<
+          " sim_ga_bias_noise_factor " << sim_ga_bias_noise_factor <<
+          " stimator_algorithm " << estimator_algorithm;
     return ss.str();
   }
 };

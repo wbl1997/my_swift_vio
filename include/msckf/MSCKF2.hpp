@@ -138,6 +138,8 @@ private:
   // return number of marginalized frames
   int marginalizeRedundantFrames(size_t maxClonedStates);
 
+  // use epipolar constraints in case of low disparity or triangulation failure?
+  bool useEpipolarConstraint_;
 
   // minimum number of culled frames in each prune frame state
   // step if cloned states size hit maxClonedStates_

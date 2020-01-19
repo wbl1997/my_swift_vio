@@ -36,18 +36,15 @@ DEFINE_bool(use_IEKF, false,
             "use iterated EKF in optimization, empirically IEKF cost at"
             "least twice as much time as EKF");
 
-DEFINE_bool(msckf_use_epipolar_constraint, true,
-            "use epipolar constraints in case of low disparity or "
-            "triangulation failure");
-
 /// \brief okvis Main namespace of this package.
 namespace okvis {
 
 MSCKF2::MSCKF2(std::shared_ptr<okvis::ceres::Map> mapPtr)
-    : HybridFilter(mapPtr) {}
+    : HybridFilter(mapPtr),
+      useEpipolarConstraint_(FLAGS_estimator_algorithm == 6) {}
 
 // The default constructor.
-MSCKF2::MSCKF2() {}
+MSCKF2::MSCKF2() : useEpipolarConstraint_(FLAGS_estimator_algorithm == 6) {}
 
 MSCKF2::~MSCKF2() {}
 
@@ -878,7 +875,7 @@ bool MSCKF2::featureJacobian(const MapPoint &mp, Eigen::MatrixXd &H_oi,
     }
     TriangulationStatus status = triangulateAMapPoint(
         mp, obsInPixel, frameIds, v4Xhomog, vRi, tempCameraGeometry, T_SC0,
-        anchorSeqId, FLAGS_msckf_use_epipolar_constraint);
+        anchorSeqId, useEpipolarConstraint_);
 
     if (!status.triangulationOk) {
       computeHTimer.stop();
@@ -986,7 +983,7 @@ bool MSCKF2::featureJacobian(const MapPoint &mp, Eigen::MatrixXd &H_oi,
     // The landmark is expressed with Euclidean coordinates in the global frame
     TriangulationStatus status = triangulateAMapPoint(mp, obsInPixel, frameIds, v4Xhomog,
                                            vRi, tempCameraGeometry, T_SC0, -1,
-                                           FLAGS_msckf_use_epipolar_constraint);
+                                           useEpipolarConstraint_);
     if (!status.triangulationOk) {
       computeHTimer.stop();
       return false;
@@ -1131,7 +1128,7 @@ int MSCKF2::computeStackedJacobianAndResidual(
     Eigen::MatrixXd R_oi;                           //(nObsDim, nObsDim)
     bool isValidJacobian = featureJacobian(it->second, H_oi, r_oi, R_oi);
     if (!isValidJacobian) {
-      isValidJacobian = FLAGS_msckf_use_epipolar_constraint
+      isValidJacobian = useEpipolarConstraint_
                             ? featureJacobianEpipolar(it->second, &H_oi, &r_oi,
                                                       &R_oi, ENTIRE_TRACK)
                             : isValidJacobian;

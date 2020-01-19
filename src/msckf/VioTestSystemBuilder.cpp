@@ -5,11 +5,6 @@
 
 #include <gflags/gflags.h>
 
-DECLARE_bool(msckf_use_epipolar_constraint);
-DECLARE_double(sim_ga_noise_factor);
-DECLARE_double(sim_ga_bias_noise_factor);
-DECLARE_int32(estimator_algorithm);
-
 namespace simul {
 void VioTestSystemBuilder::createVioSystem(
     const okvis::TestSetting& testSetting, int trajectoryId,
@@ -89,7 +84,7 @@ void VioTestSystemBuilder::createVioSystem(
 
   if (testSetting.addImuNoise) {
     imu::addImuNoise(imuParameters, &imuMeasurements_, &trueBiases_,
-                     FLAGS_sim_ga_noise_factor, FLAGS_sim_ga_bias_noise_factor,
+                     testSetting.sim_ga_noise_factor, testSetting.sim_ga_bias_noise_factor,
                      inertialStream.get());
   } else {
     trueBiases_ = imuMeasurements_;
@@ -132,7 +127,7 @@ void VioTestSystemBuilder::createVioSystem(
   distortionType_ = cameraSystem2->cameraGeometry(0)->distortionType();
 
   okvis::VisualConstraints constraintScheme(okvis::OnlyReprojectionErrors);
-  switch (FLAGS_estimator_algorithm) {
+  switch (testSetting.estimator_algorithm) {
     case 0:
       estimator.reset(new okvis::Estimator(mapPtr));
       break;
@@ -145,12 +140,10 @@ void VioTestSystemBuilder::createVioSystem(
       break;
     case 6:
       estimator.reset(new okvis::MSCKF2(mapPtr));
-      FLAGS_msckf_use_epipolar_constraint = true;
       break;
     case 4:
     default:
       estimator.reset(new okvis::MSCKF2(mapPtr));
-      FLAGS_msckf_use_epipolar_constraint = false;
       break;
   }
 
