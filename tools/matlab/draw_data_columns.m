@@ -1,4 +1,9 @@
-function draw_data_columns(data, triple_index, scalar, plot3d)
+function draw_data_columns(data, triple_index, scalar, plot3d, line_styles)
+% first column of data is x-axis
+% triple_indeix identify columns for y-axis
+if nargin < 5
+    line_styles = {'-r', '-g', '-b', '-k', '.k', '.b', '-c', '-m', '-y'};
+end
 if nargin < 4
     plot3d = 0;
 end
@@ -7,7 +12,7 @@ if nargin < 3
 end
 
 dimen = length(triple_index);
-line_styles = {'-r', '-g', '-b', '-k', '.k', '.b', '-c', '-m', '-y'};
+
 if plot3d
     plot3(data(:, triple_index(1)), data(:, triple_index(2)), ...
         data(:, triple_index(3)), line_styles{1}); 
