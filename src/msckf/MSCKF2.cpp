@@ -36,6 +36,8 @@ DEFINE_bool(use_IEKF, false,
             "use iterated EKF in optimization, empirically IEKF cost at"
             "least twice as much time as EKF");
 
+DECLARE_int32(estimator_algorithm);
+
 /// \brief okvis Main namespace of this package.
 namespace okvis {
 
