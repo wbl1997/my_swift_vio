@@ -13,16 +13,7 @@
 #include <msckf/ImuOdometry.h>
 #include <msckf/PreconditionedEkfUpdater.h>
 
-DECLARE_bool(use_AIDP);
-
-DECLARE_bool(use_mahalanobis);
-DECLARE_bool(use_first_estimate);
-DECLARE_bool(use_RK4);
-
 DECLARE_bool(use_IEKF);
-
-DECLARE_double(max_proj_tolerance);
-
 DEFINE_int32(
     two_view_obs_seq_type, 2,
     "0 the entire feature track of a landmark is used to "

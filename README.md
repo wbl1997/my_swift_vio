@@ -202,7 +202,6 @@ Parameters through command line
 |  estimator_algorithm | 0 OKVIS, 4 MSCKF, 5 triangulation-free (TF) VIO | 4 |
 |  load_input_option |  0 subscribe to rostopics, 1 load video and IMU csv |  1 |
 | dump_output_option | 0 publish to rostopics, 1 save nav states to csv, 3 save nav states and calibration parameters to csv. 0 and others do not work simultaneously | 3 |
-| use_AIDP | true, anchored inverse depth parameterization; false, Euclidean. AIDP is preferred. | true |
 | feature_tracking_method | 0 BRISK brute force in OKVIS with 3d2d RANSAC, 1 KLT back-to-back, 2 BRISK back-to-back | 0 |
 | use_IEKF | true iterated EKF, false EKF. For filters only | false |
 | max_inc_tol | the maximum infinity norm of the filter correction. 10.0 for outdoors, 2.0 for indoors, though its value should be insensitive | 2.0 |
@@ -244,7 +243,7 @@ msckf_ws/devel/lib/msckf/okvis_node $HOME/docker_documents/msckf_ws/src/msckf/co
  --output_dir=/media/$USER/Seagate/temp/parkinglot/
  --video_file="/media/$USER/Seagate/data/spin-lab/west_campus_parking_lot/Jisun/20151111_120342.mp4" 
  --imu_file="/media/$USER/Seagate/data/spin-lab/west_campus_parking_lot/Jisun/mystream_11_11_12_3_13.csv" 
- --use_AIDP=true  --start_index=18800 --finish_index=28900 --max_inc_tol=10.0 
+ --start_index=18800 --finish_index=28900 --max_inc_tol=10.0
  --dump_output_option=0 --feature_tracking_method=0 --estimator_algorithm=1
 ```
 The running program will exit once the sequence finishes.
@@ -262,7 +261,7 @@ The running program will exit once the sequence finishes.
 ```
 rosrun msckf okvis_node $HOME/docker_documents/msckf_ws/src/msckf/config/config_fpga_p2_euroc_dissertation.yaml 
  --dump_output_option=0 --load_input_option=0 --output_dir=$HOME/Desktop/temp 
- --use_AIDP=true --feature_tracking_method=0 --estimator_algorithm=1
+ --feature_tracking_method=0 --estimator_algorithm=1
 
 rosbag play --pause --start=5.0 --rate=1.0 /media/$USER/Seagate/data/euroc/MH_01_easy.bag /cam0/image_raw:=/camera0 /imu0:=/imu
 
@@ -277,7 +276,7 @@ Note the program will not exit if Ctrl+C is entered in the terminal of roscore.
 ```
 $HOME/docker_documents/msckf_ws/src/msckf/config/config_tum_vi_50_20_msckf.yaml \
  --output_dir=$HOME/Seagate/data/TUM-VI/postprocessed/ \
- --use_AIDP=true --max_inc_tol=10.0 --dump_output_option=0 \
+ --max_inc_tol=10.0 --dump_output_option=0 \
  --feature_tracking_method=0 --estimator_algorithm=1 --load_input_option=0
 
 ```

@@ -142,12 +142,12 @@ TEST(MSCKF, FeatureJacobian) {
       estimator->setKeyframe(mf->id(), asKeyframe);
     }
 
+    // examine camera measurement Jacobians
     if (frameCount == 100) {
       okvis::PointMap landmarkMap;
       size_t numLandmarks = estimator->getLandmarks(landmarkMap);
       int mpCount = 0;
-      for (auto mpIter = landmarkMap.begin(); mpIter != landmarkMap.end();
-           ++mpIter) {
+      for (auto mpIter = landmarkMap.begin(); mpIter != landmarkMap.end(); ++mpIter) {
         uint64_t latestFrameId = estimator->currentFrameId();
         const okvis::MapPoint& mapPoint = mpIter->second;
         auto obsIter = std::find_if(mapPoint.observations.begin(), mapPoint.observations.end(),

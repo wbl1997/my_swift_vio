@@ -15,7 +15,7 @@
       --load_input_option=$(arg load_input_option)
       --image_noise_cov_multiplier=$(arg image_noise_cov_multiplier)
       --estimator_algorithm=$(arg estimator_algorithm)
-      --output_dir=$(arg output_dir) --use_AIDP=true
+      --output_dir=$(arg output_dir)
       --feature_tracking_method=0
       --max_inc_tol=10.0">
     

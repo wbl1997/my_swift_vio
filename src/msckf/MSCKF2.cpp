@@ -45,13 +45,13 @@ MSCKF2::MSCKF2(std::shared_ptr<okvis::ceres::Map> mapPtr)
     : HybridFilter(mapPtr),
       useEpipolarConstraint_(FLAGS_estimator_algorithm == 6),
       cameraObservationModelId_(0),
-      landmarkModelId_(0) {}
+      landmarkModelId_(FLAGS_use_AIDP ? 1 : 0) {}
 
 // The default constructor.
 MSCKF2::MSCKF2()
     : useEpipolarConstraint_(FLAGS_estimator_algorithm == 6),
       cameraObservationModelId_(0),
-      landmarkModelId_(0) {}
+      landmarkModelId_(FLAGS_use_AIDP ? 1 : 0) {}
 
 MSCKF2::~MSCKF2() {}
 
@@ -849,7 +849,7 @@ bool MSCKF2::featureJacobian(const MapPoint &mp, Eigen::MatrixXd &H_oi,
                         Eigen::Matrix<double, Eigen::Dynamic, 1> &r_oi,
                         Eigen::MatrixXd &R_oi,
                         const std::vector<uint64_t>* involvedFrameIds) const {
-  if (landmarkModelId_ != 0 || cameraObservationModelId_ != 0) {
+  if (landmarkModelId_ == 2 || cameraObservationModelId_ != 0) {
     return featureJacobian(mp, H_oi, r_oi, R_oi, landmarkModelId_,
                            cameraObservationModelId_, involvedFrameIds);
   }
@@ -871,7 +871,7 @@ bool MSCKF2::featureJacobian(const MapPoint &mp, Eigen::MatrixXd &H_oi,
   Eigen::Vector4d v4Xhomog; // triangulated point position in the global
   // frame expressed in [X,Y,Z,W],
   computeHTimer.start();
-  if (FLAGS_use_AIDP) {
+  if (landmarkModelId_ == 1) {
     // The landmark is expressed with AIDP in the anchor frame    
     // if the feature is lost in current frame, the anchor frame is chosen
     // as the last frame observing the point.
