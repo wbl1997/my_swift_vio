@@ -67,9 +67,10 @@ implement KLT feature tracking, conventional MSCKF2 without so many parameters, 
 32. referring to msckf_mono implemented by daniliidis group, 
 a, use all feature tracks to update states at the last frame
 
-6. how to deal with static motion, standstill like the beginning of MH_01_easy? limit the number of states, and hence the size of the covariance matrix. Also, what will triangulateAmapPoint return when given two identical observations? 
-Have to add point states into the state vector. Otherwise have to assume that all the frames undergoes motion.
-refer to R-VIO to detect static motion with IMU measurements
+6. how to deal with static motion, standstill like the beginning of MH_01_easy?
+limit the number of states, and hence the size of the covariance matrix.
+Also, what will triangulateAmapPoint return when given two identical observations?
+It is not imperative to add point states into the state vector.
 
 33. Use the IMU model defined in Rheder ICRA 2016 extending Kalibr
 % In msckf2 implementation

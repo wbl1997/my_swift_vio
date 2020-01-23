@@ -28,6 +28,7 @@
 #include <msckf/CameraRig.hpp>
 #include <msckf/ImuOdometry.h>
 #include <msckf/MotionAndStructureStats.h>
+#include <msckf/PointLandmark.hpp>
 
 #include <vio/CsvReader.h>
 #include <vio/ImuErrorModel.h>
@@ -40,19 +41,6 @@ enum RetrieveObsSeqType {
     ENTIRE_TRACK=0,
     LATEST_TWO,
     HEAD_TAIL,
-};
-
-struct TriangulationStatus {
-  bool triangulationOk; // True if the landmark is in front of every camera.
-  bool chi2Small;
-  bool raysParallel; // True if rotation compensated observation directions are parallel.
-  bool flipped; // True if the landmark is flipped to be in front of every camera.
-  bool lackObservations; // True if #obs is less than minTrackLength.
-  TriangulationStatus()
-      : triangulationOk(false),
-        chi2Small(false),
-        raysParallel(false),
-        flipped(false) {}
 };
 
 //! The estimator class
@@ -175,31 +163,35 @@ class HybridFilter : public Estimator {
   bool isPureRotation(const MapPoint& mp) const;
 
   /**
-   * @brief triangulateAMapPoint, does not support rays which arise from static
-   * mode, pure rotation, or points at infinity. Assume the same camera model
-   * for all observations, and rolling shutter effect is not accounted for
+   * @brief triangulateAMapPoint initialize a landmark with proper parameterization.
+   * If not PAP, then it does not support rays which arise from static mode,
+   * pure rotation, or points at infinity.
+   * Assume the same camera model for all observations, and rolling shutter
+   * effect is not accounted for in triangulation.
    * @param mp
    * @param obsInPixel
    * @param frameIds, id of frames observing this feature in the ascending order
    *    because the MapPoint.observations is an ordinary ordered map
-   * @param v4Xhomog, stores [X,Y,Z,1] in the global frame or the anchor frame
-   *    depending on anchorSeqId
+   * @param pointLandmark, stores [X,Y,Z,1] in the global frame,
+   *  or [X,Y,Z,1] in the anchor frame,
+   *  or [cos\theta, sin\theta, n_x, n_y, n_z] depending on anchorSeqId.
    * @param vSigmai, the diagonal elements of the observation noise matrix, in
    *    pixels, size 2Nx1
    * @param cameraGeometry, used for point projection
    * @param T_SC0
-   * @param anchorSeqId index of the anchor frame in the ordered observation map
-   *    -1 by default meaning that AIDP is not used
+   * @param anchorSeqIds indices of main anchor and associate anchor frame in
+   *  the ordered observation map. It is empty by default meaning that no anchor is used.
    * @return true if triangulation successful
    */
-  TriangulationStatus triangulateAMapPoint(
+  msckf::TriangulationStatus triangulateAMapPoint(
       const MapPoint &mp,
       std::vector<Eigen::Vector2d, Eigen::aligned_allocator<Eigen::Vector2d>>
           &obsInPixel,
-      std::vector<uint64_t> &frameIds, Eigen::Vector4d &v4Xhomog,
+      std::vector<uint64_t> &frameIds, msckf::PointLandmark& pointLandmark,
       std::vector<double> &vSigmai,
       std::shared_ptr<const okvis::cameras::CameraBase> cameraGeometry,
-      const okvis::kinematics::Transformation &T_SC0, int anchorSeqId = -1,
+      const okvis::kinematics::Transformation &T_SC0,
+      const std::vector<int>& anchorSeqIds = std::vector<int>(),
       bool checkDisparity = false) const;
   /**
    * @brief computeHxf, compute the residual and Jacobians for a SLAM feature i
@@ -310,6 +302,14 @@ class HybridFilter : public Estimator {
 
   inline int startIndexOfCameraParams() const {
     return okvis::ceres::ode::NavErrorStateDim + imu_rig_.getImuParamsMinimalDim(0);
+  }
+
+  void setLandmarkModel(int landmarkModelId) {
+    landmarkModelId_ = landmarkModelId;
+  }
+
+  void setCameraObservationModel(int cameraObservationModelId) {
+    cameraObservationModelId_ = cameraObservationModelId;
   }
 
   // error state: \delta p, \alpha for q, \delta v
@@ -474,17 +474,10 @@ class HybridFilter : public Estimator {
   double translationThreshold_;
   double rotationThreshold_;
   double trackingRateThreshold_;
-};
 
-struct IsObservedInFrame {
-  IsObservedInFrame(uint64_t x) : frameId(x) {}
-  bool operator()(
-      const std::pair<okvis::KeypointIdentifier, uint64_t> &v) const {
-    return v.first.frameId == frameId;
-  }
+  int cameraObservationModelId_; // see CameraRig.hpp
 
- private:
-  uint64_t frameId;  ///< Multiframe ID.
+  int landmarkModelId_; // see PointLandmarkModels.hpp
 };
 
 }  // namespace okvis

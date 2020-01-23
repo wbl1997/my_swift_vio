@@ -151,7 +151,7 @@ TEST(MSCKF, FeatureJacobian) {
         uint64_t latestFrameId = estimator->currentFrameId();
         const okvis::MapPoint& mapPoint = mpIter->second;
         auto obsIter = std::find_if(mapPoint.observations.begin(), mapPoint.observations.end(),
-                                    okvis::IsObservedInFrame(latestFrameId));
+                                    msckf::IsObservedInFrame(latestFrameId));
         if (obsIter != mapPoint.observations.end()) {
           continue;
         }
@@ -159,15 +159,13 @@ TEST(MSCKF, FeatureJacobian) {
         Eigen::Matrix<double, Eigen::Dynamic, 1> r_oi[2];
         Eigen::MatrixXd R_oi[2];
         estimator->featureJacobian(mpIter->second, H_oi[0], r_oi[0], R_oi[0], nullptr);
-//        int landmarkModelId = 0;
-//        int observationModelId = 0;
-//        estimator->featureJacobian(mpIter->second, H_oi[1], r_oi[1], R_oi[1], landmarkModelId, observationModelId, nullptr);
-//        EXPECT_LT((H_oi[1] - H_oi[0]).lpNorm<Eigen::Infinity>(), 1e-6) << "H_oi";
-//        EXPECT_LT((r_oi[1] - r_oi[0]).lpNorm<Eigen::Infinity>(), 1e-6) << "r_oi";
-//        EXPECT_LT((R_oi[1] - R_oi[0]).lpNorm<Eigen::Infinity>(), 1e-6) << "R_oi";
+        estimator->featureJacobianGeneric(mpIter->second, H_oi[1], r_oi[1], R_oi[1], nullptr);
+        EXPECT_LT((H_oi[1] - H_oi[0]).lpNorm<Eigen::Infinity>(), 1e-6) << "H_oi";
+        EXPECT_LT((r_oi[1] - r_oi[0]).lpNorm<Eigen::Infinity>(), 1e-6) << "r_oi";
+        EXPECT_LT((R_oi[1] - R_oi[0]).lpNorm<Eigen::Infinity>(), 1e-6) << "R_oi";
         ++mpCount;
       }
-      std::cout << "examined " << mpCount << " out of " << numLandmarks << " landmarks\n";
+      std::cout << "Examined " << mpCount << " out of " << numLandmarks << " landmarks\n";
     }
 
     size_t maxIterations = 10u;

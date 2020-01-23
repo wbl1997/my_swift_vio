@@ -111,6 +111,7 @@ LIST(APPEND SOURCEFILES
     src/msckf/ImuSimulator.cpp
     src/msckf/MotionAndStructureStats.cpp
     src/msckf/MSCKF2.cpp
+    src/msckf/PointLandmark.cpp
     src/msckf/PreconditionedEkfUpdater.cpp
     src/msckf/SimulationFrontend.cpp
     src/msckf/TFVIO.cpp

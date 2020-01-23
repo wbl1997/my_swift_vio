@@ -101,18 +101,23 @@ class MSCKF2 : public HybridFilter {
       Eigen::Matrix<double, 2, 9>* J_XBj, Eigen::Matrix<double, 2, 3>* J_pfi,
       Eigen::Vector2d* residual) const;
 
-  void setLandmarkModel(int landmarkModelId) {
-    landmarkModelId_ = landmarkModelId;
-  }
+  bool measurementJacobianGeneric(
+      const msckf::PointLandmark& pointLandmark,
+      std::shared_ptr<const okvis::cameras::CameraBase> tempCameraGeometry,
+      const Eigen::Vector2d& obs, uint64_t poseId, int camIdx,
+      const std::vector<uint64_t>& anchorIds,
+      const std::vector<
+          okvis::kinematics::Transformation,
+          Eigen::aligned_allocator<okvis::kinematics::Transformation>>&
+          anchor_T_WBs,
+      Eigen::MatrixXd* J_X,
+      Eigen::Matrix<double, Eigen::Dynamic, 3>* J_pfi,
+      Eigen::Matrix<double, Eigen::Dynamic, 2>* J_n,
+      Eigen::VectorXd* residual) const;
 
-  void setCameraObservationModel(int cameraObservationModelId) {
-    cameraObservationModelId_ = cameraObservationModelId;
-  }
-
-  bool featureJacobian(
+  bool featureJacobianGeneric(
       const MapPoint& mp, Eigen::MatrixXd& H_oi,
       Eigen::Matrix<double, Eigen::Dynamic, 1>& r_oi, Eigen::MatrixXd& R_oi,
-      int landmarkParameterization, int ResidualModel,
       const std::vector<uint64_t>* involved_frame_ids) const;
 
   /**
@@ -149,10 +154,6 @@ private:
 
   // use epipolar constraints in case of low disparity or triangulation failure?
   bool useEpipolarConstraint_;
-
-  int cameraObservationModelId_; // see CameraRig.hpp
-
-  int landmarkModelId_; // see PointLandmarkModels.hpp
 
   // minimum number of culled frames in each prune frame state
   // step if cloned states size hit maxClonedStates_
