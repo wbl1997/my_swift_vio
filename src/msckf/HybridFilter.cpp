@@ -1100,8 +1100,7 @@ bool HybridFilter::computeHxf(const uint64_t hpbid, const MapPoint& mp,
   J_tr = J_td * kpN;
   Eigen::MatrixXd dpC_dExtrinsic;
   Eigen::Matrix3d R_CfCa = T_CA.C();
-  ExtrinsicModel_dpC_dExtrinsic(extrinsicModelId, pfiinC, T_BC0.C().transpose(),
-                                &dpC_dExtrinsic, &R_CfCa, &ab1rho);
+  ExtrinsicModel_dpC_dExtrinsic_AIDP(extrinsicModelId, pfiinC, T_BC0.C().transpose(), &dpC_dExtrinsic, &R_CfCa, &ab1rho);
   ProjectionOptKneadIntrinsicJacobian(projOptModelId, &intrinsicsJacobian);
   if (dpC_dExtrinsic.size() == 0) {
     J_Xc << intrinsicsJacobian, J_td, J_tr;
@@ -1391,7 +1390,7 @@ bool HybridFilter::featureJacobian(
     J_tr = J_td * kpN;
     Eigen::MatrixXd dpC_dExtrinsic;
     Eigen::Matrix3d R_CfCa = T_CA.C();
-    ExtrinsicModel_dpC_dExtrinsic(extrinsicModelId, pfiinC, T_BC0.C().transpose(),
+    ExtrinsicModel_dpC_dExtrinsic_AIDP(extrinsicModelId, pfiinC, T_BC0.C().transpose(),
                                   &dpC_dExtrinsic, &R_CfCa, &ab1rho);
     ProjectionOptKneadIntrinsicJacobian(projOptModelId, &intrinsicsJacobian);
     if (dpC_dExtrinsic.size() == 0) {
@@ -1554,7 +1553,7 @@ void HybridFilter::updateStates(
   kinematics::Transformation T_WS = poseParamBlockPtr->estimate();
   Eigen::Vector3d deltaAlpha = deltaX.segment<3>(3);
   Eigen::Quaterniond deltaq =
-      vio::quaternionFromSmallAngle(deltaAlpha);  // rvec2quat(deltaAlpha);
+      vio::quaternionFromSmallAngle(deltaAlpha);
   T_WS = kinematics::Transformation(
       T_WS.r() + deltaX.head<3>(),
       deltaq *

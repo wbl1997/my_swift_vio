@@ -105,6 +105,7 @@ class MSCKF2 : public HybridFilter {
       const msckf::PointLandmark& pointLandmark,
       std::shared_ptr<const okvis::cameras::CameraBase> tempCameraGeometry,
       const Eigen::Vector2d& obs, uint64_t poseId, int camIdx,
+      const Eigen::Matrix2d& obsNoiseInfo,
       const std::vector<uint64_t>& anchorIds,
       const std::vector<
           okvis::kinematics::Transformation,

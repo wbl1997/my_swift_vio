@@ -60,6 +60,10 @@ public:
    return parameters_.data();
  }
 
+ const double* data() const {
+   return parameters_.data();
+ }
+
 private:
   int modelId_;
   std::vector<double> parameters_;

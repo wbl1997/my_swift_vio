@@ -196,7 +196,7 @@ void setupPoseOptProblem(bool perturbPose, bool rollingShutter,
         new okvis::ceres::RsReprojectionError<DistortedPinholeCameraGeometry,
                                               okvis::ProjectionOptFXY_CXY,
                                               okvis::Extrinsic_p_BC_q_BC>(
-            cameraGeometry, frameId, kp, information, imuMeasDeque, T_SC,
+            cameraGeometry, kp, information, imuMeasDeque, T_SC,
             stateEpoch, tdAtCreation, gravity));
     allCostFunctions.emplace_back(cost_function);
 
