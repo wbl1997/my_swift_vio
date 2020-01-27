@@ -973,11 +973,11 @@ bool MSCKF2::measurementJacobianGeneric(
         J_X->topLeftCorner(2, cameraParamsDim) << duv_deltaTSC_minimal,       \
             duv_proj_intrinsic_minimal, duv_distortion_minimal,               \
             duv_td_minimal, duv_tr_minimal;                                   \
-        std::map<uint64_t, int>::const_iterator frmid_iter =                  \
+        std::map<uint64_t, int>::const_iterator poseCovIndexIter =                  \
             mStateID2CovID_.find(poseId);                                     \
         J_X->block<2, kClonedStateMinimalDimen>(                              \
             0,                                                                \
-            cameraParamsDim + kClonedStateMinimalDimen * frmid_iter->second)  \
+            cameraParamsDim + kClonedStateMinimalDimen * poseCovIndexIter->second)  \
             << duv_deltaTWS_minimal,                                          \
             duv_deltaTWS_minimal.topLeftCorner<2, 3>() * featureTime;         \
         *J_pfi = duv_deltahpW.topLeftCorner<2, 3>();                          \
@@ -1115,8 +1115,8 @@ bool MSCKF2::measurementJacobianGeneric(
   Eigen::Matrix<double, 2, 6, Eigen::RowMajor> duv_deltaTWS_minimal;
   Eigen::Matrix<double, 2, 4, Eigen::RowMajor> duv_deltahpW;
   Eigen::Matrix<double, 2, 3, Eigen::RowMajor> duv_deltahpW_minimal;
-  Eigen::Matrix<double, 2, 7, Eigen::RowMajor> duv_dextrinsic;
-  Eigen::Matrix<double, 2, 6, Eigen::RowMajor> duv_dextrinsic_minimal;
+  Eigen::Matrix<double, 2, ExtrinsicModel::kGlobalDim, Eigen::RowMajor> duv_dextrinsic;
+  Eigen::Matrix<double, 2, ExtrinsicModel::kNumParams, Eigen::RowMajor> duv_dextrinsic_minimal;
 
   RsReprojectionErrorModel::ProjectionIntrinsicJacType
       duv_proj_intrinsic;
@@ -1148,10 +1148,10 @@ bool MSCKF2::measurementJacobianGeneric(
   J_X->topLeftCorner(2, cameraParamsDim) << duv_dextrinsic_minimal,
       duv_proj_intrinsic_minimal, duv_distortion_minimal, duv_td_minimal,
       duv_tr_minimal;
-  std::map<uint64_t, int>::const_iterator frmid_iter =
+  std::map<uint64_t, int>::const_iterator poseCovIndexIter =
       mStateID2CovID_.find(poseId);
   J_X->block<2, kClonedStateMinimalDimen>(
-      0, cameraParamsDim + kClonedStateMinimalDimen * frmid_iter->second)
+      0, cameraParamsDim + kClonedStateMinimalDimen * poseCovIndexIter->second)
       << duv_deltaTWS_minimal,
       duv_deltaTWS_minimal.topLeftCorner<2, 3>() * featureTime;
 
@@ -1401,11 +1401,11 @@ bool MSCKF2::featureJacobian(const MapPoint &mp, Eigen::MatrixXd &H_oi,
     for (size_t saga = 0; saga < numValidObs; ++saga) {
       size_t saga2 = saga * 2;
       H_xi.block(saga2, 0, 2, cameraParamsDimen) = vJ_Xc[saga];
-      std::map<uint64_t, int>::const_iterator frmid_iter =
+      std::map<uint64_t, int>::const_iterator poseCovIndexIter =
           mStateID2CovID_.find(frameIds[saga]);
       H_xi.block<2, kClonedStateMinimalDimen>(
           saga2, cameraParamsDimen + kClonedStateMinimalDimen *
-                                         frmid_iter->second) = vJ_XBj[saga];
+                                         poseCovIndexIter->second) = vJ_XBj[saga];
       H_fi.block<2, 3>(saga2, 0) = vJ_pfi[saga];
       ri.segment<2>(saga2) = vri[saga];
       Ri(saga2, saga2) *= (vRi[saga2] * vRi[saga2]);
