@@ -88,6 +88,16 @@ TEST(MSCKF, FeatureJacobian) {
 
   Eigen::VectorXd navError(9);
 
+  const int kDistortionCoeffDim =
+      okvis::cameras::RadialTangentialDistortion::NumDistortionIntrinsics;
+  const int kNavImuCamParamDim =
+      okvis::ceres::ode::NavErrorStateDim +
+      okvis::ImuModelGetMinimalDim(
+          okvis::ImuModelNameToId(vioSystemBuilder.imuModelType())) +
+      2 + kDistortionCoeffDim +
+      okvis::ExtrinsicModelGetMinimalDim(extrinsicModelId) +
+      okvis::ProjectionOptGetMinimalDim(projOptModelId);
+
   for (auto iter = times.begin(), iterEnd = times.end(); iter != iterEnd;
        iter += cameraIntervalRatio, kale += cameraIntervalRatio,
        trueBiasIter += cameraIntervalRatio) {
@@ -117,18 +127,11 @@ TEST(MSCKF, FeatureJacobian) {
       frameCount = 0;
       estimator->resetInitialNavState(vioSystemBuilder.initialNavState());
       estimator->addStates(mf, imuSegment, asKeyframe);
-        const int kDistortionCoeffDim =
-            okvis::cameras::RadialTangentialDistortion::NumDistortionIntrinsics;
-        const int kNavImuCamParamDim =
-            okvis::ceres::ode::NavErrorStateDim +
-            okvis::ImuModelGetMinimalDim(
-                okvis::ImuModelNameToId(vioSystemBuilder.imuModelType())) +
-            2 + kDistortionCoeffDim +
-            okvis::ExtrinsicModelGetMinimalDim(extrinsicModelId) +
-            okvis::ProjectionOptGetMinimalDim(projOptModelId);
-        ASSERT_EQ(estimator->getEstimatedVariableMinimalDim(),
-                  kNavImuCamParamDim + okvis::HybridFilter::kClonedStateMinimalDimen)
-            << "Initial cov with one cloned state has a wrong dim";
+
+      ASSERT_EQ(
+          estimator->getEstimatedVariableMinimalDim(),
+          kNavImuCamParamDim + okvis::HybridFilter::kClonedStateMinimalDimen)
+          << "Initial cov with one cloned state has a wrong dim";
     } else {
       estimator->addStates(mf, imuSegment, asKeyframe);
       ++frameCount;
@@ -158,12 +161,58 @@ TEST(MSCKF, FeatureJacobian) {
         Eigen::MatrixXd H_oi[2];
         Eigen::Matrix<double, Eigen::Dynamic, 1> r_oi[2];
         Eigen::MatrixXd R_oi[2];
-        estimator->featureJacobian(mpIter->second, H_oi[0], r_oi[0], R_oi[0], nullptr);
-        estimator->featureJacobianGeneric(mpIter->second, H_oi[1], r_oi[1], R_oi[1], nullptr);
-        EXPECT_LT((H_oi[1] - H_oi[0]).lpNorm<Eigen::Infinity>(), 1e-6) << "H_oi";
-        EXPECT_LT((r_oi[1] - r_oi[0]).lpNorm<Eigen::Infinity>(), 1e-6) << "r_oi";
-        EXPECT_LT((R_oi[1] - R_oi[0]).lpNorm<Eigen::Infinity>(), 1e-6) << "R_oi";
-        ++mpCount;
+        bool jacOk1 = estimator->featureJacobian(mpIter->second, H_oi[0], r_oi[0], R_oi[0], nullptr);
+        bool jacOk2 = estimator->featureJacobianGeneric(mpIter->second, H_oi[1], r_oi[1], R_oi[1], nullptr);
+        EXPECT_EQ(jacOk1, jacOk2) << "featureJacobian status";
+        if (jacOk1 && jacOk2) {
+          Eigen::MatrixXd information = R_oi[0].inverse();
+          Eigen::LLT<Eigen::MatrixXd> lltOfInformation(information);
+          Eigen::MatrixXd squareRootInformation =
+              lltOfInformation.matrixL().transpose();
+          const int cameraMinimalDimWoTime = okvis::ExtrinsicModelGetMinimalDim(extrinsicModelId) +
+              okvis::ProjectionOptGetMinimalDim(projOptModelId) + kDistortionCoeffDim;
+          const int obsMinus3 = H_oi[1].rows();
+          H_oi[0] = squareRootInformation * H_oi[0];
+          r_oi[0] = squareRootInformation * r_oi[0];
+          R_oi[0] = squareRootInformation * R_oi[0] *
+              squareRootInformation.transpose();
+          Eigen::MatrixXd H_diff = H_oi[1]- H_oi[0];
+          Eigen::VectorXd r_diff = r_oi[1] - r_oi[0];
+          Eigen::MatrixXd R_diff = R_oi[1]- R_oi[0];
+
+          EXPECT_LT(H_diff.topLeftCorner(obsMinus3, cameraMinimalDimWoTime).lpNorm<Eigen::Infinity>(),
+                    1e-6)
+              << "H_oi camera params";
+
+          Eigen::MatrixXd H_time_diff =
+              H_diff.block(0, cameraMinimalDimWoTime, obsMinus3, 2);
+          Eigen::MatrixXd H_time_diff_spikes =
+              (H_time_diff.cwiseAbs().array() > 0.1)
+                  .select(H_time_diff.cwiseAbs().array(), 0.0);
+          Eigen::MatrixXd H_time_ratio =
+              H_time_diff_spikes.cwiseQuotient(
+                (H_oi[0] + H_oi[1]).block(0, cameraMinimalDimWoTime, obsMinus3, 2).cwiseAbs());
+          LOG(INFO) << "H_time_diff_spikes\n"
+                    << H_time_diff_spikes << "\n(H_oi[0] + H_oi[1]).block(0, cameraMinimalDimWoTime, obsMinus3, 2)\n"
+                    << (H_oi[0] + H_oi[1]).block(0, cameraMinimalDimWoTime, obsMinus3, 2);
+          EXPECT_LT(H_time_ratio.lpNorm<Eigen::Infinity>(), 4e-1)
+              << "H_oi camera td tr";
+          EXPECT_LT(H_diff
+                        .block(0, cameraMinimalDimWoTime + 2, obsMinus3,
+                               H_diff.cols() - cameraMinimalDimWoTime - 2)
+                        .lpNorm<Eigen::Infinity>(),
+                    1e-1)
+              << "H_diff rest XBj";
+          LOG(INFO) << "H_oi[1]\n"
+                    << H_oi[1] << "\nH_oi[0]\n"
+                    << H_oi[0] << "\nDiff\n"
+                    << H_diff;
+
+          EXPECT_LT(r_diff.lpNorm<Eigen::Infinity>(), 1e-6) << "r_oi";
+          EXPECT_LT(R_diff.lpNorm<Eigen::Infinity>(), 1e-6) << "R_oi";
+
+          ++mpCount;
+        }
       }
       std::cout << "Examined " << mpCount << " out of " << numLandmarks << " landmarks\n";
     }

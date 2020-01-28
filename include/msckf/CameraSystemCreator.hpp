@@ -93,8 +93,8 @@ class CameraSystemCreator {
                             projDistortIntrinsics[3] + fcNoise[3],
                             okvis::cameras::RadialTangentialDistortion(kpNoise[0], kpNoise[1],
                             kpNoise[2], kpNoise[3]),
-                            vio::gauss_rand(0, cameraNoiseParams.sigma_td),
-                            std::fabs(vio::gauss_rand(0, cameraNoiseParams.sigma_tr))
+                            vio::gauss_rand(refCameraGeometry->imageDelay(), cameraNoiseParams.sigma_td),
+                            std::fabs(vio::gauss_rand(refCameraGeometry->readoutTime(), cameraNoiseParams.sigma_tr))
                             ));
     cameraSystem->reset(new okvis::cameras::NCameraSystem);
     (*cameraSystem)
@@ -135,12 +135,15 @@ class CameraSystemCreator {
   std::shared_ptr<okvis::cameras::CameraBase> createCameraGeometry(
       const int caseId) {
     std::shared_ptr<okvis::cameras::CameraBase> cameraGeometry;
+    const double td = 0.0;
+    const double tr = 0.02;
     switch (caseId) {
       case 1:
         cameraGeometry.reset(new okvis::cameras::PinholeCamera<
                              okvis::cameras::RadialTangentialDistortion>(
             640, 480, 350, 350, 322, 238,
-            okvis::cameras::RadialTangentialDistortion(0, 0, 0, 0)));
+            okvis::cameras::RadialTangentialDistortion(0, 0, 0, 0),
+                               td, tr));
         break;
 
       case 0:
@@ -149,7 +152,7 @@ class CameraSystemCreator {
                              okvis::cameras::RadialTangentialDistortion>(
             752, 480, 350, 360, 378, 238,
             okvis::cameras::RadialTangentialDistortion(0.00, 0.00, 0.000,
-                                                       0.000)));
+                                                       0.000), td, tr));
         break;
     }
     return cameraGeometry;
