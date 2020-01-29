@@ -331,7 +331,7 @@ void testHybridFilterSinusoid(const std::string& outputPath,
 
     std::string pointFile = outputPath + "/" + trajLabel + "_Points.txt";
     std::string imuSampleFile = outputPath + "/" + trajLabel + "_IMU.txt";
-    std::shared_ptr<std::ofstream> inertialStream;
+
     if (bVerbose) {
       truthStream.open(truthFile, std::ofstream::out);
       truthStream << "%state timestamp, frameIdInSource, T_WS(xyz, xyzw), "
@@ -339,11 +339,7 @@ void testHybridFilterSinusoid(const std::string& outputPath,
                      "p_CB, fx, fy, cx, cy, k1, k2, p1, p2, td, tr"
                   << std::endl;
 
-      inertialStream.reset(new std::ofstream());
-      inertialStream->open(imuSampleFile, std::ofstream::out);
-      (*inertialStream) << "% timestamp, gx, gy, gz[rad/sec], acc x, acc y, acc "
-                           "z[m/s^2], and noisy gxyz, acc xyz"
-                        << std::endl;
+
     }
 
     std::stringstream ss;
@@ -353,11 +349,13 @@ void testHybridFilterSinusoid(const std::string& outputPath,
     std::string trackStatFile = outputPath + "/" + estimatorLabel + "_" +
                                 trajLabel + "_trackstat_" + ss.str() + ".txt";
 
-
     simul::VioTestSystemBuilder vioSystemBuilder;
+    double timeOffset = 0.0;
+    double readoutTime = 0.0;
     vioSystemBuilder.createVioSystem(cases[c], trajectoryId,
                                      projOptModelName, extrinsicModelName,
-                                     cameraOrientation, inertialStream,
+                                     cameraOrientation, timeOffset, readoutTime,
+                                     bVerbose ? imuSampleFile : "",
                                      bVerbose ? pointFile : "");
     int projOptModelId = okvis::ProjectionOptNameToId(projOptModelName);
     int extrinsicModelId = okvis::ExtrinsicModelNameToId(extrinsicModelName);

@@ -15,8 +15,8 @@ public:
 
   void createVioSystem(const okvis::TestSetting& testSetting, int trajectoryId,
                        std::string projOptModelName, std::string extrinsicModelName,
-                       int cameraOrientation,
-                       std::shared_ptr<std::ofstream> inertialStream, std::string pointFile);
+                       int cameraOrientation, double td, double tr,
+                       std::string imuLogFile, std::string pointFile);
 
 public:
   std::shared_ptr<okvis::Estimator> mutableEstimator() {

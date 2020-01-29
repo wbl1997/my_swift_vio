@@ -365,7 +365,7 @@ bool HybridFilter::addStates(okvis::MultiFramePtr multiFrame,
       id = IdProvider::instance().newId();
       int projOptModelId = camera_rig_.getProjectionOptMode(i);
       const int minProjectionDim = camera_rig_.getMinimalProjectionDimen(i);
-      if (minProjectionDim > 0) {
+      if (!fixCameraIntrinsicParams_[i]) {
         Eigen::VectorXd optProjIntrinsics;
         ProjectionOptGlobalToLocal(projOptModelId, allIntrinsics,
                                    &optProjIntrinsics);
@@ -506,37 +506,44 @@ void HybridFilter::initCameraParamCovariance(int camIdx) {
   Eigen::MatrixXd covDistortion;
   Eigen::Matrix2d covTDTR;
 
-  {
-    size_t i = camIdx;
-    covExtrinsic = ExtrinsicModelInitCov(
-        camera_rig_.getExtrinsicOptMode(i),
-        extrinsicsEstimationParametersVec_.at(i).sigma_absolute_translation,
-        extrinsicsEstimationParametersVec_.at(i).sigma_absolute_orientation);
+  int camParamIndex = camParamStartIndex;
+  if (!fixCameraExtrinsicParams_[camIdx]) {
+    covExtrinsic =
+        ExtrinsicModelInitCov(camera_rig_.getExtrinsicOptMode(camIdx),
+                              extrinsicsEstimationParametersVec_.at(camIdx)
+                                  .sigma_absolute_translation,
+                              extrinsicsEstimationParametersVec_.at(camIdx)
+                                  .sigma_absolute_orientation);
+    covariance_.block(camParamStartIndex, camParamStartIndex, minExtrinsicDim,
+                      minExtrinsicDim) = covExtrinsic;
+    camParamIndex += minExtrinsicDim;
+  }
 
+  if (!fixCameraIntrinsicParams_[camIdx]) {
     covProjIntrinsics = ProjectionModelGetInitCov(
-        camera_rig_.getProjectionOptMode(i),
-        extrinsicsEstimationParametersVec_.at(i).sigma_focal_length,
-        extrinsicsEstimationParametersVec_.at(i).sigma_principal_point);
+        camera_rig_.getProjectionOptMode(camIdx),
+        extrinsicsEstimationParametersVec_.at(camIdx).sigma_focal_length,
+        extrinsicsEstimationParametersVec_.at(camIdx).sigma_principal_point);
 
     covDistortion = Eigen::MatrixXd::Identity(distortionDim, distortionDim);
     for (int jack = 0; jack < distortionDim; ++jack)
       covDistortion(jack, jack) *= std::pow(
-          extrinsicsEstimationParametersVec_.at(i).sigma_distortion[jack], 2);
-    covTDTR = Eigen::Matrix2d::Identity();
-    covTDTR(0, 0) *=
-        std::pow(extrinsicsEstimationParametersVec_.at(i).sigma_td, 2);
-    covTDTR(1, 1) *=
-        std::pow(extrinsicsEstimationParametersVec_.at(i).sigma_tr, 2);
+          extrinsicsEstimationParametersVec_.at(camIdx).sigma_distortion[jack],
+          2);
+
+    covariance_.block(camParamIndex, camParamIndex, minProjectionDim,
+                      minProjectionDim) = covProjIntrinsics;
+    camParamIndex += minProjectionDim;
+    covariance_.block(camParamIndex, camParamIndex, distortionDim,
+                      distortionDim) = covDistortion;
+    camParamIndex += distortionDim;
   }
-  covariance_.block(camParamStartIndex, camParamStartIndex, minExtrinsicDim,
-                    minExtrinsicDim) = covExtrinsic;
-  int camParamIndex = camParamStartIndex + minExtrinsicDim;
-  covariance_.block(camParamIndex, camParamIndex, minProjectionDim,
-                    minProjectionDim) = covProjIntrinsics;
-  camParamIndex += minProjectionDim;
-  covariance_.block(camParamIndex, camParamIndex, distortionDim,
-                    distortionDim) = covDistortion;
-  camParamIndex += distortionDim;
+
+  covTDTR = Eigen::Matrix2d::Identity();
+  covTDTR(0, 0) *=
+      std::pow(extrinsicsEstimationParametersVec_.at(camIdx).sigma_td, 2);
+  covTDTR(1, 1) *=
+      std::pow(extrinsicsEstimationParametersVec_.at(camIdx).sigma_tr, 2);
   covariance_.block<2, 2>(camParamIndex, camParamIndex) = covTDTR;
 }
 
@@ -871,11 +878,9 @@ void HybridFilter::updateSensorRigs() {
   camera_rig_.setCameraExtrinsic(camIdx, T_BC0);
 
   Eigen::Matrix<double, Eigen::Dynamic, 1> projectionIntrinsic;
-  if (camera_rig_.getMinimalProjectionDimen(camIdx) > 0) {
-    getSensorStateEstimateAs<ceres::EuclideanParamBlock>(
-        currFrameId, camIdx, SensorStates::Camera,
-        CameraSensorStates::Intrinsics, projectionIntrinsic);
-  }
+  getSensorStateEstimateAs<ceres::EuclideanParamBlock>(
+      currFrameId, camIdx, SensorStates::Camera, CameraSensorStates::Intrinsics,
+      projectionIntrinsic);
 
   Eigen::Matrix<double, Eigen::Dynamic, 1> distortionCoeffs;
   getSensorStateEstimateAs<ceres::EuclideanParamBlock>(
@@ -1098,14 +1103,26 @@ bool HybridFilter::computeHxf(const uint64_t hpbid, const MapPoint& mp,
               interpolatedInertialData.measurement.gyroscopes -
           T_WB.C().transpose() * lP_sb.head<3>() * rho);
   J_tr = J_td * kpN;
-  Eigen::MatrixXd dpC_dExtrinsic;
-  Eigen::Matrix3d R_CfCa = T_CA.C();
-  ExtrinsicModel_dpC_dExtrinsic_AIDP(extrinsicModelId, pfiinC, T_BC0.C().transpose(), &dpC_dExtrinsic, &R_CfCa, &ab1rho);
-  ProjectionOptKneadIntrinsicJacobian(projOptModelId, &intrinsicsJacobian);
-  if (dpC_dExtrinsic.size() == 0) {
-    J_Xc << intrinsicsJacobian, J_td, J_tr;
+
+  if (fixCameraExtrinsicParams_[camIdx]) {
+    if (fixCameraIntrinsicParams_[camIdx]) {
+      J_Xc << J_td, J_tr;
+    } else {
+      ProjectionOptKneadIntrinsicJacobian(projOptModelId, &intrinsicsJacobian);
+      J_Xc << intrinsicsJacobian, J_td, J_tr;
+    }
   } else {
-    J_Xc << pointJacobian3 * dpC_dExtrinsic, intrinsicsJacobian, J_td, J_tr;
+    Eigen::MatrixXd dpC_dExtrinsic;
+    Eigen::Matrix3d R_CfCa = T_CA.C();
+    ExtrinsicModel_dpC_dExtrinsic_AIDP(extrinsicModelId, pfiinC,
+                                       T_BC0.C().transpose(), &dpC_dExtrinsic,
+                                       &R_CfCa, &ab1rho);
+    if (fixCameraIntrinsicParams_[camIdx]) {
+      J_Xc << pointJacobian3 * dpC_dExtrinsic, J_td, J_tr;
+    } else {
+      ProjectionOptKneadIntrinsicJacobian(projOptModelId, &intrinsicsJacobian);
+      J_Xc << pointJacobian3 * dpC_dExtrinsic, intrinsicsJacobian, J_td, J_tr;
+    }
   }
 
   Eigen::Matrix3d tempM3d;
@@ -1388,15 +1405,28 @@ bool HybridFilter::featureJacobian(
                 interpolatedInertialData.measurement.gyroscopes -
             T_WB.C().transpose() * lP_sb.head<3>() * rho);
     J_tr = J_td * kpN;
-    Eigen::MatrixXd dpC_dExtrinsic;
-    Eigen::Matrix3d R_CfCa = T_CA.C();
-    ExtrinsicModel_dpC_dExtrinsic_AIDP(extrinsicModelId, pfiinC, T_BC0.C().transpose(),
-                                  &dpC_dExtrinsic, &R_CfCa, &ab1rho);
-    ProjectionOptKneadIntrinsicJacobian(projOptModelId, &intrinsicsJacobian);
-    if (dpC_dExtrinsic.size() == 0) {
-      J_Xc << intrinsicsJacobian, J_td, J_tr;
+
+    if (fixCameraExtrinsicParams_[camIdx]) {
+      if (fixCameraIntrinsicParams_[camIdx]) {
+        J_Xc << J_td, J_tr;
+      } else {
+        ProjectionOptKneadIntrinsicJacobian(projOptModelId,
+                                            &intrinsicsJacobian);
+        J_Xc << intrinsicsJacobian, J_td, J_tr;
+      }
     } else {
-      J_Xc << pointJacobian3 * dpC_dExtrinsic, intrinsicsJacobian, J_td, J_tr;
+      Eigen::MatrixXd dpC_dExtrinsic;
+      Eigen::Matrix3d R_CfCa = T_CA.C();
+      ExtrinsicModel_dpC_dExtrinsic_AIDP(extrinsicModelId, pfiinC,
+                                         T_BC0.C().transpose(), &dpC_dExtrinsic,
+                                         &R_CfCa, &ab1rho);
+      if (fixCameraIntrinsicParams_[camIdx]) {
+        J_Xc << pointJacobian3 * dpC_dExtrinsic, J_td, J_tr;
+      } else {
+        ProjectionOptKneadIntrinsicJacobian(projOptModelId,
+                                            &intrinsicsJacobian);
+        J_Xc << pointJacobian3 * dpC_dExtrinsic, intrinsicsJacobian, J_td, J_tr;
+      }
     }
 
     Eigen::Matrix3d tempM3d;
@@ -1579,9 +1609,7 @@ void HybridFilter::updateStates(
   int camParamIndex = startIndexOfCameraParams();
   const int camIdx = 0;
 
-  int extrinsicOptModelId = camera_rig_.getExtrinsicOptMode(camIdx);
-  const int minExtrinsicDim = camera_rig_.getMinimalExtrinsicDimen(camIdx);
-  if (minExtrinsicDim > 0) {
+  if (!fixCameraExtrinsicParams_[camIdx]) {
     uint64_t extrinsicId = stateInQuestion.sensors.at(SensorStates::Camera)
                                .at(camIdx)
                                .at(CameraSensorStates::T_SCi)
@@ -1593,6 +1621,8 @@ void HybridFilter::updateStates(
     kinematics::Transformation T_BC0 = extrinsicParamBlockPtr->estimate();
     Eigen::Vector3d t_BC;
     Eigen::Quaterniond q_BC;
+    int extrinsicOptModelId = camera_rig_.getExtrinsicOptMode(camIdx);
+    int minExtrinsicDim = camera_rig_.getMinimalExtrinsicDimen(camIdx);
     ExtrinsicModelUpdateState(extrinsicOptModelId, T_BC0.r(), T_BC0.q(),
                               deltaX.segment(camParamIndex, minExtrinsicDim),
                               &t_BC, &q_BC);
@@ -1600,8 +1630,8 @@ void HybridFilter::updateStates(
     camParamIndex += minExtrinsicDim;
   }
 
-  const int minProjectionDim = camera_rig_.getMinimalProjectionDimen(camIdx);
-  if (minProjectionDim > 0) {
+  if (!fixCameraIntrinsicParams_[camIdx]) {
+    const int minProjectionDim = camera_rig_.getMinimalProjectionDimen(camIdx);
     uint64_t intrinsicId = stateInQuestion.sensors.at(SensorStates::Camera)
                                .at(camIdx)
                                .at(CameraSensorStates::Intrinsics)
@@ -1614,21 +1644,21 @@ void HybridFilter::updateStates(
         deltaX.segment(camParamIndex, minProjectionDim);
     intrinsicParamBlockPtr->setEstimate(cameraIntrinsics);
     camParamIndex += minProjectionDim;
-  }
 
-  const int nDistortionCoeffDim = camera_rig_.getDistortionDimen(camIdx);
-  uint64_t distortionId = stateInQuestion.sensors.at(SensorStates::Camera)
-                              .at(camIdx)
-                              .at(CameraSensorStates::Distortion)
-                              .id;
-  std::shared_ptr<ceres::EuclideanParamBlock> distortionParamBlockPtr =
-          std::static_pointer_cast<ceres::EuclideanParamBlock>(
-          mapPtr_->parameterBlockPtr(distortionId));
-  Eigen::VectorXd cameraDistortion =
-      distortionParamBlockPtr->estimate() +
-          deltaX.segment(camParamIndex, nDistortionCoeffDim);
-  distortionParamBlockPtr->setEstimate(cameraDistortion);
-  camParamIndex += nDistortionCoeffDim;
+    const int nDistortionCoeffDim = camera_rig_.getDistortionDimen(camIdx);
+    uint64_t distortionId = stateInQuestion.sensors.at(SensorStates::Camera)
+                                .at(camIdx)
+                                .at(CameraSensorStates::Distortion)
+                                .id;
+    std::shared_ptr<ceres::EuclideanParamBlock> distortionParamBlockPtr =
+        std::static_pointer_cast<ceres::EuclideanParamBlock>(
+            mapPtr_->parameterBlockPtr(distortionId));
+    Eigen::VectorXd cameraDistortion =
+        distortionParamBlockPtr->estimate() +
+        deltaX.segment(camParamIndex, nDistortionCoeffDim);
+    distortionParamBlockPtr->setEstimate(cameraDistortion);
+    camParamIndex += nDistortionCoeffDim;
+  }
 
   uint64_t tdId = stateInQuestion.sensors.at(SensorStates::Camera)
                       .at(camIdx)
@@ -2439,8 +2469,7 @@ bool HybridFilter::print(std::ostream& stream) const {
                                     T_BC0, " ", &extrinsicValues);
   stream << " " << extrinsicValues;
 
-  const int minProjectionDim = camera_rig_.getMinimalProjectionDimen(camIdx);
-  if (minProjectionDim > 0) {
+  if (!fixCameraIntrinsicParams_[camIdx]) {
     uint64_t intrinsicId = stateInQuestion.sensors.at(SensorStates::Camera)
                                .at(camIdx)
                                .at(CameraSensorStates::Intrinsics)
@@ -2451,6 +2480,7 @@ bool HybridFilter::print(std::ostream& stream) const {
     Eigen::VectorXd cameraIntrinsics = intrinsicParamBlockPtr->estimate();
     stream << " " << cameraIntrinsics.transpose().format(SpaceInitFmt);
   }
+
   if (stateInQuestion.sensors.at(SensorStates::Camera)
           .at(camIdx)
           .at(CameraSensorStates::Distortion)
@@ -2515,12 +2545,11 @@ uint64_t HybridFilter::getCameraCalibrationEstimate(
   const int camIdx = 0;
   const uint64_t poseId = statesMap_.rbegin()->first;
   Eigen::VectorXd intrinsic;
-  int optProjDim = camera_rig_.getMinimalProjectionDimen(camIdx);
-  if (optProjDim > 0) {
-    getSensorStateEstimateAs<ceres::EuclideanParamBlock>(
-        poseId, camIdx, SensorStates::Camera, CameraSensorStates::Intrinsics,
-        intrinsic);
-  }
+
+  getSensorStateEstimateAs<ceres::EuclideanParamBlock>(
+      poseId, camIdx, SensorStates::Camera, CameraSensorStates::Intrinsics,
+      intrinsic);
+
   Eigen::VectorXd distortionCoeffs;
   getSensorStateEstimateAs<ceres::EuclideanParamBlock>(
       poseId, camIdx, SensorStates::Camera, CameraSensorStates::Distortion,
@@ -2783,7 +2812,12 @@ bool HybridFilter::EpipolarMeasurement::measurementJacobian(
 
   Eigen::Matrix<double, 1, Eigen::Dynamic> de_dExtrinsic;
   switch (extrinsicModelId_) {
+    case Extrinsic_p_CB::kModelId:
+      rmj_lp.dp_dt_CB(&dp_dt_CB);
+      de_dExtrinsic = de_dt_Ctij_Ctik * dp_dt_CB;
+      break;
     case Extrinsic_p_BC_q_BC::kModelId:
+    default:
       rmj_lp.dtheta_dtheta_BC(&dtheta_dtheta_BC);
       rmj_lp.dp_dtheta_BC(&dp_dtheta_BC);
       rmj_lp.dp_dt_BC(&dp_dt_BC);
@@ -2791,13 +2825,6 @@ bool HybridFilter::EpipolarMeasurement::measurementJacobian(
       de_dExtrinsic.head<3>() = de_dt_Ctij_Ctik * dp_dt_BC;
       de_dExtrinsic.tail<3>() = de_dt_Ctij_Ctik * dp_dtheta_BC +
                                 de_dtheta_Ctij_Ctik * dtheta_dtheta_BC;
-      break;
-    case Extrinsic_p_CB::kModelId:
-      rmj_lp.dp_dt_CB(&dp_dt_CB);
-      de_dExtrinsic = de_dt_Ctij_Ctik * dp_dt_CB;
-      break;
-    case ExtrinsicFixed::kModelId:
-    default:
       break;
   }
   Eigen::Matrix<double, 1, Eigen::Dynamic> de_dxcam =
@@ -2864,7 +2891,9 @@ bool HybridFilter::EpipolarMeasurement::measurementJacobian(
   if (minExtrinsicDim_ > 0) {
     H_xjk->topLeftCorner(1, minExtrinsicDim_) = de_dExtrinsic;
   }
-  H_xjk->block(0, minExtrinsicDim_, 1, minProjDim_ + minDistortDim_) = de_dxcam;
+  if (minProjDim_ +  minDistortDim_ > 0) {
+    H_xjk->block(0, minExtrinsicDim_, 1, minProjDim_ + minDistortDim_) = de_dxcam;
+  }
   int startIndex = minExtrinsicDim_ + minProjDim_ + minDistortDim_;
   (*H_xjk)(startIndex) = de_dtd;
   startIndex += 1;
@@ -2964,10 +2993,16 @@ bool HybridFilter::featureJacobianEpipolar(
   cov_fi.setZero();
 
   int extrinsicModelId = camera_rig_.getExtrinsicOptMode(camIdx);
-  const int minExtrinsicDim = camera_rig_.getMinimalExtrinsicDimen(camIdx);
-  const int minProjDim = camera_rig_.getMinimalProjectionDimen(camIdx);
-  const int minDistortDim = camera_rig_.getDistortionDimen(camIdx);
-
+  int minExtrinsicDim = camera_rig_.getMinimalExtrinsicDimen(camIdx);
+  int minProjDim = camera_rig_.getMinimalProjectionDimen(camIdx);
+  int minDistortDim = camera_rig_.getDistortionDimen(camIdx);
+  if (fixCameraIntrinsicParams_[camIdx]) {
+    minProjDim = 0;
+    minDistortDim = 0;
+  }
+  if (fixCameraExtrinsicParams_[camIdx]) {
+    minExtrinsicDim = 0;
+  }
   EpipolarMeasurement epiMeas(*this, tempCameraGeometry->imageHeight(),
                               camIdx, extrinsicModelId,
                               minExtrinsicDim, minProjDim, minDistortDim);

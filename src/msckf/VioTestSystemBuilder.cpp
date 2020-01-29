@@ -2,6 +2,7 @@
 #include <msckf/CameraSystemCreator.hpp>
 #include <msckf/GeneralEstimator.hpp>
 #include <msckf/TFVIO.hpp>
+#include <msckf/VioEvaluationCallback.hpp>
 
 #include <gflags/gflags.h>
 
@@ -9,7 +10,8 @@ namespace simul {
 void VioTestSystemBuilder::createVioSystem(
     const okvis::TestSetting& testSetting, int trajectoryId,
     std::string projOptModelName, std::string extrinsicModelName,
-    int cameraOrientation, std::shared_ptr<std::ofstream> inertialStream,
+    int cameraOrientation, double td, double tr,
+    std::string imuLogFile,
     std::string pointFile) {
   const double DURATION = 300.0;  // length of motion in seconds
   double pCB_std = 2e-2;
@@ -83,9 +85,18 @@ void VioTestSystemBuilder::createVioSystem(
   initialNavState_.v_WS = v_WS;
 
   if (testSetting.addImuNoise) {
-    imu::addImuNoise(imuParameters, &imuMeasurements_, &trueBiases_,
-                     testSetting.sim_ga_noise_factor, testSetting.sim_ga_bias_noise_factor,
-                     inertialStream.get());
+      std::shared_ptr<std::ofstream> inertialStream;
+      if (!imuLogFile.empty()) {
+        inertialStream.reset(new std::ofstream(imuLogFile, std::ofstream::out));
+        (*inertialStream)
+            << "% timestamp, gx, gy, gz[rad/sec], acc x, acc y, acc "
+               "z[m/s^2], and noisy gxyz, acc xyz"
+            << std::endl;
+      }
+      imu::addImuNoise(imuParameters, &imuMeasurements_, &trueBiases_,
+                       testSetting.sim_ga_noise_factor,
+                       testSetting.sim_ga_bias_noise_factor,
+                       inertialStream.get());
   } else {
     trueBiases_ = imuMeasurements_;
     for (size_t i = 0; i < imuMeasurements_.size(); ++i) {
@@ -102,10 +113,11 @@ void VioTestSystemBuilder::createVioSystem(
   trueBiases_.erase(trueBiases_.begin(), tempIter);
 
   // create the map
-  std::shared_ptr<okvis::ceres::Map> mapPtr(new okvis::ceres::Map);
+  msckf::VioEvaluationCallback evaluationCallback;
+  std::shared_ptr<okvis::ceres::Map> mapPtr(new okvis::ceres::Map(&evaluationCallback));
 
   simul::CameraSystemCreator csc(cameraOrientation, projOptModelName,
-                                 extrinsicModelName);
+                                 extrinsicModelName, td, tr);
   // reference camera system
   std::shared_ptr<okvis::cameras::CameraBase> cameraGeometry0;
   csc.createNominalCameraSystem(&cameraGeometry0, &trueCameraSystem_);

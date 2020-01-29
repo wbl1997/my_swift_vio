@@ -56,7 +56,7 @@ TEST(CeresErrorTerms, EpipolarFactor) {
   std::string extrinsicModelName = "P_CB";
   int cameraOrientation = 0;
   simul::CameraSystemCreator csc(cameraOrientation, projOptModelName,
-                                 extrinsicModelName);
+                                 extrinsicModelName, 0.0, 0.0);
 
   // reference camera system
   std::shared_ptr<okvis::cameras::CameraBase> cameraGeometry0;
@@ -123,9 +123,9 @@ TEST(CeresErrorTerms, EpipolarFactor) {
     covariance12.push_back(covariance);
     covariance12.push_back(covariance);
 
-    std::vector<okvis::ImuMeasurementDeque,
-                Eigen::aligned_allocator<okvis::ImuMeasurementDeque>>
-        imuMeasCanopy{imuMeasurements, imuMeasurements};
+    std::vector<std::shared_ptr<const okvis::ImuMeasurementDeque>> imuMeasCanopy;
+    imuMeasCanopy.emplace_back(new okvis::ImuMeasurementDeque(imuMeasurements));
+    imuMeasCanopy.emplace_back(new okvis::ImuMeasurementDeque(imuMeasurements));
 
     std::vector<double> tdAtCreation2{tdAtCreation, tdAtCreation};
 
@@ -144,7 +144,7 @@ TEST(CeresErrorTerms, EpipolarFactor) {
                                          okvis::Extrinsic_p_BC_q_BC,
                                          okvis::ProjectionOptFXY_CXY>(
             cameraGeometryArg, j + 100, measurement12, covariance12,
-            imuMeasCanopy, T_SC, twoTimes, tdAtCreation2, sb2, imuParameters.g);
+            imuMeasCanopy, twoTimes, tdAtCreation2, sb2, imuParameters.g);
 
     // add parameter blocks
     uint64_t id = 1u;

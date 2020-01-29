@@ -19,10 +19,13 @@ class CameraSystemCreator {
  public:
   CameraSystemCreator(const int cameraModelId,
                       const std::string projIntrinsicRep,
-                      const std::string extrinsicRep)
+                      const std::string extrinsicRep,
+                      double td,
+                      double tr)
       : cameraModelId_(cameraModelId),
         projIntrinsicRep_(projIntrinsicRep),
-        extrinsicRep_(extrinsicRep) {}
+        extrinsicRep_(extrinsicRep),
+        timeOffset_(td), readoutTime_(tr) {}
 
   void createDummyCameraSystem(
       std::shared_ptr<okvis::cameras::CameraBase>* cameraGeometry,
@@ -33,7 +36,7 @@ class CameraSystemCreator {
     cameraGeometry->reset(new okvis::cameras::PinholeCamera<
                           okvis::cameras::RadialTangentialDistortion>(
         0, 0, 0, 0, 0, 0,
-        okvis::cameras::RadialTangentialDistortion(0.00, 0.00, 0.000, 0.000)));
+        okvis::cameras::RadialTangentialDistortion(0.00, 0.00, 0.000, 0.000), 0.0, 0.0));
     cameraSystem->reset(new okvis::cameras::NCameraSystem);
     (*cameraSystem)
         ->addCamera(
@@ -135,15 +138,14 @@ class CameraSystemCreator {
   std::shared_ptr<okvis::cameras::CameraBase> createCameraGeometry(
       const int caseId) {
     std::shared_ptr<okvis::cameras::CameraBase> cameraGeometry;
-    const double td = 0.0;
-    const double tr = 0.02;
+
     switch (caseId) {
       case 1:
         cameraGeometry.reset(new okvis::cameras::PinholeCamera<
                              okvis::cameras::RadialTangentialDistortion>(
             640, 480, 350, 350, 322, 238,
             okvis::cameras::RadialTangentialDistortion(0, 0, 0, 0),
-                               td, tr));
+                               timeOffset_, readoutTime_));
         break;
 
       case 0:
@@ -152,7 +154,7 @@ class CameraSystemCreator {
                              okvis::cameras::RadialTangentialDistortion>(
             752, 480, 350, 360, 378, 238,
             okvis::cameras::RadialTangentialDistortion(0.00, 0.00, 0.000,
-                                                       0.000), td, tr));
+                                                       0.000), timeOffset_, readoutTime_));
         break;
     }
     return cameraGeometry;
@@ -166,6 +168,8 @@ class CameraSystemCreator {
   const int cameraModelId_;
   const std::string projIntrinsicRep_;
   const std::string extrinsicRep_;
+  const double timeOffset_;
+  const double readoutTime_;
 };
 
 } // namespace simul

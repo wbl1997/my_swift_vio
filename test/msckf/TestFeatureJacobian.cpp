@@ -40,13 +40,13 @@ TEST(MSCKF, FeatureJacobian) {
   std::string extrinsicModelName = "P_CB";
   int projOptModelId = okvis::ProjectionOptNameToId(projOptModelName);
   int extrinsicModelId = okvis::ExtrinsicModelNameToId(extrinsicModelName);
-
+  double timeOffset = 0.0;
+  double readoutTime = 0.0;
   int cameraOrientation = 0;
-  std::shared_ptr<std::ofstream> inertialStream;
   vioSystemBuilder.createVioSystem(testSetting, trajectoryId,
                                    projOptModelName, extrinsicModelName,
-                                   cameraOrientation, inertialStream,
-                                   "");
+                                   cameraOrientation, timeOffset, readoutTime,
+                                   "", "");
 
   std::vector<uint64_t> multiFrameIds;
   size_t kale = 0;  // imu data counter
