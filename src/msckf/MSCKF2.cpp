@@ -394,8 +394,8 @@ bool MSCKF2::measurementJacobianAIDP(
   const okvis::kinematics::Transformation T_SC0 = camera_rig_.getCameraExtrinsic(camIdx);
   double kpN = obs[1] / imageHeight - 0.5;  // k per N
   const Duration featureTime =
-      Duration(tdEstimate + trEstimate * kpN) -
-      statesIter->second.tdAtCreation;
+      Duration(tdEstimate + trEstimate * kpN -
+      statesIter->second.tdAtCreation);
 
   // for feature i, estimate $p_B^G(t_{f_i})$, $R_B^G(t_{f_i})$,
   // $v_B^G(t_{f_i})$, and $\omega_{GB}^B(t_{f_i})$ with the corresponding
@@ -456,13 +456,13 @@ bool MSCKF2::measurementJacobianAIDP(
   if (FLAGS_use_first_estimate) {
     // compute p_WB, v_WB at (t_{f_i,j}) that use FIRST ESTIMATES of
     // position and velocity, i.e., their linearization point
-    Eigen::Matrix<double, 6, 1> posVelFirstEstimate =
+    std::shared_ptr<const Eigen::Matrix<double, 6, 1>> posVelFirstEstimatePtr =
         statesIter->second.linearizationPoint;
     lP_T_WB =
-        kinematics::Transformation(posVelFirstEstimate.head<3>(), T_WBj.q());
+        kinematics::Transformation(posVelFirstEstimatePtr->head<3>(), T_WBj.q());
     lP_sb = sbj;
-    lP_sb.head<3>() = posVelFirstEstimate.tail<3>();
-    Eigen::Vector3d tempV_WS = posVelFirstEstimate.tail<3>();
+    lP_sb.head<3>() = posVelFirstEstimatePtr->tail<3>();
+    Eigen::Vector3d tempV_WS = posVelFirstEstimatePtr->tail<3>();
 
     if (featureTime >= Duration()) {
       IMUOdometry::propagation(
@@ -586,8 +586,8 @@ bool MSCKF2::measurementJacobian(
   const double trEstimate = camera_rig_.getReadoutTime(camIdx);
   const okvis::kinematics::Transformation T_SC0 = camera_rig_.getCameraExtrinsic(camIdx);
   double kpN = obs[1] / imageHeight - 0.5;  // k per N
-  Duration featureTime = Duration(tdEstimate + trEstimate * kpN) -
-                         statesIter->second.tdAtCreation;
+  Duration featureTime = Duration(tdEstimate + trEstimate * kpN -
+                         statesIter->second.tdAtCreation);
 
   // for feature i, estimate $p_B^G(t_{f_i})$, $R_B^G(t_{f_i})$,
   // $v_B^G(t_{f_i})$, and $\omega_{GB}^B(t_{f_i})$ with the corresponding
@@ -644,11 +644,11 @@ bool MSCKF2::measurementJacobian(
   if (FLAGS_use_first_estimate) {
     lP_T_WB = T_WBj;
     lP_sb = sbj;
-    Eigen::Matrix<double, 6, 1> posVelFirstEstimate =
+    std::shared_ptr<const Eigen::Matrix<double, 6, 1>> posVelFirstEstimatePtr =
         statesIter->second.linearizationPoint;
     lP_T_WB =
-        kinematics::Transformation(posVelFirstEstimate.head<3>(), lP_T_WB.q());
-    lP_sb.head<3>() = posVelFirstEstimate.tail<3>();
+        kinematics::Transformation(posVelFirstEstimatePtr->head<3>(), lP_T_WB.q());
+    lP_sb.head<3>() = posVelFirstEstimatePtr->tail<3>();
 
     Eigen::Vector3d tempV_WS = lP_sb.head<3>();
     if (featureTime >= Duration()) {
@@ -872,7 +872,7 @@ bool MSCKF2::measurementJacobianGeneric(
   statesMap_.at(poseId);
   auto statesIter = statesMap_.find(poseId);
   okvis::Time stateEpoch = statesIter->second.timestamp;
-  double tdAtCreation = statesIter->second.tdAtCreation.toSec();
+  double tdAtCreation = statesIter->second.tdAtCreation;
   std::shared_ptr<okvis::ImuMeasurementDeque> imuMeasDequePtr(
       new okvis::ImuMeasurementDeque(
           inertialMeasForStates_.findWindow(stateEpoch, half_window_)));

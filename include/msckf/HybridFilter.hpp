@@ -289,13 +289,6 @@ class HybridFilter : public Estimator {
            3 * mInCovLmIds.size();
   }
 
-  inline int cameraParamsMinimalDimen() const {
-    const int camIdx = 0;
-    return (fixCameraExtrinsicParams_[camIdx] ? 0 : camera_rig_.getMinimalExtrinsicDimen(camIdx)) +
-           (fixCameraIntrinsicParams_[camIdx] ? 0 : camera_rig_.getMinimalProjectionDimen(camIdx) +
-           camera_rig_.getDistortionDimen(camIdx)) + 2;  // 2 for td and tr
-  }
-
   inline int startIndexOfClonedStates() const {
     return okvis::ceres::ode::NavErrorStateDim + imu_rig_.getImuParamsMinimalDim(0) +
            cameraParamsMinimalDimen();

@@ -219,13 +219,13 @@ bool HybridFilter::addStates(okvis::MultiFramePtr multiFrame,
     if (FLAGS_use_first_estimate) {
       /// use latest estimate to propagate pose, speed and bias, and first
       /// estimate to propagate covariance and Jacobian
-      Eigen::Matrix<double, 6, 1> lP =
+      std::shared_ptr<const Eigen::Matrix<double, 6, 1>> lP =
           statesMap_.rbegin()->second.linearizationPoint;
       Eigen::Vector3d tempV_WS = speedAndBias.head<3>();
       IMUErrorModel<double> tempIEM(speedAndBias.tail<6>(), vTgTsTa);
       numUsedImuMeasurements = IMUOdometry::propagation(
           imuMeasurements, imuParametersVec_.at(0), T_WS, tempV_WS, tempIEM,
-          startTime, propagationTargetTime, &Pkm1, &F_tot, &lP);
+          startTime, propagationTargetTime, &Pkm1, &F_tot, lP.get());
       speedAndBias.head<3>() = tempV_WS;
     } else {
       /// use latest estimate to propagate pose, speed and bias, and covariance
@@ -271,7 +271,7 @@ bool HybridFilter::addStates(okvis::MultiFramePtr multiFrame,
   }
 
   // create a states object:
-  States states(asKeyframe, multiFrame->id(), correctedStateTime, tdEstimate);
+  States states(asKeyframe, multiFrame->id(), correctedStateTime, tdEstimate.toSec());
 
   // check if id was used before
   OKVIS_ASSERT_TRUE_DBG(Exception,
@@ -285,7 +285,8 @@ bool HybridFilter::addStates(okvis::MultiFramePtr multiFrame,
   states.global.at(GlobalStates::T_WS).exists = true;
   states.global.at(GlobalStates::T_WS).id = states.id;
   // set first estimates
-  states.linearizationPoint << T_WS.r(), speedAndBias.head<3>();
+  states.linearizationPoint.reset(new Eigen::Matrix<double, 6, 1>());
+  (*states.linearizationPoint) << T_WS.r(), speedAndBias.head<3>();
 
   if (statesMap_.empty()) {
     referencePoseId_ = states.id;  // set this as reference pose
@@ -1004,8 +1005,8 @@ bool HybridFilter::computeHxf(const uint64_t hpbid, const MapPoint& mp,
   const okvis::kinematics::Transformation T_BC0 = camera_rig_.getCameraExtrinsic(camIdx);
 
   double kpN = obsInPixel[1] / imageHeight - 0.5;  // k per N
-  Duration featureTime = Duration(tdEstimate + trEstimate * kpN) -
-                         statesIter->second.tdAtCreation;
+  Duration featureTime = Duration(tdEstimate + trEstimate * kpN -
+                         statesIter->second.tdAtCreation);
 
   // for feature i, estimate $p_B^G(t_{f_i})$, $R_B^G(t_{f_i})$,
   // $v_B^G(t_{f_i})$, and $\omega_{GB}^B(t_{f_i})$ with the corresponding
@@ -1076,11 +1077,11 @@ bool HybridFilter::computeHxf(const uint64_t hpbid, const MapPoint& mp,
     // compute Jacobians with FIRST ESTIMATES of position and velocity
     lP_T_WB = T_WBj;
     lP_sb = sbj;
-    Eigen::Matrix<double, 6, 1> posVelFirstEstimate =
+    std::shared_ptr<const Eigen::Matrix<double, 6, 1>> posVelFirstEstimatePtr =
         statesIter->second.linearizationPoint;
     lP_T_WB =
-        kinematics::Transformation(posVelFirstEstimate.head<3>(), lP_T_WB.q());
-    lP_sb.head<3>() = posVelFirstEstimate.tail<3>();
+        kinematics::Transformation(posVelFirstEstimatePtr->head<3>(), lP_T_WB.q());
+    lP_sb.head<3>() = posVelFirstEstimatePtr->tail<3>();
 
     Eigen::Vector3d tempV_WS = lP_sb.head<3>();
     if (featureTime >= Duration()) {
@@ -1305,8 +1306,8 @@ bool HybridFilter::featureJacobian(
                     "the IMU measurement does not exist");
 
     double kpN = obsInPixel[kale][1] / imageHeight - 0.5;  // k per N
-    Duration featureTime = Duration(tdEstimate + trEstimate * kpN) -
-                           statesIter->second.tdAtCreation;
+    Duration featureTime = Duration(tdEstimate + trEstimate * kpN -
+                           statesIter->second.tdAtCreation);
 
     // for feature i, estimate $p_B^G(t_{f_i})$, $R_B^G(t_{f_i})$,
     // $v_B^G(t_{f_i})$, and $\omega_{GB}^B(t_{f_i})$ with the corresponding
@@ -1378,11 +1379,11 @@ bool HybridFilter::featureJacobian(
     if (FLAGS_use_first_estimate) {
       lP_T_WB = T_WBj;
       lP_sb = sbj;
-      Eigen::Matrix<double, 6, 1> posVelFirstEstimate =
+      std::shared_ptr<const Eigen::Matrix<double, 6, 1>> posVelFirstEstimatePtr =
           statesIter->second.linearizationPoint;
-      lP_T_WB = kinematics::Transformation(posVelFirstEstimate.head<3>(),
+      lP_T_WB = kinematics::Transformation(posVelFirstEstimatePtr->head<3>(),
                                            lP_T_WB.q());
-      lP_sb.head<3>() = posVelFirstEstimate.tail<3>();
+      lP_sb.head<3>() = posVelFirstEstimatePtr->tail<3>();
 
       Eigen::Vector3d tempV_WS = lP_sb.head<3>();
 
@@ -2722,8 +2723,8 @@ bool HybridFilter::EpipolarMeasurement::measurementJacobian(
 
     double kpN = obsInPixel2[j][1] / imageHeight_ - 0.5;  // k per N
     dtij_dtr[j] = kpN;
-    Duration featureTime = Duration(tdEstimate + trEstimate * kpN) -
-                           statesIter->second.tdAtCreation;
+    Duration featureTime = Duration(tdEstimate + trEstimate * kpN -
+                           statesIter->second.tdAtCreation);
     featureDelay[j] = featureTime.toSec();
     // for feature i, estimate $p_B^G(t_{f_i})$, $R_B^G(t_{f_i})$,
     // $v_B^G(t_{f_i})$, and $\omega_{GB}^B(t_{f_i})$ with the corresponding
@@ -2765,11 +2766,11 @@ bool HybridFilter::EpipolarMeasurement::measurementJacobian(
     kinematics::Transformation lP_T_WB = T_WB;
     Eigen::Vector3d lP_v = sb.head<3>();
     if (FLAGS_use_first_estimate) {
-      Eigen::Matrix<double, 6, 1> posVelFirstEstimate =
+      std::shared_ptr<const Eigen::Matrix<double, 6, 1>> posVelFirstEstimatePtr =
           statesIter->second.linearizationPoint;
       lP_T_WB =
-          kinematics::Transformation(posVelFirstEstimate.head<3>(), T_WBj.q());
-      lP_v = posVelFirstEstimate.tail<3>();
+          kinematics::Transformation(posVelFirstEstimatePtr->head<3>(), T_WBj.q());
+      lP_v = posVelFirstEstimatePtr->tail<3>();
       if (featureTime >= Duration()) {
         IMUOdometry::propagation(imuMeas, filter_.imuParametersVec_.at(0), lP_T_WB,
                                  lP_v, iem, stateEpoch,
