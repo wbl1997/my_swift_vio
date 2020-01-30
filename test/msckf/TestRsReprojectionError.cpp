@@ -37,8 +37,16 @@ void setupPoseOptProblem(bool perturbPose, bool rollingShutter,
                          bool noisyKeypoint) {
   // srand((unsigned int) time(0));
   bool expectedZeroResidual = !(perturbPose || rollingShutter || noisyKeypoint);
-  ::ceres::Problem problem;
-  std::cout << "set up a random geometry... " << std::flush;
+
+  ::ceres::Problem::Options problemOptions;
+  problemOptions.local_parameterization_ownership =
+      ::ceres::Ownership::TAKE_OWNERSHIP;
+  problemOptions.loss_function_ownership =
+      ::ceres::Ownership::TAKE_OWNERSHIP;
+  problemOptions.cost_function_ownership =
+      ::ceres::Ownership::TAKE_OWNERSHIP;
+  ::ceres::Problem problem(problemOptions);
+
   okvis::kinematics::Transformation T_WS;
   T_WS.setRandom(10.0, M_PI);
   okvis::kinematics::Transformation T_disturb;
@@ -68,19 +76,7 @@ void setupPoseOptProblem(bool perturbPose, bool rollingShutter,
 
   problem.SetParameterBlockVariable(poseParameterBlock.parameters());
   problem.SetParameterBlockConstant(extrinsicsParameterBlock.parameters());
-  std::cout << " [ OK ] " << std::endl;
 
-  // let's use our own local quaternion perturbation
-  // TODO(jhuai): do we still need to setParameterization?
-  //  std::cout << "setting local parameterization for pose... " << std::flush;
-  //  problem.SetParameterization(poseParameterBlock.parameters(),
-  //                              poseLocalParameterization);
-  //  problem.SetParameterization(extrinsicsParameterBlock.parameters(),
-  //                              poseLocalParameterization);
-  //  std::cout << " [ OK ] " << std::endl;
-
-  // set up a random camera geometry
-  std::cout << "set up a random camera geometry... " << std::flush;
   typedef okvis::cameras::PinholeCamera<okvis::cameras::EquidistantDistortion>
       DistortedPinholeCameraGeometry;
   const int distortionDim =
@@ -89,7 +85,6 @@ void setupPoseOptProblem(bool perturbPose, bool rollingShutter,
   std::shared_ptr<DistortedPinholeCameraGeometry> cameraGeometry =
       std::static_pointer_cast<DistortedPinholeCameraGeometry>(
           DistortedPinholeCameraGeometry::createTestObject());
-  std::cout << " [ OK ] " << std::endl;
 
   Eigen::VectorXd intrinsicParams;
   cameraGeometry->getIntrinsics(intrinsicParams);
@@ -161,7 +156,6 @@ void setupPoseOptProblem(bool perturbPose, bool rollingShutter,
 
   // get some random points and build error terms
   const size_t N = 100;
-  const int frameId = 1;
   std::cout << "create N=" << N
             << " visible points and add respective reprojection error terms... "
             << std::endl;
@@ -476,15 +470,6 @@ void setupPoseOptProblem(bool perturbPose, bool rollingShutter,
   ::ceres::Solver::Summary summary;
   Solve(options, &problem, &summary);
 
-  // delete
-  // Do not delete the below things which are likely managed by ceres solver
-  // {
-  //  for (size_t j = 0; j < allCostFunctions.size(); ++j) {
-  //    delete allCostFunctions[j];
-  //  }
-  //  delete homogeneousPointLocalParameterization;
-  //  delete poseLocalParameterization;
-  // }
   for (size_t j = 0; j < allPointBlocks.size(); ++j) {
     delete allPointBlocks[j];
   }

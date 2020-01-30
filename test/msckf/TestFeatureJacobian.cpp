@@ -28,31 +28,110 @@ void computeNavErrors(
   Eigen::Vector3d deltaV = speedAndBias_est.head<3>() - v_WS_true;
   navError->segment<3>(index) = deltaV;
 }
+
+int examinLandmarkStackedJacobian(const okvis::MapPoint& mapPoint,
+                                   std::shared_ptr<okvis::MSCKF2> estimator) {
+  Eigen::MatrixXd H_oi[2];
+  Eigen::Matrix<double, Eigen::Dynamic, 1> r_oi[2];
+  Eigen::MatrixXd R_oi[2];
+  bool jacOk1 =
+      estimator->featureJacobian(mapPoint, H_oi[0], r_oi[0], R_oi[0], nullptr);
+  bool jacOk2 = estimator->featureJacobianGeneric(mapPoint, H_oi[1], r_oi[1],
+                                                  R_oi[1], nullptr);
+  EXPECT_EQ(jacOk1, jacOk2) << "featureJacobian status";
+  if (jacOk1 && jacOk2) {
+    Eigen::MatrixXd information = R_oi[0].inverse();
+    Eigen::LLT<Eigen::MatrixXd> lltOfInformation(information);
+    Eigen::MatrixXd squareRootInformation =
+        lltOfInformation.matrixL().transpose();
+    const int cameraMinimalDimWoTime =
+        estimator->cameraParamsMinimalDimen() - 2;
+    const int obsMinus3 = H_oi[1].rows();
+    H_oi[0] = squareRootInformation * H_oi[0];
+    r_oi[0] = squareRootInformation * r_oi[0];
+    R_oi[0] =
+        squareRootInformation * R_oi[0] * squareRootInformation.transpose();
+    Eigen::MatrixXd H_diff = H_oi[1] - H_oi[0];
+    Eigen::VectorXd r_diff = r_oi[1] - r_oi[0];
+    Eigen::MatrixXd R_diff = R_oi[1] - R_oi[0];
+
+    EXPECT_LT(H_diff.topLeftCorner(obsMinus3, cameraMinimalDimWoTime)
+                  .lpNorm<Eigen::Infinity>(),
+              1e-6)
+        << "H_oi camera params\nH_diff camera params without time\n"
+        << H_diff.topLeftCorner(obsMinus3, cameraMinimalDimWoTime);
+
+    Eigen::MatrixXd H_time_diff =
+        H_diff.block(0, cameraMinimalDimWoTime, obsMinus3, 2);
+    Eigen::MatrixXd H_time_diff_spikes =
+        (H_time_diff.cwiseAbs().array() > 0.1)
+            .select(H_time_diff.cwiseAbs().array(), 0.0);
+    Eigen::MatrixXd H_time_ratio = H_time_diff_spikes.cwiseQuotient(
+        (H_oi[0] + H_oi[1])
+            .block(0, cameraMinimalDimWoTime, obsMinus3, 2)
+            .cwiseAbs());
+    EXPECT_LT(H_time_ratio.lpNorm<Eigen::Infinity>(), 4e-1)
+        << "H_oi camera td tr\nH_time_diff_spikes\n"
+        << H_time_diff_spikes
+        << "\n(H_oi[0] + H_oi[1]).block(0, cameraMinimalDimWoTime, obsMinus3, "
+           "2)\n"
+        << (H_oi[0] + H_oi[1]).block(0, cameraMinimalDimWoTime, obsMinus3, 2)
+        << "\nH_time_ratio\n"
+        << H_time_ratio;
+    EXPECT_LT(H_diff
+                  .block(0, cameraMinimalDimWoTime + 2, obsMinus3,
+                         H_diff.cols() - cameraMinimalDimWoTime - 2)
+                  .lpNorm<Eigen::Infinity>(),
+              1e-1)
+        << "H_diff rest XBj\nH_oi[1]\n"
+        << H_oi[1] << "\nH_oi[0]\n"
+        << H_oi[0] << "\nDiff\n"
+        << H_diff;
+
+    EXPECT_LT(r_diff.lpNorm<Eigen::Infinity>(), 1e-6) << "r_oi";
+    EXPECT_LT(R_diff.lpNorm<Eigen::Infinity>(), 1e-6) << "R_oi";
+    return 1;
+  }
+  return 0;
 }
+
+int examineLandmarkMeasurementJacobian(const okvis::MapPoint& mapPoint,
+                                std::shared_ptr<okvis::MSCKF2> estimator) {
+  // init landmark parameterization
+
+  // calculate Jacobians for at least three measurements
+  // compare Jacobians against auto diff
+
+  return 0;
+}
+
+} // namespace
 
 void testPointLandmarkJacobian(std::string projOptModelName,
                                std::string extrinsicModelName,
                                std::string outputFile,
                                double timeOffset,
-                               double readoutTime) {
+                               double readoutTime,
+                               int landmarkModelId = 0,
+                               int cameraObservationModelId = 0,
+                               bool examineMeasurementJacobian = false) {
   simul::VioTestSystemBuilder vioSystemBuilder;
   bool addPriorNoise = true;
   int32_t estimatorType = 4;
   okvis::TestSetting testSetting(true, addPriorNoise, false, true, true, 0.5, 0.5, estimatorType);
   int trajectoryId = 0; // Torus
   int cameraOrientation = 0;
-
   vioSystemBuilder.createVioSystem(testSetting, trajectoryId,
                                    projOptModelName, extrinsicModelName,
                                    cameraOrientation, timeOffset, readoutTime,
                                    "", "");
-
   std::vector<uint64_t> multiFrameIds;
   size_t kale = 0;  // imu data counter
   bool bStarted = false;
   int frameCount = -1;               // number of frames used in estimator
   int trackedFeatures = 0;  // feature tracks observed in a frame
   const int cameraIntervalRatio = 10; // number imu meas for 1 camera frame
+
   std::vector<okvis::Time> times = vioSystemBuilder.sampleTimes();
   okvis::Time lastKFTime = times.front();
   okvis::ImuMeasurementDeque trueBiases = vioSystemBuilder.trueBiases();
@@ -64,6 +143,9 @@ void testPointLandmarkJacobian(std::string projOptModelName,
   std::shared_ptr<okvis::Estimator> genericEstimator = vioSystemBuilder.mutableEstimator();
   std::shared_ptr<okvis::MSCKF2> estimator =
       std::dynamic_pointer_cast<okvis::MSCKF2>(genericEstimator);
+  estimator->setLandmarkModel(landmarkModelId);
+  estimator->setCameraObservationModel(cameraObservationModelId);
+
   std::shared_ptr<okvis::SimulationFrontend> frontend = vioSystemBuilder.mutableFrontend();
   std::shared_ptr<const okvis::cameras::NCameraSystem> cameraSystem0 =
       vioSystemBuilder.trueCameraSystem();
@@ -139,74 +221,31 @@ void testPointLandmarkJacobian(std::string projOptModelName,
       estimator->setKeyframe(mf->id(), asKeyframe);
     }
 
-    // examine camera measurement Jacobians
     if (frameCount == 100) {
       okvis::PointMap landmarkMap;
       size_t numLandmarks = estimator->getLandmarks(landmarkMap);
-      int mpCount = 0;
+      int featureJacobianLandmarkCount = 0;
+      int measurementJacobianCount = 0;
       for (auto mpIter = landmarkMap.begin(); mpIter != landmarkMap.end(); ++mpIter) {
         uint64_t latestFrameId = estimator->currentFrameId();
         const okvis::MapPoint& mapPoint = mpIter->second;
         auto obsIter = std::find_if(mapPoint.observations.begin(), mapPoint.observations.end(),
                                     msckf::IsObservedInFrame(latestFrameId));
         if (obsIter != mapPoint.observations.end()) {
-          continue;
+          continue; // only examine observations of landmarks disappeared in current frame.
         }
-        Eigen::MatrixXd H_oi[2];
-        Eigen::Matrix<double, Eigen::Dynamic, 1> r_oi[2];
-        Eigen::MatrixXd R_oi[2];
-        bool jacOk1 = estimator->featureJacobian(mpIter->second, H_oi[0], r_oi[0], R_oi[0], nullptr);
-        bool jacOk2 = estimator->featureJacobianGeneric(mpIter->second, H_oi[1], r_oi[1], R_oi[1], nullptr);
-        EXPECT_EQ(jacOk1, jacOk2) << "featureJacobian status";
-        if (jacOk1 && jacOk2) {
-          Eigen::MatrixXd information = R_oi[0].inverse();
-          Eigen::LLT<Eigen::MatrixXd> lltOfInformation(information);
-          Eigen::MatrixXd squareRootInformation =
-              lltOfInformation.matrixL().transpose();
-          const int cameraMinimalDimWoTime = estimator->cameraParamsMinimalDimen() - 2;
-          const int obsMinus3 = H_oi[1].rows();
-          H_oi[0] = squareRootInformation * H_oi[0];
-          r_oi[0] = squareRootInformation * r_oi[0];
-          R_oi[0] = squareRootInformation * R_oi[0] *
-              squareRootInformation.transpose();
-          Eigen::MatrixXd H_diff = H_oi[1]- H_oi[0];
-          Eigen::VectorXd r_diff = r_oi[1] - r_oi[0];
-          Eigen::MatrixXd R_diff = R_oi[1]- R_oi[0];
-
-          EXPECT_LT(H_diff.topLeftCorner(obsMinus3, cameraMinimalDimWoTime).lpNorm<Eigen::Infinity>(),
-                    1e-6) << "H_oi camera params\nH_diff camera params without time\n"
-                          << H_diff.topLeftCorner(obsMinus3, cameraMinimalDimWoTime);
-
-          Eigen::MatrixXd H_time_diff =
-              H_diff.block(0, cameraMinimalDimWoTime, obsMinus3, 2);
-          Eigen::MatrixXd H_time_diff_spikes =
-              (H_time_diff.cwiseAbs().array() > 0.1)
-                  .select(H_time_diff.cwiseAbs().array(), 0.0);
-          Eigen::MatrixXd H_time_ratio =
-              H_time_diff_spikes.cwiseQuotient(
-                (H_oi[0] + H_oi[1]).block(0, cameraMinimalDimWoTime, obsMinus3, 2).cwiseAbs());
-          EXPECT_LT(H_time_ratio.lpNorm<Eigen::Infinity>(), 4e-1)
-              << "H_oi camera td tr\nH_time_diff_spikes\n"
-              << H_time_diff_spikes << "\n(H_oi[0] + H_oi[1]).block(0, cameraMinimalDimWoTime, obsMinus3, 2)\n"
-              << (H_oi[0] + H_oi[1]).block(0, cameraMinimalDimWoTime, obsMinus3, 2)
-              << "\nH_time_ratio\n" << H_time_ratio;
-          EXPECT_LT(H_diff
-                        .block(0, cameraMinimalDimWoTime + 2, obsMinus3,
-                               H_diff.cols() - cameraMinimalDimWoTime - 2)
-                        .lpNorm<Eigen::Infinity>(),
-                    1e-1)
-              << "H_diff rest XBj\nH_oi[1]\n"
-              << H_oi[1] << "\nH_oi[0]\n"
-              << H_oi[0] << "\nDiff\n"
-              << H_diff;
-
-          EXPECT_LT(r_diff.lpNorm<Eigen::Infinity>(), 1e-6) << "r_oi";
-          EXPECT_LT(R_diff.lpNorm<Eigen::Infinity>(), 1e-6) << "R_oi";
-
-          ++mpCount;
+        if (examineMeasurementJacobian) {
+          int examined = examineLandmarkMeasurementJacobian(mapPoint, estimator);
+          measurementJacobianCount += examined;
+        } else {
+          int examined = examinLandmarkStackedJacobian(mapPoint, estimator);
+          featureJacobianLandmarkCount += examined;
         }
       }
-      LOG(INFO) << "Examined " << mpCount << " out of " << numLandmarks << " landmarks";
+      LOG(INFO) << "Examined " << featureJacobianLandmarkCount
+                << "stacked landmark Jacobians, and "
+                << measurementJacobianCount << " measurement Jacobians of "
+                << numLandmarks << " landmarks";
     }
 
     size_t maxIterations = 10u;
@@ -264,4 +303,20 @@ TEST(MSCKF, FeatureJacobianVariableTime) {
   std::string extrinsicModelName = "P_CB";
   std::string outputFile = FLAGS_log_dir + "/MSCKF_Torus_RS.txt";
   testPointLandmarkJacobian(projOptModelName, extrinsicModelName, outputFile, 0.0, 0.01);
+}
+
+TEST(MSCKF, MeasurementJacobianChordalDistance) {
+  // also inspect the Jacobians relative to velocity
+  std::string projOptModelName = "FXY_CXY";
+  std::string extrinsicModelName = "P_CB";
+  std::string outputFile = FLAGS_log_dir + "/MSCKF_Torus_RS_Chordal.txt";
+  testPointLandmarkJacobian(projOptModelName, extrinsicModelName, outputFile, 0.0, 0.0, 0, 0, true);
+}
+
+TEST(MSCKF, FeatureJacobianChordalDistance) {
+  // also inspect the Jacobians relative to velocity
+  std::string projOptModelName = "FXY_CXY";
+  std::string extrinsicModelName = "P_CB";
+  std::string outputFile = FLAGS_log_dir + "/MSCKF_Torus_Chordal.txt";
+  testPointLandmarkJacobian(projOptModelName, extrinsicModelName, outputFile, 0.0, 0.0, 2, 2, true);
 }

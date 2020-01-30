@@ -375,7 +375,6 @@ bool MSCKF2::measurementJacobianAIDP(
   // $\frac{\partial [z_u, z_v]^T}{\partial (delta\p_{B_a}^G \alpha of q_{B_a}^G, \delta v_{B_a}^G)}$
   Eigen::Matrix<double, 2, kClonedStateMinimalDimen> J_XBa;
 
-  ImuMeasurement interpolatedInertialData;
   kinematics::Transformation T_WBj;
   get_T_WS(poseId, T_WBj);
   SpeedAndBiases sbj;
@@ -397,39 +396,14 @@ bool MSCKF2::measurementJacobianAIDP(
       Duration(tdEstimate + trEstimate * kpN -
       statesIter->second.tdAtCreation);
 
-  // for feature i, estimate $p_B^G(t_{f_i})$, $R_B^G(t_{f_i})$,
-  // $v_B^G(t_{f_i})$, and $\omega_{GB}^B(t_{f_i})$ with the corresponding
-  // states' LATEST ESTIMATES and imu measurements
   kinematics::Transformation T_WB = T_WBj;
   SpeedAndBiases sb = sbj;
+  ImuMeasurement interpolatedInertialData;
   Eigen::Matrix<double, 27, 1> vTGTSTA = imu_rig_.getImuAugmentedEuclideanParams();
-  IMUErrorModel<double> iem(sb.tail<6>(), vTGTSTA);
-  if (FLAGS_use_RK4) {
-    if (featureTime >= Duration()) {
-      IMUOdometry::propagation_RungeKutta(imuMeas, imuParametersVec_.at(0),
-                                          T_WB, sb, vTGTSTA, stateEpoch,
-                                          stateEpoch + featureTime);
-    } else {
-      IMUOdometry::propagationBackward_RungeKutta(
-          imuMeas, imuParametersVec_.at(0), T_WB, sb, vTGTSTA, stateEpoch,
-          stateEpoch + featureTime);
-    }
-  } else {
-    Eigen::Vector3d tempV_WS = sb.head<3>();
-    if (featureTime >= Duration()) {
-      IMUOdometry::propagation(
-          imuMeas, imuParametersVec_.at(0), T_WB, tempV_WS, iem, stateEpoch,
-          stateEpoch + featureTime);
-    } else {
-      IMUOdometry::propagationBackward(
-          imuMeas, imuParametersVec_.at(0), T_WB, tempV_WS, iem, stateEpoch,
-          stateEpoch + featureTime);
-    }
-    sb.head<3>() = tempV_WS;
-  }
+  poseAndVelocityAtFeatureObservation(
+      imuMeas, vTGTSTA.data(), imuParametersVec_.at(0), stateEpoch, featureTime,
+      &T_WB, &sb, &interpolatedInertialData);
 
-  IMUOdometry::interpolateInertialData(imuMeas, iem, stateEpoch + featureTime,
-                                       interpolatedInertialData);
   okvis::kinematics::Transformation T_GA =
       T_WBa * T_SC0;  // anchor frame to global frame
   okvis::kinematics::Transformation T_CA =
@@ -462,18 +436,9 @@ bool MSCKF2::measurementJacobianAIDP(
         kinematics::Transformation(posVelFirstEstimatePtr->head<3>(), T_WBj.q());
     lP_sb = sbj;
     lP_sb.head<3>() = posVelFirstEstimatePtr->tail<3>();
-    Eigen::Vector3d tempV_WS = posVelFirstEstimatePtr->tail<3>();
-
-    if (featureTime >= Duration()) {
-      IMUOdometry::propagation(
-          imuMeas, imuParametersVec_.at(0), lP_T_WB, tempV_WS, iem, stateEpoch,
-          stateEpoch + featureTime);
-    } else {
-      IMUOdometry::propagationBackward(
-          imuMeas, imuParametersVec_.at(0), lP_T_WB, tempV_WS, iem, stateEpoch,
-          stateEpoch + featureTime);
-    }
-    lP_sb.head<3>() = tempV_WS;
+    poseAndLinearVelocityAtFeatureObservation(
+        imuMeas, vTGTSTA.data(), imuParametersVec_.at(0), stateEpoch,
+        featureTime, &lP_T_WB, &lP_sb);
   }
 
   double rho = ab1rho[3];
@@ -566,7 +531,6 @@ bool MSCKF2::measurementJacobian(
 
   Eigen::Vector2d J_td;
   Eigen::Vector2d J_tr;
-  ImuMeasurement interpolatedInertialData;
 
   kinematics::Transformation T_WBj;
   get_T_WS(poseId, T_WBj);
@@ -595,35 +559,12 @@ bool MSCKF2::measurementJacobian(
 
   kinematics::Transformation T_WB = T_WBj;
   SpeedAndBiases sb = sbj;
+  ImuMeasurement interpolatedInertialData;
   Eigen::Matrix<double, 27, 1> vTGTSTA = imu_rig_.getImuAugmentedEuclideanParams();
-  IMUErrorModel<double> iem(sb.tail<6>(), vTGTSTA);
-  if (FLAGS_use_RK4) {
-    if (featureTime >= Duration()) {
-      IMUOdometry::propagation_RungeKutta(imuMeas, imuParametersVec_.at(0),
-                                          T_WB, sb, vTGTSTA, stateEpoch,
-                                          stateEpoch + featureTime);
-    } else {
-      IMUOdometry::propagationBackward_RungeKutta(
-          imuMeas, imuParametersVec_.at(0), T_WB, sb, vTGTSTA, stateEpoch,
-          stateEpoch + featureTime);
-    }
-  } else {
-    Eigen::Vector3d tempV_WS = sb.head<3>();
+  poseAndVelocityAtFeatureObservation(
+      imuMeas, vTGTSTA.data(), imuParametersVec_.at(0), stateEpoch, featureTime,
+      &T_WB, &sb, &interpolatedInertialData);
 
-    if (featureTime >= Duration()) {
-      IMUOdometry::propagation(
-          imuMeas, imuParametersVec_.at(0), T_WB, tempV_WS, iem, stateEpoch,
-          stateEpoch + featureTime);
-    } else {
-      IMUOdometry::propagationBackward(
-          imuMeas, imuParametersVec_.at(0), T_WB, tempV_WS, iem, stateEpoch,
-          stateEpoch + featureTime);
-    }
-    sb.head<3>() = tempV_WS;
-  }
-
-  IMUOdometry::interpolateInertialData(imuMeas, iem, stateEpoch + featureTime,
-                                       interpolatedInertialData);
   kinematics::Transformation T_CW = (T_WB * T_SC0).inverse();
   Eigen::Vector4d hp_C = T_CW * v4Xhomog;
   Eigen::Vector3d pfiinC = hp_C.head<3>();
@@ -649,18 +590,9 @@ bool MSCKF2::measurementJacobian(
     lP_T_WB =
         kinematics::Transformation(posVelFirstEstimatePtr->head<3>(), lP_T_WB.q());
     lP_sb.head<3>() = posVelFirstEstimatePtr->tail<3>();
-
-    Eigen::Vector3d tempV_WS = lP_sb.head<3>();
-    if (featureTime >= Duration()) {
-      IMUOdometry::propagation(
-          imuMeas, imuParametersVec_.at(0), lP_T_WB, tempV_WS, iem, stateEpoch,
-          stateEpoch + featureTime);
-    } else {
-      IMUOdometry::propagationBackward(
-          imuMeas, imuParametersVec_.at(0), lP_T_WB, tempV_WS, iem, stateEpoch,
-          stateEpoch + featureTime);
-    }
-    lP_sb.head<3>() = tempV_WS;
+    poseAndLinearVelocityAtFeatureObservation(
+        imuMeas, vTGTSTA.data(), imuParametersVec_.at(0), stateEpoch,
+        featureTime, &lP_T_WB, &lP_sb);
   }
 
   J_td = pointJacobian3 * T_SC0.C().transpose() *

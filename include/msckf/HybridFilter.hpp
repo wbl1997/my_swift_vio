@@ -474,6 +474,46 @@ class HybridFilter : public Estimator {
   int landmarkModelId_; // see PointLandmarkModels.hpp
 };
 
+/**
+ * @brief poseAndVelocityAtFeatureObservation for feature i, estimate
+ *     $p_B^G(t_{f_i})$, $R_B^G(t_{f_i})$, $v_B^G(t_{f_i})$, and
+ *     $\omega_{GB}^B(t_{f_i})$ with imu measurements
+ * @param imuMeas cover stateEpoch to the extent of featureTime
+ * @param imuAugmentedParams imu params exccept for gyro and accel biases
+ * @param imuParameters
+ * @param stateEpoch
+ * @param featureTime
+ * @param T_WB[in/out] in: pose at stateEpoch;
+ *     out: pose at stateEpoch + featureTime
+ * @param sb[in/out] in: speed and biases at stateEpoch;
+ *     out: speed and biases at stateEpoch + featureTime
+ * @param interpolatedInertialData[out] inertial measurements at stateEpoch +
+ *     featureTime after correction for biases etc.
+ */
+void poseAndVelocityAtFeatureObservation(
+    const ImuMeasurementDeque& imuMeas, const double* imuAugmentedParams,
+    const okvis::ImuParameters& imuParameters, const okvis::Time& stateEpoch,
+    const okvis::Duration& featureTime, kinematics::Transformation* T_WB,
+    SpeedAndBiases* sb, okvis::ImuMeasurement* interpolatedInertialData);
+
+/**
+ * @brief poseAndLinearVelocityAtFeatureObservation Similarly to
+ *     poseAndVelocityAtFeatureObservation except that the inertial data is not
+ *     interpolated and the RK4 propagation is not used.
+ * @param imuMeas
+ * @param imuAugmentedParams
+ * @param imuParameters
+ * @param stateEpoch
+ * @param featureTime
+ * @param T_WB
+ * @param sb
+ */
+void poseAndLinearVelocityAtFeatureObservation(
+    const ImuMeasurementDeque& imuMeas, const double* imuAugmentedParams,
+    const okvis::ImuParameters& imuParameters, const okvis::Time& stateEpoch,
+    const okvis::Duration& featureTime, kinematics::Transformation* T_WB,
+    SpeedAndBiases* sb);
+
 }  // namespace okvis
 
 #endif /* INCLUDE_OKVIS_HYBRID_FILTER_HPP_ */

@@ -985,8 +985,7 @@ bool HybridFilter::computeHxf(const uint64_t hpbid, const MapPoint& mp,
   Eigen::Vector2d J_tr;
   Eigen::Matrix<double, 2, 9>
       J_XBa;  // $\frac{\partial [z_u, z_v]^T}{\partial delta\p_{B_a}^G)$
-  ImuMeasurement
-      interpolatedInertialData;  // inertial data at the feature capture epoch
+
 
   kinematics::Transformation T_WBj;
   get_T_WS(currFrameId, T_WBj);
@@ -1017,35 +1016,13 @@ bool HybridFilter::computeHxf(const uint64_t hpbid, const MapPoint& mp,
 
   kinematics::Transformation T_WB = T_WBj;
   SpeedAndBiases sb = sbj;
-
+  ImuMeasurement
+      interpolatedInertialData;  // inertial data at the feature capture epoch
   Eigen::Matrix<double, 27, 1> vTGTSTA = imu_rig_.getImuAugmentedEuclideanParams();
-  IMUErrorModel<double> iem(sb.tail<6>(), vTGTSTA);
-  if (FLAGS_use_RK4) {
-    if (featureTime >= Duration()) {
-      IMUOdometry::propagation_RungeKutta(imuMeas, imuParametersVec_.at(0),
-                                          T_WB, sb, vTGTSTA, stateEpoch,
-                                          stateEpoch + featureTime);
-    } else {
-      IMUOdometry::propagationBackward_RungeKutta(
-          imuMeas, imuParametersVec_.at(0), T_WB, sb, vTGTSTA, stateEpoch,
-          stateEpoch + featureTime);
-    }
-  } else {
-    Eigen::Vector3d tempV_WS = sb.head<3>();
-    if (featureTime >= Duration()) {
-      IMUOdometry::propagation(
-          imuMeas, imuParametersVec_.at(0), T_WB, tempV_WS, iem, stateEpoch,
-          stateEpoch + featureTime);
-    } else {
-      IMUOdometry::propagationBackward(
-          imuMeas, imuParametersVec_.at(0), T_WB, tempV_WS, iem, stateEpoch,
-          stateEpoch + featureTime);
-    }
-    sb.head<3>() = tempV_WS;
-  }
+  poseAndVelocityAtFeatureObservation(
+      imuMeas, vTGTSTA.data(), imuParametersVec_.at(0), stateEpoch, featureTime,
+      &T_WB, &sb, &interpolatedInertialData);
 
-  IMUOdometry::interpolateInertialData(imuMeas, iem, stateEpoch + featureTime,
-                                       interpolatedInertialData);
   okvis::kinematics::Transformation T_WBa;
   get_T_WS(anchorId, T_WBa);
   okvis::kinematics::Transformation T_GA(
@@ -1085,18 +1062,9 @@ bool HybridFilter::computeHxf(const uint64_t hpbid, const MapPoint& mp,
     lP_T_WB =
         kinematics::Transformation(posVelFirstEstimatePtr->head<3>(), lP_T_WB.q());
     lP_sb.head<3>() = posVelFirstEstimatePtr->tail<3>();
-
-    Eigen::Vector3d tempV_WS = lP_sb.head<3>();
-    if (featureTime >= Duration()) {
-      IMUOdometry::propagation(
-          imuMeas, imuParametersVec_.at(0), lP_T_WB, tempV_WS, iem, stateEpoch,
-          stateEpoch + featureTime);
-    } else {
-      IMUOdometry::propagationBackward(
-          imuMeas, imuParametersVec_.at(0), lP_T_WB, tempV_WS, iem, stateEpoch,
-          stateEpoch + featureTime);
-    }
-    lP_sb.head<3>() = tempV_WS;
+    poseAndLinearVelocityAtFeatureObservation(
+        imuMeas, vTGTSTA.data(), imuParametersVec_.at(0), stateEpoch,
+        featureTime, &lP_T_WB, &lP_sb);
   }
   double rho = ab1rho[3];
   okvis::kinematics::Transformation T_BcA =
@@ -1277,7 +1245,6 @@ bool HybridFilter::featureJacobian(
   Eigen::Matrix<double, 2, Eigen::Dynamic> H_x(
       2, numCamPoseStates);  // Jacobians of a feature w.r.t these states
 
-  ImuMeasurement interpolatedInertialData;
 
   // containers of the above Jacobians for all observations of a mappoint
   std::vector<
@@ -1318,35 +1285,11 @@ bool HybridFilter::featureJacobian(
 
     kinematics::Transformation T_WB = T_WBj;
     SpeedAndBiases sb = sbj;
+    ImuMeasurement interpolatedInertialData;
     Eigen::Matrix<double, 27, 1> vTGTSTA = imu_rig_.getImuAugmentedEuclideanParams();
-    IMUErrorModel<double> iem(sb.tail<6>(), vTGTSTA);
-    if (FLAGS_use_RK4) {
-      if (featureTime >= Duration()) {
-        IMUOdometry::propagation_RungeKutta(imuMeas, imuParametersVec_.at(0),
-                                            T_WB, sb, vTGTSTA, stateEpoch,
-                                            stateEpoch + featureTime);
-      } else {
-        IMUOdometry::propagationBackward_RungeKutta(
-            imuMeas, imuParametersVec_.at(0), T_WB, sb, vTGTSTA, stateEpoch,
-            stateEpoch + featureTime);
-      }
-    } else {
-      Eigen::Vector3d tempV_WS = sb.head<3>();
-
-      if (featureTime >= Duration()) {
-        IMUOdometry::propagation(
-            imuMeas, imuParametersVec_.at(0), T_WB, tempV_WS, iem, stateEpoch,
-            stateEpoch + featureTime);
-      } else {
-        IMUOdometry::propagationBackward(
-            imuMeas, imuParametersVec_.at(0), T_WB, tempV_WS, iem, stateEpoch,
-            stateEpoch + featureTime);
-      }
-      sb.head<3>() = tempV_WS;
-    }
-
-    IMUOdometry::interpolateInertialData(imuMeas, iem, stateEpoch + featureTime,
-                                         interpolatedInertialData);
+    poseAndVelocityAtFeatureObservation(
+        imuMeas, vTGTSTA.data(), imuParametersVec_.at(0), stateEpoch, featureTime,
+        &T_WB, &sb, &interpolatedInertialData);
 
     okvis::kinematics::Transformation T_CA =
         (T_WB * T_BC0).inverse() * T_GA;  // anchor frame to current camera frame
@@ -1387,19 +1330,9 @@ bool HybridFilter::featureJacobian(
       lP_T_WB = kinematics::Transformation(posVelFirstEstimatePtr->head<3>(),
                                            lP_T_WB.q());
       lP_sb.head<3>() = posVelFirstEstimatePtr->tail<3>();
-
-      Eigen::Vector3d tempV_WS = lP_sb.head<3>();
-
-      if (featureTime >= Duration()) {
-        IMUOdometry::propagation(
-            imuMeas, imuParametersVec_.at(0), lP_T_WB, tempV_WS, iem,
-            stateEpoch, stateEpoch + featureTime);
-      } else {
-        IMUOdometry::propagationBackward(
-            imuMeas, imuParametersVec_.at(0), lP_T_WB, tempV_WS, iem,
-            stateEpoch, stateEpoch + featureTime);
-      }
-      lP_sb.head<3>() = tempV_WS;
+      poseAndLinearVelocityAtFeatureObservation(
+          imuMeas, vTGTSTA.data(), imuParametersVec_.at(0), stateEpoch,
+          featureTime, &lP_T_WB, &lP_sb);
     }
 
     double rho = ab1rho[3];
@@ -2709,7 +2642,6 @@ bool HybridFilter::EpipolarMeasurement::measurementJacobian(
   const double tdEstimate = filter_.camera_rig_.getImageDelay(camIdx_);
   const double trEstimate = filter_.camera_rig_.getReadoutTime(camIdx_);
   for (int j = 0; j < 2; ++j) {
-    ImuMeasurement interpolatedInertialData;
     uint64_t poseId = frameId2[j];
     kinematics::Transformation T_WBj = T_WS2[j];
 
@@ -2728,64 +2660,37 @@ bool HybridFilter::EpipolarMeasurement::measurementJacobian(
     Duration featureTime = Duration(tdEstimate + trEstimate * kpN -
                            statesIter->second.tdAtCreation);
     featureDelay[j] = featureTime.toSec();
+
     // for feature i, estimate $p_B^G(t_{f_i})$, $R_B^G(t_{f_i})$,
     // $v_B^G(t_{f_i})$, and $\omega_{GB}^B(t_{f_i})$ with the corresponding
     // states' LATEST ESTIMATES and imu measurements
-
     kinematics::Transformation T_WB = T_WBj;
     SpeedAndBiases sb = sbj;
+    ImuMeasurement interpolatedInertialData;
     Eigen::Matrix<double, 27, 1> vTGTSTA = filter_.imu_rig_.getImuAugmentedEuclideanParams();
-    IMUErrorModel<double> iem(sb.tail<6>(), vTGTSTA);
-    if (FLAGS_use_RK4) {
-      if (featureTime >= Duration()) {
-        IMUOdometry::propagation_RungeKutta(
-            imuMeas, filter_.imuParametersVec_.at(0), T_WB, sb, vTGTSTA,
-            stateEpoch, stateEpoch + featureTime);
-      } else {
-        IMUOdometry::propagationBackward_RungeKutta(
-            imuMeas, filter_.imuParametersVec_.at(0), T_WB, sb,
-            vTGTSTA, stateEpoch, stateEpoch + featureTime);
-      }
-    } else {
-      Eigen::Vector3d tempV_WS = sb.head<3>();
-      if (featureTime >= Duration()) {
-        IMUOdometry::propagation(imuMeas, filter_.imuParametersVec_.at(0), T_WB,
-                                 tempV_WS, iem, stateEpoch,
-                                 stateEpoch + featureTime);
-      } else {
-        IMUOdometry::propagationBackward(imuMeas, filter_.imuParametersVec_.at(0), T_WB,
-                                         tempV_WS, iem, stateEpoch,
-                                         stateEpoch + featureTime);
-      }
-      sb.head<3>() = tempV_WS;
-    }
-    IMUOdometry::interpolateInertialData(imuMeas, iem, stateEpoch + featureTime,
-                                         interpolatedInertialData);
+    poseAndVelocityAtFeatureObservation(
+        imuMeas, vTGTSTA.data(), filter_.imuParametersVec_.at(0), stateEpoch, featureTime,
+        &T_WB, &sb, &interpolatedInertialData);
+
     T_WBtij.emplace_back(T_WB);
     v_WBtij.emplace_back(sb.head<3>());
     omega_WBtij.emplace_back(interpolatedInertialData.measurement.gyroscopes);
 
     kinematics::Transformation lP_T_WB = T_WB;
-    Eigen::Vector3d lP_v = sb.head<3>();
+    SpeedAndBiases lP_sb = sb;
     if (FLAGS_use_first_estimate) {
       std::shared_ptr<const Eigen::Matrix<double, 6, 1>> posVelFirstEstimatePtr =
           statesIter->second.linearizationPoint;
       lP_T_WB =
           kinematics::Transformation(posVelFirstEstimatePtr->head<3>(), T_WBj.q());
-      lP_v = posVelFirstEstimatePtr->tail<3>();
-      if (featureTime >= Duration()) {
-        IMUOdometry::propagation(imuMeas, filter_.imuParametersVec_.at(0), lP_T_WB,
-                                 lP_v, iem, stateEpoch,
-                                 stateEpoch + featureTime);
-      } else {
-        IMUOdometry::propagationBackward(imuMeas, filter_.imuParametersVec_.at(0),
-                                         lP_T_WB, lP_v, iem, stateEpoch,
-                                         stateEpoch + featureTime);
-      }
+      lP_sb = sbj;
+      lP_sb.head<3>() = posVelFirstEstimatePtr->tail<3>();
+      poseAndLinearVelocityAtFeatureObservation(
+          imuMeas, vTGTSTA.data(), filter_.imuParametersVec_.at(0), stateEpoch,
+          featureTime, &lP_T_WB, &lP_sb);
     }
-
     lP_T_WBtij.emplace_back(lP_T_WB);
-    lP_v_WBtij.emplace_back(lP_v);
+    lP_v_WBtij.emplace_back(lP_sb.head<3>());
   }
 
   // compute residual
@@ -3053,6 +2958,60 @@ uint64_t HybridFilter::getMinValidStateId() const {
   OKVIS_ASSERT_LE(Exception, min_state_id, currentKeyframeId(),
                   "Removing the current keyframe!");
   return min_state_id;
+}
+
+void poseAndVelocityAtFeatureObservation(
+    const ImuMeasurementDeque& imuMeas, const double* imuAugmentedParams,
+    const okvis::ImuParameters& imuParameters, const okvis::Time& stateEpoch,
+    const okvis::Duration& featureTime, kinematics::Transformation* T_WB,
+    SpeedAndBiases* sb, okvis::ImuMeasurement* interpolatedInertialData) {
+  Eigen::Map<const Eigen::Matrix<double, 27, 1>> vTGTSTA(imuAugmentedParams);
+  IMUErrorModel<double> iem(sb->tail<6>(), vTGTSTA, true);
+  if (FLAGS_use_RK4) {
+    if (featureTime >= Duration()) {
+      IMUOdometry::propagation_RungeKutta(imuMeas, imuParameters, *T_WB, *sb,
+                                          vTGTSTA, stateEpoch,
+                                          stateEpoch + featureTime);
+    } else {
+      IMUOdometry::propagationBackward_RungeKutta(imuMeas, imuParameters, *T_WB,
+                                                  *sb, vTGTSTA, stateEpoch,
+                                                  stateEpoch + featureTime);
+    }
+  } else {
+    Eigen::Vector3d tempV_WS = sb->head<3>();
+    if (featureTime >= Duration()) {
+      IMUOdometry::propagation(imuMeas, imuParameters, *T_WB, tempV_WS, iem,
+                               stateEpoch, stateEpoch + featureTime);
+    } else {
+      IMUOdometry::propagationBackward(imuMeas, imuParameters, *T_WB, tempV_WS,
+                                       iem, stateEpoch,
+                                       stateEpoch + featureTime);
+    }
+    sb->head<3>() = tempV_WS;
+  }
+  IMUOdometry::interpolateInertialData(imuMeas, iem, stateEpoch + featureTime,
+                                       *interpolatedInertialData);
+}
+
+void poseAndLinearVelocityAtFeatureObservation(
+    const ImuMeasurementDeque& imuMeas, const double* imuAugmentedParams,
+    const okvis::ImuParameters& imuParameters, const okvis::Time& stateEpoch,
+    const okvis::Duration& featureTime, kinematics::Transformation* T_WB,
+    SpeedAndBiases* sb) {
+  Eigen::Map<const Eigen::Matrix<double, 27, 1>> vTGTSTA(imuAugmentedParams);
+  IMUErrorModel<double> iem(sb->tail<6>(), vTGTSTA, true);
+
+  Eigen::Vector3d tempV_WS = sb->head<3>();
+  if (featureTime >= Duration()) {
+    IMUOdometry::propagation(
+        imuMeas, imuParameters, *T_WB, tempV_WS, iem, stateEpoch,
+        stateEpoch + featureTime);
+  } else {
+    IMUOdometry::propagationBackward(
+        imuMeas, imuParameters, *T_WB, tempV_WS, iem, stateEpoch,
+        stateEpoch + featureTime);
+  }
+  sb->head<3>() = tempV_WS;
 }
 
 }  // namespace okvis
