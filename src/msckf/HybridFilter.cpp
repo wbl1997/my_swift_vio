@@ -146,6 +146,8 @@ bool HybridFilter::addStates(okvis::MultiFramePtr multiFrame,
   okvis::Duration tdEstimate;
   okvis::Time correctedStateTime;  // time of current multiFrame corrected with
                                    // current td estimate
+  // record the imu measurements between two consecutive states
+  inertialMeasForStates_.push_back(imuMeasurements);
   if (statesMap_.empty()) {
     // in case this is the first frame ever, let's initialize the pose:
     tdEstimate.fromSec(camera_rig_.getImageDelay(0));
@@ -251,6 +253,9 @@ bool HybridFilter::addStates(okvis::MultiFramePtr multiFrame,
                    << " lastFrameTimestamp " << startTime << " tdEstimate "
                    << tdEstimate << std::endl;
     }
+    okvis::Time secondLatestStateTime = statesMap_.rbegin()->second.timestamp;
+    auto imuMeasCoverSecond = inertialMeasForStates_.findWindow(secondLatestStateTime, half_window_);
+    statesMap_.rbegin()->second.imuReadingWindow.reset(new okvis::ImuMeasurementDeque(imuMeasCoverSecond));
 
     int covDim = covariance_.rows();
     covariance_.topLeftCorner(ceres::ode::OdoErrorStateDim,
@@ -287,12 +292,12 @@ bool HybridFilter::addStates(okvis::MultiFramePtr multiFrame,
   // set first estimates
   states.linearizationPoint.reset(new Eigen::Matrix<double, 6, 1>());
   (*states.linearizationPoint) << T_WS.r(), speedAndBias.head<3>();
-
+  auto imuMeasCover = inertialMeasForStates_.findWindow(correctedStateTime, half_window_);
+  states.imuReadingWindow.reset(new okvis::ImuMeasurementDeque(imuMeasCover));
   if (statesMap_.empty()) {
     referencePoseId_ = states.id;  // set this as reference pose
   }
   mapPtr_->addParameterBlock(poseParameterBlock, ceres::Map::Pose6d);
-
   // add to buffer
   statesMap_.insert(std::pair<uint64_t, States>(states.id, states));
   multiFramePtrMap_.insert(
@@ -446,8 +451,6 @@ bool HybridFilter::addStates(okvis::MultiFramePtr multiFrame,
     const int camIdx = 0;
     initCovariance(camIdx);
   }
-  // record the imu measurements between two consecutive states
-  inertialMeasForStates_.push_back(imuMeasurements);
 
   addCovForClonedStates();
   updateCovarianceIndex();
@@ -992,7 +995,7 @@ bool HybridFilter::computeHxf(const uint64_t hpbid, const MapPoint& mp,
   getSpeedAndBias(currFrameId, 0, sbj);
   auto statesIter = statesMap_.find(currFrameId);
   Time stateEpoch = statesIter->second.timestamp;
-  auto imuMeas = inertialMeasForStates_.findWindow(stateEpoch, half_window_);
+  auto imuMeas = *(statesIter->second.imuReadingWindow);
   OKVIS_ASSERT_GT(Exception, imuMeas.size(), 0,
                   "the IMU measurement does not exist");
 
@@ -1301,7 +1304,7 @@ bool HybridFilter::featureJacobian(
     getSpeedAndBias(poseId, 0, sbj);
     auto statesIter = statesMap_.find(poseId);
     Time stateEpoch = statesIter->second.timestamp;
-    auto imuMeas = inertialMeasForStates_.findWindow(stateEpoch, half_window_);
+    auto imuMeas = *(statesIter->second.imuReadingWindow);
     OKVIS_ASSERT_GT(Exception, imuMeas.size(), 0,
                     "the IMU measurement does not exist");
 
@@ -2716,8 +2719,7 @@ bool HybridFilter::EpipolarMeasurement::measurementJacobian(
     filter_.getSpeedAndBias(poseId, 0, sbj);
     auto statesIter = filter_.statesMap_.find(poseId);
     Time stateEpoch = statesIter->second.timestamp;
-    auto imuMeas =
-        filter_.inertialMeasForStates_.findWindow(stateEpoch, filter_.half_window_);
+    auto imuMeas = *(statesIter->second.imuReadingWindow);
     OKVIS_ASSERT_GT(Exception, imuMeas.size(), 0,
                     "the IMU measurement does not exist");
 

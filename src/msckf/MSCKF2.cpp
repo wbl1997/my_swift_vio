@@ -382,7 +382,7 @@ bool MSCKF2::measurementJacobianAIDP(
   getSpeedAndBias(poseId, 0, sbj);
   auto statesIter = statesMap_.find(poseId);
   Time stateEpoch = statesIter->second.timestamp;
-  auto imuMeas = inertialMeasForStates_.findWindow(stateEpoch, half_window_);
+  auto imuMeas = *(statesIter->second.imuReadingWindow);
   OKVIS_ASSERT_GT(Exception, imuMeas.size(), 0,
                   "the IMU measurement does not exist");
 
@@ -575,7 +575,7 @@ bool MSCKF2::measurementJacobian(
 
   auto statesIter = statesMap_.find(poseId);
   Time stateEpoch = statesIter->second.timestamp;
-  auto imuMeas = inertialMeasForStates_.findWindow(stateEpoch, half_window_);
+  auto imuMeas = *(statesIter->second.imuReadingWindow);
   OKVIS_ASSERT_GT(Exception, imuMeas.size(), 0,
                   "the IMU measurement does not exist");
 
@@ -873,11 +873,12 @@ bool MSCKF2::measurementJacobianGeneric(
   auto statesIter = statesMap_.find(poseId);
   okvis::Time stateEpoch = statesIter->second.timestamp;
   double tdAtCreation = statesIter->second.tdAtCreation;
-  std::shared_ptr<okvis::ImuMeasurementDeque> imuMeasDequePtr(
-      new okvis::ImuMeasurementDeque(
-          inertialMeasForStates_.findWindow(stateEpoch, half_window_)));
+  std::shared_ptr<const okvis::ImuMeasurementDeque> imuMeasDequePtr =
+      statesIter->second.imuReadingWindow;
   OKVIS_ASSERT_GT(Exception, imuMeasDequePtr->size(), 0u,
                   "the IMU measurement does not exist");
+  std::shared_ptr<const Eigen::Matrix<double, 6, 1>> posVelFirstEstimate =
+      statesIter->second.linearizationPoint;
   double gravity = 9.80665;
   bool evaluateOk = true;
   std::shared_ptr<okvis::ceres::ParameterBlock> poseParamBlockPtr =
@@ -946,7 +947,7 @@ bool MSCKF2::measurementJacobianGeneric(
             std::static_pointer_cast<const CameraGeometry>(                    \
                 baseCameraGeometry);                                           \
         observationError.reset(new RsReprojectionErrorModel(                   \
-            argCameraGeometry, obs, obsNoiseInfo, imuMeasDequePtr, stateEpoch, \
+            argCameraGeometry, obs, obsNoiseInfo, imuMeasDequePtr, posVelFirstEstimate, stateEpoch, \
             tdAtCreation, gravity));                                           \
         double const* const parameters[] = {                                   \
             poseParamBlockPtr->parameters(),                                   \
@@ -1138,7 +1139,7 @@ bool MSCKF2::measurementJacobianGeneric(
       std::static_pointer_cast<const CameraGeometry>(
           baseCameraGeometry);
   observationError.reset(new RsReprojectionErrorModel(
-      argCameraGeometry, obs, obsNoiseInfo, imuMeasDequePtr,
+      argCameraGeometry, obs, obsNoiseInfo, imuMeasDequePtr, posVelFirstEstimate,
       stateEpoch, tdAtCreation, gravity));
   double const* const parameters[] = {
       poseParamBlockPtr->parameters(),

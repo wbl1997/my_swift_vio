@@ -94,3 +94,27 @@ TEST(EigenMatrix, DynamicResize) {
   EXPECT_EQ(mat.cols(), 5);
 }
 
+TEST(EigenMatrix, setIdentity) {
+  const double eps = 1e-8;
+  Eigen::Matrix<double, 2, 4> m24;
+  m24.setIdentity();
+  Eigen::Matrix<double, 2, 4> n24 = Eigen::Matrix<double, 2, 4>::Identity();
+
+  Eigen::Matrix<double, 2, 4> r24;
+  r24.setZero();
+  r24(0, 0) = 1;
+  r24(1, 1) = 1;
+  EXPECT_TRUE(r24.isApprox(m24, eps));
+  EXPECT_TRUE(r24.isApprox(n24, eps));
+
+  Eigen::Matrix<double, 4, 2> m42;
+  m42.setIdentity();
+  Eigen::Matrix<double, 4, 2> n42 = Eigen::Matrix<double, 4, 2>::Identity();
+
+  Eigen::Matrix<double, 4, 2> r42;
+  r42.setZero();
+  r42(0, 0) = 1;
+  r42(1, 1) = 1;
+  EXPECT_TRUE(r42.isApprox(m42, eps));
+  EXPECT_TRUE(r42.isApprox(n42, eps));
+}

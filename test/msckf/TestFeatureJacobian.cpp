@@ -32,16 +32,16 @@ void computeNavErrors(
 
 void testPointLandmarkJacobian(std::string projOptModelName,
                                std::string extrinsicModelName,
-                               std::string outputFile) {
+                               std::string outputFile,
+                               double timeOffset,
+                               double readoutTime) {
   simul::VioTestSystemBuilder vioSystemBuilder;
   bool addPriorNoise = true;
   int32_t estimatorType = 4;
   okvis::TestSetting testSetting(true, addPriorNoise, false, true, true, 0.5, 0.5, estimatorType);
   int trajectoryId = 0; // Torus
-
-  double timeOffset = 0.0;
-  double readoutTime = 0.0;
   int cameraOrientation = 0;
+
   vioSystemBuilder.createVioSystem(testSetting, trajectoryId,
                                    projOptModelName, extrinsicModelName,
                                    cameraOrientation, timeOffset, readoutTime,
@@ -248,12 +248,20 @@ TEST(MSCKF, FeatureJacobianFixedModels) {
   std::string projOptModelName = "FIXED";
   std::string extrinsicModelName = "FIXED";
   std::string outputFile = FLAGS_log_dir + "/MSCKF_Torus_Fixed.txt";
-  testPointLandmarkJacobian(projOptModelName, extrinsicModelName, outputFile);
+  testPointLandmarkJacobian(projOptModelName, extrinsicModelName, outputFile, 0.0, 0.0);
 }
 
 TEST(MSCKF, FeatureJacobianVariableParams) {
   std::string projOptModelName = "FXY_CXY";
   std::string extrinsicModelName = "P_CB";
   std::string outputFile = FLAGS_log_dir + "/MSCKF_Torus.txt";
-  testPointLandmarkJacobian(projOptModelName, extrinsicModelName, outputFile);
+  testPointLandmarkJacobian(projOptModelName, extrinsicModelName, outputFile, 0.0, 0.0);
+}
+
+TEST(MSCKF, FeatureJacobianVariableTime) {
+  // also inspect the Jacobians relative to velocity
+  std::string projOptModelName = "FXY_CXY";
+  std::string extrinsicModelName = "P_CB";
+  std::string outputFile = FLAGS_log_dir + "/MSCKF_Torus_RS.txt";
+  testPointLandmarkJacobian(projOptModelName, extrinsicModelName, outputFile, 0.0, 0.01);
 }

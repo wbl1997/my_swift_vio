@@ -199,6 +199,7 @@ void setupPoseOptProblem(bool perturbPose, bool rollingShutter,
                                               okvis::ProjectionOptFXY_CXY,
                                               okvis::Extrinsic_p_BC_q_BC>(
             cameraGeometry, kp, information, imuMeasDequePtr,
+            std::shared_ptr<const Eigen::Matrix<double, 6, 1>>(),
             stateEpoch, tdAtCreation, gravity));
     allCostFunctions.emplace_back(cost_function);
 

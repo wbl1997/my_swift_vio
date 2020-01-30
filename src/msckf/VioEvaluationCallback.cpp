@@ -13,7 +13,7 @@ VioEvaluationCallback::~VioEvaluationCallback() {
 void VioEvaluationCallback::PrepareForEvaluation(
     bool /*evaluate_jacobians*/, bool new_evaluation_point) {
   if (new_evaluation_point) {
-    // updateSensorRigs
+    // updateSensorRigs which includes the shared data of T_BCi, cameraGeometry
 
       // TODO(jhuai): do this prior to Evaluate() or EvaluateWithMinimalJacobians() in a EvaluationCallback().
     //  Eigen::VectorXd intrinsics(GEOMETRY_TYPE::NumIntrinsics);
