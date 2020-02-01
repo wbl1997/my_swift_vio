@@ -1,6 +1,7 @@
 #include <msckf/PointLandmark.hpp>
 
 #include <msckf/FeatureTriangulation.hpp>
+#include <msckf/ParallaxAnglePoint.hpp>
 #include <msckf/PointLandmarkModels.hpp>
 #include <okvis/FrameTypedefs.hpp>
 
@@ -25,7 +26,7 @@ void decideAnchors(const okvis::MapPoint& mp,
         // greedily choose the head and tail observation
         anchorId = involvedFrameIds->front();
         anchorIds->push_back(anchorId);
-        // slide through without break.
+        [[fallthrough]];
       case msckf::InverseDepthParameterization::kModelId:
         anchorId = involvedFrameIds->back();
         anchorIds->push_back(anchorId);
@@ -50,7 +51,7 @@ void decideAnchors(const okvis::MapPoint& mp,
         anchorId = mp.observations.begin()->first.frameId;
         anchorIds->push_back(anchorId);
         anchorSeqIds->push_back(0);
-        // slide through without break.
+        [[fallthrough]];
       case msckf::InverseDepthParameterization::kModelId:
         anchorId = mp.observations.rbegin()->first.frameId;
         anchorIds->push_back(anchorId);
@@ -98,18 +99,14 @@ TriangulationStatus PointLandmark::initialize(
       break;
     }
     case 2: {
-        parameters_.resize(5);
         Eigen::Vector3d d_m = obsDirections[anchorSeqIds[0]].normalized();
         Eigen::Vector3d d_a = obsDirections[anchorSeqIds[1]].normalized();
         Eigen::Vector3d W_d_m = T_WSs[anchorSeqIds[0]].C() * (T_BC0.C() * d_m);
         Eigen::Vector3d W_d_a = T_WSs[anchorSeqIds[1]].C() * (T_BC0.C() * d_a);
         double cos_theta = W_d_m.dot(W_d_a);
         double sin_theta = std::sqrt(1.0 - cos_theta * cos_theta);
-        parameters_[0] = cos_theta;
-        parameters_[1] = sin_theta;
-        parameters_[2] = d_m[0];
-        parameters_[3] = d_m[1];
-        parameters_[4] = d_m[2];
+        LWF::ParallaxAnglePoint pap(d_m, cos_theta);
+        pap.copy(&parameters_);
         TriangulationStatus status;
         status.triangulationOk = true;
         status.chi2Small = true;
