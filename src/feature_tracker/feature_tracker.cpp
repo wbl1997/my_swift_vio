@@ -1088,7 +1088,7 @@ void FeatureTracker::twoPointRansac(
     vector<int> inlier_set;
     for (int i = 0; i < error.rows(); ++i) {
       if (inlier_markers[i] == 0) continue;
-      if (std::abs(error(i)) < inlier_error*norm_pixel_unit)
+      if (std::fabs(error(i)) < inlier_error*norm_pixel_unit)
         inlier_set.push_back(i);
     }
 
@@ -1139,7 +1139,7 @@ void FeatureTracker::twoPointRansac(
 
     double this_error = 0.0;
     for (const auto& inlier_idx : inlier_set)
-      this_error += std::abs(new_error(inlier_idx));
+      this_error += std::fabs(new_error(inlier_idx));
     this_error /= inlier_set.size();
 
     if (inlier_set.size() > best_inlier_set.size()) {
