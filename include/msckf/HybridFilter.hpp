@@ -475,7 +475,7 @@ class HybridFilter : public Estimator {
 };
 
 /**
- * @brief poseAndVelocityAtFeatureObservation for feature i, estimate
+ * @brief poseAndVelocityAtObservation for feature i, estimate
  *     $p_B^G(t_{f_i})$, $R_B^G(t_{f_i})$, $v_B^G(t_{f_i})$, and
  *     $\omega_{GB}^B(t_{f_i})$ with imu measurements
  * @param imuMeas cover stateEpoch to the extent of featureTime
@@ -490,15 +490,15 @@ class HybridFilter : public Estimator {
  * @param interpolatedInertialData[out] inertial measurements at stateEpoch +
  *     featureTime after correction for biases etc.
  */
-void poseAndVelocityAtFeatureObservation(
+void poseAndVelocityAtObservation(
     const ImuMeasurementDeque& imuMeas, const double* imuAugmentedParams,
     const okvis::ImuParameters& imuParameters, const okvis::Time& stateEpoch,
     const okvis::Duration& featureTime, kinematics::Transformation* T_WB,
     SpeedAndBiases* sb, okvis::ImuMeasurement* interpolatedInertialData);
 
 /**
- * @brief poseAndLinearVelocityAtFeatureObservation Similarly to
- *     poseAndVelocityAtFeatureObservation except that the inertial data is not
+ * @brief poseAndLinearVelocityAtObservation Similarly to
+ *     poseAndVelocityAtObservation except that the inertial data is not
  *     interpolated and the RK4 propagation is not used.
  * @param imuMeas
  * @param imuAugmentedParams
@@ -508,7 +508,7 @@ void poseAndVelocityAtFeatureObservation(
  * @param T_WB
  * @param sb
  */
-void poseAndLinearVelocityAtFeatureObservation(
+void poseAndLinearVelocityAtObservation(
     const ImuMeasurementDeque& imuMeas, const double* imuAugmentedParams,
     const okvis::ImuParameters& imuParameters, const okvis::Time& stateEpoch,
     const okvis::Duration& featureTime, kinematics::Transformation* T_WB,

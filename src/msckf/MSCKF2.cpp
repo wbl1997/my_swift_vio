@@ -400,7 +400,7 @@ bool MSCKF2::measurementJacobianAIDP(
   SpeedAndBiases sb = sbj;
   ImuMeasurement interpolatedInertialData;
   Eigen::Matrix<double, 27, 1> vTGTSTA = imu_rig_.getImuAugmentedEuclideanParams();
-  poseAndVelocityAtFeatureObservation(
+  poseAndVelocityAtObservation(
       imuMeas, vTGTSTA.data(), imuParametersVec_.at(0), stateEpoch, featureTime,
       &T_WB, &sb, &interpolatedInertialData);
 
@@ -436,7 +436,7 @@ bool MSCKF2::measurementJacobianAIDP(
         kinematics::Transformation(posVelFirstEstimatePtr->head<3>(), T_WBj.q());
     lP_sb = sbj;
     lP_sb.head<3>() = posVelFirstEstimatePtr->tail<3>();
-    poseAndLinearVelocityAtFeatureObservation(
+    poseAndLinearVelocityAtObservation(
         imuMeas, vTGTSTA.data(), imuParametersVec_.at(0), stateEpoch,
         featureTime, &lP_T_WB, &lP_sb);
   }
@@ -561,7 +561,7 @@ bool MSCKF2::measurementJacobian(
   SpeedAndBiases sb = sbj;
   ImuMeasurement interpolatedInertialData;
   Eigen::Matrix<double, 27, 1> vTGTSTA = imu_rig_.getImuAugmentedEuclideanParams();
-  poseAndVelocityAtFeatureObservation(
+  poseAndVelocityAtObservation(
       imuMeas, vTGTSTA.data(), imuParametersVec_.at(0), stateEpoch, featureTime,
       &T_WB, &sb, &interpolatedInertialData);
 
@@ -590,7 +590,7 @@ bool MSCKF2::measurementJacobian(
     lP_T_WB =
         kinematics::Transformation(posVelFirstEstimatePtr->head<3>(), lP_T_WB.q());
     lP_sb.head<3>() = posVelFirstEstimatePtr->tail<3>();
-    poseAndLinearVelocityAtFeatureObservation(
+    poseAndLinearVelocityAtObservation(
         imuMeas, vTGTSTA.data(), imuParametersVec_.at(0), stateEpoch,
         featureTime, &lP_T_WB, &lP_sb);
   }

@@ -1019,7 +1019,7 @@ bool HybridFilter::computeHxf(const uint64_t hpbid, const MapPoint& mp,
   ImuMeasurement
       interpolatedInertialData;  // inertial data at the feature capture epoch
   Eigen::Matrix<double, 27, 1> vTGTSTA = imu_rig_.getImuAugmentedEuclideanParams();
-  poseAndVelocityAtFeatureObservation(
+  poseAndVelocityAtObservation(
       imuMeas, vTGTSTA.data(), imuParametersVec_.at(0), stateEpoch, featureTime,
       &T_WB, &sb, &interpolatedInertialData);
 
@@ -1062,7 +1062,7 @@ bool HybridFilter::computeHxf(const uint64_t hpbid, const MapPoint& mp,
     lP_T_WB =
         kinematics::Transformation(posVelFirstEstimatePtr->head<3>(), lP_T_WB.q());
     lP_sb.head<3>() = posVelFirstEstimatePtr->tail<3>();
-    poseAndLinearVelocityAtFeatureObservation(
+    poseAndLinearVelocityAtObservation(
         imuMeas, vTGTSTA.data(), imuParametersVec_.at(0), stateEpoch,
         featureTime, &lP_T_WB, &lP_sb);
   }
@@ -1287,7 +1287,7 @@ bool HybridFilter::featureJacobian(
     SpeedAndBiases sb = sbj;
     ImuMeasurement interpolatedInertialData;
     Eigen::Matrix<double, 27, 1> vTGTSTA = imu_rig_.getImuAugmentedEuclideanParams();
-    poseAndVelocityAtFeatureObservation(
+    poseAndVelocityAtObservation(
         imuMeas, vTGTSTA.data(), imuParametersVec_.at(0), stateEpoch, featureTime,
         &T_WB, &sb, &interpolatedInertialData);
 
@@ -1330,7 +1330,7 @@ bool HybridFilter::featureJacobian(
       lP_T_WB = kinematics::Transformation(posVelFirstEstimatePtr->head<3>(),
                                            lP_T_WB.q());
       lP_sb.head<3>() = posVelFirstEstimatePtr->tail<3>();
-      poseAndLinearVelocityAtFeatureObservation(
+      poseAndLinearVelocityAtObservation(
           imuMeas, vTGTSTA.data(), imuParametersVec_.at(0), stateEpoch,
           featureTime, &lP_T_WB, &lP_sb);
     }
@@ -2634,7 +2634,7 @@ bool HybridFilter::EpipolarMeasurement::measurementJacobian(
               Eigen::aligned_allocator<okvis::kinematics::Transformation>>
       T_WBtij, lP_T_WBtij;  // lp is short for linearization point
   std::vector<Eigen::Vector3d, Eigen::aligned_allocator<Eigen::Vector3d>>
-      v_WBtij, lP_v_WBtij;
+      lP_v_WBtij;
   std::vector<Eigen::Vector3d, Eigen::aligned_allocator<Eigen::Vector3d>>
       omega_WBtij;
   double dtij_dtr[2];
@@ -2668,12 +2668,11 @@ bool HybridFilter::EpipolarMeasurement::measurementJacobian(
     SpeedAndBiases sb = sbj;
     ImuMeasurement interpolatedInertialData;
     Eigen::Matrix<double, 27, 1> vTGTSTA = filter_.imu_rig_.getImuAugmentedEuclideanParams();
-    poseAndVelocityAtFeatureObservation(
+    poseAndVelocityAtObservation(
         imuMeas, vTGTSTA.data(), filter_.imuParametersVec_.at(0), stateEpoch, featureTime,
         &T_WB, &sb, &interpolatedInertialData);
 
     T_WBtij.emplace_back(T_WB);
-    v_WBtij.emplace_back(sb.head<3>());
     omega_WBtij.emplace_back(interpolatedInertialData.measurement.gyroscopes);
 
     kinematics::Transformation lP_T_WB = T_WB;
@@ -2685,7 +2684,7 @@ bool HybridFilter::EpipolarMeasurement::measurementJacobian(
           kinematics::Transformation(posVelFirstEstimatePtr->head<3>(), T_WBj.q());
       lP_sb = sbj;
       lP_sb.head<3>() = posVelFirstEstimatePtr->tail<3>();
-      poseAndLinearVelocityAtFeatureObservation(
+      poseAndLinearVelocityAtObservation(
           imuMeas, vTGTSTA.data(), filter_.imuParametersVec_.at(0), stateEpoch,
           featureTime, &lP_T_WB, &lP_sb);
     }
@@ -2960,7 +2959,7 @@ uint64_t HybridFilter::getMinValidStateId() const {
   return min_state_id;
 }
 
-void poseAndVelocityAtFeatureObservation(
+void poseAndVelocityAtObservation(
     const ImuMeasurementDeque& imuMeas, const double* imuAugmentedParams,
     const okvis::ImuParameters& imuParameters, const okvis::Time& stateEpoch,
     const okvis::Duration& featureTime, kinematics::Transformation* T_WB,
@@ -2993,7 +2992,7 @@ void poseAndVelocityAtFeatureObservation(
                                        *interpolatedInertialData);
 }
 
-void poseAndLinearVelocityAtFeatureObservation(
+void poseAndLinearVelocityAtObservation(
     const ImuMeasurementDeque& imuMeas, const double* imuAugmentedParams,
     const okvis::ImuParameters& imuParameters, const okvis::Time& stateEpoch,
     const okvis::Duration& featureTime, kinematics::Transformation* T_WB,
