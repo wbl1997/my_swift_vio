@@ -104,7 +104,6 @@ TriangulationStatus PointLandmark::initialize(
         Eigen::Vector3d W_d_m = T_WSs[anchorSeqIds[0]].C() * (T_BC0.C() * d_m);
         Eigen::Vector3d W_d_a = T_WSs[anchorSeqIds[1]].C() * (T_BC0.C() * d_a);
         double cos_theta = W_d_m.dot(W_d_a);
-        double sin_theta = std::sqrt(1.0 - cos_theta * cos_theta);
         LWF::ParallaxAnglePoint pap(d_m, cos_theta);
         pap.copy(&parameters_);
         TriangulationStatus status;

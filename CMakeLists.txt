@@ -213,6 +213,7 @@ list(APPEND TEST_SRC_FILES
     test/std/TestDequeIterator.cpp
     test/std/TestDerivedClass.cpp
     test/std/TestMapKeyOrder.cpp
+    test/std/TestModifyThisInConstMethod.cpp
     test/std/TestSizeof.cpp
     test/std/TestStdAccumulate.cpp
     )
