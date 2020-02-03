@@ -29,6 +29,7 @@
 #include <msckf/ImuOdometry.h>
 #include <msckf/MotionAndStructureStats.h>
 #include <msckf/PointLandmark.hpp>
+#include <msckf/PointSharedData.hpp>
 
 #include <vio/CsvReader.h>
 #include <vio/ImuErrorModel.h>
@@ -123,8 +124,7 @@ class HybridFilter : public Estimator {
    * @brief gatherPoseObservForTriang
    * @param mp
    * @param cameraGeometry
-   * @param frameIds
-   * @param T_WSs
+   * @param pointDataPtr
    * @param obsDirections Each observation is in image plane z=1, (\bar{x}, \bar{y}, 1).
    * @param obsInPixel
    * @param vSigmai
@@ -134,10 +134,7 @@ class HybridFilter : public Estimator {
   size_t gatherPoseObservForTriang(
       const MapPoint &mp,
       std::shared_ptr<const cameras::CameraBase> cameraGeometry,
-      std::vector<uint64_t> *frameIds,
-      std::vector<okvis::kinematics::Transformation,
-                  Eigen::aligned_allocator<okvis::kinematics::Transformation>>
-          *T_WSs,
+      msckf::PointSharedData* pointDataPtr,
       std::vector<Eigen::Vector3d, Eigen::aligned_allocator<Eigen::Vector3d>>
           *obsDirections,
       std::vector<Eigen::Vector2d, Eigen::aligned_allocator<Eigen::Vector2d>>
@@ -187,11 +184,11 @@ class HybridFilter : public Estimator {
       const MapPoint &mp,
       std::vector<Eigen::Vector2d, Eigen::aligned_allocator<Eigen::Vector2d>>
           &obsInPixel,
-      std::vector<uint64_t> &frameIds, msckf::PointLandmark& pointLandmark,
+      msckf::PointLandmark& pointLandmark,
       std::vector<double> &vSigmai,
       std::shared_ptr<const okvis::cameras::CameraBase> cameraGeometry,
       const okvis::kinematics::Transformation &T_SC0,
-      const std::vector<int>& anchorSeqIds = std::vector<int>(),
+      msckf::PointSharedData* pointDataPtr,
       bool checkDisparity = false) const;
   /**
    * @brief computeHxf, compute the residual and Jacobians for a SLAM feature i
@@ -350,10 +347,7 @@ class HybridFilter : public Estimator {
         int minDistortDim);
 
     void prepareTwoViewConstraint(
-        const std::vector<uint64_t> &frameIds,
-        const std::vector<
-            okvis::kinematics::Transformation,
-            Eigen::aligned_allocator<okvis::kinematics::Transformation>> &T_WSs,
+        std::shared_ptr<const msckf::PointSharedData> pointDataPtr,
         const std::vector<Eigen::Vector3d,
                           Eigen::aligned_allocator<Eigen::Vector3d>>
             &obsDirections,

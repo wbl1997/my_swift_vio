@@ -11,12 +11,14 @@
 #include <okvis/IdProvider.hpp>
 #include <okvis/MultiFrame.hpp>
 
+#include <msckf/ChordalDistance.hpp>
 #include <msckf/EuclideanParamBlock.hpp>
 #include <msckf/FeatureTriangulation.hpp>
 #include <msckf/FilterHelper.hpp>
 #include <msckf/ImuOdometry.h>
 #include <msckf/PointLandmark.hpp>
 #include <msckf/PointLandmarkModels.hpp>
+#include <msckf/PointSharedData.hpp>
 #include <msckf/PreconditionedEkfUpdater.h>
 #include <msckf/RsReprojectionError.hpp>
 #include <msckf/triangulate.h>
@@ -344,6 +346,7 @@ bool MSCKF2::measurementJacobianAIDP(
     const Eigen::Vector2d& obs,
     uint64_t poseId, int camIdx,
     uint64_t anchorId, const okvis::kinematics::Transformation& T_WBa,
+    std::shared_ptr<const msckf::PointSharedData> pointDataPtr,
     Eigen::Matrix<double, 2, Eigen::Dynamic>* J_x,
     Eigen::Matrix<double, 2, 3>* J_pfi, Eigen::Vector2d* residual) const {
 
@@ -511,7 +514,8 @@ bool MSCKF2::measurementJacobian(
     std::shared_ptr<const okvis::cameras::CameraBase> tempCameraGeometry,
     const Eigen::Vector2d& obs,
     uint64_t poseId,
-    int camIdx, Eigen::Matrix<double, 2, Eigen::Dynamic>* J_Xc,
+    int camIdx, std::shared_ptr<const msckf::PointSharedData> psd,
+    Eigen::Matrix<double, 2, Eigen::Dynamic>* J_Xc,
     Eigen::Matrix<double, 2, 9>* J_XBj, Eigen::Matrix<double, 2, 3>* J_pfi,
     Eigen::Vector2d* residual) const {
   const Eigen::Vector3d v3Point = v4Xhomog.head<3>();
@@ -648,23 +652,24 @@ bool MSCKF2::featureJacobianGeneric(
   // all observations for this feature point
   std::vector<Eigen::Vector2d, Eigen::aligned_allocator<Eigen::Vector2d>>
       obsInPixel;
-  std::vector<uint64_t> frameIds;  // id of frames observing this feature point
   std::vector<double> vRi;         // std noise in pixels, 2Nx1
   computeHTimer.start();
   msckf::PointLandmark pointLandmark(landmarkModelId_);
+
+  std::shared_ptr<msckf::PointSharedData> pointDataPtr(new msckf::PointSharedData());
   std::vector<uint64_t> anchorIds;
   std::vector<int> anchorSeqIds;
-
   msckf::decideAnchors(mp, involvedFrameIds, landmarkModelId_, &anchorIds,
                        &anchorSeqIds);
+  pointDataPtr->setAnchors(anchorIds, anchorSeqIds);
   msckf::TriangulationStatus status = triangulateAMapPoint(
-      mp, obsInPixel, frameIds, pointLandmark, vRi, tempCameraGeometry, T_SC0,
-      anchorSeqIds, useEpipolarConstraint_);
+      mp, obsInPixel, pointLandmark, vRi, tempCameraGeometry, T_SC0,
+      pointDataPtr.get(), useEpipolarConstraint_);
   if (!status.triangulationOk) {
     computeHTimer.stop();
     return false;
   }
-  CHECK_NE(statesMap_.rbegin()->first, frameIds.back())
+  CHECK_NE(statesMap_.rbegin()->first, pointDataPtr->lastFrameId())
       << "The landmark should not be observed by the latest frame in MSCKF.";
 
   std::vector<okvis::kinematics::Transformation,
@@ -689,10 +694,13 @@ bool MSCKF2::featureJacobianGeneric(
               Eigen::aligned_allocator<Eigen::VectorXd>>
       vri;  // residuals for feature i
 
-  size_t numPoses = frameIds.size();
+  size_t numPoses = pointDataPtr->numObservations();
   size_t numValidObs = 0;
-  auto itFrameIds = frameIds.begin();
+  auto itFrameIds = pointDataPtr->begin();
   auto itRoi = vRi.begin();
+
+  pointDataPtr->computePoseAndVelocitWithFirstEstimates();
+  pointDataPtr->computeSharedJacobians();
 
   // compute Jacobians for a measurement in image j of the current feature i
   for (size_t kale = 0; kale < numPoses; ++kale) {
@@ -700,13 +708,13 @@ bool MSCKF2::featureJacobianGeneric(
     Eigen::Matrix<double, Eigen::Dynamic, 3> J_pfi(residualBlockDim, 3);
     Eigen::Matrix<double, Eigen::Dynamic, 2> J_n(residualBlockDim, 2);
     Eigen::VectorXd residual(residualBlockDim, 1);
-    uint64_t poseId = *itFrameIds;
+    uint64_t poseId = itFrameIds->frameId;
     const int camIdx = 0;
 
     if (involvedFrameIds != nullptr &&
         std::find(involvedFrameIds->begin(), involvedFrameIds->end(), poseId) ==
             involvedFrameIds->end()) {
-      itFrameIds = frameIds.erase(itFrameIds);
+      itFrameIds = pointDataPtr->erase(itFrameIds);
       itRoi = vRi.erase(itRoi);
       itRoi = vRi.erase(itRoi);
       continue;
@@ -719,9 +727,9 @@ bool MSCKF2::featureJacobianGeneric(
     obsNoiseInfo(1, 1) = 1.0 / (imgNoiseStd * imgNoiseStd);
     bool validJacobian = measurementJacobianGeneric(
         pointLandmark, tempCameraGeometry, obsInPixel[kale], poseId, camIdx, obsNoiseInfo,
-        anchorIds, anchor_T_WBs, &J_x, &J_pfi, &J_n, &residual);
+        anchorIds, anchor_T_WBs, pointDataPtr, &J_x, &J_pfi, &J_n, &residual);
     if (!validJacobian) {
-      itFrameIds = frameIds.erase(itFrameIds);
+      itFrameIds = pointDataPtr->erase(itFrameIds);
       itRoi = vRi.erase(itRoi);
       itRoi = vRi.erase(itRoi);
       continue;
@@ -775,7 +783,6 @@ bool MSCKF2::featureJacobianGeneric(
   vJ_n.clear();
   vJ_pfi.clear();
   vJ_X.clear();
-  frameIds.clear();
   computeHTimer.stop();
   return true;
 }
@@ -790,6 +797,7 @@ bool MSCKF2::measurementJacobianGeneric(
         okvis::kinematics::Transformation,
         Eigen::aligned_allocator<okvis::kinematics::Transformation>>&
         anchor_T_WBs,
+    std::shared_ptr<const msckf::PointSharedData> pointDataPtr,
     Eigen::MatrixXd* J_X, Eigen::Matrix<double, Eigen::Dynamic, 3>* J_pfi,
     Eigen::Matrix<double, Eigen::Dynamic, 2>* J_n,
     Eigen::VectorXd* residual) const {
@@ -890,7 +898,6 @@ bool MSCKF2::measurementJacobianGeneric(
             trParamBlockPtr->parameters(),                                     \
             tdParamBlockPtr->parameters(),                                     \
             sbParamBlockPtr->parameters()};                                    \
-        Eigen::Vector2d residuals;                                             \
         Eigen::Matrix<double, 2, 7, Eigen::RowMajor> duv_deltaTWS;             \
         Eigen::Matrix<double, 2, 6, Eigen::RowMajor> duv_deltaTWS_minimal;     \
         Eigen::Matrix<double, 2, 4, Eigen::RowMajor> duv_deltahpW;             \
@@ -921,7 +928,7 @@ bool MSCKF2::measurementJacobianGeneric(
             duv_distortion_minimal.data(), duv_tr_minimal.data(),              \
             duv_td_minimal.data(),         duv_sb_minimal.data()};             \
         evaluateOk = observationError->EvaluateWithMinimalJacobians(           \
-            parameters, residuals.data(), jacobians, jacobiansMinimal);        \
+            parameters, residual->data(), jacobians, jacobiansMinimal);        \
         int cameraParamsDim = cameraParamsMinimalDimen();                      \
         J_X->setZero();                                                        \
         if (fixCameraExtrinsicParams_[camIdx]) {                               \
@@ -958,6 +965,16 @@ bool MSCKF2::measurementJacobianGeneric(
       case okvis::cameras::kTangentDistanceId:                                 \
         break;                                                                 \
       case okvis::cameras::kChordalDistanceId:                                 \
+  typedef okvis::ceres::ChordalDistance<                             \
+      CameraGeometry, ProjectionIntrinsicModel, ExtrinsicModel,          \
+      PointLandmarkModel, ImuModel>                                      \
+      RsReprojectionErrorModel;                                          \
+  std::shared_ptr<const CameraGeometry> argCameraGeometry =              \
+      std::static_pointer_cast<const CameraGeometry>(                    \
+          baseCameraGeometry);                                           \
+  observationError.reset(new ChordalDistance(                   \
+      argCameraGeometry, obs, obsNoiseInfo, imuMeasDequePtr, posVelFirstEstimate, stateEpoch, \
+      tdAtCreation, gravity));                                           \
         break;                                                                 \
       default:                                                                 \
         MODEL_DOES_NOT_EXIST_EXCEPTION                                         \
@@ -1046,7 +1063,7 @@ bool MSCKF2::measurementJacobianGeneric(
     break;
 #endif
 
-#undef DEBUG_ABOVE_MACROS
+#define DEBUG_ABOVE_MACROS
 #ifndef DEBUG_ABOVE_MACROS
   switch (imuModelId) {
     IMU_MODEL_CHAIN_CASE(Imu_BG_BA)
@@ -1061,18 +1078,17 @@ bool MSCKF2::measurementJacobianGeneric(
   typedef okvis::cameras::PinholeCamera<okvis::cameras::RadialTangentialDistortion> CameraGeometry;
   typedef ProjectionOptFXY_CXY ProjectionIntrinsicModel;
   typedef Extrinsic_p_CB ExtrinsicModel;
-  typedef msckf::HomogeneousPointParameterization PointLandmarkModel;
+  typedef msckf::ParallaxAngleParameterization PointLandmarkModel;
   typedef Imu_BG_BA_TG_TS_TA ImuModel;
-  typedef okvis::ceres::RsReprojectionError<
+  typedef okvis::ceres::ChordalDistance<
       CameraGeometry, ProjectionIntrinsicModel, ExtrinsicModel,
       PointLandmarkModel, ImuModel>
-      RsReprojectionErrorModel;
+      CameraErrorModel;
   std::shared_ptr<const CameraGeometry> argCameraGeometry =
       std::static_pointer_cast<const CameraGeometry>(
           baseCameraGeometry);
-  observationError.reset(new RsReprojectionErrorModel(
-      argCameraGeometry, obs, obsNoiseInfo, imuMeasDequePtr, posVelFirstEstimate,
-      stateEpoch, tdAtCreation, gravity));
+  observationError.reset(new CameraErrorModel(
+      argCameraGeometry, obs, obsNoiseInfo, pointDataPtr));
   double const* const parameters[] = {
       poseParamBlockPtr->parameters(),
       pointLandmark.data(),
@@ -1089,14 +1105,14 @@ bool MSCKF2::measurementJacobianGeneric(
   Eigen::Matrix<double, 2, 7, Eigen::RowMajor> duv_dExtrinsic;
   Eigen::Matrix<double, 2, ExtrinsicModel::kNumParams, Eigen::RowMajor> duv_dExtrinsic_minimal;
 
-  RsReprojectionErrorModel::ProjectionIntrinsicJacType
+  CameraErrorModel::ProjectionIntrinsicJacType
       duv_proj_intrinsic;
-  RsReprojectionErrorModel::DistortionJacType
+  CameraErrorModel::DistortionJacType
       duv_distortion;
   Eigen::Matrix<double, 2, 1> duv_tr;
-  RsReprojectionErrorModel::ProjectionIntrinsicJacType
+  CameraErrorModel::ProjectionIntrinsicJacType
       duv_proj_intrinsic_minimal;
-  RsReprojectionErrorModel::DistortionJacType
+  CameraErrorModel::DistortionJacType
       duv_distortion_minimal;
   Eigen::Matrix<double, 2, 1> duv_tr_minimal;
   Eigen::Matrix<double, 2, 1> duv_td;
@@ -1177,7 +1193,6 @@ bool MSCKF2::featureJacobian(const MapPoint &mp, Eigen::MatrixXd &H_oi,
   // all observations for this feature point
   std::vector<Eigen::Vector2d, Eigen::aligned_allocator<Eigen::Vector2d>>
       obsInPixel;
-  std::vector<uint64_t> frameIds; // id of frames observing this feature point
   std::vector<double> vRi; // std noise in pixels
   computeHTimer.start();
   if (landmarkModelId_ == 1) {
@@ -1186,20 +1201,22 @@ bool MSCKF2::featureJacobian(const MapPoint &mp, Eigen::MatrixXd &H_oi,
     // as the last frame observing the point.
 
     msckf::PointLandmark pointLandmark(landmarkModelId_);
+    std::shared_ptr<msckf::PointSharedData> pointDataPtr(new msckf::PointSharedData());
     std::vector<uint64_t> anchorIds;
     std::vector<int> anchorSeqIds;
     msckf::decideAnchors(mp,involvedFrameIds,
                        landmarkModelId_, &anchorIds, &anchorSeqIds);
+    pointDataPtr->setAnchors(anchorIds, anchorSeqIds);
     uint64_t anchorId = anchorIds[0];
     msckf::TriangulationStatus status = triangulateAMapPoint(
-        mp, obsInPixel, frameIds, pointLandmark, vRi, tempCameraGeometry, T_SC0,
-        anchorSeqIds, useEpipolarConstraint_);
+        mp, obsInPixel, pointLandmark, vRi, tempCameraGeometry, T_SC0,
+        pointDataPtr.get(), useEpipolarConstraint_);
     Eigen::Map<Eigen::Vector4d> v4Xhomog(pointLandmark.data(), 4);
     if (!status.triangulationOk) {
       computeHTimer.stop();
       return false;
     }
-    CHECK_NE(statesMap_.rbegin()->first, frameIds.back())
+    CHECK_NE(statesMap_.rbegin()->first, pointDataPtr->lastFrameId())
         << "The landmark should not be observed by the latest frame in MSCKF.";
     Eigen::Vector4d ab1rho = v4Xhomog;
     CHECK_GT(ab1rho[2], 0) << "Negative depth in anchor frame";
@@ -1221,9 +1238,9 @@ bool MSCKF2::featureJacobian(const MapPoint &mp, Eigen::MatrixXd &H_oi,
                 Eigen::aligned_allocator<Eigen::Matrix<double, 2, 1>>>
         vri;  // residuals for feature i
 
-    size_t numPoses = frameIds.size();
+    size_t numPoses = pointDataPtr->numObservations();
     size_t numValidObs = 0;
-    auto itFrameIds = frameIds.begin();
+    auto itFrameIds = pointDataPtr->begin();
     auto itRoi = vRi.begin();
     // compute Jacobians for a measurement in image j of the current feature i
     for (size_t kale = 0; kale < numPoses; ++kale) {
@@ -1232,23 +1249,23 @@ bool MSCKF2::featureJacobian(const MapPoint &mp, Eigen::MatrixXd &H_oi,
       Eigen::Matrix<double, 2, 3> J_pfi;
       Eigen::Vector2d residual;
 
-      uint64_t poseId = *itFrameIds;
+      uint64_t poseId = itFrameIds->frameId;
       const int camIdx = 0;
 
       if (involvedFrameIds != nullptr &&
           std::find(involvedFrameIds->begin(), involvedFrameIds->end(), poseId)
               == involvedFrameIds->end()) {
-          itFrameIds = frameIds.erase(itFrameIds);
+          itFrameIds = pointDataPtr->erase(itFrameIds);
           itRoi = vRi.erase(itRoi);
           itRoi = vRi.erase(itRoi);
           continue;
       }
 
       bool validJacobian = measurementJacobianAIDP(
-          ab1rho, tempCameraGeometry, obsInPixel[kale], poseId, camIdx, anchorId, T_WBa,
+          ab1rho, tempCameraGeometry, obsInPixel[kale], poseId, camIdx, anchorId, T_WBa, pointDataPtr,
           &H_x, &J_pfi, &residual);
       if (!validJacobian) {
-          itFrameIds = frameIds.erase(itFrameIds);
+          itFrameIds = pointDataPtr->erase(itFrameIds);
           itRoi = vRi.erase(itRoi);
           itRoi = vRi.erase(itRoi);
           continue;
@@ -1295,21 +1312,21 @@ bool MSCKF2::featureJacobian(const MapPoint &mp, Eigen::MatrixXd &H_oi,
     vri.clear();
     vJ_pfi.clear();
     vJ_X.clear();
-    frameIds.clear();
     computeHTimer.stop();
     return true;
   } else {
     msckf::PointLandmark pointLandmark(landmarkModelId_);
     // The landmark is expressed with Euclidean coordinates in the global frame
-    msckf::TriangulationStatus status = triangulateAMapPoint(mp, obsInPixel, frameIds, pointLandmark,
-                                           vRi, tempCameraGeometry, T_SC0, std::vector<int>(),
+    std::shared_ptr<msckf::PointSharedData> pointDataPtr(new msckf::PointSharedData());
+    msckf::TriangulationStatus status = triangulateAMapPoint(mp, obsInPixel, pointLandmark,
+                                           vRi, tempCameraGeometry, T_SC0, pointDataPtr.get(),
                                            useEpipolarConstraint_);
     Eigen::Map<Eigen::Vector4d> v4Xhomog(pointLandmark.data(), 4);
     if (!status.triangulationOk) {
       computeHTimer.stop();
       return false;
     }
-    CHECK_NE(statesMap_.rbegin()->first, frameIds.back())
+    CHECK_NE(statesMap_.rbegin()->first, pointDataPtr->lastFrameId())
         << "The landmark should not be observed by the latest frame in MSCKF.";
 
     // containers of the above Jacobians for all observations of a mappoint
@@ -1328,13 +1345,13 @@ bool MSCKF2::featureJacobian(const MapPoint &mp, Eigen::MatrixXd &H_oi,
                 Eigen::aligned_allocator<Eigen::Matrix<double, 2, 1>>>
         vri;  // residuals for feature i
 
-    size_t numPoses = frameIds.size();
+    size_t numPoses = pointDataPtr->numObservations();
     size_t numValidObs = 0;
-    auto itFrameIds = frameIds.begin();
+    auto itFrameIds = pointDataPtr->begin();
     auto itRoi = vRi.begin();
     // compute Jacobians for a measurement in image j of the current feature i
     for (size_t kale = 0; kale < numPoses; ++kale) {
-      uint64_t poseId = *itFrameIds;
+      uint64_t poseId = itFrameIds->frameId;
       const int camIdx = 0;
       // $\frac{\partial [z_u, z_v]^T}{\partial(extrinsic, intrinsic, td, tr)}$
       Eigen::Matrix<double, 2, Eigen::Dynamic> J_Xc(2, cameraParamsMinimalDimen());
@@ -1348,16 +1365,16 @@ bool MSCKF2::featureJacobian(const MapPoint &mp, Eigen::MatrixXd &H_oi,
       if (involvedFrameIds != nullptr &&
           std::find(involvedFrameIds->begin(), involvedFrameIds->end(), poseId)
               == involvedFrameIds->end()) {
-          itFrameIds = frameIds.erase(itFrameIds);
+          itFrameIds = pointDataPtr->erase(itFrameIds);
           itRoi = vRi.erase(itRoi);
           itRoi = vRi.erase(itRoi);
           continue;
       }
       bool validJacobian = measurementJacobian(
-          v4Xhomog, tempCameraGeometry, obsInPixel[kale], poseId, camIdx,
+          v4Xhomog, tempCameraGeometry, obsInPixel[kale], poseId, camIdx, pointDataPtr,
           &J_Xc, &J_XBj, &J_pfi, &residual);
       if (!validJacobian) {
-          itFrameIds = frameIds.erase(itFrameIds);
+          itFrameIds = pointDataPtr->erase(itFrameIds);
           itRoi = vRi.erase(itRoi);
           itRoi = vRi.erase(itRoi);
           continue;
@@ -1391,7 +1408,7 @@ bool MSCKF2::featureJacobian(const MapPoint &mp, Eigen::MatrixXd &H_oi,
       size_t saga2 = saga * 2;
       H_xi.block(saga2, 0, 2, cameraParamsDimen) = vJ_Xc[saga];
       std::map<uint64_t, int>::const_iterator poseCovIndexIter =
-          mStateID2CovID_.find(frameIds[saga]);
+          mStateID2CovID_.find(pointDataPtr->frameId(saga));
       H_xi.block<2, kClonedStateMinimalDimen>(
           saga2, cameraParamsDimen + kClonedStateMinimalDimen *
                                          poseCovIndexIter->second) = vJ_XBj[saga];
@@ -1413,7 +1430,6 @@ bool MSCKF2::featureJacobian(const MapPoint &mp, Eigen::MatrixXd &H_oi,
     vJ_pfi.clear();
     vJ_XBj.clear();
     vJ_Xc.clear();
-    frameIds.clear();
     computeHTimer.stop();
     return true;
   }
@@ -1613,9 +1629,10 @@ void MSCKF2::optimize(size_t /*numIter*/, size_t /*numThreads*/, bool verbose) {
       std::shared_ptr<const okvis::cameras::CameraBase> tempCameraGeometry =
           camera_rig_.getCameraGeometry(camIdx);
       msckf::PointLandmark pointLandmark(landmarkModelId_);
+      msckf::PointSharedData psd;
       msckf::TriangulationStatus status =
-          triangulateAMapPoint(it->second, obsInPixel, frameIds, pointLandmark, vRi,
-                               tempCameraGeometry, T_SC0);
+          triangulateAMapPoint(it->second, obsInPixel, pointLandmark, vRi,
+                               tempCameraGeometry, T_SC0, &psd);
       Eigen::Map<Eigen::Vector4d> v4Xhomog(pointLandmark.data(), 4);
       if (status.triangulationOk) {
         it->second.quality = 1.0;

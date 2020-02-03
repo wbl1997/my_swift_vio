@@ -22,6 +22,7 @@
 #include <msckf/FilterHelper.hpp>
 #include <msckf/ImuOdometry.h>
 #include <msckf/PointLandmark.hpp>
+#include <msckf/PointSharedData.hpp>
 #include <msckf/RelativeMotionJacobian.hpp>
 #include <msckf/TwoViewPair.hpp>
 
@@ -1152,7 +1153,6 @@ bool HybridFilter::featureJacobian(
 
   std::vector<Eigen::Vector2d, Eigen::aligned_allocator<Eigen::Vector2d>>
       obsInPixel;                  // all observations for this feature point
-  std::vector<uint64_t> frameIds;  // id of frames observing this feature point
   std::vector<double> vSigmai;         // std noise in pixels
 
   const int camIdx = 0;
@@ -1166,18 +1166,20 @@ bool HybridFilter::featureJacobian(
   const okvis::kinematics::Transformation T_BC0 = camera_rig_.getCameraExtrinsic(camIdx);
 
   msckf::PointLandmark pointLandmark(landmarkModelId_);
+  std::shared_ptr<msckf::PointSharedData> pointDataPtr(new msckf::PointSharedData());
   msckf::TriangulationStatus status =
-      triangulateAMapPoint(mp, obsInPixel, frameIds, pointLandmark, vSigmai,
-                           tempCameraGeometry, T_BC0);
+      triangulateAMapPoint(mp, obsInPixel, pointLandmark, vSigmai,
+                           tempCameraGeometry, T_BC0, pointDataPtr.get());
   Eigen::Map<Eigen::Vector4d> v4Xhomog(pointLandmark.data(), 4);
   if (!status.triangulationOk) {
     computeHTimer.stop();
     return false;
   }
 
+  std::vector<std::pair<uint64_t, int>> frameIds = pointDataPtr->frameIds();  // id of frames observing this feature point
   // the anchor frame is chosen as the last frame observing the point, i.e.,
   // the frame just before the current frame
-  uint64_t anchorId = frameIds.back();
+  uint64_t anchorId = frameIds.back().first;
 
   size_t numCamPoseStates = cameraParamPoseAndLandmarkMinimalDimen() - 3 * mInCovLmIds.size();
   // camera states, pose states, excluding feature states, and the velocity
@@ -1264,7 +1266,7 @@ bool HybridFilter::featureJacobian(
   auto itRoi = vSigmai.begin();
   // compute Jacobians for a measurement in image j of the current feature i
   for (size_t kale = 0; kale < numPoses; ++kale) {
-    uint64_t poseId = *itFrameIds;
+    uint64_t poseId = itFrameIds->first;
     kinematics::Transformation T_WBj;
     get_T_WS(poseId, T_WBj);
     SpeedAndBiases sbj;
@@ -1409,6 +1411,7 @@ bool HybridFilter::featureJacobian(
     ++itFrameIds;
     itRoi += 2;
   }
+  // What if the Jacobians of the anchor frame is invalid? It should be safe to ignore it.
   if (numValidObs < minTrackLength_) {
     computeHTimer.stop();
     return false;
@@ -2226,23 +2229,18 @@ int HybridFilter::getCameraExtrinsicOptType(size_t cameraIdx) const {
 size_t HybridFilter::gatherPoseObservForTriang(
     const MapPoint& mp,
     std::shared_ptr<const cameras::CameraBase> cameraGeometry,
-    std::vector<uint64_t>* frameIds,
-    std::vector<okvis::kinematics::Transformation,
-                Eigen::aligned_allocator<okvis::kinematics::Transformation>>*
-        T_WSs,
+    msckf::PointSharedData* pointDataPtr,
     std::vector<Eigen::Vector3d, Eigen::aligned_allocator<Eigen::Vector3d>>*
         obsDirections,
     std::vector<Eigen::Vector2d, Eigen::aligned_allocator<Eigen::Vector2d>>*
         obsInPixel,
     std::vector<double>* imageNoiseStd,
     RetrieveObsSeqType seqType) const {
-  frameIds->clear();
-  T_WSs->clear();
   obsDirections->clear();
   obsInPixel->clear();
   imageNoiseStd->clear();
-  const std::map<okvis::KeypointIdentifier, uint64_t>& observations =
-      mp.observations;
+  const std::map<okvis::KeypointIdentifier, uint64_t>* observations =
+      &mp.observations;
   std::map<okvis::KeypointIdentifier, uint64_t> obsPair;
   std::map<okvis::KeypointIdentifier, uint64_t>::const_reverse_iterator riter =
       mp.observations.rbegin();
@@ -2251,20 +2249,21 @@ size_t HybridFilter::gatherPoseObservForTriang(
 
   switch (seqType) {
   case HEAD_TAIL:
-      obsPair[observations.begin()->first] = observations.begin()->second;
+      obsPair[observations->begin()->first] = observations->begin()->second;
       obsPair[riter->first] = riter->second;
-      const_cast<std::map<okvis::KeypointIdentifier, uint64_t>&>(observations) = obsPair;
+      observations = &obsPair;
       break;
   case LATEST_TWO:
       obsPair[riter->first] = riter->second;
       obsPair[second_riter->first] = second_riter->second;
-      const_cast<std::map<okvis::KeypointIdentifier, uint64_t>&>(observations) = obsPair;
+      observations = &obsPair;
       break;
   case ENTIRE_TRACK:
   default:
       break;
   }
-  for (auto itObs = observations.begin(), iteObs = observations.end();
+
+  for (auto itObs = observations->begin(), iteObs = observations->end();
        itObs != iteObs; ++itObs) {
     uint64_t poseId = itObs->first.frameId;
     Eigen::Vector2d measurement;
@@ -2290,12 +2289,12 @@ size_t HybridFilter::gatherPoseObservForTriang(
     imageNoiseStd->push_back(kpSize / 8);
     imageNoiseStd->push_back(kpSize / 8);
 
-    okvis::kinematics::Transformation T_WS;
-    get_T_WS(poseId, T_WS);
-    T_WSs->push_back(T_WS);
-    frameIds->push_back(poseId);
+    std::shared_ptr<ceres::ParameterBlock> parameterBlockPtr;
+    getGlobalStateParameterBlockPtr(poseId, GlobalStates::T_WS, parameterBlockPtr);
+    pointDataPtr->addKeypointObservation(itObs->first, parameterBlockPtr);
   }
-  return frameIds->size();
+
+  return pointDataPtr->numObservations();
 }
 
 bool HybridFilter::hasLowDisparity(
@@ -2341,11 +2340,11 @@ msckf::TriangulationStatus HybridFilter::triangulateAMapPoint(
     const MapPoint& mp,
     std::vector<Eigen::Vector2d, Eigen::aligned_allocator<Eigen::Vector2d>>&
         obsInPixel,
-    std::vector<uint64_t>& frameIds, msckf::PointLandmark& pointLandmark,
+    msckf::PointLandmark& pointLandmark,
     std::vector<double>& imageNoiseStd,
     std::shared_ptr<const cameras::CameraBase> cameraGeometry,
     const kinematics::Transformation& T_BC0,
-    const std::vector<int>& anchorSeqIds,
+    msckf::PointSharedData* pointDataPtr,
     bool checkDisparity) const {
   triangulateTimer.start();
 
@@ -2354,10 +2353,7 @@ msckf::TriangulationStatus HybridFilter::triangulateAMapPoint(
   std::vector<Eigen::Vector3d, Eigen::aligned_allocator<Eigen::Vector3d>>
       obsDirections;
 
-  std::vector<okvis::kinematics::Transformation,
-              Eigen::aligned_allocator<okvis::kinematics::Transformation>>
-      T_WSs;
-  size_t numObs = gatherPoseObservForTriang(mp, cameraGeometry, &frameIds, &T_WSs,
+  size_t numObs = gatherPoseObservForTriang(mp, cameraGeometry, pointDataPtr,
                             &obsDirections, &obsInPixel, &imageNoiseStd);
   msckf::TriangulationStatus status;
   if (numObs < minTrackLength_) {
@@ -2365,6 +2361,46 @@ msckf::TriangulationStatus HybridFilter::triangulateAMapPoint(
       status.lackObservations = true;
       return status;
   }
+
+  std::vector<std::pair<uint64_t, int>> frameIds = pointDataPtr->frameIds();
+  int observationIndex = 0;
+  for (const std::pair<uint64_t, int>& frameAndCameraIndex: frameIds) {
+    uint64_t frameId = frameAndCameraIndex.first;
+    auto statesIter = statesMap_.find(frameId);
+    pointDataPtr->setImuInfo(observationIndex, statesIter->second.timestamp,
+                             statesIter->second.tdAtCreation,
+                             statesIter->second.imuReadingWindow,
+                             statesIter->second.linearizationPoint);
+
+    std::shared_ptr<ceres::ParameterBlock> parameterBlockPtr;
+    const int imuIdx = 0;
+    getSensorStateParameterBlockPtr(frameId, imuIdx, SensorStates::Imu,
+                                    ImuSensorStates::SpeedAndBias,
+                                    parameterBlockPtr);
+    pointDataPtr->setVelocityParameterBlockPtr(observationIndex, parameterBlockPtr);
+    ++observationIndex;
+  }
+
+  const States& oneState = statesMap_.rbegin()->second;
+  const int camIdx = 0;
+  uint64_t tdId = oneState.sensors.at(SensorStates::Camera)
+                      .at(camIdx)
+                      .at(CameraSensorStates::TD)
+                      .id;
+  std::shared_ptr<ceres::ParameterBlock> tdParamBlockPtr =
+      mapPtr_->parameterBlockPtr(tdId);
+  uint64_t trId = oneState.sensors.at(SensorStates::Camera)
+                      .at(camIdx)
+                      .at(CameraSensorStates::TR)
+                      .id;
+  std::shared_ptr<ceres::ParameterBlock> trParamBlockPtr =
+      mapPtr_->parameterBlockPtr(trId);
+  pointDataPtr->setCameraTimeParameterPtrs(tdParamBlockPtr, trParamBlockPtr);
+  pointDataPtr->computePoseAndVelocityAtObservation();
+  std::vector<okvis::kinematics::Transformation,
+              Eigen::aligned_allocator<okvis::kinematics::Transformation>>
+      T_WSs = pointDataPtr->poseAtObservationList();
+
   if (checkDisparity) {
 //    if (isPureRotation(mp)) {
 //      triangulateTimer.stop();
@@ -2377,7 +2413,7 @@ msckf::TriangulationStatus HybridFilter::triangulateAMapPoint(
       return status;
     }
   }
-  status = pointLandmark.initialize(T_WSs, obsDirections, T_BC0, anchorSeqIds);
+  status = pointLandmark.initialize(T_WSs, obsDirections, T_BC0, pointDataPtr->anchorSeqIds());
   triangulateTimer.stop();
   return status;
 }
@@ -2597,10 +2633,7 @@ HybridFilter::EpipolarMeasurement::EpipolarMeasurement(
 }
 
 void HybridFilter::EpipolarMeasurement::prepareTwoViewConstraint(
-    const std::vector<uint64_t>& frameIds,
-    const std::vector<
-        okvis::kinematics::Transformation,
-        Eigen::aligned_allocator<okvis::kinematics::Transformation>>& T_WSs,
+    std::shared_ptr<const msckf::PointSharedData> pointDataPtr,
     const std::vector<Eigen::Vector3d,
                       Eigen::aligned_allocator<Eigen::Vector3d>>& obsDirections,
     const std::vector<Eigen::Vector2d,
@@ -2614,8 +2647,8 @@ void HybridFilter::EpipolarMeasurement::prepareTwoViewConstraint(
     const std::vector<int>& index_vec) {
   int j = 0;
   for (auto index : index_vec) {
-    frameId2[j] = frameIds[index];
-    T_WS2[j] = T_WSs[index];
+    frameId2[j] = pointDataPtr->frameId(index);
+    pointDataPtr->poseAtObservation(index, &T_WS2[j]);
     obsDirection2[j] = obsDirections[index];
     obsInPixel2[j] = obsInPixels[index];
     dfj_dXcam2[j] = dfj_dXcam[index];
@@ -2833,21 +2866,15 @@ bool HybridFilter::featureJacobianEpipolar(
   // head and tail observations for this feature point
   std::vector<Eigen::Vector2d, Eigen::aligned_allocator<Eigen::Vector2d>>
       obsInPixels;
-  // id of head and tail frames observing this feature point
-  std::vector<uint64_t> frameIds;
   std::vector<double> imagePointNoiseStds;  // std noise in pixels
 
   // each entry is undistorted coordinates in image plane at
   // z=1 in the specific camera frame, [\bar{x},\bar{y},1]
   std::vector<Eigen::Vector3d, Eigen::aligned_allocator<Eigen::Vector3d>>
       obsDirections;
-  std::vector<okvis::kinematics::Transformation,
-              Eigen::aligned_allocator<okvis::kinematics::Transformation>>
-      T_WSs;
-
-  size_t numFeatures = gatherPoseObservForTriang(mp, tempCameraGeometry, &frameIds, &T_WSs,
-                            &obsDirections, &obsInPixels, &imagePointNoiseStds,
-                            seqType);
+  std::shared_ptr<msckf::PointSharedData> pointDataPtr(new msckf::PointSharedData());
+  size_t numFeatures = gatherPoseObservForTriang(mp, tempCameraGeometry, pointDataPtr.get(),
+                            &obsDirections, &obsInPixels, &imagePointNoiseStds, seqType);
 
   // compute obsDirection Jacobians and count the valid ones, and
   // meanwhile resize the relevant data structures
@@ -2866,13 +2893,12 @@ bool HybridFilter::featureJacobianEpipolar(
           &dfj_dXcam[j], &cov_fij[j]);
       projectStatus[j]= projectOk;
   }
-  removeUnsetElements<uint64_t>(&frameIds, projectStatus);
-  removeUnsetMatrices<okvis::kinematics::Transformation>(&T_WSs, projectStatus);
-  removeUnsetMatrices<Eigen::Vector3d>(&obsDirections, projectStatus);
-  removeUnsetMatrices<Eigen::Vector2d>(&obsInPixels, projectStatus);
-  removeUnsetMatrices<Eigen::Matrix<double, 3, -1>>(&dfj_dXcam, projectStatus);
-  removeUnsetMatrices<Eigen::Matrix3d>(&cov_fij, projectStatus);
-  size_t numValidDirectionJac = frameIds.size();
+  pointDataPtr->removeBadObservations(projectStatus);
+  msckf::removeUnsetMatrices<Eigen::Vector3d>(&obsDirections, projectStatus);
+  msckf::removeUnsetMatrices<Eigen::Vector2d>(&obsInPixels, projectStatus);
+  msckf::removeUnsetMatrices<Eigen::Matrix<double, 3, -1>>(&dfj_dXcam, projectStatus);
+  msckf::removeUnsetMatrices<Eigen::Matrix3d>(&cov_fij, projectStatus);
+  size_t numValidDirectionJac = pointDataPtr->numObservations();
   if (numValidDirectionJac < 2u) { // A two view constraint requires at least two obs
       return false;
   }
@@ -2921,7 +2947,7 @@ bool HybridFilter::featureJacobianEpipolar(
                 Eigen::aligned_allocator<Eigen::Matrix<double, 1, 3>>>
         H_fjk;
     double rjk;
-    epiMeas.prepareTwoViewConstraint(frameIds, T_WSs, obsDirections,
+    epiMeas.prepareTwoViewConstraint(pointDataPtr, obsDirections,
                                      obsInPixels, dfj_dXcam, cov_fij, index_vec);
     epiMeas.measurementJacobian(&H_xjk, &H_fjk, &rjk);
     Hi->row(count) = H_xjk;

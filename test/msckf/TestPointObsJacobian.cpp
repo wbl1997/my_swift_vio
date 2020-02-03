@@ -175,8 +175,11 @@ void computeFeatureMeasJacobian(
   std::cout << "poseId " << poseId << " anchorId " << anchorId << std::endl;
   okvis::kinematics::Transformation T_WBa(Eigen::Vector3d(0, 0, 1),
                                           Eigen::Quaterniond(1, 0, 0, 0));
+  std::shared_ptr<msckf::PointSharedData> psd(new msckf::PointSharedData());
+  // initialize PointSharedData
+
   bool result = estimator.measurementJacobianAIDP(
-      ab1rho, tempCameraGeometry, expectedObservation, poseId, camIdx, anchorId, T_WBa, &H_x,
+      ab1rho, tempCameraGeometry, expectedObservation, poseId, camIdx, anchorId, T_WBa, psd, &H_x,
       &J_pfi, &residual);
 //  std::cout << "H_x\n" << H_x << std::endl;
   EXPECT_TRUE(J_pfi.isApprox(expectedJpoint, 1e-6));

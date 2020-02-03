@@ -259,16 +259,16 @@ void TFVIO::optimize(size_t /*numIter*/, size_t /*numThreads*/, bool verbose) {
       // (2) to visualize the point quality
       std::vector<Eigen::Vector2d, Eigen::aligned_allocator<Eigen::Vector2d>>
           obsInPixel;
-      std::vector<uint64_t> frameIds;
       std::vector<double> vRi;  // std noise in pixels
       const int camIdx = 0;
       std::shared_ptr<const okvis::cameras::CameraBase> tempCameraGeometry =
           camera_rig_.getCameraGeometry(camIdx);
 
       msckf::PointLandmark pointLandmark(landmarkModelId_);
+      msckf::PointSharedData psd;
       msckf::TriangulationStatus status =
-          triangulateAMapPoint(it->second, obsInPixel, frameIds, pointLandmark, vRi,
-                               tempCameraGeometry, T_SC0);
+          triangulateAMapPoint(it->second, obsInPixel, pointLandmark, vRi,
+                               tempCameraGeometry, T_SC0, &psd);
       if (status.triangulationOk) {
         it->second.quality = 1.0;
         it->second.pointHomog = Eigen::Map<Eigen::Vector4d>(pointLandmark.data(), 4);

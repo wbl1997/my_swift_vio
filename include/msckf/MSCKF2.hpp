@@ -90,6 +90,7 @@ class MSCKF2 : public HybridFilter {
       std::shared_ptr<const okvis::cameras::CameraBase> tempCameraGeometry,
       const Eigen::Vector2d& obs, uint64_t poseId, int camIdx,
       uint64_t anchorId, const okvis::kinematics::Transformation& T_WBa,
+      std::shared_ptr<const msckf::PointSharedData> pointDataPtr,
       Eigen::Matrix<double, 2, Eigen::Dynamic>* H_x,
       Eigen::Matrix<double, 2, 3>* J_pfi, Eigen::Vector2d* residual) const;
 
@@ -97,6 +98,7 @@ class MSCKF2 : public HybridFilter {
       const Eigen::Vector4d& v4Xhomog,
       std::shared_ptr<const okvis::cameras::CameraBase> tempCameraGeometry,
       const Eigen::Vector2d& obs, uint64_t poseId, int camIdx,
+      std::shared_ptr<const msckf::PointSharedData> psd,
       Eigen::Matrix<double, 2, Eigen::Dynamic>* J_Xc,
       Eigen::Matrix<double, 2, 9>* J_XBj, Eigen::Matrix<double, 2, 3>* J_pfi,
       Eigen::Vector2d* residual) const;
@@ -111,6 +113,7 @@ class MSCKF2 : public HybridFilter {
           okvis::kinematics::Transformation,
           Eigen::aligned_allocator<okvis::kinematics::Transformation>>&
           anchor_T_WBs,
+      std::shared_ptr<const msckf::PointSharedData> pointDataPtr,
       Eigen::MatrixXd* J_X,
       Eigen::Matrix<double, Eigen::Dynamic, 3>* J_pfi,
       Eigen::Matrix<double, Eigen::Dynamic, 2>* J_n,
