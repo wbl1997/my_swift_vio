@@ -99,19 +99,19 @@ TriangulationStatus PointLandmark::initialize(
       break;
     }
     case 2: {
-        Eigen::Vector3d d_m = obsDirections[anchorSeqIds[0]].normalized();
-        Eigen::Vector3d d_a = obsDirections[anchorSeqIds[1]].normalized();
-        Eigen::Vector3d W_d_m = T_WSs[anchorSeqIds[0]].C() * (T_BC0.C() * d_m);
-        Eigen::Vector3d W_d_a = T_WSs[anchorSeqIds[1]].C() * (T_BC0.C() * d_a);
-        double cos_theta = W_d_m.dot(W_d_a);
-        LWF::ParallaxAnglePoint pap(d_m, cos_theta);
-        pap.copy(&parameters_);
-        TriangulationStatus status;
-        status.triangulationOk = true;
-        status.chi2Small = true;
-        status.flipped = false;
-        status.raysParallel = false;
-        return status;
+      Eigen::Vector3d d_m = obsDirections[anchorSeqIds[0]].normalized();
+      Eigen::Vector3d d_a = obsDirections[anchorSeqIds[1]].normalized();
+      Eigen::Vector3d W_d_m = T_WSs[anchorSeqIds[0]].C() * (T_BC0.C() * d_m);
+      Eigen::Vector3d W_d_a = T_WSs[anchorSeqIds[1]].C() * (T_BC0.C() * d_a);
+      double cos_theta = W_d_m.dot(W_d_a);
+      LWF::ParallaxAnglePoint pap(d_m, cos_theta);
+      pap.copy(&parameters_);
+      TriangulationStatus status;
+      status.triangulationOk = true;
+      status.chi2Small = true;
+      status.flipped = false;
+      status.raysParallel = false;
+      return status;
     }
     case 0:
     default:

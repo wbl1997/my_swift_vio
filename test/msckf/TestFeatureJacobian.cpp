@@ -95,8 +95,8 @@ int examinLandmarkStackedJacobian(const okvis::MapPoint& mapPoint,
   return 0;
 }
 
-int examineLandmarkMeasurementJacobian(const okvis::MapPoint& mapPoint,
-                                std::shared_ptr<okvis::MSCKF2> estimator) {
+int examineLandmarkMeasurementJacobian(
+    const okvis::MapPoint& mapPoint, std::shared_ptr<okvis::MSCKF2> estimator) {
   // init landmark parameterization
 
   // calculate Jacobians for at least three measurements
@@ -306,7 +306,6 @@ TEST(MSCKF, FeatureJacobianVariableTime) {
 }
 
 TEST(MSCKF, MeasurementJacobianChordalDistance) {
-  // also inspect the Jacobians relative to velocity
   std::string projOptModelName = "FXY_CXY";
   std::string extrinsicModelName = "P_CB";
   std::string outputFile = FLAGS_log_dir + "/MSCKF_Torus_RS_Chordal.txt";
@@ -314,7 +313,6 @@ TEST(MSCKF, MeasurementJacobianChordalDistance) {
 }
 
 TEST(MSCKF, FeatureJacobianChordalDistance) {
-  // also inspect the Jacobians relative to velocity
   std::string projOptModelName = "FXY_CXY";
   std::string extrinsicModelName = "P_CB";
   std::string outputFile = FLAGS_log_dir + "/MSCKF_Torus_Chordal.txt";
