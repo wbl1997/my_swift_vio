@@ -22,10 +22,6 @@
 #include <okvis/ceres/ReprojectionError.hpp>
 #include <okvis/ceres/SpeedAndBiasParameterBlock.hpp>
 
-#include <okvis/timing/Timer.hpp>
-#include "vio/CsvReader.h"
-#include <vio/ImuErrorModel.h>
-
 /// \brief okvis Main namespace of this package.
 namespace okvis {
 
@@ -75,8 +71,8 @@ class MSCKF2 : public HybridFilter {
    * @param ab1rho
    * @param tempCameraGeometry
    * @param obs
-   * @param poseId
-   * @param camIdx
+   * @param observationIndex index of the observation inside the point's shared data.
+   * @param pointDataPtr shared data of the point.
    * @param anchorId
    * @param T_WBa
    * @param H_x Jacobians of the image observation relative to the camera parameters and cloned states.
@@ -97,8 +93,8 @@ class MSCKF2 : public HybridFilter {
   bool measurementJacobian(
       const Eigen::Vector4d& v4Xhomog,
       std::shared_ptr<const okvis::cameras::CameraBase> tempCameraGeometry,
-      const Eigen::Vector2d& obs, uint64_t poseId, int camIdx,
-      std::shared_ptr<const msckf::PointSharedData> psd,
+      const Eigen::Vector2d& obs, int observationIndex,
+      std::shared_ptr<const msckf::PointSharedData> pointData,
       Eigen::Matrix<double, 2, Eigen::Dynamic>* J_Xc,
       Eigen::Matrix<double, 2, 9>* J_XBj, Eigen::Matrix<double, 2, 3>* J_pfi,
       Eigen::Vector2d* residual) const;

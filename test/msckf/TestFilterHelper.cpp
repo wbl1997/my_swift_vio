@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 #include <msckf/FilterHelper.hpp>
+#include <msckf/RemoveFromVector.hpp>
 #include <msckf/SimulationNView.h>
 
 #include <random>
@@ -16,7 +17,7 @@ TEST(FilterHelper, removeUnsetElements) {
       expectedElements.push_back(ele);
     }
   }
-  removeUnsetElements(&sampleElements, markers);
+  msckf::removeUnsetElements(&sampleElements, markers);
   for (size_t j = 0; j < sampleElements.size(); ++j) {
     EXPECT_NEAR(sampleElements[j], expectedElements[j], 1e-8);
   }
@@ -42,7 +43,7 @@ TEST(FilterHelper, removeUnsetElementsStep) {
                               eleArray.end());
     }
   }
-  removeUnsetElements(&sampleElements, markers, step);
+  msckf::removeUnsetElements(&sampleElements, markers, step);
   for (size_t j = 0; j < sampleElements.size(); ++j) {
     EXPECT_NEAR(sampleElements[j], expectedElements[j], 1e-8);
   }
@@ -61,7 +62,7 @@ TEST(FilterHelper, removeUnsetMatrices) {
       expectedMatrices.push_back(mat);
     }
   }
-  removeUnsetMatrices(&sampleMatrices, markers);
+  msckf::removeUnsetMatrices(&sampleMatrices, markers);
   for (size_t j = 0; j < sampleMatrices.size(); ++j) {
     EXPECT_TRUE(sampleMatrices[j].isApprox(expectedMatrices[j], 1e-8));
   }

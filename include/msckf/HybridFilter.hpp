@@ -31,10 +31,6 @@
 #include <msckf/PointLandmark.hpp>
 #include <msckf/PointSharedData.hpp>
 
-#include <vio/CsvReader.h>
-#include <vio/ImuErrorModel.h>
-
-
 /// \brief okvis Main namespace of this package.
 namespace okvis {
 
@@ -248,6 +244,12 @@ class HybridFilter : public Estimator {
    * @return the last pose id
    */
   uint64_t getCameraCalibrationEstimate(Eigen::Matrix<double, Eigen::Dynamic, 1> &vfckptdr) const;
+
+  std::vector<std::shared_ptr<const okvis::ceres::ParameterBlock>>
+      getCameraTimeParameterPtrs() const;
+
+  std::vector<std::shared_ptr<const okvis::ceres::ParameterBlock>>
+      getImuAugmentedParameterPtrs() const;
 
   /**
    * @brief getImuAugmentedStatesEstimate get the lastest estimate of IMU augmented params.
@@ -468,45 +470,6 @@ class HybridFilter : public Estimator {
   int landmarkModelId_; // see PointLandmarkModels.hpp
 };
 
-/**
- * @brief poseAndVelocityAtObservation for feature i, estimate
- *     $p_B^G(t_{f_i})$, $R_B^G(t_{f_i})$, $v_B^G(t_{f_i})$, and
- *     $\omega_{GB}^B(t_{f_i})$ with imu measurements
- * @param imuMeas cover stateEpoch to the extent of featureTime
- * @param imuAugmentedParams imu params exccept for gyro and accel biases
- * @param imuParameters
- * @param stateEpoch
- * @param featureTime
- * @param T_WB[in/out] in: pose at stateEpoch;
- *     out: pose at stateEpoch + featureTime
- * @param sb[in/out] in: speed and biases at stateEpoch;
- *     out: speed and biases at stateEpoch + featureTime
- * @param interpolatedInertialData[out] inertial measurements at stateEpoch +
- *     featureTime after correction for biases etc.
- */
-void poseAndVelocityAtObservation(
-    const ImuMeasurementDeque& imuMeas, const double* imuAugmentedParams,
-    const okvis::ImuParameters& imuParameters, const okvis::Time& stateEpoch,
-    const okvis::Duration& featureTime, kinematics::Transformation* T_WB,
-    SpeedAndBiases* sb, okvis::ImuMeasurement* interpolatedInertialData);
-
-/**
- * @brief poseAndLinearVelocityAtObservation Similarly to
- *     poseAndVelocityAtObservation except that the inertial data is not
- *     interpolated and the RK4 propagation is not used.
- * @param imuMeas
- * @param imuAugmentedParams
- * @param imuParameters
- * @param stateEpoch
- * @param featureTime
- * @param T_WB
- * @param sb
- */
-void poseAndLinearVelocityAtObservation(
-    const ImuMeasurementDeque& imuMeas, const double* imuAugmentedParams,
-    const okvis::ImuParameters& imuParameters, const okvis::Time& stateEpoch,
-    const okvis::Duration& featureTime, kinematics::Transformation* T_WB,
-    SpeedAndBiases* sb);
 
 }  // namespace okvis
 

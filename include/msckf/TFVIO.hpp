@@ -22,10 +22,6 @@
 #include <okvis/ceres/ReprojectionError.hpp>
 #include <okvis/ceres/SpeedAndBiasParameterBlock.hpp>
 
-#include <okvis/timing/Timer.hpp>
-#include "vio/CsvReader.h"
-#include <vio/ImuErrorModel.h>
-
 /// \brief okvis Main namespace of this package.
 namespace okvis {
 

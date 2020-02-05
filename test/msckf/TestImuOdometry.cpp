@@ -1,11 +1,17 @@
 
+#include <gtest/gtest.h>
+
+#include "msckf/ImuErrorModel.h"
 #include <msckf/ImuOdometry.h>
+#include <msckf/ImuOdometryLegacy.hpp>
+
 #include <okvis/ceres/ImuError.hpp>
 #include <okvis/timing/Timer.hpp>
-#include "vio/ImuErrorModel.h"
-#include "vio/Sample.h"
 
-#include <gtest/gtest.h>
+#include "vio/Sample.h"
+#include "vio/eigen_utils.h"
+
+#include "sophus/se3.hpp"
 
 static void check_q_near(const Eigen::Quaterniond& q_WS0,
                          const Eigen::Quaterniond& q_WS1, const double tol) {
