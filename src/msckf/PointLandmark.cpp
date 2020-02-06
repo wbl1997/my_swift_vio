@@ -10,57 +10,61 @@ namespace msckf {
 /**
  * @brief decideAnchors
  * @param mp
- * @param involvedFrameIds
+ * @param orderedCulledFrameIds
  * @param landmarkModelId
  * @param anchorIds
  * @param anchorSeqIds id of anchors relative to mappoint observations
  */
-void decideAnchors(const okvis::MapPoint& mp,
-                   const std::vector<uint64_t>* involvedFrameIds,
+void decideAnchors(const std::vector<std::pair<uint64_t, int>>& frameIds,
+                   const std::vector<uint64_t>& orderedCulledFrameIds,
                    int landmarkModelId, std::vector<uint64_t>* anchorIds,
                    std::vector<int>* anchorSeqIds) {
   uint64_t anchorId;
-  if (involvedFrameIds != nullptr) {
-    switch (landmarkModelId) {
-      case msckf::ParallaxAngleParameterization::kModelId:
-        // greedily choose the head and tail observation
-        anchorId = involvedFrameIds->front();
-        anchorIds->push_back(anchorId);
-        [[fallthrough]];
-      case msckf::InverseDepthParameterization::kModelId:
-        anchorId = involvedFrameIds->back();
-        anchorIds->push_back(anchorId);
-        break;
-      case msckf::HomogeneousPointParameterization::kModelId:
-      default:
-        break;
-    }
-    const std::map<okvis::KeypointIdentifier, uint64_t>& obsMap =
-        mp.observations;
-    for (auto aid : *anchorIds) {
-      std::map<okvis::KeypointIdentifier, uint64_t>::const_iterator anchorIter =
-          std::find_if(obsMap.begin(), obsMap.end(), IsObservedInFrame(aid));
-      int anchorSeqId = std::distance(obsMap.begin(), anchorIter);
-      anchorSeqIds->push_back(anchorSeqId);
-    }
-  } else {
-    switch (landmarkModelId) {
-      case msckf::ParallaxAngleParameterization::kModelId:
-        // TODO(jhuai): is there an efficient way to find the ray pair of max angle?
-        // greedily choose the head and tail observation
-        anchorId = mp.observations.begin()->first.frameId;
-        anchorIds->push_back(anchorId);
-        anchorSeqIds->push_back(0);
-        [[fallthrough]];
-      case msckf::InverseDepthParameterization::kModelId:
-        anchorId = mp.observations.rbegin()->first.frameId;
-        anchorIds->push_back(anchorId);
-        anchorSeqIds->push_back(mp.observations.size() - 1);
-        break;
-      case msckf::HomogeneousPointParameterization::kModelId:
-      default:
-        break;
-    }
+  switch (landmarkModelId) {
+    case msckf::ParallaxAngleParameterization::kModelId:
+      // greedily choose the head and tail observation
+      anchorId = orderedCulledFrameIds.front();
+      anchorIds->push_back(anchorId);
+      [[fallthrough]];
+    case msckf::InverseDepthParameterization::kModelId:
+      anchorId = orderedCulledFrameIds.back();
+      anchorIds->push_back(anchorId);
+      break;
+    case msckf::HomogeneousPointParameterization::kModelId:
+    default:
+      break;
+  }
+  for (auto aid : *anchorIds) {
+    std::vector<std::pair<uint64_t, int>>::const_iterator anchorIter =
+        std::find_if(frameIds.begin(), frameIds.end(),
+                     [aid](const std::pair<uint64_t, int>& s) {
+                       return s.first == aid;
+                     });
+    int anchorSeqId = std::distance(frameIds.begin(), anchorIter);
+    anchorSeqIds->push_back(anchorSeqId);
+  }
+}
+
+void decideAnchors(const std::vector<std::pair<uint64_t, int>>& frameIds,
+                   int landmarkModelId, std::vector<uint64_t>* anchorIds,
+                   std::vector<int>* anchorSeqIds) {
+  uint64_t anchorId;
+  switch (landmarkModelId) {
+    case msckf::ParallaxAngleParameterization::kModelId:
+      // TODO(jhuai): is there an efficient way to find the ray pair of max
+      // angle? For now, we greedily choose the head and tail observation.
+      anchorId = frameIds.front().first;
+      anchorIds->push_back(anchorId);
+      anchorSeqIds->push_back(0);
+      [[fallthrough]];
+    case msckf::InverseDepthParameterization::kModelId:
+      anchorId = frameIds.back().first;
+      anchorIds->push_back(anchorId);
+      anchorSeqIds->push_back(frameIds.size() - 1);
+      break;
+    case msckf::HomogeneousPointParameterization::kModelId:
+    default:
+      break;
   }
 }
 

@@ -268,7 +268,7 @@ void TFVIO::optimize(size_t /*numIter*/, size_t /*numThreads*/, bool verbose) {
       msckf::PointSharedData psd;
       msckf::TriangulationStatus status =
           triangulateAMapPoint(it->second, obsInPixel, pointLandmark, vRi,
-                               tempCameraGeometry, T_SC0, &psd);
+                               tempCameraGeometry, T_SC0, &psd, nullptr, false);
       if (status.triangulationOk) {
         it->second.quality = 1.0;
         it->second.pointHomog = Eigen::Map<Eigen::Vector4d>(pointLandmark.data(), 4);

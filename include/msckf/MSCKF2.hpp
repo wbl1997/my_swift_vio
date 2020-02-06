@@ -24,6 +24,12 @@
 
 /// \brief okvis Main namespace of this package.
 namespace okvis {
+enum class MeasurementJacobianStatus {
+  Successful = 0,
+  GeneralProjectionFailed = 1,
+  MainAnchorProjectionFailed = 2,
+  AssociateAnchorProjectionFailed = 3,
+};
 
 //! The estimator class
 /*!
@@ -84,8 +90,7 @@ class MSCKF2 : public HybridFilter {
   bool measurementJacobianAIDP(
       const Eigen::Vector4d& ab1rho,
       std::shared_ptr<const okvis::cameras::CameraBase> tempCameraGeometry,
-      const Eigen::Vector2d& obs, uint64_t poseId, int camIdx,
-      uint64_t anchorId, const okvis::kinematics::Transformation& T_WBa,
+      const Eigen::Vector2d& obs, int observationIndex,
       std::shared_ptr<const msckf::PointSharedData> pointDataPtr,
       Eigen::Matrix<double, 2, Eigen::Dynamic>* H_x,
       Eigen::Matrix<double, 2, 3>* J_pfi, Eigen::Vector2d* residual) const;
@@ -99,16 +104,11 @@ class MSCKF2 : public HybridFilter {
       Eigen::Matrix<double, 2, 9>* J_XBj, Eigen::Matrix<double, 2, 3>* J_pfi,
       Eigen::Vector2d* residual) const;
 
-  bool measurementJacobianGeneric(
+  MeasurementJacobianStatus measurementJacobianGeneric(
       const msckf::PointLandmark& pointLandmark,
       std::shared_ptr<const okvis::cameras::CameraBase> tempCameraGeometry,
-      const Eigen::Vector2d& obs, uint64_t poseId, int camIdx,
+      const Eigen::Vector2d& obs, int observationIndex,
       const Eigen::Matrix2d& obsNoiseInfo,
-      const std::vector<uint64_t>& anchorIds,
-      const std::vector<
-          okvis::kinematics::Transformation,
-          Eigen::aligned_allocator<okvis::kinematics::Transformation>>&
-          anchor_T_WBs,
       std::shared_ptr<const msckf::PointSharedData> pointDataPtr,
       Eigen::MatrixXd* J_X,
       Eigen::Matrix<double, Eigen::Dynamic, 3>* J_pfi,
@@ -118,7 +118,7 @@ class MSCKF2 : public HybridFilter {
   bool featureJacobianGeneric(
       const MapPoint& mp, Eigen::MatrixXd& H_oi,
       Eigen::Matrix<double, Eigen::Dynamic, 1>& r_oi, Eigen::MatrixXd& R_oi,
-      const std::vector<uint64_t>* involved_frame_ids) const;
+      std::vector<uint64_t>* involved_frame_ids) const;
 
   /**
    * @brief compute the marginalized Jacobian for a feature i's track.
@@ -138,7 +138,7 @@ class MSCKF2 : public HybridFilter {
                   Eigen::MatrixXd& H_oi,
                   Eigen::Matrix<double, Eigen::Dynamic, 1>& r_oi,
                   Eigen::MatrixXd& R_oi,
-                  const std::vector<uint64_t>* involved_frame_ids=nullptr) const;
+                  std::vector<uint64_t>* involved_frame_ids=nullptr) const;
 
 private:
   int computeStackedJacobianAndResidual(

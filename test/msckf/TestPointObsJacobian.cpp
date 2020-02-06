@@ -2,6 +2,8 @@
 #include "gtest/gtest.h"
 
 #include <msckf/MSCKF2.hpp>
+#include <msckf/PointLandmarkModels.hpp>
+
 #include <okvis/IdProvider.hpp>
 #include <okvis/cameras/PinholeCamera.hpp>
 #include <okvis/cameras/FovDistortion.hpp>
@@ -47,6 +49,7 @@ void computeFeatureMeasJacobian(
   double trNoisy = 0.033;
   std::shared_ptr<okvis::ceres::Map> mapPtr(new okvis::ceres::Map);
   okvis::MSCKF2 estimator(mapPtr);
+  estimator.setLandmarkModel(msckf::InverseDepthParameterization::kModelId);
 
   okvis::Time t0(5, 0);
   okvis::ImuMeasurementDeque imuMeasurements = createImuMeasurements(t0);
@@ -144,7 +147,17 @@ void computeFeatureMeasJacobian(
   pvstd.std_q_WS = Eigen::Vector3d(5e-2, 5e-2, 5e-2);
   estimator.resetInitialNavState(pvstd);
 
-  for (int k = 0; k < 3; ++k) {
+  uint64_t landmarkId = 1000;
+  Eigen::Vector4d ab1rho;
+  ab1rho << 0.4, 0.3, 1.0, 0.3;
+  okvis::kinematics::Transformation T_WCa;
+  estimator.addLandmark(landmarkId, T_WCa * ab1rho/ab1rho[3]);
+  estimator.setLandmarkInitialized(landmarkId, true);
+
+  // We have 3 observations in 3 frames.
+  int numObservations = 3; // Warn: This should be at least minTrackLength_.
+  int numStates = numObservations + 1;
+  for (int k = 0; k < numStates; ++k) {
     okvis::Time currentKFTime = t0 + okvis::Duration(0.5 * k + 0.5);
     okvis::Time lastKFTime = t0;
 
@@ -156,34 +169,72 @@ void computeFeatureMeasJacobian(
 
     std::shared_ptr<okvis::MultiFrame> mf =
         createMultiFrame(currentKFTime, cameraSystem);
+
+    // add landmark observations
+    std::vector<cv::KeyPoint> keypoints;
+    Eigen::Vector2d measurement = expectedObservation;
+    keypoints.emplace_back(measurement[0], measurement[1], 8.0);
+    mf->resetKeypoints(0, keypoints);
+    mf->setLandmarkId(0, 0, landmarkId);
+    int cameraIndex = 0;
+    int keypointIndex = 0;
     estimator.addStates(mf, imuSegment, true);
+    if (k < numObservations) {
+      // We skip adding observation for the latest frame because
+      // triangulateAMapPoint will set the anchor id as the last frame observing
+      // the point.
+      if (distortionId == okvis::cameras::NCameraSystem::DistortionType::FOV) {
+        estimator.addObservation<
+            okvis::cameras::PinholeCamera<okvis::cameras::FovDistortion>>(
+            landmarkId, mf->id(), cameraIndex, keypointIndex);
+      } else if (distortionId == okvis::cameras::NCameraSystem::DistortionType::
+                                     RadialTangential) {
+        estimator.addObservation<okvis::cameras::PinholeCamera<
+            okvis::cameras::RadialTangentialDistortion>>(
+            landmarkId, mf->id(), cameraIndex, keypointIndex);
+      }
+    }
   }
+
   int stateMapSize = estimator.statesMapSize();
   int featureVariableDimen = estimator.cameraParamsMinimalDimen() +
                              estimator.kClonedStateMinimalDimen * (stateMapSize - 1);
-  Eigen::Matrix<double, 2, Eigen::Dynamic> H_x(2, featureVariableDimen);
+  Eigen::Matrix<double, 2, Eigen::Dynamic> J_x(2, featureVariableDimen);
   // $\frac{\partial [z_u, z_v]^T}{\partial [\alpha, \beta, \rho]}$
   Eigen::Matrix<double, 2, 3> J_pfi;
   Eigen::Vector2d residual;
 
-  Eigen::Vector4d ab1rho;
-  ab1rho << 0.4, 0.3, 1.0, 0.3;
-
-  uint64_t poseId = estimator.oldestFrameId();
-  const int camIdx = 0;
   uint64_t anchorId = estimator.frameIdByAge(1);
-  std::cout << "poseId " << poseId << " anchorId " << anchorId << std::endl;
+
   okvis::kinematics::Transformation T_WBa(Eigen::Vector3d(0, 0, 1),
                                           Eigen::Quaterniond(1, 0, 0, 0));
-  std::shared_ptr<msckf::PointSharedData> psd(new msckf::PointSharedData());
-  // initialize PointSharedData
+  int landmarkModelId = 0;
+  msckf::PointLandmark pointLandmark(landmarkModelId);
+  std::shared_ptr<msckf::PointSharedData> pointDataPtr(new msckf::PointSharedData());
 
+  // all observations for this feature point
+  std::vector<Eigen::Vector2d, Eigen::aligned_allocator<Eigen::Vector2d>>
+      obsInPixel;
+  std::vector<double> vRi; // std noise in pixels
+  okvis::PointMap landmarkMap;
+  size_t numLandmarks = estimator.getLandmarks(landmarkMap);
+  EXPECT_EQ(numLandmarks, 1);
+  const okvis::MapPoint& mp = landmarkMap.begin()->second;
+  estimator.triangulateAMapPoint(
+      mp, obsInPixel, pointLandmark, vRi, tempCameraGeometry, *T_SC_0,
+      pointDataPtr.get(), nullptr, false);
+  pointDataPtr->computePoseAndVelocityForJacobians(true);
+  EXPECT_EQ(anchorId, pointDataPtr->anchorIds()[0]);
+  int observationIndex = 0;
   bool result = estimator.measurementJacobianAIDP(
-      ab1rho, tempCameraGeometry, expectedObservation, poseId, camIdx, anchorId, T_WBa, psd, &H_x,
-      &J_pfi, &residual);
-//  std::cout << "H_x\n" << H_x << std::endl;
-  EXPECT_TRUE(J_pfi.isApprox(expectedJpoint, 1e-6));
-  EXPECT_TRUE(residual.isMuchSmallerThan(1.0, 1e-4));
+      ab1rho, tempCameraGeometry, expectedObservation, observationIndex,
+      pointDataPtr, &J_x, &J_pfi, &residual);
+  Eigen::IOFormat spaceInitFmt(Eigen::FullPrecision, Eigen::DontAlignCols,
+                               ",", " ", "", "", "", "");
+  std::cout << "J_x\n" << J_x.rows() << " " << J_x.cols() << "\n" << J_x.format(spaceInitFmt) << std::endl;
+  EXPECT_LT((J_x - expectedJstates).lpNorm<Eigen::Infinity>(), 1e-6);
+  EXPECT_LT((J_pfi - expectedJpoint).lpNorm<Eigen::Infinity>(), 1e-6);
+  EXPECT_LT(residual.lpNorm<Eigen::Infinity>(), 1e-4);
   EXPECT_TRUE(result);
 }
 
@@ -191,15 +242,52 @@ TEST(MSCKF2, MeasurementJacobian) {
   Eigen::Vector2d expectedObservation(360.4815, 238.0);
   Eigen::Matrix<double, 2, 3> expectedJpoint;
   expectedJpoint << 350.258, 9.93345e-11, -525.386, 1.02593e-10, 360.084, -360.084;
-  Eigen::MatrixXd expectedJstates;
-  computeFeatureMeasJacobian(okvis::cameras::NCameraSystem::DistortionType::RadialTangential,
-                             expectedObservation, expectedJpoint, expectedJstates);
+  Eigen::MatrixXd expectedJstates(2, 40);
+  expectedJstates << -0.000216805851973353, -1.98955441749053e-16,
+      0.00433440512740632, -0.0500529547647059, 0, 1, 0, -0.0438561999225605,
+      -0.000109817857626036, 9.93354729270363e-10, 2.62924628013702,
+      102.975852337977, -0.429066051408235, -105.077360523391,
+      -5.25377046353618, 2.98001502045618e-11, 5.95977831679945e-10,
+      -9.92806083732939e-09, 351.139998429583, 0.0144480319946058,
+      0.000722388184965761, -4.09749085297704e-15, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+      105.077360523391, 5.25377046353618, -2.98001502045618e-11,
+      5.25377046343684, -105.077360523351, -343.252841126589, 0, 0,
+      0, -1.26430388652045e-13, -1.16516105242636e-25, 5.37359365296899e-15, 0,
+      -2.83657371915451e-11, 0, 1, -2.55640588735688e-11, -6.40135301890805e-14,
+      0.901455867475549, 1.0217362929638e-09, 0.000148532458908287,
+      -6.18885245451193e-07, -3.07780126661939e-11, -3.0649816240008e-09,
+      108.02526136408, 360.090888561366, 18.0042100894899, 6.13425546685075e-10,
+      4.23194596358899e-15, 4.21431908318486e-13, -0.0148533654122997, 0, 0, 0,
+      0, 0, 0, 0, 0, 0, 3.07780126661939e-11, 3.0649816240008e-09,
+      -108.02526136408, -360.084204543869, 144.033681818743,
+      3.98404878978042e-09, 0, 0, 0;
+  computeFeatureMeasJacobian(
+      okvis::cameras::NCameraSystem::DistortionType::RadialTangential,
+      expectedObservation, expectedJpoint, expectedJstates);
   try {
     expectedObservation = Eigen::Vector2d(359.214, 238.0);
     expectedJpoint << 374.828, -3.30823e-10, -562.241,
                       -3.39825e-10, 386.137, -386.137;
-    computeFeatureMeasJacobian(okvis::cameras::NCameraSystem::DistortionType::FOV,
-                               expectedObservation, expectedJpoint, expectedJstates);
+    expectedJstates.resize(2, 37);
+    expectedJstates << -0.00023201451463455, -2.12911920186466e-16,
+        0.0046384582921142, -0.053674389058464, 0, 1, 0, -3.07170483111539,
+        110.199481157046, -0.459164504821023, -112.44840754534,
+        -5.62231597073543, -9.92471170912074e-11, 2.00651122793431e-10,
+        -1.06463583243582e-08, 375.77203550036, 0.0154615435890767,
+        0.000773062823660151, 1.36463793529239e-14, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        112.44840754534, 5.62231597073543, 9.92471170912074e-11,
+        5.62231597106625, -112.448407545472, -367.33160385682, 0, 0,
+        0, -1.35299440712587e-13, -1.2469076402355e-25, 1.9564742098705e-16, 0,
+        -3.04180566583197e-11, 0, 1, -1.79051635307018e-09,
+        0.000159278955759189, -6.63662315663286e-07, 1.01947450414553e-10,
+        -3.27999186221071e-09, 115.841111356055, 386.144205470152,
+        19.3068517448449, 2.06834163514887e-10, -1.40176724845506e-14,
+        4.5099560106211e-13, -0.0159280369703463, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        -1.01947450414553e-10, 3.27999186221071e-09, -115.841111356055,
+        -386.137037850238, 154.454815141509, 4.71314731766279e-09, 0, 0, 0;
+    computeFeatureMeasJacobian(
+        okvis::cameras::NCameraSystem::DistortionType::FOV, expectedObservation,
+        expectedJpoint, expectedJstates);
   } catch (...) {
     std::cout << "Error occurred!\n";
   }

@@ -117,26 +117,29 @@ class HybridFilter : public Estimator {
 
  public:
   /**
-   * @brief gatherPoseObservForTriang
+   * @brief gatherMapPointObservations
    * @param mp
    * @param cameraGeometry
    * @param pointDataPtr
    * @param obsDirections Each observation is in image plane z=1, (\bar{x}, \bar{y}, 1).
    * @param obsInPixel
    * @param vSigmai
+   * @param orderedBadFrameIds[out] Ids of frames that have bad back
+   *     projections of the mappoint.
    * @param seqType
    * @return number of gathered valid observations
    */
-  size_t gatherPoseObservForTriang(
+  size_t gatherMapPointObservations(
       const MapPoint &mp,
       std::shared_ptr<const cameras::CameraBase> cameraGeometry,
-      msckf::PointSharedData* pointDataPtr,
+      msckf::PointSharedData *pointDataPtr,
       std::vector<Eigen::Vector3d, Eigen::aligned_allocator<Eigen::Vector3d>>
           *obsDirections,
       std::vector<Eigen::Vector2d, Eigen::aligned_allocator<Eigen::Vector2d>>
           *obsInPixel,
       std::vector<double> *vSigmai,
-      RetrieveObsSeqType seqType=ENTIRE_TRACK) const;
+      std::vector<std::pair<uint64_t, int>>* orderedBadFrameIds,
+      RetrieveObsSeqType seqType = ENTIRE_TRACK) const;
 
   /**
    * @brief hasLowDisparity check if a feature track has low disparity at its endpoints
@@ -156,11 +159,12 @@ class HybridFilter : public Estimator {
   bool isPureRotation(const MapPoint& mp) const;
 
   /**
-   * @brief triangulateAMapPoint initialize a landmark with proper parameterization.
-   * If not PAP, then it does not support rays which arise from static mode,
-   * pure rotation, or points at infinity.
-   * Assume the same camera model for all observations, and rolling shutter
-   * effect is not accounted for in triangulation.
+   * @brief triangulateAMapPoint initialize a landmark with proper
+   * parameterization. If not PAP, then it does not support rays which arise
+   * from static mode, pure rotation, or points at infinity. Assume the same
+   * camera model for all observations, and rolling shutter effect is not
+   * accounted for in triangulation.
+   * This function will determine the anchor frames if applicable.
    * @param mp
    * @param obsInPixel
    * @param frameIds, id of frames observing this feature in the ascending order
@@ -172,8 +176,16 @@ class HybridFilter : public Estimator {
    *    pixels, size 2Nx1
    * @param cameraGeometry, used for point projection
    * @param T_SC0
-   * @param anchorSeqIds indices of main anchor and associate anchor frame in
-   *  the ordered observation map. It is empty by default meaning that no anchor is used.
+   * @param pointDataPtr[in/out] shared data of the map point for computing
+   * poses and velocity at observation.
+   * The anchor frames will be set depending on the landmarkModelId_.
+   * If 0, none anchor.
+   * else if 1, last frame (of orderedCulledFrameIds if not null) observing the map point
+   * else if 2, last frame (of orderedCulledFrameIds if not null) is main anchor,
+   * first frame is associate anchor.
+   * @param orderedCulledFrameIds[in/out] Ordered Ids of frames to be used for
+   * update, e.g., in marginalization. Some frame Ids may be erased in this
+   * function due to bad back projection.
    * @return true if triangulation successful
    */
   msckf::TriangulationStatus triangulateAMapPoint(
@@ -185,6 +197,7 @@ class HybridFilter : public Estimator {
       std::shared_ptr<const okvis::cameras::CameraBase> cameraGeometry,
       const okvis::kinematics::Transformation &T_SC0,
       msckf::PointSharedData* pointDataPtr,
+      std::vector<uint64_t>* orderedCulledFrameIds,
       bool checkDisparity = false) const;
   /**
    * @brief computeHxf, compute the residual and Jacobians for a SLAM feature i

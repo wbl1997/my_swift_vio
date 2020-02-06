@@ -1169,9 +1169,9 @@ bool HybridFilter::featureJacobian(
 
   msckf::PointLandmark pointLandmark(landmarkModelId_);
   std::shared_ptr<msckf::PointSharedData> pointDataPtr(new msckf::PointSharedData());
-  msckf::TriangulationStatus status =
-      triangulateAMapPoint(mp, obsInPixel, pointLandmark, vSigmai,
-                           tempCameraGeometry, T_BC0, pointDataPtr.get());
+  msckf::TriangulationStatus status = triangulateAMapPoint(
+      mp, obsInPixel, pointLandmark, vSigmai, tempCameraGeometry, T_BC0,
+      pointDataPtr.get(), nullptr, false);
   Eigen::Map<Eigen::Vector4d> v4Xhomog(pointLandmark.data(), 4);
   if (!status.triangulationOk) {
     computeHTimer.stop();
@@ -1196,7 +1196,8 @@ bool HybridFilter::featureJacobian(
         Exception, anchorId, (statesMap_.rbegin())->first,
         "anchor frame of to be included points should be the current frame");
   }
-
+  pointDataPtr->computePoseAndVelocityForJacobians(FLAGS_use_first_estimate);
+  pointDataPtr->computeSharedJacobians(landmarkModelId_);
   // compute Jacobians for a measurement in image j of the current feature i
   // C_j is the current frame, Bj refers to the body frame associated with the
   // current frame, Ba refers to body frame associated with the anchor frame,
@@ -2228,7 +2229,7 @@ int HybridFilter::getCameraExtrinsicOptType(size_t cameraIdx) const {
 }
 
 // private stuff
-size_t HybridFilter::gatherPoseObservForTriang(
+size_t HybridFilter::gatherMapPointObservations(
     const MapPoint& mp,
     std::shared_ptr<const cameras::CameraBase> cameraGeometry,
     msckf::PointSharedData* pointDataPtr,
@@ -2237,6 +2238,7 @@ size_t HybridFilter::gatherPoseObservForTriang(
     std::vector<Eigen::Vector2d, Eigen::aligned_allocator<Eigen::Vector2d>>*
         obsInPixel,
     std::vector<double>* imageNoiseStd,
+    std::vector<std::pair<uint64_t, int>>* orderedBadFrameIds,
     RetrieveObsSeqType seqType) const {
   obsDirections->clear();
   obsInPixel->clear();
@@ -2279,6 +2281,7 @@ size_t HybridFilter::gatherPoseObservForTriang(
     Eigen::Vector3d backProjectionDirection;
     bool validDirection = cameraGeometry->backProject(measurement, &backProjectionDirection);
     if (!validDirection) {
+        orderedBadFrameIds->emplace_back(poseId, itObs->first.cameraIndex);
         continue;
     }
     obsDirections->push_back(backProjectionDirection);
@@ -2297,7 +2300,6 @@ size_t HybridFilter::gatherPoseObservForTriang(
     double kpN = measurement[1] / imageHeight - 0.5;
     pointDataPtr->addKeypointObservation(itObs->first, parameterBlockPtr, kpN);
   }
-
   return pointDataPtr->numObservations();
 }
 
@@ -2349,6 +2351,7 @@ msckf::TriangulationStatus HybridFilter::triangulateAMapPoint(
     std::shared_ptr<const cameras::CameraBase> cameraGeometry,
     const kinematics::Transformation& T_BC0,
     msckf::PointSharedData* pointDataPtr,
+    std::vector<uint64_t>* orderedCulledFrameIds,
     bool checkDisparity) const {
   triangulateTimer.start();
 
@@ -2356,9 +2359,11 @@ msckf::TriangulationStatus HybridFilter::triangulateAMapPoint(
   // z=1 in the specific camera frame, [\bar{x},\bar{y},1]
   std::vector<Eigen::Vector3d, Eigen::aligned_allocator<Eigen::Vector3d>>
       obsDirections;
+  std::vector<std::pair<uint64_t, int>> badObservationIdentifiers;
+  size_t numObs = gatherMapPointObservations(
+      mp, cameraGeometry, pointDataPtr, &obsDirections, &obsInPixel,
+      &imageNoiseStd, &badObservationIdentifiers);
 
-  size_t numObs = gatherPoseObservForTriang(mp, cameraGeometry, pointDataPtr,
-                            &obsDirections, &obsInPixel, &imageNoiseStd);
   msckf::TriangulationStatus status;
   if (numObs < minTrackLength_) {
       triangulateTimer.stop();
@@ -2413,7 +2418,19 @@ msckf::TriangulationStatus HybridFilter::triangulateAMapPoint(
       return status;
     }
   }
-  status = pointLandmark.initialize(T_WSs, obsDirections, T_BC0, pointDataPtr->anchorSeqIds());
+
+  std::vector<uint64_t> anchorIds;
+  std::vector<int> anchorSeqIds;
+  if (orderedCulledFrameIds) {
+    msckf::eraseBadObservations(badObservationIdentifiers, orderedCulledFrameIds);
+    msckf::decideAnchors(frameIds, *orderedCulledFrameIds, landmarkModelId_,
+                         &anchorIds, &anchorSeqIds);
+  } else {
+    msckf::decideAnchors(frameIds, landmarkModelId_, &anchorIds, &anchorSeqIds);
+  }
+  pointDataPtr->setAnchors(anchorIds, anchorSeqIds);
+
+  status = pointLandmark.initialize(T_WSs, obsDirections, T_BC0, anchorSeqIds);
   triangulateTimer.stop();
   return status;
 }
@@ -2894,8 +2911,10 @@ bool HybridFilter::featureJacobianEpipolar(
   std::vector<Eigen::Vector3d, Eigen::aligned_allocator<Eigen::Vector3d>>
       obsDirections;
   std::shared_ptr<msckf::PointSharedData> pointDataPtr(new msckf::PointSharedData());
-  size_t numFeatures = gatherPoseObservForTriang(mp, tempCameraGeometry, pointDataPtr.get(),
-                            &obsDirections, &obsInPixels, &imagePointNoiseStds, seqType);
+  std::vector<std::pair<uint64_t, int>> badObservationIdentifiers;
+  size_t numFeatures = gatherMapPointObservations(
+      mp, tempCameraGeometry, pointDataPtr.get(), &obsDirections, &obsInPixels,
+      &imagePointNoiseStds, &badObservationIdentifiers, seqType);
 
   // compute obsDirection Jacobians and count the valid ones, and
   // meanwhile resize the relevant data structures

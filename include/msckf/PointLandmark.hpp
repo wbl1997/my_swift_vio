@@ -14,9 +14,11 @@ struct TriangulationStatus {
   bool lackObservations; // True if #obs is less than minTrackLength.
   TriangulationStatus()
       : triangulationOk(false),
-        chi2Small(false),
+        chi2Small(true),
         raysParallel(false),
-        flipped(false) {}
+        flipped(false),
+        lackObservations(false)
+  {}
 };
 
 struct IsObservedInFrame {
@@ -30,10 +32,30 @@ struct IsObservedInFrame {
   uint64_t frameId;  ///< Multiframe ID.
 };
 
-void decideAnchors(const okvis::MapPoint& mp,
-                   const std::vector<uint64_t>* involvedFrameIds,
+void decideAnchors(const std::vector<std::pair<uint64_t, int>>& frameIdentifiers,
+                   const std::vector<uint64_t>& orderedCulledFrameIds,
                    int landmarkModelId, std::vector<uint64_t>* anchorIds,
                    std::vector<int>* anchorSeqIds);
+
+void decideAnchors(const std::vector<std::pair<uint64_t, int>>& frameIdentifiers,
+                   int landmarkModelId, std::vector<uint64_t>* anchorIds,
+                   std::vector<int>* anchorSeqIds);
+
+inline int eraseBadObservations(const std::vector<std::pair<uint64_t, int>>& dudIds,
+                                std::vector<uint64_t>* candidateFrameIds) {
+  int numErased = 0;
+  for (auto dud : dudIds) {
+    uint64_t frameId = dud.first;
+    auto iter =
+        std::find_if(candidateFrameIds->begin(), candidateFrameIds->end(),
+                     [frameId](const uint64_t& s) { return s == frameId; });
+    if (iter != candidateFrameIds->end()) {
+      candidateFrameIds->erase(iter);
+      ++numErased;
+    }
+  }
+  return numErased;
+}
 
 class PointLandmark {
 public:
