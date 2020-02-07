@@ -1260,7 +1260,7 @@ bool HybridFilter::featureJacobian(
   for (size_t kale = 0; kale < numPoses; ++kale) {
     int observationIndex = std::distance(pointDataPtr->begin(), itFrameIds);
     double kpN = pointDataPtr->normalizedRow(observationIndex);
-    Duration featureTime = pointDataPtr->normalizedFeatureTime(observationIndex);
+    double featureTime = pointDataPtr->normalizedFeatureTime(observationIndex);
     kinematics::Transformation T_WB = pointDataPtr->T_WBtij(observationIndex);
     Eigen::Vector3d omega_Btij = pointDataPtr->omega_Btij(observationIndex);
 
@@ -1334,7 +1334,7 @@ bool HybridFilter::featureJacobian(
     Eigen::Vector3d pfinG = (T_GA * ab1rho).head<3>();
     factorJ_XBj << -rho * Eigen::Matrix3d::Identity(),
         okvis::kinematics::crossMx(pfinG - lP_T_WB.r() * rho),
-        -rho * Eigen::Matrix3d::Identity() * featureTime.toSec();
+        -rho * Eigen::Matrix3d::Identity() * featureTime;
     J_XBj = pointJacobian3 * (T_WB.C() * T_BC0.C()).transpose() * factorJ_XBj;
 
     factorJ_XBa.topLeftCorner<3, 3>() = rho * Eigen::Matrix3d::Identity();
@@ -2297,6 +2297,40 @@ bool HybridFilter::isPureRotation(const MapPoint& mp) const {
   return relativeMotionTypes[1] == ROTATION_ONLY;
 }
 
+void HybridFilter::propagatePoseAndVelocityForMapPoint(
+    msckf::PointSharedData* pointDataPtr) const {
+  std::vector<std::pair<uint64_t, int>> frameIds = pointDataPtr->frameIds();
+  int observationIndex = 0;
+  for (const std::pair<uint64_t, int>& frameAndCameraIndex : frameIds) {
+    uint64_t frameId = frameAndCameraIndex.first;
+    auto statesIter = statesMap_.find(frameId);
+    pointDataPtr->setImuInfo(observationIndex, statesIter->second.timestamp,
+                             statesIter->second.tdAtCreation,
+                             statesIter->second.imuReadingWindow,
+                             statesIter->second.linearizationPoint);
+
+    std::shared_ptr<ceres::ParameterBlock> parameterBlockPtr;
+    const int imuIdx = 0;
+    getSensorStateParameterBlockPtr(frameId, imuIdx, SensorStates::Imu,
+                                    ImuSensorStates::SpeedAndBias,
+                                    parameterBlockPtr);
+    pointDataPtr->setVelocityParameterBlockPtr(observationIndex,
+                                               parameterBlockPtr);
+    ++observationIndex;
+  }
+
+  std::vector<std::shared_ptr<const okvis::ceres::ParameterBlock>>
+      cameraTimeParameterPtrs = getCameraTimeParameterPtrs();
+  pointDataPtr->setCameraTimeParameterPtrs(cameraTimeParameterPtrs[0],
+                                           cameraTimeParameterPtrs[1]);
+
+  std::vector<std::shared_ptr<const okvis::ceres::ParameterBlock>>
+      imuAugmentedParameterPtrs = getImuAugmentedParameterPtrs();
+  pointDataPtr->setImuAugmentedParameterPtrs(imuAugmentedParameterPtrs,
+                                             &imuParametersVec_.at(0));
+  pointDataPtr->computePoseAndVelocityAtObservation();
+}
+
 msckf::TriangulationStatus HybridFilter::triangulateAMapPoint(
     const MapPoint& mp,
     std::vector<Eigen::Vector2d, Eigen::aligned_allocator<Eigen::Vector2d>>&
@@ -2326,36 +2360,7 @@ msckf::TriangulationStatus HybridFilter::triangulateAMapPoint(
       return status;
   }
 
-  std::vector<std::pair<uint64_t, int>> frameIds = pointDataPtr->frameIds();
-  int observationIndex = 0;
-  for (const std::pair<uint64_t, int>& frameAndCameraIndex: frameIds) {
-    uint64_t frameId = frameAndCameraIndex.first;
-    auto statesIter = statesMap_.find(frameId);
-    pointDataPtr->setImuInfo(observationIndex, statesIter->second.timestamp,
-                             statesIter->second.tdAtCreation,
-                             statesIter->second.imuReadingWindow,
-                             statesIter->second.linearizationPoint);
-
-    std::shared_ptr<ceres::ParameterBlock> parameterBlockPtr;
-    const int imuIdx = 0;
-    getSensorStateParameterBlockPtr(frameId, imuIdx, SensorStates::Imu,
-                                    ImuSensorStates::SpeedAndBias,
-                                    parameterBlockPtr);
-    pointDataPtr->setVelocityParameterBlockPtr(observationIndex, parameterBlockPtr);
-    ++observationIndex;
-  }
-
-  std::vector<std::shared_ptr<const okvis::ceres::ParameterBlock>>
-      cameraTimeParameterPtrs = getCameraTimeParameterPtrs();
-  pointDataPtr->setCameraTimeParameterPtrs(cameraTimeParameterPtrs[0],
-                                           cameraTimeParameterPtrs[1]);
-
-  std::vector<std::shared_ptr<const okvis::ceres::ParameterBlock>>
-      imuAugmentedParameterPtrs = getImuAugmentedParameterPtrs();
-  pointDataPtr->setImuAugmentedParameterPtrs(imuAugmentedParameterPtrs,
-                                             &imuParametersVec_.at(0));
-
-  pointDataPtr->computePoseAndVelocityAtObservation();
+  propagatePoseAndVelocityForMapPoint(pointDataPtr);
 
   std::vector<okvis::kinematics::Transformation,
               Eigen::aligned_allocator<okvis::kinematics::Transformation>>
@@ -2374,6 +2379,7 @@ msckf::TriangulationStatus HybridFilter::triangulateAMapPoint(
     }
   }
 
+  std::vector<std::pair<uint64_t, int>> frameIds = pointDataPtr->frameIds();
   std::vector<uint64_t> anchorIds;
   std::vector<int> anchorSeqIds;
   if (orderedCulledFrameIds) {
@@ -2616,17 +2622,13 @@ HybridFilter::EpipolarMeasurement::EpipolarMeasurement(
       minExtrinsicDim_(minExtrinsicDim),
       minProjDim_(minProjDim),
       minDistortDim_(minDistortDim),
-      frameId2(2),
-      T_WS2(2),
       obsDirection2(2),
       obsInPixel2(2),
-      dfj_dXcam2(2),
-      cov_fj2(2) {
+      dfj_dXcam2(2) {
 
 }
 
 void HybridFilter::EpipolarMeasurement::prepareTwoViewConstraint(
-    std::shared_ptr<const msckf::PointSharedData> pointDataPtr,
     const std::vector<Eigen::Vector3d,
                       Eigen::aligned_allocator<Eigen::Vector3d>>& obsDirections,
     const std::vector<Eigen::Vector2d,
@@ -2635,22 +2637,19 @@ void HybridFilter::EpipolarMeasurement::prepareTwoViewConstraint(
         Eigen::Matrix<double, 3, Eigen::Dynamic>,
         Eigen::aligned_allocator<Eigen::Matrix<double, 3, Eigen::Dynamic>>>&
         dfj_dXcam,
-    const std::vector<Eigen::Matrix3d,
-                      Eigen::aligned_allocator<Eigen::Matrix3d>>& cov_fj,
     const std::vector<int>& index_vec) {
   int j = 0;
   for (auto index : index_vec) {
-    frameId2[j] = pointDataPtr->frameId(index);
-    pointDataPtr->poseAtObservation(index, &T_WS2[j]);
     obsDirection2[j] = obsDirections[index];
     obsInPixel2[j] = obsInPixels[index];
     dfj_dXcam2[j] = dfj_dXcam[index];
-    cov_fj2[j] = cov_fj[index];
     ++j;
   }
 }
 
 bool HybridFilter::EpipolarMeasurement::measurementJacobian(
+    std::shared_ptr<const msckf::PointSharedData> pointDataPtr,
+    const std::vector<int> observationIndexPair,
     Eigen::Matrix<double, 1, Eigen::Dynamic>* H_xjk,
     std::vector<Eigen::Matrix<double, 1, 3>,
                 Eigen::aligned_allocator<Eigen::Matrix<double, 1, 3>>>* H_fjk,
@@ -2665,57 +2664,13 @@ bool HybridFilter::EpipolarMeasurement::measurementJacobian(
       omega_WBtij;
   double dtij_dtr[2];
   double featureDelay[2];
-  const double tdEstimate = filter_.camera_rig_.getImageDelay(camIdx_);
-  const double trEstimate = filter_.camera_rig_.getReadoutTime(camIdx_);
   for (int j = 0; j < 2; ++j) {
-    uint64_t poseId = frameId2[j];
-    kinematics::Transformation T_WBj = T_WS2[j];
-
-    // TODO(jhuai): do we ue the latest estimate for bg ba or the saved ones
-    // for each state?
-    SpeedAndBiases sbj;
-    filter_.getSpeedAndBias(poseId, 0, sbj);
-    auto statesIter = filter_.statesMap_.find(poseId);
-    Time stateEpoch = statesIter->second.timestamp;
-    auto imuMeas = *(statesIter->second.imuReadingWindow);
-    OKVIS_ASSERT_GT(Exception, imuMeas.size(), 0,
-                    "the IMU measurement does not exist");
-
-    double kpN = obsInPixel2[j][1] / imageHeight_ - 0.5;  // k per N
-    dtij_dtr[j] = kpN;
-    Duration featureTime = Duration(tdEstimate + trEstimate * kpN -
-                           statesIter->second.tdAtCreation);
-    featureDelay[j] = featureTime.toSec();
-
-    // for feature i, estimate $p_B^G(t_{f_i})$, $R_B^G(t_{f_i})$,
-    // $v_B^G(t_{f_i})$, and $\omega_{GB}^B(t_{f_i})$ with the corresponding
-    // states' LATEST ESTIMATES and imu measurements
-    kinematics::Transformation T_WB = T_WBj;
-    SpeedAndBiases sb = sbj;
-    ImuMeasurement interpolatedInertialData;
-    Eigen::Matrix<double, 27, 1> vTGTSTA = filter_.imu_rig_.getImuAugmentedEuclideanParams();
-    poseAndVelocityAtObservation(
-        imuMeas, vTGTSTA.data(), filter_.imuParametersVec_.at(0), stateEpoch, featureTime,
-        &T_WB, &sb, &interpolatedInertialData, FLAGS_use_RK4);
-
-    T_WBtij.emplace_back(T_WB);
-    omega_WBtij.emplace_back(interpolatedInertialData.measurement.gyroscopes);
-
-    kinematics::Transformation lP_T_WB = T_WB;
-    SpeedAndBiases lP_sb = sb;
-    if (FLAGS_use_first_estimate) {
-      std::shared_ptr<const Eigen::Matrix<double, 6, 1>> posVelFirstEstimatePtr =
-          statesIter->second.linearizationPoint;
-      lP_T_WB =
-          kinematics::Transformation(posVelFirstEstimatePtr->head<3>(), T_WBj.q());
-      lP_sb = sbj;
-      lP_sb.head<3>() = posVelFirstEstimatePtr->tail<3>();
-      poseAndLinearVelocityAtObservation(
-          imuMeas, vTGTSTA.data(), filter_.imuParametersVec_.at(0), stateEpoch,
-          featureTime, &lP_T_WB, &lP_sb);
-    }
-    lP_T_WBtij.emplace_back(lP_T_WB);
-    lP_v_WBtij.emplace_back(lP_sb.head<3>());
+    dtij_dtr[j] = pointDataPtr->normalizedRow(observationIndexPair[j]);
+    featureDelay[j] = pointDataPtr->normalizedFeatureTime(observationIndexPair[j]);
+    T_WBtij.emplace_back(pointDataPtr->T_WBtij(observationIndexPair[j]));
+    omega_WBtij.emplace_back(pointDataPtr->omega_Btij(observationIndexPair[j]));
+    lP_T_WBtij.emplace_back(pointDataPtr->T_WBtij_ForJacobian(observationIndexPair[j]));
+    lP_v_WBtij.emplace_back(pointDataPtr->v_WBtij_ForJacobian(observationIndexPair[j]));
   }
 
   // compute residual
@@ -2834,7 +2789,7 @@ bool HybridFilter::EpipolarMeasurement::measurementJacobian(
 
   const int minCamParamDim = filter_.cameraParamsMinimalDimen();
   for (int j = 0; j < 2; ++j) {
-    uint64_t poseId = frameId2[j];
+    uint64_t poseId = pointDataPtr->frameId(observationIndexPair[j]);
     std::map<uint64_t, int>::const_iterator poseid_iter =
         filter_.mStateID2CovID_.find(poseId);
     int covid = poseid_iter->second;
@@ -2898,6 +2853,10 @@ bool HybridFilter::featureJacobianEpipolar(
       return false;
   }
 
+  propagatePoseAndVelocityForMapPoint(pointDataPtr.get());
+  pointDataPtr->computePoseAndVelocityForJacobians(FLAGS_use_first_estimate);
+  pointDataPtr->computeSharedJacobians(cameraObservationModelId_);
+
   // enlarge cov of the head obs to counteract the noise reduction
   // due to correlation in head_tail scheme
   size_t trackLength = mp.observations.size();
@@ -2942,9 +2901,8 @@ bool HybridFilter::featureJacobianEpipolar(
                 Eigen::aligned_allocator<Eigen::Matrix<double, 1, 3>>>
         H_fjk;
     double rjk;
-    epiMeas.prepareTwoViewConstraint(pointDataPtr, obsDirections,
-                                     obsInPixels, dfj_dXcam, cov_fij, index_vec);
-    epiMeas.measurementJacobian(&H_xjk, &H_fjk, &rjk);
+    epiMeas.prepareTwoViewConstraint(obsDirections, obsInPixels, dfj_dXcam, index_vec);
+    epiMeas.measurementJacobian(pointDataPtr, index_vec, &H_xjk, &H_fjk, &rjk);
     Hi->row(count) = H_xjk;
     (*ri)(count) = rjk;
     for (int j = 0; j < 2; ++j) {

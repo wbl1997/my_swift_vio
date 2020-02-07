@@ -387,7 +387,7 @@ bool MSCKF2::measurementJacobianAIDP(
   const okvis::kinematics::Transformation T_SC0 = camera_rig_.getCameraExtrinsic(camIdx);
 
   double kpN = pointDataPtr->normalizedRow(observationIndex);
-  const Duration featureTime = pointDataPtr->normalizedFeatureTime(observationIndex);
+  const double featureTime = pointDataPtr->normalizedFeatureTime(observationIndex);
 
   kinematics::Transformation T_WB = pointDataPtr->T_WBtij(observationIndex);
   Eigen::Vector3d omega_Btij = pointDataPtr->omega_Btij(observationIndex);
@@ -448,7 +448,7 @@ bool MSCKF2::measurementJacobianAIDP(
   Eigen::Vector3d pfinG = (T_GA * ab1rho).head<3>();
   factorJ_XBj << -rho * Eigen::Matrix3d::Identity(),
       okvis::kinematics::crossMx(pfinG - lP_T_WB.r() * rho),
-      -rho * Eigen::Matrix3d::Identity() * featureTime.toSec();
+      -rho * Eigen::Matrix3d::Identity() * featureTime;
   J_XBj = pointJacobian3 * (T_WB.C() * T_SC0.C()).transpose() * factorJ_XBj;
 
   factorJ_XBa.topLeftCorner<3, 3>() = rho * Eigen::Matrix3d::Identity();
@@ -511,7 +511,7 @@ bool MSCKF2::measurementJacobian(
   int projOptModelId = camera_rig_.getProjectionOptMode(camIdx);
   int extrinsicModelId = camera_rig_.getExtrinsicOptMode(camIdx);
   const okvis::kinematics::Transformation T_SC0 = camera_rig_.getCameraExtrinsic(camIdx);
-  okvis::Duration featureTime = pointDataPtr->normalizedFeatureTime(observationIndex);
+  double featureTime = pointDataPtr->normalizedFeatureTime(observationIndex);
   double kpN = pointDataPtr->normalizedRow(observationIndex);
 
   kinematics::Transformation T_WB = pointDataPtr->T_WBtij(observationIndex);
@@ -566,7 +566,7 @@ bool MSCKF2::measurementJacobian(
 
   factorJ_XBj << -Eigen::Matrix3d::Identity(),
       okvis::kinematics::crossMx(v3Point - lP_T_WB.r()),
-      -Eigen::Matrix3d::Identity() * featureTime.toSec();
+      -Eigen::Matrix3d::Identity() * featureTime;
 
   (*J_XBj) = (*J_pfi) * factorJ_XBj;
   return true;

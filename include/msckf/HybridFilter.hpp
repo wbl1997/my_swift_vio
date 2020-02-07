@@ -158,6 +158,8 @@ class HybridFilter : public Estimator {
 
   bool isPureRotation(const MapPoint& mp) const;
 
+  void propagatePoseAndVelocityForMapPoint(msckf::PointSharedData* pointDataPtr) const;
+
   /**
    * @brief triangulateAMapPoint initialize a landmark with proper
    * parameterization. If not PAP, then it does not support rays which arise
@@ -362,7 +364,6 @@ class HybridFilter : public Estimator {
         int minDistortDim);
 
     void prepareTwoViewConstraint(
-        std::shared_ptr<const msckf::PointSharedData> pointDataPtr,
         const std::vector<Eigen::Vector3d,
                           Eigen::aligned_allocator<Eigen::Vector3d>>
             &obsDirections,
@@ -373,8 +374,6 @@ class HybridFilter : public Estimator {
             Eigen::Matrix<double, 3, Eigen::Dynamic>,
             Eigen::aligned_allocator<Eigen::Matrix<double, 3, Eigen::Dynamic>>>
             &dfj_dXcam,
-        const std::vector<Eigen::Matrix3d,
-                          Eigen::aligned_allocator<Eigen::Matrix3d>> &cov_fj,
         const std::vector<int> &index_vec);
     /**
      * @brief measurementJacobian
@@ -392,6 +391,8 @@ class HybridFilter : public Estimator {
      * @return
      */
     bool measurementJacobian(
+        std::shared_ptr<const msckf::PointSharedData> pointDataPtr,
+        const std::vector<int> observationIndexPairs,
         Eigen::Matrix<double, 1, Eigen::Dynamic> *H_xjk,
         std::vector<Eigen::Matrix<double, 1, 3>,
                     Eigen::aligned_allocator<Eigen::Matrix<double, 1, 3>>>
