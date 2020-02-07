@@ -200,7 +200,7 @@ class HybridFilter : public Estimator {
       std::vector<uint64_t>* orderedCulledFrameIds,
       bool checkDisparity = false) const;
   /**
-   * @brief computeHxf, compute the residual and Jacobians for a SLAM feature i
+   * @brief slamFeatureJacobian, compute the residual and Jacobians for a SLAM feature i
    * observed in current frame
    * @param hpbid homogeneous point parameter block id of the map point
    * @param mp mappoint
@@ -211,11 +211,11 @@ class HybridFilter : public Estimator {
    * @param R_i covariance matrix of this observation (2x2)
    * @return true if succeeded in computing the residual and Jacobians
    */
-  bool computeHxf(const uint64_t hpbid, const MapPoint &mp,
-                  Eigen::Matrix<double, 2, 1> &r_i,
-                  Eigen::Matrix<double, 2, Eigen::Dynamic> &H_x,
-                  Eigen::Matrix<double, 2, Eigen::Dynamic> &H_f,
-                  Eigen::Matrix2d &R_i);
+  bool slamFeatureJacobian(const uint64_t hpbid, const MapPoint &mp,
+                           Eigen::Matrix<double, 2, 1> &r_i,
+                           Eigen::Matrix<double, 2, Eigen::Dynamic> &H_x,
+                           Eigen::Matrix<double, 2, Eigen::Dynamic> &H_f,
+                           Eigen::Matrix2d &R_i);
 
   /**
    * @brief compute the marginalized Jacobian for a feature i's

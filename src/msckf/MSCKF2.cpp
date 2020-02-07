@@ -602,6 +602,11 @@ bool MSCKF2::featureJacobianGeneric(
     computeHTimer.stop();
     return false;
   }
+  if (orderedCulledFrameIds) {
+    pointDataPtr->removeExtraObservations(*orderedCulledFrameIds, &vRi);
+  }
+  pointDataPtr->computePoseAndVelocityForJacobians(FLAGS_use_first_estimate);
+  pointDataPtr->computeSharedJacobians(cameraObservationModelId_);
   CHECK_NE(statesMap_.rbegin()->first, pointDataPtr->lastFrameId())
       << "The landmark should not be observed by the latest frame in MSCKF.";
 
@@ -622,25 +627,13 @@ bool MSCKF2::featureJacobianGeneric(
   auto itFrameIds = pointDataPtr->begin();
   auto itRoi = vRi.begin();
 
-  pointDataPtr->computePoseAndVelocityForJacobians(FLAGS_use_first_estimate);
-  pointDataPtr->computeSharedJacobians(cameraObservationModelId_);
-
   // compute Jacobians for a measurement in image j of the current feature i
   for (size_t kale = 0; kale < numPoses; ++kale) {
     Eigen::MatrixXd J_x(residualBlockDim, featureVariableDimen);
     Eigen::Matrix<double, Eigen::Dynamic, 3> J_pfi(residualBlockDim, 3);
     Eigen::Matrix<double, Eigen::Dynamic, 2> J_n(residualBlockDim, 2);
     Eigen::VectorXd residual(residualBlockDim, 1);
-    uint64_t poseId = itFrameIds->frameId;
 
-    if (orderedCulledFrameIds != nullptr &&
-        std::find(orderedCulledFrameIds->begin(), orderedCulledFrameIds->end(), poseId) ==
-            orderedCulledFrameIds->end()) {
-      itFrameIds = pointDataPtr->erase(itFrameIds);
-      itRoi = vRi.erase(itRoi);
-      itRoi = vRi.erase(itRoi);
-      continue;
-    }
     int observationIndex = std::distance(pointDataPtr->begin(), itFrameIds);
     Eigen::Matrix2d obsNoiseInfo = Eigen::Matrix2d::Identity();
     double imgNoiseStd = *itRoi;
@@ -1140,11 +1133,13 @@ bool MSCKF2::featureJacobian(const MapPoint &mp, Eigen::MatrixXd &H_oi,
       computeHTimer.stop();
       return false;
     }
-
-    CHECK_NE(statesMap_.rbegin()->first, pointDataPtr->lastFrameId())
-        << "The landmark should not be observed by the latest frame in MSCKF.";
+    if (orderedCulledFrameIds) {
+      pointDataPtr->removeExtraObservations(*orderedCulledFrameIds, &vRi);
+    }
     pointDataPtr->computePoseAndVelocityForJacobians(FLAGS_use_first_estimate);
     pointDataPtr->computeSharedJacobians(cameraObservationModelId_);
+    CHECK_NE(statesMap_.rbegin()->first, pointDataPtr->lastFrameId())
+        << "The landmark should not be observed by the latest frame in MSCKF.";
 
     Eigen::Vector4d ab1rho = v4Xhomog;
     CHECK_GT(ab1rho[2], 0) << "Negative depth in anchor frame";
@@ -1173,16 +1168,6 @@ bool MSCKF2::featureJacobian(const MapPoint &mp, Eigen::MatrixXd &H_oi,
       // $\frac{\partial [z_u, z_v]^T}{\partial [\alpha, \beta, \rho]}$
       Eigen::Matrix<double, 2, 3> J_pfi;
       Eigen::Vector2d residual;
-
-      uint64_t poseId = itFrameIds->frameId;
-      if (orderedCulledFrameIds != nullptr &&
-          std::find(orderedCulledFrameIds->begin(), orderedCulledFrameIds->end(), poseId)
-              == orderedCulledFrameIds->end()) {
-          itFrameIds = pointDataPtr->erase(itFrameIds);
-          itRoi = vRi.erase(itRoi);
-          itRoi = vRi.erase(itRoi);
-          continue;
-      }
 
       int observationIndex = std::distance(pointDataPtr->begin(), itFrameIds);
       bool validJacobian = measurementJacobianAIDP(
@@ -1250,10 +1235,14 @@ bool MSCKF2::featureJacobian(const MapPoint &mp, Eigen::MatrixXd &H_oi,
       computeHTimer.stop();
       return false;
     }
-    CHECK_NE(statesMap_.rbegin()->first, pointDataPtr->lastFrameId())
-        << "The landmark should not be observed by the latest frame in MSCKF.";
+    if (orderedCulledFrameIds) {
+      pointDataPtr->removeExtraObservations(*orderedCulledFrameIds, &vRi);
+    }
     pointDataPtr->computePoseAndVelocityForJacobians(FLAGS_use_first_estimate);
     pointDataPtr->computeSharedJacobians(cameraObservationModelId_);
+    CHECK_NE(statesMap_.rbegin()->first, pointDataPtr->lastFrameId())
+        << "The landmark should not be observed by the latest frame in MSCKF.";
+
     // containers of the above Jacobians for all observations of a mappoint
     const int cameraParamsDimen = cameraParamsMinimalDimen();
     std::vector<
@@ -1276,7 +1265,6 @@ bool MSCKF2::featureJacobian(const MapPoint &mp, Eigen::MatrixXd &H_oi,
     auto itRoi = vRi.begin();
     // compute Jacobians for a measurement in image j of the current feature i
     for (size_t kale = 0; kale < numPoses; ++kale) {
-      uint64_t poseId = itFrameIds->frameId;
       int observationIndex = std::distance(pointDataPtr->begin(), itFrameIds);
       // $\frac{\partial [z_u, z_v]^T}{\partial(extrinsic, intrinsic, td, tr)}$
       Eigen::Matrix<double, 2, Eigen::Dynamic> J_Xc(2, cameraParamsMinimalDimen());
@@ -1287,14 +1275,6 @@ bool MSCKF2::featureJacobian(const MapPoint &mp, Eigen::MatrixXd &H_oi,
           J_pfi;  // $\frac{\partial [z_u, z_v]^T}{\partial p_{f_i}^G}$
       Eigen::Vector2d residual;
 
-      if (orderedCulledFrameIds != nullptr &&
-          std::find(orderedCulledFrameIds->begin(), orderedCulledFrameIds->end(), poseId)
-              == orderedCulledFrameIds->end()) {
-          itFrameIds = pointDataPtr->erase(itFrameIds);
-          itRoi = vRi.erase(itRoi);
-          itRoi = vRi.erase(itRoi);
-          continue;
-      }
       bool validJacobian = measurementJacobian(
           v4Xhomog, tempCameraGeometry, obsInPixel[kale], observationIndex, pointDataPtr,
           &J_Xc, &J_XBj, &J_pfi, &residual);

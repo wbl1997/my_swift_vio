@@ -915,13 +915,11 @@ void HybridFilter::updateSensorRigs() {
 // used, e.g., ignore correspondences of too large discrepancy between
 // prediction and measurement
 
-bool HybridFilter::computeHxf(const uint64_t hpbid, const MapPoint& mp,
-                              Eigen::Matrix<double, 2, 1>& r_i,
-                              Eigen::Matrix<double, 2, Eigen::Dynamic>& H_x,
-                              Eigen::Matrix<double, 2, Eigen::Dynamic>& H_f,
-                              Eigen::Matrix2d& R_i) {
+bool HybridFilter::slamFeatureJacobian(
+    const uint64_t hpbid, const MapPoint& mp, Eigen::Matrix<double, 2, 1>& r_i,
+    Eigen::Matrix<double, 2, Eigen::Dynamic>& H_x,
+    Eigen::Matrix<double, 2, Eigen::Dynamic>& H_f, Eigen::Matrix2d& R_i) {
   computeHTimer.start();
-
   Eigen::Vector2d obsInPixel;
   Eigen::Vector4d ab1rho =
       std::static_pointer_cast<okvis::ceres::HomogeneousPointParameterBlock>(
@@ -955,7 +953,7 @@ bool HybridFilter::computeHxf(const uint64_t hpbid, const MapPoint& mp,
   }
   OKVIS_ASSERT_TRUE(
       Exception, bObservedInCurrentFrame,
-      "a point in computeHxf should be observed in current frame!");
+      "a point in slamFeatureJacobian should be observed in current frame!");
   // compute Jacobians for a measurement in image j of the current feature i
   // C_j is the current frame, Bj refers to the body frame associated with the
   // current frame, Ba refers to body frame associated with the anchor frame,
@@ -1160,11 +1158,8 @@ bool HybridFilter::featureJacobian(
   const int camIdx = 0;
   std::shared_ptr<const okvis::cameras::CameraBase> tempCameraGeometry =
       camera_rig_.getCameraGeometry(camIdx);
-  uint32_t imageHeight = tempCameraGeometry->imageHeight();
   int projOptModelId = camera_rig_.getProjectionOptMode(camIdx);
   int extrinsicModelId = camera_rig_.getExtrinsicOptMode(camIdx);
-  const double tdEstimate = camera_rig_.getImageDelay(camIdx);
-  const double trEstimate = camera_rig_.getReadoutTime(camIdx);
   const okvis::kinematics::Transformation T_BC0 = camera_rig_.getCameraExtrinsic(camIdx);
 
   msckf::PointLandmark pointLandmark(landmarkModelId_);
@@ -1177,11 +1172,7 @@ bool HybridFilter::featureJacobian(
     computeHTimer.stop();
     return false;
   }
-
-  std::vector<std::pair<uint64_t, int>> frameIds = pointDataPtr->frameIds();  // id of frames observing this feature point
-  // the anchor frame is chosen as the last frame observing the point, i.e.,
-  // the frame just before the current frame
-  uint64_t anchorId = frameIds.back().first;
+  uint64_t anchorId = pointDataPtr->anchorIds()[0];
 
   size_t numCamPoseStates = cameraParamPoseAndLandmarkMinimalDimen() - 3 * mInCovLmIds.size();
   // camera states, pose states, excluding feature states, and the velocity
@@ -1202,12 +1193,10 @@ bool HybridFilter::featureJacobian(
   // C_j is the current frame, Bj refers to the body frame associated with the
   // current frame, Ba refers to body frame associated with the anchor frame,
   // f_i is the feature in consideration
-  okvis::kinematics::Transformation
-      T_WBa;  // transform from the body frame at the anchor frame epoch to
-              // the world frame
-  get_T_WS(anchorId, T_WBa);
-  okvis::kinematics::Transformation T_GA = T_WBa * T_BC0;  // anchor frame to global frame
 
+  // transform from the body frame at the anchor frame epoch to the world frame
+  okvis::kinematics::Transformation T_WBa = pointDataPtr->T_WBa_list()[0];
+  okvis::kinematics::Transformation T_GA = T_WBa * T_BC0;  // anchor frame to global frame
   ab1rho = T_GA.inverse() * v4Xhomog;
   if (ab1rho[2] < 0) {
     std::cout << "negative depth in ab1rho " << ab1rho.transpose() << std::endl;
@@ -1263,38 +1252,17 @@ bool HybridFilter::featureJacobian(
               Eigen::aligned_allocator<Eigen::Matrix<double, 2, 1>>>
       vri;  // residuals for feature i
 
-  size_t numPoses = frameIds.size();
+  size_t numPoses = pointDataPtr->numObservations();
   size_t numValidObs = 0;
-  auto itFrameIds = frameIds.begin();
+  auto itFrameIds = pointDataPtr->begin();
   auto itRoi = vSigmai.begin();
   // compute Jacobians for a measurement in image j of the current feature i
   for (size_t kale = 0; kale < numPoses; ++kale) {
-    uint64_t poseId = itFrameIds->first;
-    kinematics::Transformation T_WBj;
-    get_T_WS(poseId, T_WBj);
-    SpeedAndBiases sbj;
-    getSpeedAndBias(poseId, 0, sbj);
-    auto statesIter = statesMap_.find(poseId);
-    Time stateEpoch = statesIter->second.timestamp;
-    auto imuMeas = *(statesIter->second.imuReadingWindow);
-    OKVIS_ASSERT_GT(Exception, imuMeas.size(), 0,
-                    "the IMU measurement does not exist");
-
-    double kpN = obsInPixel[kale][1] / imageHeight - 0.5;  // k per N
-    Duration featureTime = Duration(tdEstimate + trEstimate * kpN -
-                           statesIter->second.tdAtCreation);
-
-    // for feature i, estimate $p_B^G(t_{f_i})$, $R_B^G(t_{f_i})$,
-    // $v_B^G(t_{f_i})$, and $\omega_{GB}^B(t_{f_i})$ with the corresponding
-    // states' LATEST ESTIMATES and imu measurements
-
-    kinematics::Transformation T_WB = T_WBj;
-    SpeedAndBiases sb = sbj;
-    ImuMeasurement interpolatedInertialData;
-    Eigen::Matrix<double, 27, 1> vTGTSTA = imu_rig_.getImuAugmentedEuclideanParams();
-    poseAndVelocityAtObservation(
-        imuMeas, vTGTSTA.data(), imuParametersVec_.at(0), stateEpoch, featureTime,
-        &T_WB, &sb, &interpolatedInertialData, FLAGS_use_RK4);
+    int observationIndex = std::distance(pointDataPtr->begin(), itFrameIds);
+    double kpN = pointDataPtr->normalizedRow(observationIndex);
+    Duration featureTime = pointDataPtr->normalizedFeatureTime(observationIndex);
+    kinematics::Transformation T_WB = pointDataPtr->T_WBtij(observationIndex);
+    Eigen::Vector3d omega_Btij = pointDataPtr->omega_Btij(observationIndex);
 
     okvis::kinematics::Transformation T_CA =
         (T_WB * T_BC0).inverse() * T_GA;  // anchor frame to current camera frame
@@ -1308,7 +1276,7 @@ bool HybridFilter::featureJacobian(
                    << ab1rho.transpose() << " and [r,q]_CA"
                    << T_CA.coeffs().transpose();
 
-      itFrameIds = frameIds.erase(itFrameIds);
+      itFrameIds = pointDataPtr->erase(itFrameIds);
       itRoi = vSigmai.erase(itRoi);
       itRoi = vSigmai.erase(itRoi);
       continue;
@@ -1316,7 +1284,7 @@ bool HybridFilter::featureJacobian(
       Eigen::Vector2d discrep = obsInPixel[kale] - imagePoint;
       if (std::fabs(discrep[0]) > FLAGS_max_proj_tolerance ||
           std::fabs(discrep[1]) > FLAGS_max_proj_tolerance) {
-        itFrameIds = frameIds.erase(itFrameIds);
+        itFrameIds = pointDataPtr->erase(itFrameIds);
         itRoi = vSigmai.erase(itRoi);
         itRoi = vSigmai.erase(itRoi);
         continue;
@@ -1325,27 +1293,15 @@ bool HybridFilter::featureJacobian(
 
     vri.push_back(obsInPixel[kale] - imagePoint);
 
-    okvis::kinematics::Transformation lP_T_WB = T_WB;
-    SpeedAndBiases lP_sb = sb;
-    if (FLAGS_use_first_estimate) {
-      lP_T_WB = T_WBj;
-      lP_sb = sbj;
-      std::shared_ptr<const Eigen::Matrix<double, 6, 1>> posVelFirstEstimatePtr =
-          statesIter->second.linearizationPoint;
-      lP_T_WB = kinematics::Transformation(posVelFirstEstimatePtr->head<3>(),
-                                           lP_T_WB.q());
-      lP_sb.head<3>() = posVelFirstEstimatePtr->tail<3>();
-      poseAndLinearVelocityAtObservation(
-          imuMeas, vTGTSTA.data(), imuParametersVec_.at(0), stateEpoch,
-          featureTime, &lP_T_WB, &lP_sb);
-    }
+    okvis::kinematics::Transformation lP_T_WB = pointDataPtr->T_WBtij_ForJacobian(observationIndex);
+    Eigen::Vector3d lP_v_WB = pointDataPtr->v_WBtij_ForJacobian(observationIndex);
 
     double rho = ab1rho[3];
     okvis::kinematics::Transformation T_BcA = lP_T_WB.inverse() * T_GA;
     J_td = pointJacobian3 * T_BC0.C().transpose() *
            (okvis::kinematics::crossMx((T_BcA * ab1rho).head<3>()) *
-                interpolatedInertialData.measurement.gyroscopes -
-            T_WB.C().transpose() * lP_sb.head<3>() * rho);
+                omega_Btij -
+            T_WB.C().transpose() * lP_v_WB * rho);
     J_tr = J_td * kpN;
 
     if (fixCameraExtrinsicParams_[camIdx]) {
@@ -1389,7 +1345,7 @@ bool HybridFilter::featureJacobian(
 
     H_x.setZero();
     H_x.topLeftCorner(2, minCamParamDim) = J_Xc;
-
+    uint64_t poseId = itFrameIds->frameId;
     if (poseId == anchorId) {
       std::map<uint64_t, int>::const_iterator poseid_iter =
           mStateID2CovID_.find(poseId);
@@ -1419,7 +1375,7 @@ bool HybridFilter::featureJacobian(
     computeHTimer.stop();
     return false;
   }
-  OKVIS_ASSERT_EQ_DBG(Exception, numValidObs, frameIds.size(),
+  OKVIS_ASSERT_EQ_DBG(Exception, numValidObs, pointDataPtr->numObservations(),
                       "Inconsistent number of observations and frameIds");
 
   // Now we stack the Jacobians and marginalize the point position related
@@ -1431,7 +1387,7 @@ bool HybridFilter::featureJacobian(
   Eigen::Matrix<double, Eigen::Dynamic, 1> ri(2 * numValidObs, 1);
   Eigen::MatrixXd Ri =
       Eigen::MatrixXd::Identity(2 * numValidObs, 2 * numValidObs);
-  for (size_t saga = 0; saga < frameIds.size(); ++saga) {
+  for (size_t saga = 0; saga < numValidObs; ++saga) {
     size_t saga2 = saga * 2;
     H_xi.block(saga2, 0, 2, numCamPoseStates) = vJ_X[saga];
     H_fi.block<2, 3>(saga2, 0) = vJ_pfi[saga];
@@ -1460,7 +1416,6 @@ bool HybridFilter::featureJacobian(
   vri.clear();
   vJ_pfi.clear();
   vJ_X.clear();
-  frameIds.clear();
   computeHTimer.stop();
   return true;
 }
@@ -1798,7 +1753,7 @@ void HybridFilter::optimize(size_t /*numIter*/, size_t /*numThreads*/,
       Eigen::Matrix<double, 2, Eigen::Dynamic> H_f;
       Eigen::Matrix2d R_i;
       bool isValidJacobian =
-          computeHxf(it->first, it->second, r_i, H_x, H_f, R_i);
+          slamFeatureJacobian(it->first, it->second, r_i, H_x, H_f, R_i);
       if (!isValidJacobian) continue;
 
       if (!FilterHelper::gatingTest(H_x, r_i, R_i, variableCov2)) {

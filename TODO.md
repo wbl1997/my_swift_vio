@@ -48,7 +48,7 @@ For MSCKF2, pointHomog and parameter block stores position in the global frame, 
 
 23. implement batch processing with global nonlinear optimization using msckf2 observations and initializations, and assume time offset changes linearly. ---can be done with maplab map optimization backend
 
-24. Do we fix p_BA_G and q_GA after a feature is initialized into the States? If fixed, we need to modify computeHxf to make it consistent, if not fixed, we need to modify computeHxf (primarily) and other places related to these two parameters(trivia).
+24. Do we fix p_BA_G and q_GA after a feature is initialized into the States? If fixed, we need to modify slamFeatureJacobian to make it consistent, if not fixed, we need to modify slamFeatureJacobian (primarily) and other places related to these two parameters(trivia).
 
 25. compare the performance of msckf2 against Kalibr with multiple IMUs and multiple cameras for a publication. Does Kalibr output the trajectory of the camera-IMU system? If so, this serves for better comparison.
 

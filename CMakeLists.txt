@@ -199,6 +199,7 @@ list(APPEND TEST_SRC_FILES
     test/msckf/TestImuOdometry.cpp
     test/msckf/TestImuSimulator.cpp
     test/msckf/TestOkvisTriangulateFast.cpp
+    test/msckf/TestPointLandmark.cpp
     test/msckf/TestPointObsJacobian.cpp
     test/msckf/TestRelativeMotionJacobian.cpp
     test/msckf/TestRsReprojectionError.cpp
