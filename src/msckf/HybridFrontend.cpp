@@ -1011,6 +1011,7 @@ int HybridFrontend::runRansac2d2d(okvis::HybridFilter& estimator,
         rotation_only_problem_ptr(
             new FrameRotationOnlySacProblem(adapter));
     rotation_only_ransac.sac_model_ = rotation_only_problem_ptr;
+    // This is about 3 pixel in image.
     rotation_only_ransac.threshold_ = 9;
     rotation_only_ransac.max_iterations_ = 50;
 
@@ -1039,7 +1040,8 @@ int HybridFrontend::runRansac2d2d(okvis::HybridFilter& estimator,
         new FrameTranslationOnlySacProblem(adapter));
 
     translation_only_ransac.sac_model_ = translation_only_problem_ptr;
-    translation_only_ransac.threshold_ = 9;     //(1.0 - cos(0.5/600));
+    // This is about 3 pixels in image. More info at getSelectedDistancesToModel().
+    translation_only_ransac.threshold_ = 9;
     translation_only_ransac.max_iterations_ = 50;
 
     // run the ransac

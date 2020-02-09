@@ -431,7 +431,8 @@ class HybridFrontend {
    * @brief Check the relative motion between current frame and an older frame,
    * and record the relative motion in the estimator. If overlap area or
    * matching ratio in the overlap area between the two frames does not meet
-   * thresholds, the current frame will be chosen as a keyframe.
+   * thresholds, the current frame will be chosen as a keyframe, i.e.,
+   * asKeyframe is set true.
    * @param estimator
    * @param params
    * @param currentFrameId

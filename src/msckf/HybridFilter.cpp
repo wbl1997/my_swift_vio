@@ -40,14 +40,17 @@ DEFINE_double(max_proj_tolerance, 7,
               "maximum tolerable discrepancy between predicted and measured "
               "point coordinates in image in pixel units");
 
-DEFINE_double(
-    image_noise_cov_multiplier, 4.0,
-    "Enlarge the image observation noise covariance by this multiplier for TFVIO.");
+DEFINE_double(image_noise_cov_multiplier, 4.0,
+              "Enlarge the image observation noise covariance by this "
+              "multiplier for epipolar constraints to weaken their effect.");
 
-DEFINE_double(sigma_keypoint_size, 8.0,
-              "The keypoint size for checking low disparity. Lower this value"
-              " from reference 8.0 to achieve the effect of fiber-reinforced"
-              " concrete for MSCKF.");
+DEFINE_double(
+    pavio_sigma_keypoint_size, 2.0,
+    "The keypoint size for checking low disparity when epipolar constraints "
+    "are enabled. The bigger this value, the more likely a feature track is "
+    "deemed to have low disparity and to contribute epipolar constraints. "
+    "Lower this value from reference 8.0 to achieve the effect of "
+    "fiber-reinforced concrete for MSCKF. 1.0 - 2.0 is recommended ");
 
 DEFINE_bool(use_AIDP, true,
             "use anchored inverse depth parameterization for a feature point?"
@@ -2268,7 +2271,7 @@ bool HybridFilter::hasLowDisparity(
   Eigen::VectorXd intrinsics;
   camera_rig_.getCameraGeometry(0)->getIntrinsics(intrinsics);
   double focalLength = intrinsics[0];
-  double keypointAStdDev = 0.8 * FLAGS_sigma_keypoint_size / 12.0;
+  double keypointAStdDev = 0.8 * FLAGS_pavio_sigma_keypoint_size / 12.0;
   const double fourthRoot2 = 1.1892071150;
   double raySigma = fourthRoot2 * keypointAStdDev / focalLength;
   Eigen::Vector3d rayA_inA = obsDirections.front().normalized();
