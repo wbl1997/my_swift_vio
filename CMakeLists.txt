@@ -116,7 +116,7 @@ LIST(APPEND SOURCEFILES
     src/msckf/TFVIO.cpp
     src/msckf/TwoViewPair.cpp
     src/msckf/VioEvaluationCallback.cpp
-    src/msckf/VioFrameMatchingAlgorithm.cpp
+#    src/msckf/VioFrameMatchingAlgorithm.cpp
     src/msckf/VioTestSystemBuilder.cpp
     src/msckf/numeric_ceres_residual_Jacobian.cpp
     src/msckf/triangulate.cpp

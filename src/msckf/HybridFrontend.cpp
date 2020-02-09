@@ -12,7 +12,7 @@
 
 #include <opencv2/imgproc/imgproc.hpp>
 
-#include <msckf/VioFrameMatchingAlgorithm.hpp>
+#include <okvis/VioKeyframeWindowMatchingAlgorithm.hpp>
 #include <okvis/IdProvider.hpp>
 #include <okvis/ceres/ImuError.hpp>
 
@@ -191,7 +191,7 @@ bool HybridFrontend::dataAssociationAndInitialization(
     switch (distortionType) {
       case okvis::cameras::NCameraSystem::RadialTangential: {
         num3dMatches = matchToKeyframes<
-            VioFrameMatchingAlgorithm<
+            VioKeyframeWindowMatchingAlgorithm<
                 okvis::cameras::PinholeCamera<
                     okvis::cameras::RadialTangentialDistortion> > >(
             estimator, params, framesInOut->id(), rotationOnly, false,
@@ -200,7 +200,7 @@ bool HybridFrontend::dataAssociationAndInitialization(
       }
       case okvis::cameras::NCameraSystem::Equidistant: {
         num3dMatches = matchToKeyframes<
-            VioFrameMatchingAlgorithm<
+            VioKeyframeWindowMatchingAlgorithm<
                 okvis::cameras::PinholeCamera<
                     okvis::cameras::EquidistantDistortion> > >(
             estimator, params, framesInOut->id(), rotationOnly, false,
@@ -209,7 +209,7 @@ bool HybridFrontend::dataAssociationAndInitialization(
       }
       case okvis::cameras::NCameraSystem::RadialTangential8: {
         num3dMatches = matchToKeyframes<
-            VioFrameMatchingAlgorithm<
+            VioKeyframeWindowMatchingAlgorithm<
                 okvis::cameras::PinholeCamera<
                     okvis::cameras::RadialTangentialDistortion8> > >(
             estimator, params, framesInOut->id(), rotationOnly, false,
@@ -218,7 +218,7 @@ bool HybridFrontend::dataAssociationAndInitialization(
       }
       case okvis::cameras::NCameraSystem::FOV: {
         num3dMatches = matchToKeyframes<
-            VioFrameMatchingAlgorithm<
+            VioKeyframeWindowMatchingAlgorithm<
                 okvis::cameras::PinholeCamera<
                     okvis::cameras::FovDistortion> > >(
             estimator, params, framesInOut->id(), rotationOnly, false,
@@ -262,7 +262,7 @@ bool HybridFrontend::dataAssociationAndInitialization(
     switch (distortionType) {
       case okvis::cameras::NCameraSystem::RadialTangential: {
         num3dMatches = matchToLastFrame<
-            VioFrameMatchingAlgorithm<okvis::cameras::PinholeCamera<
+            VioKeyframeWindowMatchingAlgorithm<okvis::cameras::PinholeCamera<
                 okvis::cameras::RadialTangentialDistortion> > >(
             estimator, params, framesInOut->id(),
             rotationOnly, false);
@@ -270,7 +270,7 @@ bool HybridFrontend::dataAssociationAndInitialization(
       }
       case okvis::cameras::NCameraSystem::Equidistant: {
         num3dMatches = matchToLastFrame<
-            VioFrameMatchingAlgorithm<okvis::cameras::PinholeCamera<
+            VioKeyframeWindowMatchingAlgorithm<okvis::cameras::PinholeCamera<
                 okvis::cameras::EquidistantDistortion> > >(
             estimator, params, framesInOut->id(),
             rotationOnly, false);
@@ -278,7 +278,7 @@ bool HybridFrontend::dataAssociationAndInitialization(
       }
       case okvis::cameras::NCameraSystem::RadialTangential8: {
         num3dMatches = matchToLastFrame<
-            VioFrameMatchingAlgorithm<okvis::cameras::PinholeCamera<
+            VioKeyframeWindowMatchingAlgorithm<okvis::cameras::PinholeCamera<
                 okvis::cameras::RadialTangentialDistortion8> > >(
             estimator, params, framesInOut->id(),
             rotationOnly, false);
@@ -287,7 +287,7 @@ bool HybridFrontend::dataAssociationAndInitialization(
       }
       case okvis::cameras::NCameraSystem::FOV: {
         num3dMatches = matchToLastFrame<
-            VioFrameMatchingAlgorithm<okvis::cameras::PinholeCamera<
+            VioKeyframeWindowMatchingAlgorithm<okvis::cameras::PinholeCamera<
                 okvis::cameras::FovDistortion> > >(
             estimator, params, framesInOut->id(),
             rotationOnly, false);
@@ -298,7 +298,7 @@ bool HybridFrontend::dataAssociationAndInitialization(
         break;
     }
     matchToLastFrameTimer.stop();
-    if (num3dMatches <= requiredMatches) {
+    if (FLAGS_feature_tracking_method != 0 && num3dMatches <= requiredMatches) {
       LOG(WARNING) << "Tracking last frame failure. Number of 3d2d-matches: " << num3dMatches;
     }
   } else
@@ -309,7 +309,7 @@ bool HybridFrontend::dataAssociationAndInitialization(
   switch (distortionType) {
     case okvis::cameras::NCameraSystem::RadialTangential: {
       matchStereo<
-          VioFrameMatchingAlgorithm<
+          VioKeyframeWindowMatchingAlgorithm<
               okvis::cameras::PinholeCamera<
                   okvis::cameras::RadialTangentialDistortion> > >(estimator,
                                                                   framesInOut);
@@ -317,7 +317,7 @@ bool HybridFrontend::dataAssociationAndInitialization(
     }
     case okvis::cameras::NCameraSystem::Equidistant: {
       matchStereo<
-          VioFrameMatchingAlgorithm<
+          VioKeyframeWindowMatchingAlgorithm<
               okvis::cameras::PinholeCamera<
                   okvis::cameras::EquidistantDistortion> > >(estimator,
                                                              framesInOut);
@@ -325,7 +325,7 @@ bool HybridFrontend::dataAssociationAndInitialization(
     }
     case okvis::cameras::NCameraSystem::RadialTangential8: {
       matchStereo<
-          VioFrameMatchingAlgorithm<
+          VioKeyframeWindowMatchingAlgorithm<
               okvis::cameras::PinholeCamera<
                   okvis::cameras::RadialTangentialDistortion8> > >(estimator,
                                                                    framesInOut);
@@ -333,7 +333,7 @@ bool HybridFrontend::dataAssociationAndInitialization(
     }
     case okvis::cameras::NCameraSystem::FOV: {
       matchStereo<
-          VioFrameMatchingAlgorithm<
+          VioKeyframeWindowMatchingAlgorithm<
               okvis::cameras::PinholeCamera<
                   okvis::cameras::FovDistortion> > >(estimator,
                                                      framesInOut);
