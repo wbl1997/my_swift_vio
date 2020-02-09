@@ -9,7 +9,7 @@ classdef Msckf2Constants
         b_g = 13:15;
         b_a = 16:18;
     end
-    properties       
+    properties
         T_g = 19:27;
         T_g_diag = [19, 23, 27];
         T_s = 28:36;
@@ -40,91 +40,91 @@ classdef Msckf2Constants
         tr_std = 113;
     end
     methods
-      function obj = Msckf2Constants(misalignment_dim, extrinsic_dim, ...
-              project_intrinsic_dim, distort_intrinsic_dim)
-        obj.T_g = 19:27;
-        obj.T_g_diag = [19, 23, 27];
-        obj.T_s = 28:36;
-        obj.T_s_diag = [28, 32, 36];
-        obj.T_a = 37:45;
-        obj.T_a_diag = [37, 41, 45];
-        param_index = 46;
-        
-        switch extrinsic_dim
-            case 0
-                obj.p_BC = [];
-            otherwise
-                obj.p_BC = param_index + (0:2);
-        end
-        param_index = param_index + extrinsic_dim;
-        
-        switch project_intrinsic_dim
-            case 0
-                obj.fxy_cxy = [];
-            case 1
-                obj.fxy_cxy = param_index + [0, 0, 0, 0];
-            case 3
-                obj.fxy_cxy = param_index + [0, 0, 1, 2];
-            otherwise
-                obj.fxy_cxy = param_index + (0:3);
-        end
-        param_index = param_index + project_intrinsic_dim;
-        
-        switch distort_intrinsic_dim
-            case 1
-                obj.k1_k2 = param_index + [0, 0];
-                obj.p1_p2 = param_index + [0, 0];
-            otherwise
-                obj.k1_k2 = param_index + (0:1);
-                obj.p1_p2 = param_index + (2:3);
-        end
-        param_index = param_index + distort_intrinsic_dim;
-        obj.td = param_index;
-        obj.tr = param_index + 1;
-        param_index = param_index + 2;
-        
-        obj.r_std = param_index + (0:2);
-        obj.q_std = param_index + (3:5);
-        obj.v_std = param_index + (6:8);
-        obj.b_g_std = param_index + (9:11);
-        obj.b_a_std = param_index + (12:14);
-        param_index = param_index + 15;
-        
-        obj.T_g_std = param_index + (0:8);
-        obj.T_s_std = param_index + (9:17);
-        obj.T_a_std = param_index + (18:26);
-        
-        param_index = param_index + misalignment_dim;
-        switch extrinsic_dim
-            case 0
+        function obj = Msckf2Constants(misalignment_dim, extrinsic_global_dim, ...
+                project_intrinsic_dim, distort_intrinsic_dim, ...
+                fix_extrinsic, fix_intrinsic)
+            obj.T_g = 19:27;
+            obj.T_g_diag = [19, 23, 27];
+            obj.T_s = 28:36;
+            obj.T_s_diag = [28, 32, 36];
+            obj.T_a = 37:45;
+            obj.T_a_diag = [37, 41, 45];
+            param_index = 46;
+            
+            obj.p_BC = param_index + (0:(extrinsic_global_dim - 1));
+            param_index = param_index + extrinsic_global_dim;
+            
+            switch project_intrinsic_dim
+                case 1
+                    obj.fxy_cxy = param_index + [0, 0, 0, 0];
+                case 3
+                    obj.fxy_cxy = param_index + [0, 0, 1, 2];
+                otherwise
+                    obj.fxy_cxy = param_index + (0:3);
+            end
+            param_index = param_index + project_intrinsic_dim;
+            
+            switch distort_intrinsic_dim
+                case 1
+                    obj.k1_k2 = param_index + [0, 0];
+                    obj.p1_p2 = param_index + [0, 0];
+                otherwise
+                    obj.k1_k2 = param_index + (0:1);
+                    obj.p1_p2 = param_index + (2:3);
+            end
+            param_index = param_index + distort_intrinsic_dim;
+            obj.td = param_index;
+            obj.tr = param_index + 1;
+            param_index = param_index + 2;
+            
+            obj.r_std = param_index + (0:2);
+            obj.q_std = param_index + (3:5);
+            obj.v_std = param_index + (6:8);
+            obj.b_g_std = param_index + (9:11);
+            obj.b_a_std = param_index + (12:14);
+            param_index = param_index + 15;
+            
+            obj.T_g_std = param_index + (0:8);
+            obj.T_s_std = param_index + (9:17);
+            obj.T_a_std = param_index + (18:26);
+            
+            param_index = param_index + misalignment_dim;
+            if (fix_extrinsic)
                 obj.p_BC_std = [];
-            otherwise
-                obj.p_BC_std = param_index + (0:2);
-        end        
-        param_index = param_index + extrinsic_dim;
-        
-        switch project_intrinsic_dim
-            case 0
+            else
+                obj.p_BC_std = param_index + (0:(extrinsic_global_dim - 1));
+                param_index = param_index + extrinsic_global_dim;
+            end
+            
+            if fix_intrinsic
                 obj.fxy_cxy_std = [];
-            case 1
-                obj.fxy_cxy_std = param_index + [0, 0, 0, 0];
-            case 3
-                obj.fxy_cxy_std = param_index + [0, 0, 1, 2];
-            otherwise
-                obj.fxy_cxy_std = param_index + (0:project_intrinsic_dim-1);
+            else
+                switch project_intrinsic_dim
+                    case 1
+                        obj.fxy_cxy_std = param_index + [0, 0, 0, 0];
+                    case 3
+                        obj.fxy_cxy_std = param_index + [0, 0, 1, 2];
+                    otherwise
+                        obj.fxy_cxy_std = param_index + (0:project_intrinsic_dim-1);
+                end                
+                param_index = param_index + project_intrinsic_dim;
+            end
+            if fix_intrinsic
+                obj.k1_k2_std = [];
+                obj.p1_p2_std = [];
+            else
+                switch distort_intrinsic_dim
+                    case 1
+                        obj.k1_k2_std = param_index + [0, 0];
+                        obj.p1_p2_std = param_index + [0, 0];
+                    otherwise
+                        obj.k1_k2_std = param_index + (0:1);
+                        obj.p1_p2_std = param_index + (2:3);
+                end
+                param_index = param_index + distort_intrinsic_dim;
+            end
+            obj.td_std = param_index;
+            obj.tr_std = param_index + 1;
         end
-        param_index = param_index + project_intrinsic_dim;
-        switch distort_intrinsic_dim
-            case 1
-                obj.k1_k2_std = param_index + [0, 0];
-                obj.p1_p2_std = param_index + [0, 0];
-            otherwise
-                obj.k1_k2_std = param_index + (0:1);
-                obj.p1_p2_std = param_index + (2:3);
-        end
-        param_index = param_index + distort_intrinsic_dim;
-        obj.td_std = param_index;
-        obj.tr_std = param_index + 1;
-      end
-   end
+    end
 end

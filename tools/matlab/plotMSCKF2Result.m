@@ -1,11 +1,18 @@
 function plotMSCKF2Result(msckf_csv, export_fig_path, voicebox_path, output_dir, ...
     cmp_data_file, gt_file, avg_since_start, avg_trim_end, ...
     misalignment_dim, extrinsic_dim, project_intrinsic_dim, ...
-    distort_intrinsic_dim)
+    distort_intrinsic_dim, fix_extrinsic, fix_intrinsic)
 if nargin < 1
     disp(['Usage:plotMSCKF2Result msckf_csv ...']);
     return;
 end
+if ~exist('fix_extrinsic', 'var')
+    fix_extrinsic = 0;
+end
+if ~exist('fix_intrinsic', 'var')
+    fix_intrinsic = 0;
+end
+
 close all;
 if ~exist('export_fig_path','var')
     export_fig_path = input('path of export_fig:', 's');
@@ -71,7 +78,7 @@ else
 end
 end
 msckf_index_server = Msckf2Constants(misalignment_dim, extrinsic_dim, ...
-    project_intrinsic_dim, distort_intrinsic_dim);
+    project_intrinsic_dim, distort_intrinsic_dim, fix_extrinsic, fix_intrinsic);
 
 fontsize = 18;
 msckf_estimates = readmatrix(filename, 'NumHeaderLines', 1);
@@ -260,9 +267,11 @@ if exist(outputfig, 'file')==2
 end
 export_fig(outputfig);
 
-if ~isempty(msckf_index_server.p_BC)
+if ~isempty(msckf_index_server.p_BC_std)
 figure;
+
 draw_ekf_triplet_with_std(data, msckf_index_server.p_BC, msckf_index_server.p_BC_std, 100.0);
+
 ylabel('p_{BC}[cm]');
 outputfig = [output_dir, '/p_BC.eps'];
 if exist(outputfig, 'file')==2
@@ -271,8 +280,8 @@ end
 export_fig(outputfig);
 end
 
-if ~isempty(msckf_index_server.fxy_cxy)
-figure;    
+if ~isempty(msckf_index_server.fxy_cxy_std)
+figure;
 data(:, msckf_index_server.fxy_cxy) = data(:, msckf_index_server.fxy_cxy) - ...
     repmat(nominal_intrinsics, size(data, 1), 1);
 draw_ekf_triplet_with_std(data, msckf_index_server.fxy_cxy, ...
@@ -286,6 +295,7 @@ end
 export_fig(outputfig);
 end
 
+if ~isempty(msckf_index_server.k1_k2_std)
 figure;
 draw_ekf_triplet_with_std(data, msckf_index_server.k1_k2, msckf_index_server.k1_k2_std);
 ylabel('k_1 and k_2[1]');
@@ -295,7 +305,9 @@ if exist(outputfig, 'file')==2
   delete(outputfig);
 end
 export_fig(outputfig);
+end
 
+if ~isempty(msckf_index_server.p1_p2_std)
 figure;
 p1p2Scale = 1e2;
 draw_ekf_triplet_with_std(data, msckf_index_server.p1_p2, msckf_index_server.p1_p2_std, p1p2Scale);
@@ -306,6 +318,7 @@ if exist(outputfig, 'file')==2
   delete(outputfig);
 end
 export_fig(outputfig);
+end
 
 intermediatePlotter(data, msckf_index_server, output_dir);
 if exist('avg_since_start','var')
