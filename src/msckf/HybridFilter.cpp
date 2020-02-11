@@ -1260,8 +1260,7 @@ bool HybridFilter::featureJacobian(
   auto itFrameIds = pointDataPtr->begin();
   auto itRoi = vSigmai.begin();
   // compute Jacobians for a measurement in image j of the current feature i
-  for (size_t kale = 0; kale < numPoses; ++kale) {
-    int observationIndex = std::distance(pointDataPtr->begin(), itFrameIds);
+  for (size_t observationIndex = 0; observationIndex < numPoses; ++observationIndex) {
     double kpN = pointDataPtr->normalizedRow(observationIndex);
     double featureTime = pointDataPtr->normalizedFeatureTime(observationIndex);
     kinematics::Transformation T_WB = pointDataPtr->T_WBtij(observationIndex);
@@ -1279,22 +1278,22 @@ bool HybridFilter::featureJacobian(
                    << ab1rho.transpose() << " and [r,q]_CA"
                    << T_CA.coeffs().transpose();
 
-      itFrameIds = pointDataPtr->erase(itFrameIds);
+      ++itFrameIds;
       itRoi = vSigmai.erase(itRoi);
       itRoi = vSigmai.erase(itRoi);
       continue;
     } else if (!FLAGS_use_mahalanobis) {
-      Eigen::Vector2d discrep = obsInPixel[kale] - imagePoint;
+      Eigen::Vector2d discrep = obsInPixel[observationIndex] - imagePoint;
       if (std::fabs(discrep[0]) > FLAGS_max_proj_tolerance ||
           std::fabs(discrep[1]) > FLAGS_max_proj_tolerance) {
-        itFrameIds = pointDataPtr->erase(itFrameIds);
+        ++itFrameIds;
         itRoi = vSigmai.erase(itRoi);
         itRoi = vSigmai.erase(itRoi);
         continue;
       }
     }
 
-    vri.push_back(obsInPixel[kale] - imagePoint);
+    vri.push_back(obsInPixel[observationIndex] - imagePoint);
 
     okvis::kinematics::Transformation lP_T_WB = pointDataPtr->T_WBtij_ForJacobian(observationIndex);
     Eigen::Vector3d lP_v_WB = pointDataPtr->v_WBtij_ForJacobian(observationIndex);
@@ -1378,7 +1377,7 @@ bool HybridFilter::featureJacobian(
     computeHTimer.stop();
     return false;
   }
-  OKVIS_ASSERT_EQ_DBG(Exception, numValidObs, pointDataPtr->numObservations(),
+  OKVIS_ASSERT_EQ_DBG(Exception, numValidObs * 2, vSigmai.size(),
                       "Inconsistent number of observations and frameIds");
 
   // Now we stack the Jacobians and marginalize the point position related

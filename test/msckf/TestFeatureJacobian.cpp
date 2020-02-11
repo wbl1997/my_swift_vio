@@ -97,12 +97,18 @@ int examinLandmarkStackedJacobian(const okvis::MapPoint& mapPoint,
 
 int examineLandmarkMeasurementJacobian(
     const okvis::MapPoint& mapPoint, std::shared_ptr<okvis::MSCKF2> estimator) {
+  Eigen::MatrixXd H_oi;
+  Eigen::Matrix<double, Eigen::Dynamic, 1> r_oi;
+  Eigen::MatrixXd R_oi;
+  bool jacOk = estimator->featureJacobianGeneric(mapPoint, H_oi, r_oi,
+                                                  R_oi, nullptr);
+
   // init landmark parameterization
 
   // calculate Jacobians for at least three measurements
   // compare Jacobians against auto diff
 
-  return 0;
+  return jacOk;
 }
 
 } // namespace
@@ -243,7 +249,7 @@ void testPointLandmarkJacobian(std::string projOptModelName,
         }
       }
       LOG(INFO) << "Examined " << featureJacobianLandmarkCount
-                << "stacked landmark Jacobians, and "
+                << " stacked landmark Jacobians, and "
                 << measurementJacobianCount << " measurement Jacobians of "
                 << numLandmarks << " landmarks";
     }

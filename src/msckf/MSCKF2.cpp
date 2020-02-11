@@ -16,6 +16,7 @@
 #include <msckf/FeatureTriangulation.hpp>
 #include <msckf/FilterHelper.hpp>
 #include <msckf/ImuOdometry.h>
+#include <msckf/MeasurementJacobianMacros.hpp>
 #include <msckf/PointLandmark.hpp>
 #include <msckf/PointLandmarkModels.hpp>
 #include <msckf/PointSharedData.hpp>
@@ -628,26 +629,25 @@ bool MSCKF2::featureJacobianGeneric(
   auto itRoi = vRi.begin();
 
   // compute Jacobians for a measurement in image j of the current feature i
-  for (size_t kale = 0; kale < numPoses; ++kale) {
+  for (size_t observationIndex = 0; observationIndex < numPoses; ++observationIndex) {
     Eigen::MatrixXd J_x(residualBlockDim, featureVariableDimen);
     Eigen::Matrix<double, Eigen::Dynamic, 3> J_pfi(residualBlockDim, 3);
     Eigen::Matrix<double, Eigen::Dynamic, 2> J_n(residualBlockDim, 2);
     Eigen::VectorXd residual(residualBlockDim, 1);
 
-    int observationIndex = std::distance(pointDataPtr->begin(), itFrameIds);
     Eigen::Matrix2d obsCov = Eigen::Matrix2d::Identity();
     double imgNoiseStd = *itRoi;
     obsCov(0, 0) = imgNoiseStd * imgNoiseStd;
     imgNoiseStd = *(itRoi + 1);
     obsCov(1, 1) = imgNoiseStd * imgNoiseStd;
     MeasurementJacobianStatus status = measurementJacobianGeneric(
-        pointLandmark, tempCameraGeometry, obsInPixel[kale], observationIndex, obsCov,
-        pointDataPtr, &J_x, &J_pfi, &J_n, &residual);
+        pointLandmark, tempCameraGeometry, obsInPixel[observationIndex],
+        observationIndex, obsCov, pointDataPtr, &J_x, &J_pfi, &J_n, &residual);
     if (status != MeasurementJacobianStatus::Successful) {
-      // TODO(jhuai): what if the main or associate anchor is removed? The Jacobians may become rank deficient.
-      itFrameIds = pointDataPtr->erase(itFrameIds);
-      itRoi = vRi.erase(itRoi);
-      itRoi = vRi.erase(itRoi);
+      // TODO(jhuai): what if the main or associate anchor has invalid Jacobians?
+      // The Jacobians may become rank deficient.
+      ++itFrameIds;
+      itRoi += 2;
       continue;
     }
 
@@ -720,24 +720,13 @@ MeasurementJacobianStatus MSCKF2::measurementJacobianGeneric(
   int extrinsicModelId = camera_rig_.getExtrinsicOptMode(camIdx);
   int imuModelId = imu_rig_.getModelId(0);
   std::shared_ptr<okvis::ceres::ErrorInterface> observationError;
-  okvis::kinematics::Transformation T_BC_ref =
-      camera_rig_.getCameraExtrinsic(camIdx);
-  statesMap_.at(poseId);
-  auto statesIter = statesMap_.find(poseId);
-  okvis::Time stateEpoch = statesIter->second.timestamp;
-  double tdAtCreation = statesIter->second.tdAtCreation;
-  std::shared_ptr<const okvis::ImuMeasurementDeque> imuMeasDequePtr =
-      statesIter->second.imuReadingWindow;
-  OKVIS_ASSERT_GT(Exception, imuMeasDequePtr->size(), 0u,
-                  "the IMU measurement does not exist");
-  std::shared_ptr<const Eigen::Matrix<double, 6, 1>> posVelFirstEstimate =
-      statesIter->second.linearizationPoint;
 
   MeasurementJacobianStatus status = MeasurementJacobianStatus::Successful;
   bool evaluateOk = true;
   std::shared_ptr<const okvis::ceres::ParameterBlock> poseParamBlockPtr =
           pointDataPtr->poseParameterBlockPtr(observationIndex);
 
+  auto statesIter = statesMap_.find(poseId);
   const States& stateInQuestion = statesIter->second;
   uint64_t extrinsicBlockId = stateInQuestion.sensors.at(SensorStates::Camera)
                              .at(camIdx)
@@ -767,202 +756,7 @@ MeasurementJacobianStatus MSCKF2::measurementJacobianGeneric(
   std::shared_ptr<const okvis::ceres::ParameterBlock> sbParamBlockPtr =
       pointDataPtr->speedAndBiasParameterBlockPtr(observationIndex);
 
-#ifndef POINT_LANDMARK_MODEL_CHAIN_CASE
-#define POINT_LANDMARK_MODEL_CHAIN_CASE(                                      \
-    ImuModel, ExtrinsicModel, CameraGeometry, ProjectionIntrinsicModel,       \
-    PointLandmarkModel)                                                       \
-  case PointLandmarkModel::kModelId:                                          \
-    switch (cameraObservationModelId_) {                                      \
-      case okvis::cameras::kReprojectionErrorId: {                            \
-        typedef okvis::ceres::RsReprojectionError<                            \
-            CameraGeometry, ProjectionIntrinsicModel, ExtrinsicModel,         \
-            PointLandmarkModel, ImuModel>                                     \
-            RsReprojectionErrorModel;                                         \
-        std::shared_ptr<const CameraGeometry> argCameraGeometry =             \
-            std::static_pointer_cast<const CameraGeometry>(                   \
-                baseCameraGeometry);                                          \
-        double gravity = imuParametersVec_.at(0).g;                           \
-        observationError.reset(new RsReprojectionErrorModel(                  \
-            argCameraGeometry, obs, obsCov, imuMeasDequePtr,                  \
-            posVelFirstEstimate, stateEpoch, tdAtCreation, gravity));         \
-        double const* const parameters[] = {                                  \
-            poseParamBlockPtr->parameters(),                                  \
-            pointLandmark.data(),                                             \
-            extrinsicParamBlockPtr->parameters(),                             \
-            projectionParamBlockPtr->parameters(),                            \
-            distortionParamBlockPtr->parameters(),                            \
-            trParamBlockPtr->parameters(),                                    \
-            tdParamBlockPtr->parameters(),                                    \
-            sbParamBlockPtr->parameters()};                                   \
-        Eigen::Matrix<double, 2, 7, Eigen::RowMajor> duv_deltaTWS;            \
-        Eigen::Matrix<double, 2, 6, Eigen::RowMajor> duv_deltaTWS_minimal;    \
-        Eigen::Matrix<double, 2, 4, Eigen::RowMajor> duv_deltahpW;            \
-        Eigen::Matrix<double, 2, 3, Eigen::RowMajor> duv_deltahpW_minimal;    \
-        Eigen::Matrix<double, 2, 7, Eigen::RowMajor> duv_dExtrinsic;          \
-        Eigen::Matrix<double, 2, ExtrinsicModel::kNumParams, Eigen::RowMajor> \
-            duv_dExtrinsic_minimal;                                           \
-        RsReprojectionErrorModel::ProjectionIntrinsicJacType                  \
-            duv_proj_intrinsic;                                               \
-        RsReprojectionErrorModel::DistortionJacType duv_distortion;           \
-        Eigen::Matrix<double, 2, 1> duv_tr;                                   \
-        RsReprojectionErrorModel::ProjectionIntrinsicJacType                  \
-            duv_proj_intrinsic_minimal;                                       \
-        RsReprojectionErrorModel::DistortionJacType duv_distortion_minimal;   \
-        Eigen::Matrix<double, 2, 1> duv_tr_minimal;                           \
-        Eigen::Matrix<double, 2, 1> duv_td;                                   \
-        Eigen::Matrix<double, 2, 1> duv_td_minimal;                           \
-        Eigen::Matrix<double, 2, 9, Eigen::RowMajor> duv_sb;                  \
-        Eigen::Matrix<double, 2, 9, Eigen::RowMajor> duv_sb_minimal;          \
-        double* jacobians[] = {                                               \
-            duv_deltaTWS.data(),   duv_deltahpW.data(),                       \
-            duv_dExtrinsic.data(), duv_proj_intrinsic.data(),                 \
-            duv_distortion.data(), duv_tr.data(),                             \
-            duv_td.data(),         duv_sb.data()};                            \
-        double* jacobiansMinimal[] = {                                        \
-            duv_deltaTWS_minimal.data(),   duv_deltahpW_minimal.data(),       \
-            duv_dExtrinsic_minimal.data(), duv_proj_intrinsic_minimal.data(), \
-            duv_distortion_minimal.data(), duv_tr_minimal.data(),             \
-            duv_td_minimal.data(),         duv_sb_minimal.data()};            \
-        evaluateOk = observationError->EvaluateWithMinimalJacobians(          \
-            parameters, residual->data(), jacobians, jacobiansMinimal);       \
-        if (!evaluateOk) {                                                    \
-          status = MeasurementJacobianStatus::GeneralProjectionFailed;        \
-        }                                                                     \
-        int cameraParamsDim = cameraParamsMinimalDimen();                     \
-        J_X->setZero();                                                       \
-        if (fixCameraExtrinsicParams_[camIdx]) {                              \
-          if (fixCameraIntrinsicParams_[camIdx]) {                            \
-            J_X->topLeftCorner(2, cameraParamsDim) << duv_td_minimal,         \
-                duv_tr_minimal;                                               \
-          } else {                                                            \
-            J_X->topLeftCorner(2, cameraParamsDim)                            \
-                << duv_proj_intrinsic_minimal,                                \
-                duv_distortion_minimal, duv_td_minimal, duv_tr_minimal;       \
-          }                                                                   \
-        } else {                                                              \
-          if (fixCameraIntrinsicParams_[camIdx]) {                            \
-            J_X->topLeftCorner(2, cameraParamsDim) << duv_dExtrinsic_minimal, \
-                duv_td_minimal, duv_tr_minimal;                               \
-          } else {                                                            \
-            J_X->topLeftCorner(2, cameraParamsDim) << duv_dExtrinsic_minimal, \
-                duv_proj_intrinsic_minimal, duv_distortion_minimal,           \
-                duv_td_minimal, duv_tr_minimal;                               \
-          }                                                                   \
-        }                                                                     \
-        std::map<uint64_t, int>::const_iterator poseCovIndexIter =            \
-            mStateID2CovID_.find(poseId);                                     \
-        J_X->block<2, kClonedStateMinimalDimen>(                              \
-            0, cameraParamsDim +                                              \
-                   kClonedStateMinimalDimen * poseCovIndexIter->second)       \
-            << duv_deltaTWS_minimal,                                          \
-            duv_sb_minimal.topLeftCorner<2, 3>();                             \
-        *J_pfi = duv_deltahpW.topLeftCorner<2, 3>();                          \
-        *J_n = Eigen::Matrix2d::Identity();                                   \
-        *residual = -(*residual);                                             \
-        break;                                                                \
-      }                                                                       \
-      case okvis::cameras::kTangentDistanceId:                                \
-        break;                                                                \
-      case okvis::cameras::kChordalDistanceId: {                              \
-        typedef okvis::ceres::ChordalDistance<                                \
-            CameraGeometry, ProjectionIntrinsicModel, ExtrinsicModel,         \
-            msckf::ParallaxAngleParameterization, ImuModel>                   \
-            ChordalDistanceErrorModel;                                        \
-        std::shared_ptr<const CameraGeometry> argCameraGeometry =             \
-            std::static_pointer_cast<const CameraGeometry>(                   \
-                baseCameraGeometry);                                          \
-        observationError.reset(new ChordalDistanceErrorModel(                 \
-            argCameraGeometry, obs, obsCov, observationIndex, pointDataPtr)); \
-        break;                                                                \
-      }                                                                       \
-      default:                                                                \
-        MODEL_DOES_NOT_EXIST_EXCEPTION                                        \
-        break;                                                                \
-    }                                                                         \
-    break;
-#endif
-
-#ifndef PROJECTION_INTRINSIC_MODEL_CHAIN_CASE
-#define PROJECTION_INTRINSIC_MODEL_CHAIN_CASE(                                \
-    ImuModel, ExtrinsicModel, CameraGeometry, ProjectionIntrinsicModel)       \
-  case ProjectionIntrinsicModel::kModelId:                                    \
-    switch (landmarkModelId_) {                                               \
-      POINT_LANDMARK_MODEL_CHAIN_CASE(                                        \
-          ImuModel, ExtrinsicModel, CameraGeometry, ProjectionIntrinsicModel, \
-          msckf::HomogeneousPointParameterization)                            \
-      POINT_LANDMARK_MODEL_CHAIN_CASE(                                        \
-          ImuModel, ExtrinsicModel, CameraGeometry, ProjectionIntrinsicModel, \
-          msckf::InverseDepthParameterization)                                \
-      POINT_LANDMARK_MODEL_CHAIN_CASE(                                        \
-          ImuModel, ExtrinsicModel, CameraGeometry, ProjectionIntrinsicModel, \
-          msckf::ParallaxAngleParameterization)                               \
-      default:                                                                \
-        MODEL_DOES_NOT_EXIST_EXCEPTION                                        \
-        break;                                                                \
-    }                                                                         \
-    break;
-#endif
-
-#ifndef DISTORTION_MODEL_CHAIN_CASE
-#define DISTORTION_MODEL_CHAIN_CASE(ImuModel, ExtrinsicModel, CameraGeometry)  \
-  switch (projOptModelId) {                                                    \
-    PROJECTION_INTRINSIC_MODEL_CHAIN_CASE(                                     \
-        ImuModel, ExtrinsicModel, CameraGeometry, ProjectionOptFXY_CXY)        \
-    PROJECTION_INTRINSIC_MODEL_CHAIN_CASE(ImuModel, ExtrinsicModel,            \
-                                          CameraGeometry, ProjectionOptFX_CXY) \
-    PROJECTION_INTRINSIC_MODEL_CHAIN_CASE(ImuModel, ExtrinsicModel,            \
-                                          CameraGeometry, ProjectionOptFX)     \
-    default:                                                                   \
-      MODEL_DOES_NOT_APPLY_EXCEPTION                                           \
-      break;                                                                   \
-  }                                                                            \
-  break;
-#endif
-
-#ifndef EXTRINSIC_MODEL_CHAIN_CASE
-#define EXTRINSIC_MODEL_CHAIN_CASE(ImuModel, ExtrinsicModel)              \
-  case ExtrinsicModel::kModelId:                                          \
-    switch (distortionType) {                                             \
-      case okvis::cameras::NCameraSystem::Equidistant:                    \
-        DISTORTION_MODEL_CHAIN_CASE(                                      \
-            ImuModel, ExtrinsicModel,                                     \
-            okvis::cameras::PinholeCamera<                                \
-                okvis::cameras::EquidistantDistortion>)                   \
-      case okvis::cameras::NCameraSystem::RadialTangential:               \
-        DISTORTION_MODEL_CHAIN_CASE(                                      \
-            ImuModel, ExtrinsicModel,                                     \
-            okvis::cameras::PinholeCamera<                                \
-                okvis::cameras::RadialTangentialDistortion>)              \
-      case okvis::cameras::NCameraSystem::RadialTangential8:              \
-        DISTORTION_MODEL_CHAIN_CASE(                                      \
-            ImuModel, ExtrinsicModel,                                     \
-            okvis::cameras::PinholeCamera<                                \
-                okvis::cameras::RadialTangentialDistortion8>)             \
-      case okvis::cameras::NCameraSystem::FOV:                            \
-        DISTORTION_MODEL_CHAIN_CASE(                                      \
-            ImuModel, ExtrinsicModel,                                     \
-            okvis::cameras::PinholeCamera<okvis::cameras::FovDistortion>) \
-      default:                                                            \
-        MODEL_DOES_NOT_APPLY_EXCEPTION                                    \
-        break;                                                            \
-    }                                                                     \
-    break;
-#endif
-
-#ifndef IMU_MODEL_CHAIN_CASE
-#define IMU_MODEL_CHAIN_CASE(ImuModel)                          \
-  case ImuModel::kModelId:                                      \
-    switch (extrinsicModelId) {                                 \
-      EXTRINSIC_MODEL_CHAIN_CASE(ImuModel, Extrinsic_p_CB)      \
-      EXTRINSIC_MODEL_CHAIN_CASE(ImuModel, Extrinsic_p_BC_q_BC) \
-      default:                                                  \
-        MODEL_DOES_NOT_APPLY_EXCEPTION                          \
-        break;                                                  \
-    }                                                           \
-    break;
-#endif
-
-#undef DEBUG_ABOVE_MACROS
+#define DEBUG_ABOVE_MACROS
 #ifndef DEBUG_ABOVE_MACROS
   switch (imuModelId) {
     IMU_MODEL_CHAIN_CASE(Imu_BG_BA)
@@ -1024,44 +818,60 @@ MeasurementJacobianStatus MSCKF2::measurementJacobianGeneric(
       Eigen::Matrix<double, krd, 6, Eigen::RowMajor>,
       Eigen::aligned_allocator<Eigen::Matrix<double, krd, 6, Eigen::RowMajor>>>
       de_dTWB_minimal;
-  Eigen::Matrix<double, krd, PointLandmarkModel::kGlobalDim, Eigen::RowMajor> de_dPoint;
-  Eigen::Matrix<double, krd, PointLandmarkModel::kLocalDim, Eigen::RowMajor> de_dPoint_minimal;
-  Eigen::Matrix<double, krd, ExtrinsicModel::kGlobalDim, Eigen::RowMajor> de_dExtrinsic;
-  Eigen::Matrix<double, krd, ExtrinsicModel::kNumParams, Eigen::RowMajor> de_dExtrinsic_minimal;
-
-  CameraErrorModel::ProjectionIntrinsicJacType
-      de_proj_intrinsic;
-  CameraErrorModel::DistortionJacType
-      de_distortion;
-  Eigen::Matrix<double, krd, 1> de_tr;
-  CameraErrorModel::ProjectionIntrinsicJacType
-      de_proj_intrinsic_minimal;
-  CameraErrorModel::DistortionJacType
-      de_distortion_minimal;
-  Eigen::Matrix<double, krd, 1> de_tr_minimal;
-  Eigen::Matrix<double, krd, 1> de_td;
-  Eigen::Matrix<double, krd, 1> de_td_minimal;
   std::vector<
       Eigen::Matrix<double, krd, 9, Eigen::RowMajor>,
       Eigen::aligned_allocator<Eigen::Matrix<double, krd, 9, Eigen::RowMajor>>> de_dSpeedAndBias;
   std::vector<
       Eigen::Matrix<double, krd, 9, Eigen::RowMajor>,
       Eigen::aligned_allocator<Eigen::Matrix<double, krd, 9, Eigen::RowMajor>>> de_dSpeedAndBias_minimal;
-  double* jacobians[] = {
-      de_dTWB[0].data(), de_dTWB[1].data(), de_dTWB[2].data(),
-      de_dPoint.data(),
-      de_dExtrinsic.data(), de_proj_intrinsic.data(),
-      de_distortion.data(), de_tr.data(),
-      de_td.data(), de_dSpeedAndBias[0].data(), de_dSpeedAndBias[1].data(), de_dSpeedAndBias[2].data()
-  };
-  double* jacobiansMinimal[] = {
-      de_dTWB_minimal[0].data(),  de_dTWB_minimal[1].data(), de_dTWB_minimal[2].data(),
-      de_dPoint_minimal.data(),
-      de_dExtrinsic_minimal.data(),   de_proj_intrinsic_minimal.data(),
-      de_distortion_minimal.data(), de_tr_minimal.data(),
-      de_td_minimal.data(),         de_dSpeedAndBias_minimal[0].data(),
-     de_dSpeedAndBias_minimal[1].data(),  de_dSpeedAndBias_minimal[2].data()
-  };
+  for (int f = 0; f < 3; ++f) {
+    de_dTWB.emplace_back(Eigen::Matrix<double, krd, 7>());
+    de_dTWB_minimal.emplace_back(Eigen::Matrix<double, krd, 6>());
+    de_dSpeedAndBias.emplace_back(Eigen::Matrix<double, krd, 9>());
+    de_dSpeedAndBias_minimal.emplace_back(Eigen::Matrix<double, krd, 9>());
+  }
+  Eigen::Matrix<double, krd, PointLandmarkModel::kGlobalDim, Eigen::RowMajor> de_dPoint;
+  Eigen::Matrix<double, krd, PointLandmarkModel::kLocalDim, Eigen::RowMajor> de_dPoint_minimal;
+  Eigen::Matrix<double, krd, ExtrinsicModel::kGlobalDim, Eigen::RowMajor> de_dExtrinsic;
+  Eigen::Matrix<double, krd, ExtrinsicModel::kNumParams, Eigen::RowMajor> de_dExtrinsic_minimal;
+
+  CameraErrorModel::ProjectionIntrinsicJacType
+      de_dproj_intrinsic;
+  CameraErrorModel::ProjectionIntrinsicJacType
+      de_dproj_intrinsic_minimal;
+  CameraErrorModel::DistortionJacType
+      de_ddistortion;
+  CameraErrorModel::DistortionJacType
+      de_ddistortion_minimal;
+  Eigen::Matrix<double, krd, 1> de_dtr;
+  Eigen::Matrix<double, krd, 1> de_dtr_minimal;
+  Eigen::Matrix<double, krd, 1> de_dtd;
+  Eigen::Matrix<double, krd, 1> de_dtd_minimal;
+
+  double* jacobians[] = {de_dTWB[0].data(),
+                         de_dTWB[1].data(),
+                         de_dTWB[2].data(),
+                         de_dPoint.data(),
+                         de_dExtrinsic.data(),
+                         de_dproj_intrinsic.data(),
+                         de_ddistortion.data(),
+                         de_dtr.data(),
+                         de_dtd.data(),
+                         de_dSpeedAndBias[0].data(),
+                         de_dSpeedAndBias[1].data(),
+                         de_dSpeedAndBias[2].data()};
+  double* jacobiansMinimal[] = {de_dTWB_minimal[0].data(),
+                                de_dTWB_minimal[1].data(),
+                                de_dTWB_minimal[2].data(),
+                                de_dPoint_minimal.data(),
+                                de_dExtrinsic_minimal.data(),
+                                de_dproj_intrinsic_minimal.data(),
+                                de_ddistortion_minimal.data(),
+                                de_dtr_minimal.data(),
+                                de_dtd_minimal.data(),
+                                de_dSpeedAndBias_minimal[0].data(),
+                                de_dSpeedAndBias_minimal[1].data(),
+                                de_dSpeedAndBias_minimal[2].data()};
   evaluateOk = observationError->EvaluateWithMinimalJacobians(
       parameters, residual->data(), jacobians, jacobiansMinimal);
   if (!evaluateOk) {
@@ -1069,30 +879,36 @@ MeasurementJacobianStatus MSCKF2::measurementJacobianGeneric(
   }
   int cameraParamsDim = cameraParamsMinimalDimen();
   J_X->setZero();
-
   if (fixCameraExtrinsicParams_[camIdx]) {
     if (fixCameraIntrinsicParams_[camIdx]) {
-      J_X->topLeftCorner(2, cameraParamsDim) << de_td_minimal, de_tr_minimal;
+      J_X->topLeftCorner(krd, cameraParamsDim) << de_dtd_minimal, de_dtr_minimal;
     } else {
-      J_X->topLeftCorner(2, cameraParamsDim) << de_proj_intrinsic_minimal,
-          de_distortion_minimal, de_td_minimal, de_tr_minimal;
+      J_X->topLeftCorner(krd, cameraParamsDim) << de_dproj_intrinsic_minimal,
+          de_ddistortion_minimal, de_dtd_minimal, de_dtr_minimal;
     }
   } else {
     if (fixCameraIntrinsicParams_[camIdx]) {
-      J_X->topLeftCorner(2, cameraParamsDim) << de_dExtrinsic_minimal,
-          de_td_minimal, de_tr_minimal;
+      J_X->topLeftCorner(krd, cameraParamsDim) << de_dExtrinsic_minimal,
+          de_dtd_minimal, de_dtr_minimal;
     } else {
-      J_X->topLeftCorner(2, cameraParamsDim) << de_dExtrinsic_minimal,
-          de_proj_intrinsic_minimal, de_distortion_minimal, de_td_minimal,
-          de_tr_minimal;
+      J_X->topLeftCorner(krd, cameraParamsDim) << de_dExtrinsic_minimal,
+          de_dproj_intrinsic_minimal, de_ddistortion_minimal, de_dtd_minimal,
+          de_dtr_minimal;
     }
   }
-
-  std::map<uint64_t, int>::const_iterator poseCovIndexIter =
-      mStateID2CovID_.find(poseId);
-  J_X->block<2, kClonedStateMinimalDimen>(
-      0, cameraParamsDim + kClonedStateMinimalDimen * poseCovIndexIter->second)
-      << de_dTWB_minimal[0], de_dSpeedAndBias_minimal[0].topLeftCorner<2, 3>();
+  std::vector<uint64_t> anchorIds = pointDataPtr->anchorIds();
+  std::vector<uint64_t> jmaFrameIds{poseId, anchorIds[0], anchorIds[1]};
+  for (int f = 0; f < 3; ++f) {
+    uint64_t frameId = jmaFrameIds[f];
+    std::map<uint64_t, int>::const_iterator poseCovIndexIter =
+        mStateID2CovID_.find(frameId);
+    J_X->block<krd, kClonedStateMinimalDimen>(
+        0,
+        cameraParamsDim + kClonedStateMinimalDimen * poseCovIndexIter->second)
+        << de_dTWB_minimal[f],
+        de_dSpeedAndBias_minimal[f]
+            .topLeftCorner<krd, 3>();
+  }
 
   *J_pfi = de_dPoint_minimal;
   *J_n = Eigen::Matrix2d::Identity();
@@ -1177,18 +993,17 @@ bool MSCKF2::featureJacobian(const MapPoint &mp, Eigen::MatrixXd &H_oi,
     auto itFrameIds = pointDataPtr->begin();
     auto itRoi = vRi.begin();
     // compute Jacobians for a measurement in image j of the current feature i
-    for (size_t kale = 0; kale < numPoses; ++kale) {
+    for (size_t observationIndex = 0; observationIndex < numPoses; ++observationIndex) {
       Eigen::Matrix<double, 2, Eigen::Dynamic> J_x(2, featureVariableDimen);
       // $\frac{\partial [z_u, z_v]^T}{\partial [\alpha, \beta, \rho]}$
       Eigen::Matrix<double, 2, 3> J_pfi;
       Eigen::Vector2d residual;
 
-      int observationIndex = std::distance(pointDataPtr->begin(), itFrameIds);
       bool validJacobian = measurementJacobianAIDP(
-          ab1rho, tempCameraGeometry, obsInPixel[kale], observationIndex, pointDataPtr,
-          &J_x, &J_pfi, &residual);
+          ab1rho, tempCameraGeometry, obsInPixel[observationIndex],
+          observationIndex, pointDataPtr, &J_x, &J_pfi, &residual);
       if (!validJacobian) {
-          itFrameIds = pointDataPtr->erase(itFrameIds);
+          ++itFrameIds;
           itRoi = vRi.erase(itRoi);
           itRoi = vRi.erase(itRoi);
           continue;
@@ -1573,5 +1388,4 @@ void MSCKF2::optimize(size_t /*numIter*/, size_t /*numThreads*/, bool verbose) {
     LOG(INFO) << mapPtr_->summary.FullReport();
   }
 }
-
 }  // namespace okvis
