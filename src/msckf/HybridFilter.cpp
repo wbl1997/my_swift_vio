@@ -2840,9 +2840,13 @@ bool HybridFilter::featureJacobianEpipolar(
   std::vector<bool> projectStatus(numFeatures);
   int projOptModelId = camera_rig_.getProjectionOptMode(camIdx);
   for (size_t j = 0; j < numFeatures; ++j) {
+      Eigen::Matrix2d imageObservationCov = Eigen::Matrix2d::Identity();
       double pixelNoiseStd = imagePointNoiseStds[2 * j];
+      imageObservationCov(0, 0) *= (pixelNoiseStd * pixelNoiseStd);
+      pixelNoiseStd = imagePointNoiseStds[2 * j + 1];
+      imageObservationCov(1, 1) *= (pixelNoiseStd * pixelNoiseStd);
       bool projectOk = obsDirectionJacobian(
-          obsDirections[j], tempCameraGeometry, projOptModelId, pixelNoiseStd,
+          obsDirections[j], tempCameraGeometry, projOptModelId, imageObservationCov,
           &dfj_dXcam[j], &cov_fij[j]);
       projectStatus[j]= projectOk;
   }

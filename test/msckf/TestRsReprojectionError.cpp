@@ -183,7 +183,7 @@ void setupPoseOptProblem(bool perturbPose, bool rollingShutter,
     }
 
     // Set up the only cost function (also known as residual).
-    Eigen::Matrix2d information = Eigen::Matrix2d::Identity() * 0.36;
+    Eigen::Matrix2d covariance = Eigen::Matrix2d::Identity() / 0.36;
     double tdAtCreation = 0.0;
 
     std::shared_ptr<okvis::ImuMeasurementDeque> imuMeasDequePtr(
@@ -192,7 +192,7 @@ void setupPoseOptProblem(bool perturbPose, bool rollingShutter,
         new okvis::ceres::RsReprojectionError<DistortedPinholeCameraGeometry,
                                               okvis::ProjectionOptFXY_CXY,
                                               okvis::Extrinsic_p_BC_q_BC>(
-            cameraGeometry, kp, information, imuMeasDequePtr,
+            cameraGeometry, kp, covariance, imuMeasDequePtr,
             std::shared_ptr<const Eigen::Matrix<double, 6, 1>>(),
             stateEpoch, tdAtCreation, gravity));
     allCostFunctions.emplace_back(cost_function);
