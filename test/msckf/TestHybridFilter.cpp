@@ -263,13 +263,12 @@ std::map<std::string, int> trajectoryLabelToId{
  * @param runs
  * @param trajectoryId: 0: yarn torus, 1: yarn ball, 2: rounded square,
  *     3: circle, 4: dot
- * @param cameraOrientation 0: forward 1: sideways inward 2: sidways outward
- *     Sideways orientation is geometrically favorable for motion estimation.
+ * @param cameraOrientationId
  */
 void testHybridFilterSinusoid(const std::string& outputPath,
                               const int runs = 100,
                               const int trajectoryId=1,
-                              const int cameraOrientation=0) {
+                              simul::CameraOrientation cameraOrientationId=simul::CameraOrientation::Forward) {
 
   // definition of NEES in Huang et al. 2007 Generalized Analysis and
   // Improvement of the consistency of EKF-based SLAM
@@ -338,8 +337,6 @@ void testHybridFilterSinusoid(const std::string& outputPath,
                      "v_WS, bg, ba, Tg, Ts, Ta, "
                      "p_CB, fx, fy, cx, cy, k1, k2, p1, p2, td, tr"
                   << std::endl;
-
-
     }
 
     std::stringstream ss;
@@ -352,9 +349,11 @@ void testHybridFilterSinusoid(const std::string& outputPath,
     simul::VioTestSystemBuilder vioSystemBuilder;
     double timeOffset = 0.0;
     double readoutTime = 0.0;
+    int cameraModelId = 0;
     vioSystemBuilder.createVioSystem(cases[c], trajectoryId,
                                      projOptModelName, extrinsicModelName,
-                                     cameraOrientation, timeOffset, readoutTime,
+                                     cameraModelId,
+                                     cameraOrientationId, timeOffset, readoutTime,
                                      bVerbose ? imuSampleFile : "",
                                      bVerbose ? pointFile : "");
     int projOptModelId = okvis::ProjectionOptNameToId(projOptModelName);
@@ -389,6 +388,24 @@ void testHybridFilterSinusoid(const std::string& outputPath,
         vioSystemBuilder.ref_T_WS_list();
     okvis::ImuMeasurementDeque imuMeasurements = vioSystemBuilder.imuMeasurements();
     std::shared_ptr<okvis::Estimator> estimator = vioSystemBuilder.mutableEstimator();
+    int landmarkModelId = 2;
+    int cameraObservationModelId = 2;
+    std::shared_ptr<okvis::HybridFilter> hybridFilter =
+        std::dynamic_pointer_cast<okvis::HybridFilter>(estimator);
+    if (hybridFilter) {
+      int insideLandmarkModelId = hybridFilter->landmarkModelId();
+      int insideCameraObservationModelId = hybridFilter->cameraObservationModelId();
+      LOG(INFO) << "Previous landmark model " << insideLandmarkModelId
+                << " camera model " << insideCameraObservationModelId;
+
+      hybridFilter->setLandmarkModel(landmarkModelId);
+      hybridFilter->setCameraObservationModel(cameraObservationModelId);
+      insideLandmarkModelId = hybridFilter->landmarkModelId();
+      insideCameraObservationModelId = hybridFilter->cameraObservationModelId();
+      LOG(INFO) << "Present landmark model " << insideLandmarkModelId
+                << " camera model " << insideCameraObservationModelId;
+    }
+
     std::shared_ptr<okvis::SimulationFrontend> frontend = vioSystemBuilder.mutableFrontend();
     std::shared_ptr<const okvis::cameras::NCameraSystem> cameraSystem0 =
         vioSystemBuilder.trueCameraSystem();
@@ -591,64 +608,64 @@ void testHybridFilterSinusoid(const std::string& outputPath,
 #endif
 
 TEST(MSCKF, Ball)
-TEST_ALGO_TRAJ(MSCKF, Ball, 5, 0)
+TEST_ALGO_TRAJ(MSCKF, Ball, 5, simul::CameraOrientation::Forward)
 
 TEST(OKVIS, Ball)
-TEST_ALGO_TRAJ(OKVIS, Ball, 5, 0)
+TEST_ALGO_TRAJ(OKVIS, Ball, 5, simul::CameraOrientation::Forward)
 
 TEST(PAVIO, Ball)
-TEST_ALGO_TRAJ(PAVIO, Ball, 5, 0)
+TEST_ALGO_TRAJ(PAVIO, Ball, 5, simul::CameraOrientation::Forward)
 
 TEST(TFVIO, Ball)
-TEST_ALGO_TRAJ(TFVIO, Ball, 5, 0)
+TEST_ALGO_TRAJ(TFVIO, Ball, 5, simul::CameraOrientation::Forward)
 
 TEST(General, Torus)
-TEST_ALGO_TRAJ(General, Torus, 5, 0)
+TEST_ALGO_TRAJ(General, Torus, 5, simul::CameraOrientation::Forward)
 
 TEST(MSCKF, Torus)
-TEST_ALGO_TRAJ(MSCKF, Torus, 5, 0)
+TEST_ALGO_TRAJ(MSCKF, Torus, 5, simul::CameraOrientation::Forward)
 
 TEST(OKVIS, Torus)
-TEST_ALGO_TRAJ(OKVIS, Torus, 5, 0)
+TEST_ALGO_TRAJ(OKVIS, Torus, 5, simul::CameraOrientation::Forward)
 
 TEST(PAVIO, Torus)
-TEST_ALGO_TRAJ(PAVIO, Torus, 5, 0)
+TEST_ALGO_TRAJ(PAVIO, Torus, 5, simul::CameraOrientation::Forward)
 
 TEST(TFVIO, Torus)
-TEST_ALGO_TRAJ(TFVIO, Torus, 5, 0)
+TEST_ALGO_TRAJ(TFVIO, Torus, 5, simul::CameraOrientation::Forward)
 
 TEST(MSCKF, Squircle)
-TEST_ALGO_TRAJ(MSCKF, Squircle, 5, 0)
+TEST_ALGO_TRAJ(MSCKF, Squircle, 5, simul::CameraOrientation::Forward)
 
 TEST(OKVIS, Squircle)
-TEST_ALGO_TRAJ(OKVIS, Squircle, 5, 0)
+TEST_ALGO_TRAJ(OKVIS, Squircle, 5, simul::CameraOrientation::Forward)
 
 TEST(PAVIO, Squircle)
-TEST_ALGO_TRAJ(PAVIO, Squircle, 5, 0)
+TEST_ALGO_TRAJ(PAVIO, Squircle, 5, simul::CameraOrientation::Forward)
 
 TEST(TFVIO, Squircle)
-TEST_ALGO_TRAJ(TFVIO, Squircle, 5, 0)
+TEST_ALGO_TRAJ(TFVIO, Squircle, 5, simul::CameraOrientation::Forward)
 
 TEST(MSCKF, Circle)
-TEST_ALGO_TRAJ(MSCKF, Circle, 5, 0)
+TEST_ALGO_TRAJ(MSCKF, Circle, 5, simul::CameraOrientation::Forward)
 
 TEST(OKVIS, Circle)
-TEST_ALGO_TRAJ(OKVIS, Circle, 5, 0)
+TEST_ALGO_TRAJ(OKVIS, Circle, 5, simul::CameraOrientation::Forward)
 
 TEST(PAVIO, Circle)
-TEST_ALGO_TRAJ(PAVIO, Circle, 5, 0)
+TEST_ALGO_TRAJ(PAVIO, Circle, 5, simul::CameraOrientation::Forward)
 
 TEST(TFVIO, Circle)
-TEST_ALGO_TRAJ(TFVIO, Circle, 5, 0)
+TEST_ALGO_TRAJ(TFVIO, Circle, 5, simul::CameraOrientation::Forward)
 
 TEST(MSCKF, Dot)
-TEST_ALGO_TRAJ(MSCKF, Dot, 5, 0)
+TEST_ALGO_TRAJ(MSCKF, Dot, 5, simul::CameraOrientation::Forward)
 
 TEST(TFVIO, Dot)
-TEST_ALGO_TRAJ(TFVIO, Dot, 5, 0)
+TEST_ALGO_TRAJ(TFVIO, Dot, 5, simul::CameraOrientation::Forward)
 
 TEST(PAVIO, Dot)
-TEST_ALGO_TRAJ(PAVIO, Dot, 5, 0)
+TEST_ALGO_TRAJ(PAVIO, Dot, 5, simul::CameraOrientation::Forward)
 
 TEST(OKVIS, Dot)
-TEST_ALGO_TRAJ(OKVIS, Dot, 5, 0)
+TEST_ALGO_TRAJ(OKVIS, Dot, 5, simul::CameraOrientation::Forward)

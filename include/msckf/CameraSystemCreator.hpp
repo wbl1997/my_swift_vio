@@ -15,22 +15,30 @@
 
 namespace simul {
 
+// Sideways orientation is geometrically favorable for motion estimation.
+enum class CameraOrientation {
+  Forward = 0,
+  Backward,
+  Left,
+  Right,
+};
+
 class CameraSystemCreator {
  public:
-  CameraSystemCreator(const int cameraModelId,
+  CameraSystemCreator(int cameraModelId, CameraOrientation cameraOrientationId,
                       const std::string projIntrinsicRep,
-                      const std::string extrinsicRep,
-                      double td,
-                      double tr)
+                      const std::string extrinsicRep, double td, double tr)
       : cameraModelId_(cameraModelId),
+        cameraOrientationId_(cameraOrientationId),
         projIntrinsicRep_(projIntrinsicRep),
         extrinsicRep_(extrinsicRep),
-        timeOffset_(td), readoutTime_(tr) {}
+        timeOffset_(td),
+        readoutTime_(tr) {}
 
   void createDummyCameraSystem(
       std::shared_ptr<okvis::cameras::CameraBase>* cameraGeometry,
       std::shared_ptr<okvis::cameras::NCameraSystem>* cameraSystem) {
-    Eigen::Matrix<double, 4, 4> matT_SC0 = create_T_SC(cameraModelId_, camIdx_);
+    Eigen::Matrix<double, 4, 4> matT_SC0 = create_T_BC(cameraOrientationId_, camIdx_);
     std::shared_ptr<const okvis::kinematics::Transformation> T_SC_0(
         new okvis::kinematics::Transformation(matT_SC0));
     cameraGeometry->reset(new okvis::cameras::PinholeCamera<
@@ -48,7 +56,7 @@ class CameraSystemCreator {
   void createNominalCameraSystem(
       std::shared_ptr<okvis::cameras::CameraBase>* cameraGeometry,
       std::shared_ptr<okvis::cameras::NCameraSystem>* cameraSystem) {
-    Eigen::Matrix<double, 4, 4> matT_SC0 = create_T_SC(cameraModelId_, camIdx_);
+    Eigen::Matrix<double, 4, 4> matT_SC0 = create_T_BC(cameraOrientationId_, camIdx_);
     std::shared_ptr<const okvis::kinematics::Transformation> T_SC_0(
         new okvis::kinematics::Transformation(matT_SC0));
 
@@ -79,7 +87,7 @@ class CameraSystemCreator {
           vio::gauss_rand(0, cameraNoiseParams.sigma_absolute_translation);
     }
 
-    okvis::kinematics::Transformation ref_T_SC(create_T_SC(cameraModelId_, 0));
+    okvis::kinematics::Transformation ref_T_SC(create_T_BC(cameraOrientationId_, 0));
     std::shared_ptr<const okvis::kinematics::Transformation> T_SC_noisy(
         new okvis::kinematics::Transformation(
             ref_T_SC.r() - ref_T_SC.C() * p_CBNoise, ref_T_SC.q()));
@@ -108,23 +116,36 @@ class CameraSystemCreator {
   }
 
  private:
-  Eigen::Matrix<double, 4, 4> create_T_SC(const int caseId,
-                                          const int /*camIdx*/) {
+  /**
+   * @brief create_T_BC
+   * The body frame is forward-left-up. Relative to the camera,
+   * the camera frame is right-down-forward.
+   * @param orientationId: forward, backward, left, right
+   * @return T_BC
+   */
+  Eigen::Matrix<double, 4, 4> create_T_BC(CameraOrientation orientationId,
+                                          int /*camIdx*/) {
     Eigen::Matrix<double, 4, 4> matT_SC0;
-    switch (caseId) {
-      case 1: // sideways motion facing inward if the device goes straight forward
+    switch (orientationId) {
+      case CameraOrientation::Backward: // Backward motion: The camera faces backward when the device goes straight forward.
+        matT_SC0 << 0, 0, -1, 0,
+                    1, 0, 0, 0,
+                    0, -1, 0, 0,
+                    0, 0, 0, 1;
+        break;
+      case CameraOrientation::Left: // Sideways motion: The camera faces left if the device goes straight forward.
         matT_SC0 << 1, 0, 0, 0,
                     0, 0, 1, 0,
                     0, -1, 0, 0,
                     0, 0, 0, 1;
         break;
-      case 2: // sideways motion facing outward if the device goes straight forward
+      case CameraOrientation::Right: // Sideways motion: The camera faces right if the device goes straight forward.
         matT_SC0 << -1, 0, 0, 0,
                     0, 0, -1, 0,
                     0, -1, 0, 0,
                     0, 0, 0, 1;
         break;
-      case 0: // forward motion if the device goes straight forward
+      case CameraOrientation::Forward: // Forward motion: The camera faces forward when the device goes straight forward.
       default:
         matT_SC0 << 0, 0, 1, 0,
                    -1, 0, 0, 0,
@@ -136,10 +157,10 @@ class CameraSystemCreator {
   }
 
   std::shared_ptr<okvis::cameras::CameraBase> createCameraGeometry(
-      const int caseId) {
+      int cameraModelId) {
     std::shared_ptr<okvis::cameras::CameraBase> cameraGeometry;
 
-    switch (caseId) {
+    switch (cameraModelId) {
       case 1:
         cameraGeometry.reset(new okvis::cameras::PinholeCamera<
                              okvis::cameras::RadialTangentialDistortion>(
@@ -166,12 +187,12 @@ class CameraSystemCreator {
   static const int camIdx_ = 0;
 
   const int cameraModelId_;
+  const CameraOrientation cameraOrientationId_;
   const std::string projIntrinsicRep_;
   const std::string extrinsicRep_;
   const double timeOffset_;
   const double readoutTime_;
 };
-
 } // namespace simul
 
 #endif // INCLUDE_MSCKF_CAMERA_SYSTEM_CREATOR_HPP_

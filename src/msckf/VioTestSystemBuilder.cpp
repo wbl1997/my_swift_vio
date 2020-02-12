@@ -10,7 +10,8 @@ namespace simul {
 void VioTestSystemBuilder::createVioSystem(
     const okvis::TestSetting& testSetting, int trajectoryId,
     std::string projOptModelName, std::string extrinsicModelName,
-    int cameraOrientation, double td, double tr,
+    int cameraModelId,
+    CameraOrientation cameraOrientationId, double td, double tr,
     std::string imuLogFile,
     std::string pointFile) {
   const double DURATION = 300.0;  // length of motion in seconds
@@ -120,7 +121,7 @@ void VioTestSystemBuilder::createVioSystem(
 
   std::shared_ptr<okvis::ceres::Map> mapPtr(new okvis::ceres::Map());
 
-  simul::CameraSystemCreator csc(cameraOrientation, projOptModelName,
+  simul::CameraSystemCreator csc(cameraModelId, cameraOrientationId, projOptModelName,
                                  extrinsicModelName, td, tr);
   // reference camera system
   std::shared_ptr<okvis::cameras::CameraBase> cameraGeometry0;

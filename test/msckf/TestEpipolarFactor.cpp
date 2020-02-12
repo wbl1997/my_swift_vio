@@ -54,9 +54,11 @@ TEST(CeresErrorTerms, EpipolarFactor) {
   // create camera geometry
   std::string projOptModelName = "FXY_CXY";
   std::string extrinsicModelName = "P_CB";
-  int cameraOrientation = 0;
-  simul::CameraSystemCreator csc(cameraOrientation, projOptModelName,
-                                 extrinsicModelName, 0.0, 0.0);
+  int cameraModelId = 0;
+  simul::CameraOrientation cameraOrientationId = simul::CameraOrientation::Forward;
+  simul::CameraSystemCreator csc(cameraModelId, cameraOrientationId,
+                                 projOptModelName, extrinsicModelName, 0.0,
+                                 0.0);
 
   // reference camera system
   std::shared_ptr<okvis::cameras::CameraBase> cameraGeometry0;

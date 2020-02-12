@@ -312,6 +312,14 @@ class HybridFilter : public Estimator {
     return okvis::ceres::ode::NavErrorStateDim + imu_rig_.getImuParamsMinimalDim(0);
   }
 
+  int landmarkModelId() const {
+    return landmarkModelId_;
+  }
+
+  int cameraObservationModelId() const {
+    return cameraObservationModelId_;
+  }
+
   void setLandmarkModel(int landmarkModelId) {
     landmarkModelId_ = landmarkModelId;
   }

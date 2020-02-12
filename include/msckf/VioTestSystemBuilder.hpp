@@ -4,6 +4,7 @@
 #include <msckf/ImuSimulator.h>
 #include <msckf/MSCKF2.hpp>
 #include <msckf/SimulationFrontend.hpp>
+#include <msckf/CameraSystemCreator.hpp>
 
 namespace simul {
 class VioTestSystemBuilder {
@@ -15,7 +16,8 @@ public:
 
   void createVioSystem(const okvis::TestSetting& testSetting, int trajectoryId,
                        std::string projOptModelName, std::string extrinsicModelName,
-                       int cameraOrientation, double td, double tr,
+                       int cameraModelId,
+                       CameraOrientation cameraOrientationId, double td, double tr,
                        std::string imuLogFile, std::string pointFile);
 
 public:
