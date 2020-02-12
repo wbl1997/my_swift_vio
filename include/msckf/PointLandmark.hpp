@@ -59,7 +59,7 @@ inline int eraseBadObservations(const std::vector<std::pair<uint64_t, int>>& dud
 
 class PointLandmark {
 public:
- PointLandmark(int modelId=0);
+ explicit PointLandmark(int modelId);
 
  /**
   * @brief initialize
@@ -84,6 +84,10 @@ public:
 
  const double* data() const {
    return parameters_.data();
+ }
+
+ int modelId() const {
+   return modelId_;
  }
 
 private:

@@ -22,6 +22,7 @@
 #include <gflags/gflags.h>
 #include <glog/logging.h>
 
+#include <okvis/Parameters.hpp>
 #include <okvis/ThreadedKFVio.hpp>
 
 #include <io_wrap/StreamHelper.hpp>
@@ -58,8 +59,6 @@ DEFINE_string(imu_file, "", "full name of an input IMU file");
 DEFINE_int32(start_index, 0, "index of the first frame to be processed");
 
 DEFINE_int32(finish_index, 0, "index of the last frame to be processed");
-
-DECLARE_int32(estimator_algorithm);
 
 bool setInputParameters(okvis::InputData *input) {
   input->videoFile = FLAGS_video_file;
@@ -129,17 +128,15 @@ int main(int argc, char **argv) {
   setInputParameters(&parameters.input);
 
   std::shared_ptr<okvis::VioInterface> okvis_estimator;
-  switch (FLAGS_estimator_algorithm) {
-    case 0:
-    case 1:
-    case 2:
-      parameters.optimization.algorithm = FLAGS_estimator_algorithm;
+  switch (parameters.optimization.algorithm) {
+    case okvis::EstimatorAlgorithm::OKVIS:
+    case okvis::EstimatorAlgorithm::General:
+    case okvis::EstimatorAlgorithm::Priorless:
       // http://eigen.tuxfamily.org/bz/show_bug.cgi?id=1049
       okvis_estimator.reset(new okvis::ThreadedKFVio(parameters));
       break;
-    case 4:
-    case 5:
-    case 6:
+    case okvis::EstimatorAlgorithm::MSCKF:
+    case okvis::EstimatorAlgorithm::TFVIO:
       okvis_estimator.reset(new okvis::HybridVio(parameters));
       break;
     default:

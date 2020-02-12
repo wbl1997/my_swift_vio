@@ -145,24 +145,29 @@ void VioTestSystemBuilder::createVioSystem(
 
   okvis::VisualConstraints constraintScheme(okvis::OnlyReprojectionErrors);
   switch (testSetting.estimator_algorithm) {
-    case 0:
+    case okvis::EstimatorAlgorithm::OKVIS:
       estimator.reset(new okvis::Estimator(mapPtr));
       break;
-    case 1:
+    case okvis::EstimatorAlgorithm::General:
       estimator.reset(new okvis::GeneralEstimator(mapPtr));
       constraintScheme = okvis::OnlyTwoViewConstraints;
       break;
-    case 5:
+    case okvis::EstimatorAlgorithm::TFVIO:
       estimator.reset(new okvis::TFVIO(mapPtr));
       break;
-    case 6:
-      estimator.reset(new okvis::MSCKF2(mapPtr));
-      break;
-    case 4:
+    case okvis::EstimatorAlgorithm::MSCKF:
     default:
       estimator.reset(new okvis::MSCKF2(mapPtr));
       break;
   }
+  estimator->setUseEpipolarConstraint(testSetting.useEpipolarConstraint);
+  estimator->setCameraObservationModel(testSetting.cameraObservationModelId);
+  estimator->setLandmarkModel(testSetting.landmarkModelId);
+
+  int insideLandmarkModelId = estimator->landmarkModelId();
+  int insideCameraObservationModelId = estimator->cameraObservationModelId();
+  LOG(INFO) << "Present landmark model " << insideLandmarkModelId
+            << " camera model " << insideCameraObservationModelId;
 
   frontend.reset(new okvis::SimulationFrontend(trueCameraSystem_->numCameras(),
                                                testSetting.addImageNoise, 60,

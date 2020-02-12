@@ -22,6 +22,7 @@
 #include <msckf/FilterHelper.hpp>
 #include <msckf/ImuOdometry.h>
 #include <msckf/PointLandmark.hpp>
+#include <msckf/PointLandmarkModels.hpp>
 #include <msckf/PointSharedData.hpp>
 #include <msckf/RelativeMotionJacobian.hpp>
 #include <msckf/TwoViewPair.hpp>
@@ -45,16 +46,12 @@ DEFINE_double(image_noise_cov_multiplier, 4.0,
               "multiplier for epipolar constraints to weaken their effect.");
 
 DEFINE_double(
-    pavio_sigma_keypoint_size, 2.0,
+    epipolar_sigma_keypoint_size, 2.0,
     "The keypoint size for checking low disparity when epipolar constraints "
     "are enabled. The bigger this value, the more likely a feature track is "
     "deemed to have low disparity and to contribute epipolar constraints. "
     "Lower this value from reference 8.0 to achieve the effect of "
     "fiber-reinforced concrete for MSCKF. 1.0 - 2.0 is recommended ");
-
-DEFINE_bool(use_AIDP, true,
-            "use anchored inverse depth parameterization for a feature point?"
-            " Preliminary result shows AIDP worsen the result slightly");
 
 /// \brief okvis Main namespace of this package.
 namespace okvis {
@@ -69,9 +66,9 @@ HybridFilter::HybridFilter(std::shared_ptr<okvis::ceres::Map> mapPtr)
       updateStatesTimer("3.1.3 updateStates", true),
       updateCovarianceTimer("3.1.4 updateCovariance", true),
       updateLandmarksTimer("3.1.5 updateLandmarks", true),
-      mTrackLengthAccumulator(100, 0),
-      cameraObservationModelId_(0),
-      landmarkModelId_(FLAGS_use_AIDP ? 1 : 0) {}
+      mTrackLengthAccumulator(100, 0) {
+  setLandmarkModel(msckf::InverseDepthParameterization::kModelId);
+}
 
 // The default constructor.
 HybridFilter::HybridFilter()
@@ -83,9 +80,9 @@ HybridFilter::HybridFilter()
       updateStatesTimer("3.1.3 updateStates", true),
       updateCovarianceTimer("3.1.4 updateCovariance", true),
       updateLandmarksTimer("3.1.5 updateLandmarks", true),
-      mTrackLengthAccumulator(100, 0),
-      cameraObservationModelId_(0),
-      landmarkModelId_(FLAGS_use_AIDP ? 1 : 0) {}
+      mTrackLengthAccumulator(100, 0) {
+  setLandmarkModel(msckf::InverseDepthParameterization::kModelId);
+}
 
 HybridFilter::~HybridFilter() {
   LOG(INFO) << "Destructing HybridFilter";
@@ -1165,7 +1162,7 @@ bool HybridFilter::featureJacobian(
   int extrinsicModelId = camera_rig_.getExtrinsicOptMode(camIdx);
   const okvis::kinematics::Transformation T_BC0 = camera_rig_.getCameraExtrinsic(camIdx);
 
-  msckf::PointLandmark pointLandmark(landmarkModelId_);
+  msckf::PointLandmark pointLandmark(msckf::InverseDepthParameterization::kModelId);
   std::shared_ptr<msckf::PointSharedData> pointDataPtr(new msckf::PointSharedData());
   msckf::TriangulationStatus status = triangulateAMapPoint(
       mp, obsInPixel, pointLandmark, vSigmai, tempCameraGeometry, T_BC0,
@@ -1191,7 +1188,7 @@ bool HybridFilter::featureJacobian(
         "anchor frame of to be included points should be the current frame");
   }
   pointDataPtr->computePoseAndVelocityForJacobians(FLAGS_use_first_estimate);
-  pointDataPtr->computeSharedJacobians(landmarkModelId_);
+  pointDataPtr->computeSharedJacobians(cameraObservationModelId_);
   // compute Jacobians for a measurement in image j of the current feature i
   // C_j is the current frame, Bj refers to the body frame associated with the
   // current frame, Ba refers to body frame associated with the anchor frame,
@@ -2270,7 +2267,7 @@ bool HybridFilter::hasLowDisparity(
   Eigen::VectorXd intrinsics;
   camera_rig_.getCameraGeometry(0)->getIntrinsics(intrinsics);
   double focalLength = intrinsics[0];
-  double keypointAStdDev = 0.8 * FLAGS_pavio_sigma_keypoint_size / 12.0;
+  double keypointAStdDev = 0.8 * FLAGS_epipolar_sigma_keypoint_size / 12.0;
   const double fourthRoot2 = 1.1892071150;
   double raySigma = fourthRoot2 * keypointAStdDev / focalLength;
   Eigen::Vector3d rayA_inA = obsDirections.front().normalized();
@@ -2386,10 +2383,10 @@ msckf::TriangulationStatus HybridFilter::triangulateAMapPoint(
   std::vector<int> anchorSeqIds;
   if (orderedCulledFrameIds) {
     msckf::eraseBadObservations(badObservationIdentifiers, orderedCulledFrameIds);
-    msckf::decideAnchors(frameIds, *orderedCulledFrameIds, landmarkModelId_,
+    msckf::decideAnchors(frameIds, *orderedCulledFrameIds, pointLandmark.modelId(),
                          &anchorIds, &anchorSeqIds);
   } else {
-    msckf::decideAnchors(frameIds, landmarkModelId_, &anchorIds, &anchorSeqIds);
+    msckf::decideAnchors(frameIds, pointLandmark.modelId(), &anchorIds, &anchorSeqIds);
   }
   pointDataPtr->setAnchors(anchorIds, anchorSeqIds);
 

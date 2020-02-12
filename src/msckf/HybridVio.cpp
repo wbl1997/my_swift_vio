@@ -16,16 +16,7 @@
 #include <okvis/assert_macros.hpp>
 #include <okvis/ceres/ImuError.hpp>
 
-DEFINE_int32(
-    estimator_algorithm, 4,
-    "0 and 1 for okvis optimization paired with ThreadedKFVio. "
-    "0 okvis original estimator, 1 general estimator.\n"
-    "4 for msckf, 5 for triangulation free vio, 6 for pavio, "
-    "4, 5, and 6 are paired with HybridVio.\n"
-    "This flag will overwrite parameters.optimization.algorithm");
-
 DECLARE_int32(feature_tracking_method);
-
 
 msckf_vio::Feature::OptimizationConfig msckf_vio::Feature::optimization_config;
 
@@ -75,22 +66,24 @@ HybridVio::HybridVio(okvis::VioParameters &parameters)
       maxImuInputQueueSize_(2 * max_camera_input_queue_size *
                             parameters.imu.rate /
                             parameters.sensors_information.cameraRate) {
-  switch (FLAGS_estimator_algorithm) {
-    case 4:
-    case 6:
-      estimator_.reset(
-          new okvis::MSCKF2());
+  switch (parameters.optimization.algorithm) {
+    case okvis::EstimatorAlgorithm::MSCKF:
+      estimator_.reset(new okvis::MSCKF2());
       break;
-    case 5:
+    case okvis::EstimatorAlgorithm::TFVIO:
       estimator_.reset(new okvis::TFVIO());
       break;
     default:
-      LOG(WARNING) << "There are bugs inside the present HybridFilter!";
+      LOG(WARNING) << "The present HybridFilter is broken!";
       estimator_.reset(new okvis::HybridFilter());
       break;
   }
-  estimator_->resetInitialNavState(
+
+  estimator_->setInitialNavState(
       InitialNavState(parameters.initialState));
+  estimator_->setUseEpipolarConstraint(parameters.optimization.useEpipolarConstraint);
+  estimator_->setCameraObservationModel(parameters.optimization.cameraObservationModelId);
+  estimator_->setLandmarkModel(parameters.optimization.landmarkModelId);
   msckf_vio::Feature::optimization_config.translation_threshold =
       parameters.optimization.triangulationTranslationThreshold;
   msckf_vio::Feature::optimization_config.max_depth =

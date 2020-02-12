@@ -118,13 +118,15 @@ void testPointLandmarkJacobian(std::string projOptModelName,
                                std::string outputFile,
                                double timeOffset,
                                double readoutTime,
-                               int landmarkModelId = 0,
                                int cameraObservationModelId = 0,
+                               int landmarkModelId = 0,
                                bool examineMeasurementJacobian = false) {
   simul::VioTestSystemBuilder vioSystemBuilder;
   bool addPriorNoise = true;
-  int32_t estimatorType = 4;
-  okvis::TestSetting testSetting(true, addPriorNoise, false, true, true, 0.5, 0.5, estimatorType);
+  bool useEpipolarConstraint = false;
+  okvis::TestSetting testSetting(true, addPriorNoise, false, true, true, 0.5,
+                                 0.5, okvis::EstimatorAlgorithm::MSCKF, useEpipolarConstraint,
+                                 cameraObservationModelId, landmarkModelId);
   int trajectoryId = 0; // Torus
   int cameraModelId = 0;
   simul::CameraOrientation cameraOrientationId = simul::CameraOrientation::Forward;
@@ -149,10 +151,7 @@ void testPointLandmarkJacobian(std::string projOptModelName,
       vioSystemBuilder.ref_T_WS_list();
   okvis::ImuMeasurementDeque imuMeasurements = vioSystemBuilder.imuMeasurements();
   std::shared_ptr<okvis::Estimator> genericEstimator = vioSystemBuilder.mutableEstimator();
-  std::shared_ptr<okvis::MSCKF2> estimator =
-      std::dynamic_pointer_cast<okvis::MSCKF2>(genericEstimator);
-  estimator->setLandmarkModel(landmarkModelId);
-  estimator->setCameraObservationModel(cameraObservationModelId);
+  std::shared_ptr<okvis::MSCKF2> estimator = std::dynamic_pointer_cast<okvis::MSCKF2>(genericEstimator);
 
   std::shared_ptr<okvis::SimulationFrontend> frontend = vioSystemBuilder.mutableFrontend();
   std::shared_ptr<const okvis::cameras::NCameraSystem> cameraSystem0 =
@@ -209,7 +208,7 @@ void testPointLandmarkJacobian(std::string projOptModelName,
     if (!bStarted) {
       bStarted = true;
       frameCount = 0;
-      estimator->resetInitialNavState(vioSystemBuilder.initialNavState());
+      estimator->setInitialNavState(vioSystemBuilder.initialNavState());
       estimator->addStates(mf, imuSegment, asKeyframe);
 
       ASSERT_EQ(

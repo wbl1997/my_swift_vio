@@ -35,18 +35,14 @@ DEFINE_bool(use_IEKF, false,
             "use iterated EKF in optimization, empirically IEKF cost at"
             "least twice as much time as EKF");
 
-DECLARE_int32(estimator_algorithm);
-
 /// \brief okvis Main namespace of this package.
 namespace okvis {
 
 MSCKF2::MSCKF2(std::shared_ptr<okvis::ceres::Map> mapPtr)
-    : HybridFilter(mapPtr),
-      useEpipolarConstraint_(FLAGS_estimator_algorithm == 6) {}
+    : HybridFilter(mapPtr) {}
 
 // The default constructor.
-MSCKF2::MSCKF2()
-    : useEpipolarConstraint_(FLAGS_estimator_algorithm == 6) {}
+MSCKF2::MSCKF2() {}
 
 MSCKF2::~MSCKF2() {}
 
@@ -587,7 +583,8 @@ bool MSCKF2::featureJacobianGeneric(
   // in which the marginalized observations should never occur.
   int featureVariableDimen = cameraParamsMinimalDimen() +
                              kClonedStateMinimalDimen * (statesMap_.size() - 1);
-  int residualBlockDim = okvis::cameras::CameraObservationModelResidualDim(cameraObservationModelId_);
+  int residualBlockDim = okvis::cameras::CameraObservationModelResidualDim(
+        cameraObservationModelId_);
   // all observations for this feature point
   std::vector<Eigen::Vector2d, Eigen::aligned_allocator<Eigen::Vector2d>>
       obsInPixel;
@@ -928,7 +925,8 @@ bool MSCKF2::featureJacobian(const MapPoint &mp, Eigen::MatrixXd &H_oi,
                         Eigen::Matrix<double, Eigen::Dynamic, 1> &r_oi,
                         Eigen::MatrixXd &R_oi,
                         std::vector<uint64_t>* orderedCulledFrameIds) const {
-  if (landmarkModelId_ == 2 || cameraObservationModelId_ != 0) {
+  if (landmarkModelId_ == msckf::ParallaxAngleParameterization::kModelId ||
+      cameraObservationModelId_ != okvis::cameras::kReprojectionErrorId) {
     return featureJacobianGeneric(mp, H_oi, r_oi, R_oi, orderedCulledFrameIds);
   }
   const int camIdx = 0;
@@ -946,7 +944,7 @@ bool MSCKF2::featureJacobian(const MapPoint &mp, Eigen::MatrixXd &H_oi,
       obsInPixel;
   std::vector<double> vRi; // std noise in pixels
   computeHTimer.start();
-  if (landmarkModelId_ == 1) {
+  if (landmarkModelId_ == msckf::InverseDepthParameterization::kModelId) {
     // The landmark is expressed with AIDP in the anchor frame    
     // if the feature is lost in current frame, the anchor frame is chosen
     // as the last frame observing the point.
@@ -1362,7 +1360,7 @@ void MSCKF2::optimize(size_t /*numIter*/, size_t /*numThreads*/, bool verbose) {
       const int camIdx = 0;
       std::shared_ptr<const okvis::cameras::CameraBase> tempCameraGeometry =
           camera_rig_.getCameraGeometry(camIdx);
-      msckf::PointLandmark pointLandmark(landmarkModelId_);
+      msckf::PointLandmark pointLandmark(msckf::HomogeneousPointParameterization::kModelId);
       msckf::PointSharedData psd;
       msckf::TriangulationStatus status =
           triangulateAMapPoint(it->second, obsInPixel, pointLandmark, vRi,

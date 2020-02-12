@@ -184,16 +184,20 @@ struct TestSetting {
 //  "factor in generating noise.\n");
   double sim_ga_bias_noise_factor;
 
-  int32_t estimator_algorithm;
+  okvis::EstimatorAlgorithm estimator_algorithm;
+  bool useEpipolarConstraint;
+  int cameraObservationModelId;
+  int landmarkModelId;
 
-  TestSetting(bool _addImuNoise = true,
-              bool _addPriorNoise = true,
-              bool _addSystemError = false,
-              bool _addImageNoise = true,
-              bool _useImageObservs = true,
-              double _sim_ga_noise_factor = 0.5,
+  TestSetting(bool _addImuNoise = true, bool _addPriorNoise = true,
+              bool _addSystemError = false, bool _addImageNoise = true,
+              bool _useImageObservs = true, double _sim_ga_noise_factor = 0.5,
               double _sim_ga_bias_noise_factor = 0.5,
-              int32_t _estimator_algorithm = 4)
+              okvis::EstimatorAlgorithm _estimator_algorithm =
+                  okvis::EstimatorAlgorithm::MSCKF,
+              bool _useEpipolarConstraint = false,
+              int _cameraObservationModelId = 0,
+              int _landmarkModelId = 0)
       : addImuNoise(_addImuNoise),
         addPriorNoise(_addPriorNoise),
         addSystemError(_addSystemError),
@@ -201,20 +205,24 @@ struct TestSetting {
         useImageObservs(_useImageObservs),
         sim_ga_noise_factor(_sim_ga_noise_factor),
         sim_ga_bias_noise_factor(_sim_ga_bias_noise_factor),
-        estimator_algorithm(_estimator_algorithm) {
-
-  }
+        estimator_algorithm(_estimator_algorithm),
+        useEpipolarConstraint(_useEpipolarConstraint),
+        cameraObservationModelId(_cameraObservationModelId),
+        landmarkModelId(_landmarkModelId)
+  {}
 
   std::string print() {
     std::stringstream ss;
-    ss << "addImuNoise " << addImuNoise <<
-          " addPriorNoise " << addPriorNoise <<
-          " addSystemError " << addSystemError <<
-          " addImageNoise " << addImageNoise <<
-          " useImageObservs " << useImageObservs <<
-          " sim_ga_noise_factor " << sim_ga_noise_factor <<
-          " sim_ga_bias_noise_factor " << sim_ga_bias_noise_factor <<
-          " stimator_algorithm " << estimator_algorithm;
+    ss << "addImuNoise " << addImuNoise << " addPriorNoise " << addPriorNoise
+       << " addSystemError " << addSystemError << " addImageNoise "
+       << addImageNoise << " useImageObservs " << useImageObservs
+       << " sim_ga_noise_factor " << sim_ga_noise_factor
+       << " sim_ga_bias_noise_factor " << sim_ga_bias_noise_factor
+       << " stimator_algorithm "
+       << okvis::EstimatorAlgorithmIdToName(estimator_algorithm)
+       << " use epipolar constraint? " << useEpipolarConstraint
+       << " camera observation model id " << cameraObservationModelId
+       << " camera landmark model id " << landmarkModelId;
     return ss.str();
   }
 };

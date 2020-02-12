@@ -25,6 +25,7 @@
 #include <msckf/EuclideanParamBlock.hpp>
 
 #include <msckf/ImuOdometry.h>
+#include <msckf/PointLandmarkModels.hpp>
 #include <msckf/ProjParamOptModels.hpp>
 #include <msckf/VioTestSystemBuilder.hpp>
 
@@ -41,7 +42,6 @@ DEFINE_bool(
     "and distortion intrinsic parameters, td, tr");
 
 DECLARE_bool(use_mahalanobis);
-DECLARE_int32(estimator_algorithm);
 
 typedef boost::iterator_range<std::vector<std::pair<double, double>>::iterator>
     HistogramType;
@@ -61,8 +61,8 @@ void outputFeatureHistogram(const std::string& featureHistFile,
       << "Total of densities: " << total << " should be 1.";
 }
 
-inline bool isFilteringMethod(int algorithmId) {
-  return algorithmId >= 4;
+inline bool isFilteringMethod(okvis::EstimatorAlgorithm algorithmId) {
+  return algorithmId >= okvis::EstimatorAlgorithm::MSCKF;
 }
 
 /**
@@ -78,6 +78,7 @@ inline bool isFilteringMethod(int algorithmId) {
  */
 void computeErrors(
     const okvis::Estimator* estimator,
+    okvis::EstimatorAlgorithm estimator_algorithm,
     const okvis::kinematics::Transformation& T_WS,
     const Eigen::Vector3d& v_WS_true,
     const okvis::ImuSensorReadings& ref_measurement,
@@ -96,7 +97,7 @@ void computeErrors(
   Eigen::Matrix<double, 6, 1> deltaPose;
   deltaPose << delta, alpha;
   Eigen::MatrixXd covariance;
-  bool isFilter = isFilteringMethod(FLAGS_estimator_algorithm);
+  bool isFilter = isFilteringMethod(estimator_algorithm);
 
   estimator->computeCovariance(&covariance);
 
@@ -230,24 +231,6 @@ void check_tail_nees(const Eigen::Vector3d &nees_tail) {
   EXPECT_LT(nees_tail[2], 10) << "Pose NEES";
 }
 
-std::map<int, std::string> estimatorIdToLabel{
-  {0, "OKVIS"},
-  {1, "General"},
-  {4, "MSCKF"},
-  {5, "TFVIO"},
-  {6, "PAVIO"},
-  {9, "Uncanny"},
-};
-
-std::map<std::string, int> estimatorLabelToId{
-  {"OKVIS", 0},
-  {"General", 1},
-  {"MSCKF", 4},
-  {"TFVIO", 5},
-  {"PAVIO", 6},
-  {"Uncanny", 9},
-};
-
 std::vector<std::string> trajectoryIdToLabel{
     "Torus", "Ball", "Squircle", "Circle", "Dot", "Uncanny",
 };
@@ -266,9 +249,13 @@ std::map<std::string, int> trajectoryLabelToId{
  * @param cameraOrientationId
  */
 void testHybridFilterSinusoid(const std::string& outputPath,
-                              const int runs = 100,
-                              const int trajectoryId=1,
-                              simul::CameraOrientation cameraOrientationId=simul::CameraOrientation::Forward) {
+                              okvis::EstimatorAlgorithm estimator_algorithm,
+                              const int runs = 100, const int trajectoryId = 1,
+                              simul::CameraOrientation cameraOrientationId =
+                                  simul::CameraOrientation::Forward,
+                              bool useEpipolarConstraint = false,
+                              int cameraObservationModelId = 0,
+                              int landmarkModelId = 0) {
 
   // definition of NEES in Huang et al. 2007 Generalized Analysis and
   // Improvement of the consistency of EKF-based SLAM
@@ -298,14 +285,20 @@ void testHybridFilterSinusoid(const std::string& outputPath,
   std::string featureHistFile = outputPath + "/FeatureHist.txt";
 
   okvis::timing::Timer filterTimer("msckf timer", true);
-  std::string estimatorLabel = estimatorIdToLabel[FLAGS_estimator_algorithm];
-
-  LOG(INFO) << "Estimator algorithm: " << FLAGS_estimator_algorithm
-            << " " << estimatorLabel << " trajectory " << trajLabel;
-  std::string neesFile = outputPath + "/" + estimatorLabel + "_" +
-      trajLabel + "_NEES.txt";
-  std::string rmseFile = outputPath + "/" + estimatorLabel + "_" +
-      trajLabel + "_RMSE.txt";
+  std::string estimatorLabel = okvis::EstimatorAlgorithmIdToName(estimator_algorithm);
+  std::string suffix;
+  if (useEpipolarConstraint) {
+    suffix = "Epi";
+  }
+  if (landmarkModelId == msckf::ParallaxAngleParameterization::kModelId) {
+    suffix = "Pap";
+  }
+  LOG(INFO) << "Estimator algorithm: " << estimatorLabel << suffix
+            << " trajectory " << trajLabel;
+  std::string pathEstimatorTrajectory = outputPath + "/" + estimatorLabel + suffix + "_" +
+      trajLabel;
+  std::string neesFile = pathEstimatorTrajectory + "_NEES.txt";
+  std::string rmseFile = pathEstimatorTrajectory + "_RMSE.txt";
 
   // only output the ground truth and data for the first successful trial
   bool bVerbose = false;
@@ -324,9 +317,10 @@ void testHybridFilterSinusoid(const std::string& outputPath,
     srand((unsigned int)time(0)); // comment out to make tests deterministic
     okvis::TestSetting cases[] = {
         okvis::TestSetting(true, FLAGS_add_prior_noise, false, true, true,
-        0.5, 0.5, FLAGS_estimator_algorithm)};
+        0.5, 0.5, estimator_algorithm, useEpipolarConstraint,
+        cameraObservationModelId, landmarkModelId)};
     size_t c = 0;
-    LOG(INFO) << "Run " << run << " " << cases[c].print() << " algo " << estimatorLabel;
+    LOG(INFO) << "Run " << run << " " << cases[c].print();
 
     std::string pointFile = outputPath + "/" + trajLabel + "_Points.txt";
     std::string imuSampleFile = outputPath + "/" + trajLabel + "_IMU.txt";
@@ -341,10 +335,8 @@ void testHybridFilterSinusoid(const std::string& outputPath,
 
     std::stringstream ss;
     ss << run;
-    std::string outputFile = outputPath + "/" + estimatorLabel + "_" +
-                             trajLabel + "_" + ss.str() + ".txt";
-    std::string trackStatFile = outputPath + "/" + estimatorLabel + "_" +
-                                trajLabel + "_trackstat_" + ss.str() + ".txt";
+    std::string outputFile = pathEstimatorTrajectory + "_" + ss.str() + ".txt";
+    std::string trackStatFile = pathEstimatorTrajectory + "_trackstat_" + ss.str() + ".txt";
 
     simul::VioTestSystemBuilder vioSystemBuilder;
     double timeOffset = 0.0;
@@ -388,23 +380,6 @@ void testHybridFilterSinusoid(const std::string& outputPath,
         vioSystemBuilder.ref_T_WS_list();
     okvis::ImuMeasurementDeque imuMeasurements = vioSystemBuilder.imuMeasurements();
     std::shared_ptr<okvis::Estimator> estimator = vioSystemBuilder.mutableEstimator();
-    int landmarkModelId = 2;
-    int cameraObservationModelId = 2;
-    std::shared_ptr<okvis::HybridFilter> hybridFilter =
-        std::dynamic_pointer_cast<okvis::HybridFilter>(estimator);
-    if (hybridFilter) {
-      int insideLandmarkModelId = hybridFilter->landmarkModelId();
-      int insideCameraObservationModelId = hybridFilter->cameraObservationModelId();
-      LOG(INFO) << "Previous landmark model " << insideLandmarkModelId
-                << " camera model " << insideCameraObservationModelId;
-
-      hybridFilter->setLandmarkModel(landmarkModelId);
-      hybridFilter->setCameraObservationModel(cameraObservationModelId);
-      insideLandmarkModelId = hybridFilter->landmarkModelId();
-      insideCameraObservationModelId = hybridFilter->cameraObservationModelId();
-      LOG(INFO) << "Present landmark model " << insideLandmarkModelId
-                << " camera model " << insideCameraObservationModelId;
-    }
 
     std::shared_ptr<okvis::SimulationFrontend> frontend = vioSystemBuilder.mutableFrontend();
     std::shared_ptr<const okvis::cameras::NCameraSystem> cameraSystem0 =
@@ -441,9 +416,9 @@ void testHybridFilterSinusoid(const std::string& outputPath,
         if (!bStarted) {
           bStarted = true;
           frameCount = 0;
-          estimator->resetInitialNavState(vioSystemBuilder.initialNavState());
+          estimator->setInitialNavState(vioSystemBuilder.initialNavState());
           estimator->addStates(mf, imuSegment, asKeyframe);
-          if (isFilteringMethod(FLAGS_estimator_algorithm)) {
+          if (isFilteringMethod(estimator_algorithm)) {
             const int kDistortionCoeffDim =
                 okvis::cameras::RadialTangentialDistortion::NumDistortionIntrinsics;
             const int kNavImuCamParamDim =
@@ -482,7 +457,7 @@ void testHybridFilterSinusoid(const std::string& outputPath,
         okvis::MapPointVector removedLandmarks;
         size_t numKeyFrames = 5u;
         size_t numImuFrames = 5u;
-        if (isFilteringMethod(FLAGS_estimator_algorithm)) {
+        if (isFilteringMethod(estimator_algorithm)) {
           numImuFrames = 20u;
         }
         estimator->applyMarginalizationStrategy(numKeyFrames, numImuFrames, removedLandmarks);
@@ -513,7 +488,7 @@ void testHybridFilterSinusoid(const std::string& outputPath,
 
         Eigen::Vector3d normalizedError;
         Eigen::VectorXd rmsError;
-        computeErrors(estimator.get(), T_WS, v_WS_true,
+        computeErrors(estimator.get(), estimator_algorithm, T_WS, v_WS_true,
                       trueBiasIter->measurement, cameraGeometry0,
                       projOptModelId, &normalizedError, &rmsError);
 
@@ -594,78 +569,194 @@ void testHybridFilterSinusoid(const std::string& outputPath,
 }
 
 // FLAGS_log_dir can be passed in commandline as --log_dir=/some/log/dir
-#ifndef TEST_ALGO_TRAJ
-#define TEST_ALGO_TRAJ(algo_name, traj_name, repeat_times_value, \
-                       camera_orientation_value)                 \
-  {                                                              \
-    int32_t old_algorithm = FLAGS_estimator_algorithm;           \
-    FLAGS_estimator_algorithm = estimatorLabelToId[#algo_name];  \
-    testHybridFilterSinusoid(FLAGS_log_dir, repeat_times_value,  \
-                             trajectoryLabelToId[#traj_name],    \
-                             camera_orientation_value);          \
-    FLAGS_estimator_algorithm = old_algorithm;                   \
-  }
-#endif
+TEST(MSCKF, Ball) {
+  okvis::EstimatorAlgorithm algorithmId =
+      okvis::EstimatorAlgorithmNameToId("MSCKF");
+  testHybridFilterSinusoid(FLAGS_log_dir, algorithmId, 5,
+                           trajectoryLabelToId["Ball"],
+                           simul::CameraOrientation::Forward, false, 0, 1);
+}
 
-TEST(MSCKF, Ball)
-TEST_ALGO_TRAJ(MSCKF, Ball, 5, simul::CameraOrientation::Forward)
+TEST(OKVIS, Ball) {
+  okvis::EstimatorAlgorithm algorithmId =
+      okvis::EstimatorAlgorithmNameToId("OKVIS");
+  testHybridFilterSinusoid(FLAGS_log_dir, algorithmId, 5,
+                           trajectoryLabelToId["Ball"],
+                           simul::CameraOrientation::Forward, false, 0, 0);
+}
 
-TEST(OKVIS, Ball)
-TEST_ALGO_TRAJ(OKVIS, Ball, 5, simul::CameraOrientation::Forward)
+TEST(MSCKFWithEpipolarConstraints, Ball) {
+  okvis::EstimatorAlgorithm algorithmId =
+      okvis::EstimatorAlgorithmNameToId("MSCKF");
+  testHybridFilterSinusoid(FLAGS_log_dir, algorithmId, 5,
+                           trajectoryLabelToId["Ball"],
+                           simul::CameraOrientation::Forward, true, 0, 1);
+}
 
-TEST(PAVIO, Ball)
-TEST_ALGO_TRAJ(PAVIO, Ball, 5, simul::CameraOrientation::Forward)
+TEST(TFVIO, Ball) {
+  okvis::EstimatorAlgorithm algorithmId =
+      okvis::EstimatorAlgorithmNameToId("TFVIO");
+  testHybridFilterSinusoid(FLAGS_log_dir, algorithmId, 5,
+                           trajectoryLabelToId["Ball"],
+                           simul::CameraOrientation::Forward, false, 1, 0);
+}
 
-TEST(TFVIO, Ball)
-TEST_ALGO_TRAJ(TFVIO, Ball, 5, simul::CameraOrientation::Forward)
+TEST(General, Torus) {
+  okvis::EstimatorAlgorithm algorithmId =
+      okvis::EstimatorAlgorithmNameToId("General");
+  testHybridFilterSinusoid(FLAGS_log_dir, algorithmId, 5,
+                           trajectoryLabelToId["Torus"],
+                           simul::CameraOrientation::Forward, false, 0, 0);
+}
 
-TEST(General, Torus)
-TEST_ALGO_TRAJ(General, Torus, 5, simul::CameraOrientation::Forward)
+TEST(MSCKF, Torus) {
+  okvis::EstimatorAlgorithm algorithmId =
+      okvis::EstimatorAlgorithmNameToId("MSCKF");
+  testHybridFilterSinusoid(FLAGS_log_dir, algorithmId, 5,
+                           trajectoryLabelToId["Torus"],
+                           simul::CameraOrientation::Forward, false, 0, 1);
+}
 
-TEST(MSCKF, Torus)
-TEST_ALGO_TRAJ(MSCKF, Torus, 5, simul::CameraOrientation::Forward)
+TEST(OKVIS, Torus) {
+  okvis::EstimatorAlgorithm algorithmId =
+      okvis::EstimatorAlgorithmNameToId("OKVIS");
+  testHybridFilterSinusoid(FLAGS_log_dir, algorithmId, 5,
+                           trajectoryLabelToId["Torus"],
+                           simul::CameraOrientation::Forward, false, 0, 0);
+}
 
-TEST(OKVIS, Torus)
-TEST_ALGO_TRAJ(OKVIS, Torus, 5, simul::CameraOrientation::Forward)
+TEST(MSCKFWithEpipolarConstraints, Torus) {
+  okvis::EstimatorAlgorithm algorithmId =
+      okvis::EstimatorAlgorithmNameToId("MSCKF");
+  testHybridFilterSinusoid(FLAGS_log_dir, algorithmId, 5,
+                           trajectoryLabelToId["Torus"],
+                           simul::CameraOrientation::Forward, true, 0, 1);
+}
 
-TEST(PAVIO, Torus)
-TEST_ALGO_TRAJ(PAVIO, Torus, 5, simul::CameraOrientation::Forward)
+TEST(TFVIO, Torus) {
+  okvis::EstimatorAlgorithm algorithmId =
+      okvis::EstimatorAlgorithmNameToId("TFVIO");
+  testHybridFilterSinusoid(FLAGS_log_dir, algorithmId, 5,
+                           trajectoryLabelToId["Torus"],
+                           simul::CameraOrientation::Forward, false, 1, 0);
+}
 
-TEST(TFVIO, Torus)
-TEST_ALGO_TRAJ(TFVIO, Torus, 5, simul::CameraOrientation::Forward)
+TEST(MSCKF, Squircle) {
+  okvis::EstimatorAlgorithm algorithmId =
+      okvis::EstimatorAlgorithmNameToId("MSCKF");
+  testHybridFilterSinusoid(FLAGS_log_dir, algorithmId, 5,
+                           trajectoryLabelToId["Squircle"],
+                           simul::CameraOrientation::Forward, false, 0, 1);
+}
 
-TEST(MSCKF, Squircle)
-TEST_ALGO_TRAJ(MSCKF, Squircle, 5, simul::CameraOrientation::Forward)
+TEST(OKVIS, Squircle) {
+  okvis::EstimatorAlgorithm algorithmId =
+      okvis::EstimatorAlgorithmNameToId("OKVIS");
+  testHybridFilterSinusoid(FLAGS_log_dir, algorithmId, 5,
+                           trajectoryLabelToId["Squircle"],
+                           simul::CameraOrientation::Forward, false, 0, 0);
+}
 
-TEST(OKVIS, Squircle)
-TEST_ALGO_TRAJ(OKVIS, Squircle, 5, simul::CameraOrientation::Forward)
+TEST(MSCKFWithEpipolarConstraints, Squircle) {
+  okvis::EstimatorAlgorithm algorithmId =
+      okvis::EstimatorAlgorithmNameToId("MSCKF");
+  testHybridFilterSinusoid(FLAGS_log_dir, algorithmId, 5,
+                           trajectoryLabelToId["Squircle"],
+                           simul::CameraOrientation::Forward, true, 0, 1);
+}
 
-TEST(PAVIO, Squircle)
-TEST_ALGO_TRAJ(PAVIO, Squircle, 5, simul::CameraOrientation::Forward)
+TEST(TFVIO, Squircle) {
+  okvis::EstimatorAlgorithm algorithmId =
+      okvis::EstimatorAlgorithmNameToId("TFVIO");
+  testHybridFilterSinusoid(FLAGS_log_dir, algorithmId, 5,
+                           trajectoryLabelToId["Squircle"],
+                           simul::CameraOrientation::Forward, false, 1, 0);
+}
 
-TEST(TFVIO, Squircle)
-TEST_ALGO_TRAJ(TFVIO, Squircle, 5, simul::CameraOrientation::Forward)
+TEST(MSCKF, Circle) {
+  okvis::EstimatorAlgorithm algorithmId =
+      okvis::EstimatorAlgorithmNameToId("MSCKF");
+  testHybridFilterSinusoid(FLAGS_log_dir, algorithmId, 5,
+                           trajectoryLabelToId["Circle"],
+                           simul::CameraOrientation::Forward, false, 0, 1);
+}
 
-TEST(MSCKF, Circle)
-TEST_ALGO_TRAJ(MSCKF, Circle, 5, simul::CameraOrientation::Forward)
+TEST(OKVIS, Circle) {
+  okvis::EstimatorAlgorithm algorithmId =
+      okvis::EstimatorAlgorithmNameToId("OKVIS");
+  testHybridFilterSinusoid(FLAGS_log_dir, algorithmId, 5,
+                           trajectoryLabelToId["Circle"],
+                           simul::CameraOrientation::Forward, false, 0, 0);
+}
 
-TEST(OKVIS, Circle)
-TEST_ALGO_TRAJ(OKVIS, Circle, 5, simul::CameraOrientation::Forward)
+TEST(MSCKFWithEpipolarConstraints, Circle) {
+  okvis::EstimatorAlgorithm algorithmId =
+      okvis::EstimatorAlgorithmNameToId("MSCKF");
+  testHybridFilterSinusoid(FLAGS_log_dir, algorithmId, 5,
+                           trajectoryLabelToId["Circle"],
+                           simul::CameraOrientation::Forward, true, 0, 1);
+}
 
-TEST(PAVIO, Circle)
-TEST_ALGO_TRAJ(PAVIO, Circle, 5, simul::CameraOrientation::Forward)
+TEST(TFVIO, Circle) {
+  okvis::EstimatorAlgorithm algorithmId =
+      okvis::EstimatorAlgorithmNameToId("TFVIO");
+  testHybridFilterSinusoid(FLAGS_log_dir, algorithmId, 5,
+                           trajectoryLabelToId["Circle"],
+                           simul::CameraOrientation::Forward, false, 1, 0);
+}
 
-TEST(TFVIO, Circle)
-TEST_ALGO_TRAJ(TFVIO, Circle, 5, simul::CameraOrientation::Forward)
+TEST(MSCKF, Dot) {
+  okvis::EstimatorAlgorithm algorithmId =
+      okvis::EstimatorAlgorithmNameToId("MSCKF");
+  testHybridFilterSinusoid(FLAGS_log_dir, algorithmId, 5,
+                           trajectoryLabelToId["Dot"],
+                           simul::CameraOrientation::Forward, false, 0, 1);
+}
 
-TEST(MSCKF, Dot)
-TEST_ALGO_TRAJ(MSCKF, Dot, 5, simul::CameraOrientation::Forward)
+TEST(TFVIO, Dot) {
+  okvis::EstimatorAlgorithm algorithmId =
+      okvis::EstimatorAlgorithmNameToId("TFVIO");
+  testHybridFilterSinusoid(FLAGS_log_dir, algorithmId, 5,
+                           trajectoryLabelToId["Dot"],
+                           simul::CameraOrientation::Forward, false, 1, 0);
+}
 
-TEST(TFVIO, Dot)
-TEST_ALGO_TRAJ(TFVIO, Dot, 5, simul::CameraOrientation::Forward)
+TEST(MSCKFWithEpipolarConstraints, Dot) {
+  okvis::EstimatorAlgorithm algorithmId =
+      okvis::EstimatorAlgorithmNameToId("MSCKF");
+  testHybridFilterSinusoid(FLAGS_log_dir, algorithmId, 5,
+                           trajectoryLabelToId["Dot"],
+                           simul::CameraOrientation::Forward, true, 0, 1);
+}
 
-TEST(PAVIO, Dot)
-TEST_ALGO_TRAJ(PAVIO, Dot, 5, simul::CameraOrientation::Forward)
+TEST(OKVIS, Dot) {
+  okvis::EstimatorAlgorithm algorithmId =
+      okvis::EstimatorAlgorithmNameToId("OKVIS");
+  testHybridFilterSinusoid(FLAGS_log_dir, algorithmId, 5,
+                           trajectoryLabelToId["Dot"],
+                           simul::CameraOrientation::Forward, false, 0, 0);
+}
 
-TEST(OKVIS, Dot)
-TEST_ALGO_TRAJ(OKVIS, Dot, 5, simul::CameraOrientation::Forward)
+TEST(MSCKFWithPAP, Dot) {
+  okvis::EstimatorAlgorithm algorithmId =
+      okvis::EstimatorAlgorithmNameToId("MSCKF");
+  testHybridFilterSinusoid(FLAGS_log_dir, algorithmId, 5,
+                           trajectoryLabelToId["Dot"],
+                           simul::CameraOrientation::Forward, false, 2, 2);
+}
+
+TEST(MSCKFWithPAP, Squircle) {
+  okvis::EstimatorAlgorithm algorithmId =
+      okvis::EstimatorAlgorithmNameToId("MSCKF");
+  testHybridFilterSinusoid(FLAGS_log_dir, algorithmId, 5,
+                           trajectoryLabelToId["Squircle"],
+                           simul::CameraOrientation::Forward, false, 2, 2);
+}
+
+TEST(MSCKFWithPAP, Torus) {
+  okvis::EstimatorAlgorithm algorithmId =
+      okvis::EstimatorAlgorithmNameToId("MSCKF");
+  testHybridFilterSinusoid(FLAGS_log_dir, algorithmId, 5,
+                           trajectoryLabelToId["Torus"],
+                           simul::CameraOrientation::Forward, false, 2, 2);
+}

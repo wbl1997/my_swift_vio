@@ -145,7 +145,7 @@ void computeFeatureMeasJacobian(
   pvstd.std_p_WS = Eigen::Vector3d(1e-2, 1e-2, 1e-2);
   pvstd.std_v_WS = Eigen::Vector3d(1e-1, 1e-1, 1e-1);
   pvstd.std_q_WS = Eigen::Vector3d(5e-2, 5e-2, 5e-2);
-  estimator.resetInitialNavState(pvstd);
+  estimator.setInitialNavState(pvstd);
 
   uint64_t landmarkId = 1000;
   Eigen::Vector4d ab1rho;
@@ -208,8 +208,7 @@ void computeFeatureMeasJacobian(
 
   okvis::kinematics::Transformation T_WBa(Eigen::Vector3d(0, 0, 1),
                                           Eigen::Quaterniond(1, 0, 0, 0));
-  int landmarkModelId = 0;
-  msckf::PointLandmark pointLandmark(landmarkModelId);
+  msckf::PointLandmark pointLandmark(msckf::InverseDepthParameterization::kModelId);
   std::shared_ptr<msckf::PointSharedData> pointDataPtr(new msckf::PointSharedData());
 
   // all observations for this feature point

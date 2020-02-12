@@ -312,21 +312,6 @@ class HybridFilter : public Estimator {
     return okvis::ceres::ode::NavErrorStateDim + imu_rig_.getImuParamsMinimalDim(0);
   }
 
-  int landmarkModelId() const {
-    return landmarkModelId_;
-  }
-
-  int cameraObservationModelId() const {
-    return cameraObservationModelId_;
-  }
-
-  void setLandmarkModel(int landmarkModelId) {
-    landmarkModelId_ = landmarkModelId;
-  }
-
-  void setCameraObservationModel(int cameraObservationModelId) {
-    cameraObservationModelId_ = cameraObservationModelId;
-  }
 
   // error state: \delta p, \alpha for q, \delta v
   // state: \pi_{B_i}(=[p_{B_i}^G, q_{B_i}^G, v_{B_i}^G])
@@ -486,10 +471,6 @@ class HybridFilter : public Estimator {
   double translationThreshold_;
   double rotationThreshold_;
   double trackingRateThreshold_;
-
-  int cameraObservationModelId_; // see CameraRig.hpp
-
-  int landmarkModelId_; // see PointLandmarkModels.hpp
 };
 
 

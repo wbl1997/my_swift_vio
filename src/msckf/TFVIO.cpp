@@ -11,6 +11,7 @@
 #include <msckf/EuclideanParamBlock.hpp>
 #include <msckf/FilterHelper.hpp>
 #include <msckf/ImuOdometry.h>
+#include <msckf/PointLandmarkModels.hpp>
 #include <msckf/PreconditionedEkfUpdater.h>
 
 DECLARE_bool(use_IEKF);
@@ -264,7 +265,7 @@ void TFVIO::optimize(size_t /*numIter*/, size_t /*numThreads*/, bool verbose) {
       std::shared_ptr<const okvis::cameras::CameraBase> tempCameraGeometry =
           camera_rig_.getCameraGeometry(camIdx);
 
-      msckf::PointLandmark pointLandmark(landmarkModelId_);
+      msckf::PointLandmark pointLandmark(msckf::HomogeneousPointParameterization::kModelId);
       msckf::PointSharedData psd;
       msckf::TriangulationStatus status =
           triangulateAMapPoint(it->second, obsInPixel, pointLandmark, vRi,
