@@ -148,8 +148,12 @@ if (gt_file)
     end
     data(:,10:12) = (R_res*data(:, 10:12)')';
 else
-    gt = [];    
-    data(:,1) = (data(:,1) - startTime) / sec_to_nanos;
+    gt = [];
+    if data(1, 1) > sec_to_nanos
+        data(:,1) = (data(:,1) - startTime) / sec_to_nanos;
+    else
+        data(:,1) = data(:,1) - startTime;
+    end
 end
 
 figure;

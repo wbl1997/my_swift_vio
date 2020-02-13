@@ -255,10 +255,12 @@ class HybridFilter : public Estimator {
   /**
    * @brief getCameraCalibrationEstimate get the latest estimate of camera
    * calibration parameters
-   * @param vfckptdr
-   * @return the last pose id
+   * @param cameraParams[out] including projection and distortion intrinsic
+   * parameters and time delay and readout time.
+   * @return
    */
-  uint64_t getCameraCalibrationEstimate(Eigen::Matrix<double, Eigen::Dynamic, 1> &vfckptdr) const;
+  void getCameraCalibrationEstimate(
+      int cameraIndex, Eigen::Matrix<double, Eigen::Dynamic, 1>* cameraParams) const;
 
   std::vector<std::shared_ptr<const okvis::ceres::ParameterBlock>>
       getCameraTimeParameterPtrs() const;
@@ -433,6 +435,18 @@ class HybridFilter : public Estimator {
       Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> *Ri,
       RetrieveObsSeqType seqType) const;
 
+  template <class CameraGeometry, class ProjectionIntrinsicModel,
+  class ExtrinsicModel, class PointLandmarkModel, class ImuModel>
+  msckf::MeasurementJacobianStatus computeCameraObservationJacobians(
+      const msckf::PointLandmark& pointLandmark,
+      std::shared_ptr<const okvis::cameras::CameraBase> baseCameraGeometry,
+      const Eigen::Vector2d& obs,
+      const Eigen::Matrix2d& obsCov, int observationIndex,
+      std::shared_ptr<const msckf::PointSharedData> pointDataPtr,
+      Eigen::MatrixXd* J_X, Eigen::Matrix<double, Eigen::Dynamic, 3>* J_pfi,
+      Eigen::Matrix<double, Eigen::Dynamic, 2>* J_n,
+      Eigen::VectorXd* residual) const;
+
   Eigen::MatrixXd
       covariance_;  ///< covariance of the error vector of all states, error is
                     ///< defined as \tilde{x} = x - \hat{x} except for rotations
@@ -472,8 +486,6 @@ class HybridFilter : public Estimator {
   double rotationThreshold_;
   double trackingRateThreshold_;
 };
-
-
 }  // namespace okvis
-
+#include <msckf/implementation/HybridFilter.hpp>
 #endif /* INCLUDE_OKVIS_HYBRID_FILTER_HPP_ */

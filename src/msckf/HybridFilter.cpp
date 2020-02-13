@@ -2397,12 +2397,12 @@ msckf::TriangulationStatus HybridFilter::triangulateAMapPoint(
 
 bool HybridFilter::print(std::ostream& stream) const {
   Estimator::print(stream);
-  Eigen::IOFormat SpaceInitFmt(Eigen::StreamPrecision, Eigen::DontAlignCols,
+  Eigen::IOFormat spaceInitFmt(Eigen::StreamPrecision, Eigen::DontAlignCols,
                                " ", " ", "", "", "", "");
   const States stateInQuestion = statesMap_.rbegin()->second;
   Eigen::Matrix<double, Eigen::Dynamic, 1> extraParams;
   getImuAugmentedStatesEstimate(&extraParams);
-  stream << " " << extraParams.transpose().format(SpaceInitFmt);
+  stream << " " << extraParams.transpose().format(spaceInitFmt);
 
   // camera sensor states
   const int camIdx = 0;
@@ -2418,66 +2418,15 @@ bool HybridFilter::print(std::ostream& stream) const {
   ExtrinsicModelToParamsValueString(camera_rig_.getExtrinsicOptMode(camIdx),
                                     T_BC0, " ", &extrinsicValues);
   stream << " " << extrinsicValues;
-
-  if (!fixCameraIntrinsicParams_[camIdx]) {
-    uint64_t intrinsicId = stateInQuestion.sensors.at(SensorStates::Camera)
-                               .at(camIdx)
-                               .at(CameraSensorStates::Intrinsics)
-                               .id;
-    std::shared_ptr<ceres::EuclideanParamBlock> intrinsicParamBlockPtr =
-        std::static_pointer_cast<ceres::EuclideanParamBlock>(
-            mapPtr_->parameterBlockPtr(intrinsicId));
-    Eigen::VectorXd cameraIntrinsics = intrinsicParamBlockPtr->estimate();
-    stream << " " << cameraIntrinsics.transpose().format(SpaceInitFmt);
-  }
-
-  if (stateInQuestion.sensors.at(SensorStates::Camera)
-          .at(camIdx)
-          .at(CameraSensorStates::Distortion)
-          .exists) {
-    uint64_t distortionId = stateInQuestion.sensors.at(SensorStates::Camera)
-                                .at(camIdx)
-                                .at(CameraSensorStates::Distortion)
-                                .id;
-    std::shared_ptr<ceres::EuclideanParamBlock> distortionParamBlockPtr =
-        std::static_pointer_cast<ceres::EuclideanParamBlock>(
-            mapPtr_->parameterBlockPtr(distortionId));
-    Eigen::VectorXd cameraDistortion = distortionParamBlockPtr->estimate();
-    stream << " " << cameraDistortion.transpose().format(SpaceInitFmt);
-  }
-  if (stateInQuestion.sensors.at(SensorStates::Camera)
-          .at(camIdx)
-          .at(CameraSensorStates::TD)
-          .exists) {
-    uint64_t tdId = stateInQuestion.sensors.at(SensorStates::Camera)
-                        .at(camIdx)
-                        .at(CameraSensorStates::TD)
-                        .id;
-    std::shared_ptr<ceres::ParameterBlock> tdParamBlockPtr =
-        mapPtr_->parameterBlockPtr(tdId);
-    double td = tdParamBlockPtr->parameters()[0];
-    stream << " " << td;
-  }
-  if (stateInQuestion.sensors.at(SensorStates::Camera)
-          .at(camIdx)
-          .at(CameraSensorStates::TR)
-          .exists) {
-    uint64_t trId = stateInQuestion.sensors.at(SensorStates::Camera)
-                        .at(camIdx)
-                        .at(CameraSensorStates::TR)
-                        .id;
-    std::shared_ptr<ceres::ParameterBlock> trParamBlockPtr =
-        mapPtr_->parameterBlockPtr(trId);
-    double tr = trParamBlockPtr->parameters()[0];
-    stream << " " << tr;
-  }
+  Eigen::VectorXd cameraParams;
+  getCameraCalibrationEstimate(camIdx, &cameraParams);
+  stream << " " << cameraParams.transpose().format(spaceInitFmt);
 
   // stds
   const int stateDim = startIndexOfClonedStates();
   Eigen::Matrix<double, Eigen::Dynamic, 1> variances =
       covariance_.topLeftCorner(stateDim, stateDim).diagonal();
-
-  stream << " " << variances.cwiseSqrt().transpose().format(SpaceInitFmt);
+  stream << " " << variances.cwiseSqrt().transpose().format(spaceInitFmt);
   return true;
 }
 
@@ -2490,9 +2439,9 @@ void HybridFilter::printTrackLengthHistogram(std::ostream& stream) const {
     stream << bin << " " << *it << std::endl;
 }
 
-uint64_t HybridFilter::getCameraCalibrationEstimate(
-    Eigen::Matrix<double, Eigen::Dynamic, 1>& vfckptdr) const {
-  const int camIdx = 0;
+void HybridFilter::getCameraCalibrationEstimate(
+    int camIdx,
+    Eigen::Matrix<double, Eigen::Dynamic, 1>* cameraParams) const {
   const uint64_t poseId = statesMap_.rbegin()->first;
   Eigen::VectorXd intrinsic;
 
@@ -2504,17 +2453,16 @@ uint64_t HybridFilter::getCameraCalibrationEstimate(
   getSensorStateEstimateAs<ceres::EuclideanParamBlock>(
       poseId, camIdx, SensorStates::Camera, CameraSensorStates::Distortion,
       distortionCoeffs);
-  vfckptdr.resize(intrinsic.size() + distortionCoeffs.size() + 2, 1);
-  vfckptdr.head(intrinsic.size()) = intrinsic;
-  vfckptdr.segment(intrinsic.size(), distortionCoeffs.size()) =
+  cameraParams->resize(intrinsic.size() + distortionCoeffs.size() + 2, 1);
+  cameraParams->head(intrinsic.size()) = intrinsic;
+  cameraParams->segment(intrinsic.size(), distortionCoeffs.size()) =
           distortionCoeffs;
   double tdEstimate(0), trEstimate(0);
   getSensorStateEstimateAs<ceres::CameraTimeParamBlock>(
       poseId, camIdx, SensorStates::Camera, CameraSensorStates::TD, tdEstimate);
   getSensorStateEstimateAs<ceres::CameraTimeParamBlock>(
       poseId, camIdx, SensorStates::Camera, CameraSensorStates::TR, trEstimate);
-  vfckptdr.tail<2>() = Eigen::Vector2d(tdEstimate, trEstimate);
-  return poseId;
+  cameraParams->tail<2>() = Eigen::Vector2d(tdEstimate, trEstimate);
 }
 
 std::vector<std::shared_ptr<const okvis::ceres::ParameterBlock>>

@@ -11,9 +11,15 @@ algo_est = find_algo_name(name_est);
 algo_cmp = find_algo_name(name_cmp);
 truth_file=[result_dir, '/', traj_est, '.txt'];
 est_data = readmatrix(est_file, 'NumHeaderLines', 1);
+if est_data(1, 1) > 1e9
+    est_data(:, 1) = est_data(:, 1) * 0.000000001;
+end
 draw_cmp = 0;
 if isfile(cmp_file)
     cmp_data = readmatrix(cmp_file, 'NumHeaderLines', 1);
+    if cmp_data(1, 1) > 1e9
+        cmp_data(:, 1) = cmp_data(:, 1) * 0.000000001;
+    end
     draw_cmp = 1;
 else
     cmp_data = [];

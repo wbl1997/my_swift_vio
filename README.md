@@ -91,22 +91,6 @@ TODO(jhuai): the progress percentage in building msckf jumps back and forth with
 This effect is not observed with OKVIS_ROS. 
 An comparison of the CMakeLists.txt between msckf and okvis_ros does not reveal suspicious differences.
 
-## Configure linter for making contributions
-
-If you are going to contribute to the project, please configure linter as follows.
-The below instructions were tested on Ubuntu 16.04.
-```
-sudo pip2 install yapf requests
-sudo apt install clang-format-6.0 pylint
-# the below follows installation guide at https://github.com/ethz-asl/linter/tree/master
-cd workspace/src/msckf/tools/linter
-echo ". $(realpath setup_linter.sh)" >> ~/.bashrc
-bash
-
-cd ../..
-init_linter_git_hooks
-```
-
 ## Run tests
 
 * To run all tests,
@@ -355,14 +339,25 @@ To perform a calibration yourself, we recommend the following:
 * Code review: please create a pull request for all changes proposed. The pull 
   request will be reviewed by an admin before merging.
 
-* Static program analysis
-linter
+## Static program analysis with linter
+The below instructions installs linter which requres python2 following the
+guide at [here](https://github.com/ethz-asl/linter/tree/master).
+
 ```
+sudo pip2 install yapf requests pylint
+sudo apt install clang-format-6.0
+cd $SLAM_TOOL_PATH
 git clone https://github.com/JzHuai0108/linter.git
+cd linter
 git fetch origin
 git checkout -b feature/onespacecppcomment
+
+echo ". $(realpath setup_linter.sh)" >> ~/.bashrc
+bash
+
+cd msckf_ws/src/msckf
+init_linter_git_hooks
 ```
-Then follow the instructions in linter README.md to init linter git hooks for the msckf repo.
 
 ## Support
 

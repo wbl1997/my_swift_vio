@@ -771,7 +771,8 @@ void HybridVio::optimizationLoop() {
             result.vector_of_T_SCi.emplace_back(T_SCA);
           }
           estimator_->getImuAugmentedStatesEstimate(&result.imuExtraParams_);
-          estimator_->getCameraCalibrationEstimate(result.cameraParams_);
+          const int camIdx = 0;
+          estimator_->getCameraCalibrationEstimate(camIdx, &result.cameraParams_);
           estimator_->getStateVariance(&result.stateVariance_);
         } else {
           result.onlyPublishLandmarks = true;

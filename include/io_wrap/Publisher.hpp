@@ -233,6 +233,7 @@ class Publisher
 
   /**
    * @brief Set and write full state including call calibration parameters to file.
+   * @warning Make sure this function uses similar format to Estimator.print().
    * @remark This can be registered with the VioInterface.
    * @param t Timestamp of state.
    * @param T_WS The pose.

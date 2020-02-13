@@ -21,6 +21,13 @@ struct TriangulationStatus {
   {}
 };
 
+enum class MeasurementJacobianStatus {
+  Successful = 0,
+  GeneralProjectionFailed = 1,
+  MainAnchorProjectionFailed = 2,
+  AssociateAnchorProjectionFailed = 3,
+};
+
 struct IsObservedInFrame {
   IsObservedInFrame(uint64_t x) : frameId(x) {}
   bool operator()(

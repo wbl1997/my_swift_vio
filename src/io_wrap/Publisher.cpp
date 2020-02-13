@@ -590,9 +590,9 @@ void Publisher::csvSaveFullStateWithAllCalibrationAsCallback(
     const std::vector<
         Eigen::VectorXd,
         Eigen::aligned_allocator<Eigen::VectorXd>>& extrinsics,
-    const Eigen::Matrix<double, Eigen::Dynamic, 1> &vTgsa,
-    const Eigen::Matrix<double, Eigen::Dynamic, 1> &vfckptdr,
-    const Eigen::Matrix<double, Eigen::Dynamic, 1> &vVariance) {
+    const Eigen::Matrix<double, Eigen::Dynamic, 1> &imuAugmentedParams,
+    const Eigen::Matrix<double, Eigen::Dynamic, 1> &cameraParams,
+    const Eigen::Matrix<double, Eigen::Dynamic, 1> &stateVarianceDiagonal) {
   setTime(t);
   setOdometry(T_WS, speedAndBiases,
               omega_S);  // TODO(sleuten): provide setters for this hack
@@ -620,8 +620,8 @@ void Publisher::csvSaveFullStateWithAllCalibrationAsCallback(
                 << FLAGS_datafile_separator << speedAndBiases[7]
                 << FLAGS_datafile_separator << speedAndBiases[8];
 
-      for (int jack = 0; jack < vTgsa.size(); ++jack)
-        *csvFile_ << FLAGS_datafile_separator << vTgsa[jack];
+      for (int jack = 0; jack < imuAugmentedParams.size(); ++jack)
+        *csvFile_ << FLAGS_datafile_separator << imuAugmentedParams[jack];
 
       for (size_t i = 0; i < extrinsics.size(); ++i) {
         int n = extrinsics[i].size();
@@ -631,11 +631,12 @@ void Publisher::csvSaveFullStateWithAllCalibrationAsCallback(
         }
       }
 
-      for (int jack = 0; jack < vfckptdr.size(); ++jack)
-        *csvFile_ << FLAGS_datafile_separator << vfckptdr[jack];
+      for (int jack = 0; jack < cameraParams.size(); ++jack)
+        *csvFile_ << FLAGS_datafile_separator << cameraParams[jack];
 
-      for (int jack = 0; jack < vVariance.size(); ++jack)
-        *csvFile_ << FLAGS_datafile_separator << std::sqrt(vVariance[jack]);
+      for (int jack = 0; jack < stateVarianceDiagonal.size(); ++jack)
+        *csvFile_ << FLAGS_datafile_separator
+                  << std::sqrt(stateVarianceDiagonal[jack]);
 
       *csvFile_ << std::endl;
     }

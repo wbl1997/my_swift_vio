@@ -24,12 +24,6 @@
 
 /// \brief okvis Main namespace of this package.
 namespace okvis {
-enum class MeasurementJacobianStatus {
-  Successful = 0,
-  GeneralProjectionFailed = 1,
-  MainAnchorProjectionFailed = 2,
-  AssociateAnchorProjectionFailed = 3,
-};
 
 //! The estimator class
 /*!
@@ -104,11 +98,12 @@ class MSCKF2 : public HybridFilter {
       Eigen::Matrix<double, 2, 9>* J_XBj, Eigen::Matrix<double, 2, 3>* J_pfi,
       Eigen::Vector2d* residual) const;
 
-  MeasurementJacobianStatus measurementJacobianGeneric(
+  msckf::MeasurementJacobianStatus measurementJacobianGeneric(
       const msckf::PointLandmark& pointLandmark,
       std::shared_ptr<const okvis::cameras::CameraBase> tempCameraGeometry,
-      const Eigen::Vector2d& obs, int observationIndex,
+      const Eigen::Vector2d& obs,
       const Eigen::Matrix2d& obsCovariance,
+      int observationIndex,
       std::shared_ptr<const msckf::PointSharedData> pointDataPtr,
       Eigen::MatrixXd* J_X,
       Eigen::Matrix<double, Eigen::Dynamic, 3>* J_pfi,

@@ -290,7 +290,9 @@ void testHybridFilterSinusoid(const std::string& outputPath,
   if (useEpipolarConstraint) {
     suffix = "Epi";
   }
-  if (landmarkModelId == msckf::ParallaxAngleParameterization::kModelId) {
+  if (landmarkModelId == msckf::HomogeneousPointParameterization::kModelId) {
+    suffix = "Euc";
+  } else if (msckf::ParallaxAngleParameterization::kModelId) {
     suffix = "Pap";
   }
   LOG(INFO) << "Estimator algorithm: " << estimatorLabel << suffix
@@ -471,18 +473,18 @@ void testHybridFilterSinusoid(const std::string& outputPath,
           cameraGeometry0->getIntrinsics(allIntrinsics);
           std::shared_ptr<const okvis::kinematics::Transformation> T_SC_0
               = cameraSystem0->T_SC(0);
-          Eigen::IOFormat SpaceInitFmt(Eigen::StreamPrecision,
+          Eigen::IOFormat spaceInitFmt(Eigen::StreamPrecision,
                                        Eigen::DontAlignCols, " ", " ", "", "",
                                        "", "");
           truthStream << *iter << " " << id << " " << std::setfill(' ')
-                      << T_WS.parameters().transpose().format(SpaceInitFmt)
-                      << " " << v_WS_true.transpose().format(SpaceInitFmt)
+                      << T_WS.parameters().transpose().format(spaceInitFmt)
+                      << " " << v_WS_true.transpose().format(spaceInitFmt)
                       << " 0 0 0 0 0 0 "
                       << "1 0 0 0 1 0 0 0 1 "
                       << "0 0 0 0 0 0 0 0 0 "
                       << "1 0 0 0 1 0 0 0 1 "
-                      << T_SC_0->inverse().r().transpose().format(SpaceInitFmt)
-                      << " " << allIntrinsics.transpose().format(SpaceInitFmt)
+                      << T_SC_0->inverse().r().transpose().format(spaceInitFmt)
+                      << " " << allIntrinsics.transpose().format(spaceInitFmt)
                       << " 0 0" << std::endl;
         }
 
@@ -759,4 +761,12 @@ TEST(MSCKFWithPAP, Torus) {
   testHybridFilterSinusoid(FLAGS_log_dir, algorithmId, 5,
                            trajectoryLabelToId["Torus"],
                            simul::CameraOrientation::Forward, false, 2, 2);
+}
+
+TEST(MSCKFWithEuclidean, Torus) {
+  okvis::EstimatorAlgorithm algorithmId =
+      okvis::EstimatorAlgorithmNameToId("MSCKF");
+  testHybridFilterSinusoid(FLAGS_log_dir, algorithmId, 5,
+                           trajectoryLabelToId["Torus"],
+                           simul::CameraOrientation::Forward, false, 0, 0);
 }
