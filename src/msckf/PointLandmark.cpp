@@ -103,15 +103,14 @@ TriangulationStatus PointLandmark::initialize(
       break;
     }
     case 2: {
-      Eigen::Vector3d d_m = obsDirections[anchorSeqIds[0]].normalized();
-      Eigen::Vector3d d_a = obsDirections[anchorSeqIds[1]].normalized();
-      Eigen::Vector3d W_d_m = T_WSs[anchorSeqIds[0]].C() * (T_BC0.C() * d_m);
-      Eigen::Vector3d W_d_a = T_WSs[anchorSeqIds[1]].C() * (T_BC0.C() * d_a);
-      double cos_theta = W_d_m.dot(W_d_a);
-      LWF::ParallaxAnglePoint pap(d_m, cos_theta);
-      pap.copy(&parameters_);
+      for (auto iter = T_WSs.begin(); iter != T_WSs.end(); ++iter, ++joel) {
+        cam_states[joel] = *iter * T_BC0;
+      }
+      LWF::ParallaxAnglePoint pap;
       TriangulationStatus status;
-      status.triangulationOk = true;
+      status.triangulationOk =
+          pap.initializePosition(obsDirections, cam_states, anchorSeqIds);
+      pap.copy(&parameters_);
       status.chi2Small = true;
       status.flipped = false;
       status.raysParallel = false;

@@ -240,6 +240,42 @@ std::map<std::string, int> trajectoryLabelToId{
     {"Circle", 3}, {"Dot", 4},  {"Uncanny", 5},
 };
 
+std::string landmarkModelIdToShorthand(int landmarkModelId) {
+  std::string suffix;
+  switch (landmarkModelId) {
+    case msckf::HomogeneousPointParameterization::kModelId:
+      suffix = "_Euc";
+      break;
+    case msckf::ParallaxAngleParameterization::kModelId:
+      suffix = "_Pap";
+      break;
+    case msckf::InverseDepthParameterization::kModelId:
+      suffix = "_Idp";
+      break;
+  }
+  return suffix;
+}
+
+std::string cameraOrientationIdToShorthand(
+    simul::CameraOrientation cameraOrientation) {
+  std::string suffix;
+  switch (cameraOrientation) {
+    case simul::CameraOrientation::Left:
+      suffix = "_L";
+      break;
+    case simul::CameraOrientation::Right:
+      suffix = "_R";
+      break;
+    case simul::CameraOrientation::Backward:
+      suffix = "_B";
+      break;
+    case simul::CameraOrientation::Forward:
+      suffix = "_F";
+      break;
+  }
+  return suffix;
+}
+
 /**
  * @brief testHybridFilterSinusoid
  * @param outputPath
@@ -288,13 +324,11 @@ void testHybridFilterSinusoid(const std::string& outputPath,
   std::string estimatorLabel = okvis::EstimatorAlgorithmIdToName(estimator_algorithm);
   std::string suffix;
   if (useEpipolarConstraint) {
-    suffix = "Epi";
+    suffix = "_Epi";
   }
-  if (landmarkModelId == msckf::HomogeneousPointParameterization::kModelId) {
-    suffix = "Euc";
-  } else if (msckf::ParallaxAngleParameterization::kModelId) {
-    suffix = "Pap";
-  }
+  suffix += landmarkModelIdToShorthand(landmarkModelId);
+  suffix += cameraOrientationIdToShorthand(cameraOrientationId);
+
   LOG(INFO) << "Estimator algorithm: " << estimatorLabel << suffix
             << " trajectory " << trajLabel;
   std::string pathEstimatorTrajectory = outputPath + "/" + estimatorLabel + suffix + "_" +
@@ -754,6 +788,23 @@ TEST(MSCKFWithPAP, Squircle) {
                            trajectoryLabelToId["Squircle"],
                            simul::CameraOrientation::Forward, false, 2, 2);
 }
+
+TEST(MSCKFWithPAP, SquircleBackward) {
+  okvis::EstimatorAlgorithm algorithmId =
+      okvis::EstimatorAlgorithmNameToId("MSCKF");
+  testHybridFilterSinusoid(FLAGS_log_dir, algorithmId, 5,
+                           trajectoryLabelToId["Squircle"],
+                           simul::CameraOrientation::Backward, false, 2, 2);
+}
+
+TEST(MSCKFWithPAP, SquircleSideways) {
+  okvis::EstimatorAlgorithm algorithmId =
+      okvis::EstimatorAlgorithmNameToId("MSCKF");
+  testHybridFilterSinusoid(FLAGS_log_dir, algorithmId, 5,
+                           trajectoryLabelToId["Squircle"],
+                           simul::CameraOrientation::Right, false, 2, 2);
+}
+
 
 TEST(MSCKFWithPAP, Torus) {
   okvis::EstimatorAlgorithm algorithmId =
