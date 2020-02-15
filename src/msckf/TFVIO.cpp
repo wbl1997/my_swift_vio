@@ -190,7 +190,7 @@ void TFVIO::optimize(size_t /*numIter*/, size_t /*numThreads*/, bool verbose) {
                      // in IEKF
     size_t numIteration = 0;
     const double epsilon = 1e-3;
-    PreconditionedEkfUpdater pceu(covariance_, featureVariableDimen);
+    DefaultEkfUpdater pceu(covariance_, featureVariableDimen);
     while (numIteration < 5) {
       if (numIteration) {
         updateStates(-deltaX);  // effectively undo last update in IEKF
@@ -232,7 +232,7 @@ void TFVIO::optimize(size_t /*numIter*/, size_t /*numThreads*/, bool verbose) {
       minValidStateId_ = getMinValidStateId();
       return;  // no need to optimize
     }
-    PreconditionedEkfUpdater pceu(covariance_, featureVariableDimen);
+    DefaultEkfUpdater pceu(covariance_, featureVariableDimen);
     computeKalmanGainTimer.start();
     Eigen::Matrix<double, Eigen::Dynamic, 1> deltaX =
         pceu.computeCorrection(T_H, r_q, R_q);

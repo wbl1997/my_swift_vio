@@ -163,7 +163,7 @@ int MSCKF2::marginalizeRedundantFrames(size_t maxClonedStates) {
     FilterHelper::shrinkResidual(H_o, r_o, R_o, &T_H, &r_q, &R_q);
 
     // perform filter update covariance and states (EKF)
-    PreconditionedEkfUpdater pceu(covariance_, featureVariableDimen);
+    DefaultEkfUpdater pceu(covariance_, featureVariableDimen);
     computeKalmanGainTimer.start();
     Eigen::Matrix<double, Eigen::Dynamic, 1> deltaX =
         pceu.computeCorrection(T_H, r_q, R_q);
@@ -641,8 +641,13 @@ bool MSCKF2::featureJacobianGeneric(
         pointLandmark, tempCameraGeometry, obsInPixel[observationIndex],
         obsCov, observationIndex, pointDataPtr, &J_x, &J_pfi, &J_n, &residual);
     if (status != msckf::MeasurementJacobianStatus::Successful) {
-      // TODO(jhuai): what if the main or associate anchor has invalid Jacobians?
-      // The Jacobians may become rank deficient.
+      if (status == msckf::MeasurementJacobianStatus::
+                        AssociateAnchorProjectionFailed ||
+          status == msckf::MeasurementJacobianStatus::
+                        MainAnchorProjectionFailed) {
+        computeHTimer.stop();
+        return false;
+      }
       ++itFrameIds;
       itRoi += 2;
       continue;
@@ -1081,14 +1086,21 @@ void MSCKF2::optimize(size_t /*numIter*/, size_t /*numThreads*/, bool verbose) {
       static_cast<double>(landmarksMap_.size());
 
   if (FLAGS_use_IEKF) {
-    // c.f., Faraz Mirzaei, a Kalman filter based algorithm for IMU-Camera
-    // calibration
+    // c.f., (1) Performance evaluation of iterated extended Kalman filter with variable step-length
+    // on: https://iopscience.iop.org/article/10.1088/1742-6596/659/1/012022/pdf
+    // (2) Faraz Mirzaei, a Kalman filter based algorithm for IMU-Camera calibration
+    // on: http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.157.6717&rep=rep1&type=pdf
+    // (3) Iterated extended Kalman filter based visual-inertial odometry using direct photometric feedback
+    // on: https://www.research-collection.ethz.ch/bitstream/handle/20.500.11850/263423/ROVIO.pdf?sequence=1&isAllowed=y
+    std::vector<Eigen::VectorXd, Eigen::aligned_allocator<Eigen::VectorXd>> linStates;
+//    cloneFilterStates(linStates);
+
     Eigen::Matrix<double, Eigen::Dynamic, 1> deltaX,
         tempDeltaX;  // record the last update step, used to cancel last update
                      // in IEKF
     size_t numIteration = 0;
     const double epsilon = 1e-3;
-    PreconditionedEkfUpdater pceu(covariance_, featureVariableDimen);
+    DefaultEkfUpdater pceu(covariance_, featureVariableDimen);
     while (numIteration < 5) {
       if (numIteration) {
         updateStates(-deltaX);  // effectively undo last update in IEKF
@@ -1137,7 +1149,7 @@ void MSCKF2::optimize(size_t /*numIter*/, size_t /*numThreads*/, bool verbose) {
       minValidStateId_ = getMinValidStateId();
       return;  // no need to optimize
     }
-    PreconditionedEkfUpdater pceu(covariance_, featureVariableDimen);
+    DefaultEkfUpdater pceu(covariance_, featureVariableDimen);
     computeKalmanGainTimer.start();
     Eigen::Matrix<double, Eigen::Dynamic, 1> deltaX =
         pceu.computeCorrection(T_H, r_q, R_q);
