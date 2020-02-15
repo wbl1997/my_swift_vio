@@ -110,6 +110,8 @@ TriangulationStatus PointLandmark::initialize(
       TriangulationStatus status;
       status.triangulationOk =
           pap.initializePosition(obsDirections, cam_states, anchorSeqIds);
+      status.triangulationOk = status.triangulationOk &&
+          pap.optimizePosition(obsDirections, cam_states, anchorSeqIds);
       pap.copy(&parameters_);
       status.chi2Small = true;
       status.flipped = false;
@@ -136,6 +138,4 @@ TriangulationStatus PointLandmark::initialize(
   status.raysParallel = feature.is_parallel;
   return status;
 }
-
-
 } // namespace msckf

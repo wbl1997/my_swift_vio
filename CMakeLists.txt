@@ -210,6 +210,7 @@ list(APPEND TEST_SRC_FILES
     test/opencv/TestOpenCVDistortion.cpp
 
     test/std/TestBinaryOperators.cpp
+    test/std/TestCallMemberFunctionAtConstruction.cpp
     test/std/TestDequeIterator.cpp
     test/std/TestDerivedClass.cpp
     test/std/TestMapKeyOrder.cpp

@@ -246,7 +246,7 @@ rosrun msckf okvis_node $HOME/docker_documents/msckf_ws/src/msckf/config/config_
  --dump_output_option=0 --load_input_option=0 --output_dir=$HOME/Desktop/temp 
  --feature_tracking_method=0
 
-rosbag play --pause --start=5.0 --rate=1.0 /media/$USER/Seagate/data/euroc/MH_01_easy.bag /cam0/image_raw:=/camera0 /imu0:=/imu
+rosbag play --pause --start=5.0 --rate=1.0 /media/$USER/Seagate/$USER/data/euroc/MH_01_easy.bag /cam0/image_raw:=/camera0 /imu0:=/imu
 
 rosrun rviz rviz -d $HOME/docker_documents/msckf_ws/src/msckf/config/rviz.rviz
 ```
