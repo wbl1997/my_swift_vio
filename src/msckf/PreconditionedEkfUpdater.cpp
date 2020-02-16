@@ -26,7 +26,7 @@ PreconditionedEkfUpdater::computeCorrection(
     const Eigen::MatrixXd &T_H,
     const Eigen::Matrix<double, Eigen::Dynamic, 1> &r_q,
     const Eigen::MatrixXd &R_q,
-    const Eigen::Matrix<double, Eigen::Dynamic, 1> *prev_deltaX) {
+    const Eigen::Matrix<double, Eigen::Dynamic, 1> *totalCorrection) {
   Eigen::MatrixXd Py = T_H *
                            cov_ref_.block(okvis::ceres::ode::OdoErrorStateDim,
                                           okvis::ceres::ode::OdoErrorStateDim,
@@ -74,13 +74,13 @@ PreconditionedEkfUpdater::computeCorrection(
 
   // State correction
   Eigen::Matrix<double, Eigen::Dynamic, 1> deltaX;
-  if (prev_deltaX == nullptr) {
+  if (totalCorrection == nullptr) {
     deltaX = KScaled_ * rqScaled;
   } else {
-    deltaX = KScaled_ * (rqScaled + SVecI.asDiagonal() * T_H *
-                                        prev_deltaX->segment(
+    deltaX = KScaled_ * (rqScaled - SVecI.asDiagonal() * T_H *
+                                        totalCorrection->segment(
                                             okvis::ceres::ode::OdoErrorStateDim,
-                                            variable_dim_));
+                                            variable_dim_)) + (*totalCorrection);
   }
   if (!deltaX.allFinite()) {
     std::cout << "allfinite? KScaled " << KScaled_.allFinite() << " rqScaled "
@@ -141,7 +141,7 @@ Eigen::Matrix<double, Eigen::Dynamic, 1> DefaultEkfUpdater::computeCorrection(
     const Eigen::MatrixXd &T_H,
     const Eigen::Matrix<double, Eigen::Dynamic, 1> &r_q,
     const Eigen::MatrixXd &R_q,
-    const Eigen::Matrix<double, Eigen::Dynamic, 1> *prev_deltaX) {
+    const Eigen::Matrix<double, Eigen::Dynamic, 1> *totalCorrection) {
   PyScaled_ = T_H *
                   cov_ref_.block(okvis::ceres::ode::OdoErrorStateDim,
                                  okvis::ceres::ode::OdoErrorStateDim,
@@ -171,13 +171,13 @@ Eigen::Matrix<double, Eigen::Dynamic, 1> DefaultEkfUpdater::computeCorrection(
 
   // State correction
   Eigen::Matrix<double, Eigen::Dynamic, 1> deltaX;
-  if (prev_deltaX == nullptr) {
+  if (totalCorrection == nullptr) {
     deltaX = KScaled_ * rqScaled;
   } else {
     deltaX =
-        KScaled_ * (rqScaled + T_H * prev_deltaX->segment(
+        KScaled_ * (rqScaled - T_H * totalCorrection->segment(
                                          okvis::ceres::ode::OdoErrorStateDim,
-                                         variable_dim_));
+                                         variable_dim_)) + (*totalCorrection);
   }
   if (!deltaX.allFinite()) {
     std::cout << "allfinite? KScaled " << KScaled_.allFinite() << " rqScaled "

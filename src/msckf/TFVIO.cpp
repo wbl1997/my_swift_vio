@@ -183,47 +183,33 @@ void TFVIO::optimize(size_t /*numIter*/, size_t /*numThreads*/, bool verbose) {
                   static_cast<double>(landmarksMap_.size());
 
   if (FLAGS_use_IEKF) {
-    // c.f., Faraz Mirzaei, a Kalman filter based algorithm for IMU-Camera
-    // calibration
-    Eigen::Matrix<double, Eigen::Dynamic, 1> deltaX,
-        tempDeltaX;  // record the last update step, used to cancel last update
-                     // in IEKF
-    size_t numIteration = 0;
-    const double epsilon = 1e-3;
-    DefaultEkfUpdater pceu(covariance_, featureVariableDimen);
-    while (numIteration < 5) {
-      if (numIteration) {
-        updateStates(-deltaX);  // effectively undo last update in IEKF
-      }
-      Eigen::MatrixXd T_H, R_q;
-      Eigen::Matrix<double, Eigen::Dynamic, 1> r_q;
-      int numResiduals = computeStackedJacobianAndResidual(&T_H, &r_q, &R_q);
-      if (numResiduals == 0) {
-        minValidStateId_ = getMinValidStateId();
-        return;  // no need to optimize
-      }
+      StatePointerAndEstimateList initialStates;
+      cloneFilterStates(&initialStates);
 
-      if (numIteration) {
+      int numIteration = 0;
+      DefaultEkfUpdater pceu(covariance_, featureVariableDimen);
+      while (numIteration < maxNumIteration_) {
+        Eigen::MatrixXd T_H, R_q;
+        Eigen::Matrix<double, Eigen::Dynamic, 1> r_q;
+        int numResiduals = computeStackedJacobianAndResidual(&T_H, &r_q, &R_q);
+        if (numResiduals == 0) {
+          minValidStateId_ = getMinValidStateId();
+          return;  // no need to optimize
+        }
         computeKalmanGainTimer.start();
-        tempDeltaX = pceu.computeCorrection(T_H, r_q, R_q, &deltaX);
+        Eigen::VectorXd totalCorrection;
+        boxminusFromInput(initialStates, &totalCorrection);
+        Eigen::VectorXd deltax =
+            pceu.computeCorrection(T_H, r_q, R_q, &totalCorrection);
         computeKalmanGainTimer.stop();
-        updateStates(tempDeltaX);
-        if ((deltaX - tempDeltaX).lpNorm<Eigen::Infinity>() < epsilon) break;
-
-      } else {
-        computeKalmanGainTimer.start();
-        tempDeltaX = pceu.computeCorrection(T_H, r_q, R_q);
-        computeKalmanGainTimer.stop();
-        updateStates(tempDeltaX);
-        if (tempDeltaX.lpNorm<Eigen::Infinity>() < epsilon) break;
+        updateStates(deltax);
+        if (deltax.lpNorm<Eigen::Infinity>() < updateVecNormTermination_)
+          break;
+        ++numIteration;
       }
-
-      deltaX = tempDeltaX;
-      ++numIteration;
-    }
-    updateCovarianceTimer.start();
-    pceu.updateCovariance(&covariance_);
-    updateCovarianceTimer.stop();
+      updateCovarianceTimer.start();
+      pceu.updateCovariance(&covariance_);
+      updateCovarianceTimer.stop();
   } else {
     Eigen::MatrixXd T_H, R_q;
     Eigen::Matrix<double, Eigen::Dynamic, 1> r_q;
@@ -284,5 +270,4 @@ void TFVIO::optimize(size_t /*numIter*/, size_t /*numThreads*/, bool verbose) {
     LOG(INFO) << mapPtr_->summary.FullReport();
   }
 }
-
 }  // namespace okvis

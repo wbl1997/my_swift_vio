@@ -20,11 +20,19 @@ class PreconditionedEkfUpdater {
  public:
   PreconditionedEkfUpdater(const Eigen::MatrixXd &cov, int variable_dim);
 
+  /**
+   * @brief computeCorrection
+   * @param T_H
+   * @param r_q
+   * @param R_q
+   * @param totalCorrection $x_{k|k-1} \boxminus x_k^i$ where $x_{k|k-1} := x_k^0$
+   * @return
+   */
   Eigen::Matrix<double, Eigen::Dynamic, 1> computeCorrection(
       const Eigen::MatrixXd &T_H,
       const Eigen::Matrix<double, Eigen::Dynamic, 1> &r_q,
       const Eigen::MatrixXd &R_q,
-      const Eigen::Matrix<double, Eigen::Dynamic, 1> *prev_deltaX = nullptr);
+      const Eigen::Matrix<double, Eigen::Dynamic, 1> *totalCorrection = nullptr);
 
   void updateCovariance(Eigen::MatrixXd *cov_ptr) const;
 };
@@ -47,7 +55,7 @@ public:
      const Eigen::MatrixXd &T_H,
      const Eigen::Matrix<double, Eigen::Dynamic, 1> &r_q,
      const Eigen::MatrixXd &R_q,
-     const Eigen::Matrix<double, Eigen::Dynamic, 1> *prev_deltaX = nullptr);
+     const Eigen::Matrix<double, Eigen::Dynamic, 1> *totalCorrection = nullptr);
 
  void updateCovariance(Eigen::MatrixXd *cov_ptr) const;
 };

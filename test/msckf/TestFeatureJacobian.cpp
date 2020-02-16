@@ -229,6 +229,13 @@ void testPointLandmarkJacobian(std::string projOptModelName,
     }
 
     if (frameCount == 100) {
+      {
+        okvis::StatePointerAndEstimateList currentStates;
+        estimator->cloneFilterStates(&currentStates);
+        Eigen::VectorXd deltaX;
+        estimator->boxminusFromInput(currentStates, &deltaX);
+        EXPECT_LT(deltaX.lpNorm<Eigen::Infinity>(), 1e-8);
+      }
       okvis::PointMap landmarkMap;
       size_t numLandmarks = estimator->getLandmarks(landmarkMap);
       int featureJacobianLandmarkCount = 0;
@@ -312,7 +319,7 @@ TEST(MSCKF, FeatureJacobianVariableTime) {
   testPointLandmarkJacobian(projOptModelName, extrinsicModelName, outputFile, 0.0, 0.01);
 }
 
-TEST(MSCKF, MeasurementJacobianChordalDistance) {
+TEST(MSCKF, FeatureJacobianSingleChordalDistance) {
   std::string projOptModelName = "FXY_CXY";
   std::string extrinsicModelName = "P_CB";
   std::string outputFile = FLAGS_log_dir + "/MSCKF_Torus_RS_Chordal.txt";

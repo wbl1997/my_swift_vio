@@ -201,6 +201,7 @@ list(APPEND TEST_SRC_FILES
     test/msckf/TestOkvisTriangulateFast.cpp
     test/msckf/TestPointLandmark.cpp
     test/msckf/TestPointObsJacobian.cpp
+    test/msckf/TestQuaternionFromSmallAngle.cpp
     test/msckf/TestRelativeMotionJacobian.cpp
     test/msckf/TestRsReprojectionError.cpp
     test/msckf/TestEpipolarFactor.cpp

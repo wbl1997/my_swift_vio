@@ -40,6 +40,21 @@ enum RetrieveObsSeqType {
     HEAD_TAIL,
 };
 
+struct StatePointerAndEstimate {
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+  StatePointerAndEstimate(
+      std::shared_ptr<const okvis::ceres::ParameterBlock> _parameterBlockPtr,
+      const Eigen::VectorXd &_parameterEstimate)
+      : parameterBlockPtr(_parameterBlockPtr),
+        parameterEstimate(_parameterEstimate) {}
+  std::shared_ptr<const okvis::ceres::ParameterBlock> parameterBlockPtr;
+  Eigen::VectorXd parameterEstimate;
+};
+
+typedef std::vector<StatePointerAndEstimate,
+                    Eigen::aligned_allocator<StatePointerAndEstimate>>
+    StatePointerAndEstimateList;
+
 //! The estimator class
 /*!
  The estimator class does all the backend work.
@@ -244,6 +259,11 @@ class HybridFilter : public Estimator {
       Eigen::Matrix<double, Eigen::Dynamic, 3> *pH_fi =
           (Eigen::Matrix<double, Eigen::Dynamic, 3> *)(NULL)) const;
 
+  void cloneFilterStates(StatePointerAndEstimateList *currentStates) const;
+
+  void boxminusFromInput(
+      const StatePointerAndEstimateList& refState,
+      Eigen::Matrix<double, Eigen::Dynamic, 1>* deltaX) const;
 
   /// print out the most recent state vector and the stds of its elements.
   /// It can be called in the optimizationLoop, but a better way to save
@@ -324,6 +344,14 @@ class HybridFilter : public Estimator {
   // using latest state estimates set imu_rig_ and camera_rig_ which are then
   // used in computing Jacobians of all feature observations
   void updateSensorRigs();
+
+  void cloneImuAugmentedStates(
+      const States &stateInQuestion,
+      StatePointerAndEstimateList *currentStates) const;
+
+  void cloneCameraParameterStates(
+      const States &stateInQuestion,
+      StatePointerAndEstimateList *currentStates) const;
 
   void updateStates(const Eigen::Matrix<double, Eigen::Dynamic, 1> &deltaX);
 
@@ -485,6 +513,8 @@ class HybridFilter : public Estimator {
   double translationThreshold_;
   double rotationThreshold_;
   double trackingRateThreshold_;
+  double updateVecNormTermination_;
+  int maxNumIteration_;
 };
 }  // namespace okvis
 #include <msckf/implementation/HybridFilter.hpp>

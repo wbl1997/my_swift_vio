@@ -1086,25 +1086,26 @@ void MSCKF2::optimize(size_t /*numIter*/, size_t /*numThreads*/, bool verbose) {
       static_cast<double>(landmarksMap_.size());
 
   if (FLAGS_use_IEKF) {
-    // c.f., (1) Performance evaluation of iterated extended Kalman filter with variable step-length
-    // on: https://iopscience.iop.org/article/10.1088/1742-6596/659/1/012022/pdf
-    // (2) Faraz Mirzaei, a Kalman filter based algorithm for IMU-Camera calibration
-    // on: http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.157.6717&rep=rep1&type=pdf
-    // (3) Iterated extended Kalman filter based visual-inertial odometry using direct photometric feedback
+    // (1) Iterated extended Kalman filter based visual-inertial odometry using direct photometric feedback
     // on: https://www.research-collection.ethz.ch/bitstream/handle/20.500.11850/263423/ROVIO.pdf?sequence=1&isAllowed=y
-    std::vector<Eigen::VectorXd, Eigen::aligned_allocator<Eigen::VectorXd>> linStates;
-//    cloneFilterStates(linStates);
+    // (2) Performance evaluation of iterated extended Kalman filter with variable step-length
+    // on: https://iopscience.iop.org/article/10.1088/1742-6596/659/1/012022/pdf
+    // (3) Faraz Mirzaei, a Kalman filter based algorithm for IMU-Camera calibration
+    // on: http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.157.6717&rep=rep1&type=pdf
 
-    Eigen::Matrix<double, Eigen::Dynamic, 1> deltaX,
-        tempDeltaX;  // record the last update step, used to cancel last update
-                     // in IEKF
-    size_t numIteration = 0;
-    const double epsilon = 1e-3;
+    // Initial condition: $x_k^0 = x_{k|k-1}$
+    // in each iteration,
+    // $\Delta x_i = K_k^i(z - h(x_k^i) - H_k^i(x_{k|k-1}\boxminus x_k^i)) + x_{k|k-1}\boxminus x_k^i$
+    // $x_k^{i+1} =  x_k^i\boxplus \Delta x_i$
+
+    // We record the initial states, and update the estimator states in each
+    // iteration which are used in computing Jacobians, and initializing landmarks.
+    StatePointerAndEstimateList initialStates;
+    cloneFilterStates(&initialStates);
+
+    int numIteration = 0;
     DefaultEkfUpdater pceu(covariance_, featureVariableDimen);
-    while (numIteration < 5) {
-      if (numIteration) {
-        updateStates(-deltaX);  // effectively undo last update in IEKF
-      }
+    while (numIteration < maxNumIteration_) {
       Eigen::MatrixXd T_H, R_q;
       Eigen::Matrix<double, Eigen::Dynamic, 1> r_q;
       int numResiduals = computeStackedJacobianAndResidual(&T_H, &r_q, &R_q);
@@ -1112,30 +1113,17 @@ void MSCKF2::optimize(size_t /*numIter*/, size_t /*numThreads*/, bool verbose) {
         minValidStateId_ = getMinValidStateId();
         return;  // no need to optimize
       }
-
-      if (numIteration) {
-        computeKalmanGainTimer.start();
-        tempDeltaX = pceu.computeCorrection(T_H, r_q, R_q, &deltaX);
-        computeKalmanGainTimer.stop();
-        updateStates(tempDeltaX);
-        if ((deltaX - tempDeltaX).lpNorm<Eigen::Infinity>() < epsilon) break;
-
-        //            double normInf = (deltaX-
-        //            tempDeltaX).lpNorm<Eigen::Infinity>(); std::cout <<"iter
-        //            "<< numIteration<<" normInf "<<normInf<<" normInf<eps?"<<
-        //            (bool)(normInf<epsilon)<<std::endl<<
-        //                            (deltaX-
-        //                            tempDeltaX).transpose()<<std::endl;
-
-      } else {
-        computeKalmanGainTimer.start();
-        tempDeltaX = pceu.computeCorrection(T_H, r_q, R_q);
-        computeKalmanGainTimer.stop();
-        updateStates(tempDeltaX);
-        if (tempDeltaX.lpNorm<Eigen::Infinity>() < epsilon) break;
-      }
-
-      deltaX = tempDeltaX;
+      computeKalmanGainTimer.start();
+      Eigen::VectorXd totalCorrection;
+      boxminusFromInput(initialStates, &totalCorrection);
+      Eigen::VectorXd deltax =
+          pceu.computeCorrection(T_H, r_q, R_q, &totalCorrection);
+      computeKalmanGainTimer.stop();
+      updateStates(deltax);
+      double lpNorm = deltax.lpNorm<Eigen::Infinity>();
+//      LOG(INFO) << "num iteration " << numIteration << " deltax norm " << lpNorm;
+      if (lpNorm < updateVecNormTermination_)
+        break;
       ++numIteration;
     }
     updateCovarianceTimer.start();

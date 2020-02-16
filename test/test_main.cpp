@@ -8,9 +8,9 @@ int main(int argc, char **argv) {
   testing::InitGoogleTest(&argc, argv);
   google::ParseCommandLineFlags(&argc, &argv, true);
   google::InitGoogleLogging(argv[0]);
-  // write LOG(INFO) to stderr
+
+  FLAGS_logtostderr = 1;
   FLAGS_stderrthreshold = 0; // INFO: 0, WARNING: 1, ERROR: 2, FATAL: 3
   FLAGS_colorlogtostderr = 1;
-
   return RUN_ALL_TESTS();
 }
