@@ -351,12 +351,12 @@ void testHybridFilterSinusoid(const std::string& outputPath,
     filterTimer.start();
 
     srand((unsigned int)time(0)); // comment out to make tests deterministic
-    okvis::TestSetting cases[] = {
+    okvis::TestSetting testSetting{
         okvis::TestSetting(true, FLAGS_add_prior_noise, false, true, true,
         0.5, 0.5, estimator_algorithm, useEpipolarConstraint,
         cameraObservationModelId, landmarkModelId)};
-    size_t c = 0;
-    LOG(INFO) << "Run " << run << " " << cases[c].print();
+
+    LOG(INFO) << "Run " << run << " " << testSetting.print();
 
     std::string pointFile = outputPath + "/" + trajLabel + "_Points.txt";
     std::string imuSampleFile = outputPath + "/" + trajLabel + "_IMU.txt";
@@ -378,7 +378,7 @@ void testHybridFilterSinusoid(const std::string& outputPath,
     double timeOffset = 0.0;
     double readoutTime = 0.0;
     int cameraModelId = 0;
-    vioSystemBuilder.createVioSystem(cases[c], trajectoryId,
+    vioSystemBuilder.createVioSystem(testSetting, trajectoryId,
                                      projOptModelName, extrinsicModelName,
                                      cameraModelId,
                                      cameraOrientationId, timeOffset, readoutTime,
@@ -475,7 +475,7 @@ void testHybridFilterSinusoid(const std::string& outputPath,
 
         // add landmark observations
         trackedFeatures = 0;
-        if (cases[c].useImageObservs) {
+        if (testSetting.useImageObservs) {
           trackedFeatures = frontend->dataAssociationAndInitialization(
               *estimator, T_WS, cameraSystem0, mf, &asKeyframe);
           estimator->setKeyframe(mf->id(), asKeyframe);

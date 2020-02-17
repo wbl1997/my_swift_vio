@@ -30,16 +30,12 @@ void create_landmark_grid(
     std::vector<Eigen::Vector4d, Eigen::aligned_allocator<Eigen::Vector4d>>
         *homogeneousPoints,
     std::vector<uint64_t> *lmIds, std::string pointFile = "") {
-  //        const double xyLimit = 10, zLimit = 5,
-  //            xyzIncrement = 0.5, offsetNoiseMag = 0.1;
-  //        const double xyLimit = 5, zLimit = 2.5,
-  //            xyzIncrement = 0.25, offsetNoiseMag = 0.05;
-  const double xyLimit = 5, zLimit = 2.5, xyzIncrement = 0.5,
-               offsetNoiseMag = 0.05;
+  const double xyLimit = 5, zLimit = 1.5,
+      xyIncrement = 1.0, zIncrement = 0.5, offsetNoiseMag = 0.0;
   // four walls
   double x(xyLimit), y(xyLimit), z(zLimit);
-  for (y = -xyLimit; y <= xyLimit; y += xyzIncrement) {
-    for (z = -zLimit; z <= zLimit; z += xyzIncrement) {
+  for (y = -xyLimit; y <= xyLimit; y += xyIncrement) {
+    for (z = -zLimit; z <= zLimit; z += zIncrement) {
       homogeneousPoints->push_back(
           Eigen::Vector4d(x + vio::gauss_rand(0, offsetNoiseMag),
                           y + vio::gauss_rand(0, offsetNoiseMag),
@@ -48,8 +44,8 @@ void create_landmark_grid(
     }
   }
 
-  for (y = -xyLimit; y <= xyLimit; y += xyzIncrement) {
-    for (z = -zLimit; z <= zLimit; z += xyzIncrement) {
+  for (y = -xyLimit; y <= xyLimit; y += xyIncrement) {
+    for (z = -zLimit; z <= zLimit; z += zIncrement) {
       homogeneousPoints->push_back(
           Eigen::Vector4d(y + vio::gauss_rand(0, offsetNoiseMag),
                           x + vio::gauss_rand(0, offsetNoiseMag),
@@ -59,8 +55,8 @@ void create_landmark_grid(
   }
 
   x = -xyLimit;
-  for (y = -xyLimit; y <= xyLimit; y += xyzIncrement) {
-    for (z = -zLimit; z <= zLimit; z += xyzIncrement) {
+  for (y = -xyLimit; y <= xyLimit; y += xyIncrement) {
+    for (z = -zLimit; z <= zLimit; z += zIncrement) {
       homogeneousPoints->push_back(
           Eigen::Vector4d(x + vio::gauss_rand(0, offsetNoiseMag),
                           y + vio::gauss_rand(0, offsetNoiseMag),
@@ -69,8 +65,8 @@ void create_landmark_grid(
     }
   }
 
-  for (y = -xyLimit; y <= xyLimit; y += xyzIncrement) {
-    for (z = -zLimit; z <= zLimit; z += xyzIncrement) {
+  for (y = -xyLimit; y <= xyLimit; y += xyIncrement) {
+    for (z = -zLimit; z <= zLimit; z += zIncrement) {
       homogeneousPoints->push_back(
           Eigen::Vector4d(y + vio::gauss_rand(0, offsetNoiseMag),
                           x + vio::gauss_rand(0, offsetNoiseMag),
@@ -78,28 +74,6 @@ void create_landmark_grid(
       lmIds->push_back(okvis::IdProvider::instance().newId());
     }
   }
-//  // top
-//  z = zLimit;
-//  for (y = -xyLimit; y <= xyLimit; y += xyzIncrement) {
-//    for (x = -xyLimit; x <= xyLimit; x += xyzIncrement) {
-//      homogeneousPoints->push_back(
-//          Eigen::Vector4d(x + vio::gauss_rand(0, offsetNoiseMag),
-//                          y + vio::gauss_rand(0, offsetNoiseMag),
-//                          z + vio::gauss_rand(0, offsetNoiseMag), 1));
-//      lmIds->push_back(okvis::IdProvider::instance().newId());
-//    }
-//  }
-//  // bottom
-//  z = -zLimit;
-//  for (y = -xyLimit; y <= xyLimit; y += xyzIncrement) {
-//    for (x = -xyLimit; x <= xyLimit; x += xyzIncrement) {
-//      homogeneousPoints->push_back(
-//          Eigen::Vector4d(x + vio::gauss_rand(0, offsetNoiseMag),
-//                          y + vio::gauss_rand(0, offsetNoiseMag),
-//                          z + vio::gauss_rand(0, offsetNoiseMag), 1));
-//      lmIds->push_back(okvis::IdProvider::instance().newId());
-//    }
-//  }
 
   // save these points into file
   if (pointFile.size()) {

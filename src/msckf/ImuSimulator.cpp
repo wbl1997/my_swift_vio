@@ -16,7 +16,7 @@ CircularSinusoidalTrajectory::CircularSinusoidalTrajectory()
       rxy(61.0 / 19),
       freq(100),
       interval(1 / freq),
-      maxThetaZ(0.4 * M_PI),
+      maxThetaZ(0.2 * M_PI),
       gw(0, 0, -9.8) {}
 
 CircularSinusoidalTrajectory::CircularSinusoidalTrajectory(double imuFreq,
@@ -27,7 +27,7 @@ CircularSinusoidalTrajectory::CircularSinusoidalTrajectory(double imuFreq,
       rxy(61.0 / 19),
       freq(imuFreq),
       interval(1 / freq),
-      maxThetaZ(0.4 * M_PI),
+      maxThetaZ(0.2 * M_PI),
       gw(ginw) {}
 
 void CircularSinusoidalTrajectory::getTrueInertialMeasurements(
@@ -379,12 +379,11 @@ SphereTrajectory::computeGlobalPose(const okvis::Time time) const {
           Eigen::AngleAxisd(thetaZ, Eigen::Vector3d::UnitY()));
 }
 
-
 RoundedSquare::RoundedSquare()
     : CircularSinusoidalTrajectory(),
       radius_(1.0),
-      sideLength_(2.0),
-      velocityNorm_(0.8) {
+      sideLength_(6.0),
+      velocityNorm_(1.2) {
   initDataStructures();
 }
 
