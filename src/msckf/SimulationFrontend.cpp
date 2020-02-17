@@ -26,7 +26,27 @@ const double SimulationFrontend::imageNoiseMag_ = 1.0;
 
 const double SimulationFrontend::fourthRoot2_ = 1.1892071150;
 
-void create_landmark_grid(
+const double SimulationFrontend::kRangeThreshold = 20;
+
+void saveLandmarkGrid(
+    const std::vector<Eigen::Vector4d,
+                      Eigen::aligned_allocator<Eigen::Vector4d>>&
+        homogeneousPoints,
+    const std::vector<uint64_t>& lmIds, std::string pointFile) {
+  // save these points into file
+  if (pointFile.size()) {
+    std::ofstream pointStream(pointFile, std::ofstream::out);
+    pointStream << "%id, x, y, z in the world frame " << std::endl;
+    auto iter = homogeneousPoints.begin();
+    for (auto it = lmIds.begin(); it != lmIds.end(); ++it, ++iter)
+      pointStream << *it << " " << (*iter)[0] << " " << (*iter)[1] << " "
+                  << (*iter)[2] << std::endl;
+    pointStream.close();
+    assert(iter == homogeneousPoints.end());
+  }
+}
+
+void createBoxLandmarkGrid(
     std::vector<Eigen::Vector4d, Eigen::aligned_allocator<Eigen::Vector4d>>
         *homogeneousPoints,
     std::vector<uint64_t> *lmIds, std::string pointFile = "") {
@@ -74,18 +94,32 @@ void create_landmark_grid(
       lmIds->push_back(okvis::IdProvider::instance().newId());
     }
   }
+  saveLandmarkGrid(*homogeneousPoints, *lmIds, pointFile);
+}
 
-  // save these points into file
-  if (pointFile.size()) {
-    std::ofstream pointStream(pointFile, std::ofstream::out);
-    pointStream << "%id, x, y, z in the world frame " << std::endl;
-    auto iter = homogeneousPoints->begin();
-    for (auto it = lmIds->begin(); it != lmIds->end(); ++it, ++iter)
-      pointStream << *it << " " << (*iter)[0] << " " << (*iter)[1] << " "
-                  << (*iter)[2] << std::endl;
-    pointStream.close();
-    assert(iter == homogeneousPoints->end());
+void createCylinderLandmarkGrid(
+    std::vector<Eigen::Vector4d, Eigen::aligned_allocator<Eigen::Vector4d>>*
+        homogeneousPoints,
+    std::vector<uint64_t>* lmIds, double radius, std::string pointFile = "") {
+  const int numSteps = 40;
+  double zmin = -1.5, zmax = 1.5;
+  double zstep = 0.5;
+  if (radius >= SimulationFrontend::kRangeThreshold) {
+    zmin = -1.5;
+    zmax = 3.5;
+    zstep = 0.8;
   }
+  double step = 2 * M_PI / numSteps;
+  for (int j = 0; j < numSteps; ++j) {
+    double theta = step * j;
+    double px = radius * sin(theta);
+    double py = radius * cos(theta);
+    for (double pz = zmin; pz < zmax; pz += zstep) {
+      homogeneousPoints->emplace_back(px, py, pz, 1.0);
+      lmIds->push_back(okvis::IdProvider::instance().newId());
+    }
+  }
+  saveLandmarkGrid(*homogeneousPoints, *lmIds, pointFile);
 }
 
 void addLandmarkNoise(
@@ -128,14 +162,20 @@ void initCameraNoiseParams(
 // Constructor.
 SimulationFrontend::SimulationFrontend(
     size_t numCameras, bool addImageNoise,
-    int maxTrackLength, VisualConstraints constraintScheme,
+    int maxTrackLength, double landmarkRadius,
+    VisualConstraints constraintScheme,
     std::string pointFile)
     : isInitialized_(true), numCameras_(numCameras),
       addImageNoise_(addImageNoise),
       maxTrackLength_(maxTrackLength),
       constraintScheme_(constraintScheme) {
-  create_landmark_grid(&homogeneousPoints_, &lmIds_, pointFile);
-
+  if (landmarkRadius < SimulationFrontend::kRangeThreshold) {
+    createBoxLandmarkGrid(&homogeneousPoints_, &lmIds_, pointFile);
+  } else {
+    createCylinderLandmarkGrid(&homogeneousPoints_, &lmIds_,
+                               landmarkRadius,
+                               pointFile);
+  }
   double axisSigma = 0.1;
   addLandmarkNoise(homogeneousPoints_, &noisyHomogeneousPoints_, axisSigma);
 }

@@ -1,5 +1,6 @@
 #include <glog/logging.h>
 #include <gtest/gtest.h>
+#include "msckf/JacobianHelpers.hpp"
 #include "msckf/ImuSimulator.h"
 
 void testSquircle(double radius, double sideLength, double velocity) {
@@ -78,4 +79,45 @@ TEST(Squircle, Dot) {
   double velocity = 0.008;
   double sideLength = 0.0;
   testSquircle(radius, sideLength, velocity);
+}
+
+TEST(WavyCircle, AngularVelocity) {
+  imu::WavyCircle wavyCircle(100, Eigen::Vector3d(0, 0, -9.80665), 5.0, 4.0, 3,
+                             10, 1.2);
+  EXPECT_NEAR(wavyCircle.waveHeight(), 0.18, 1e-8);
+  okvis::Time time(0.8 / 1.2);
+  okvis::kinematics::Transformation T_WB = wavyCircle.computeGlobalPose(time);
+  Eigen::Vector3d omegaW = wavyCircle.computeGlobalAngularRate(time);
+  double h = 1e-6;
+  okvis::kinematics::Transformation T_WBdelta = wavyCircle.computeGlobalPose(time + okvis::Duration(h));
+  Eigen::Matrix3d Rdelta = (T_WBdelta.C() - T_WB.C()) / h;
+  Eigen::Matrix3d OmegaW = Rdelta * T_WB.C().transpose();
+  EXPECT_LT((okvis::ceres::vee(OmegaW) - omegaW).lpNorm<Eigen::Infinity>(), 5e-6);
+}
+
+TEST(WavyCircle, LinearVelocity) {
+  imu::WavyCircle wavyCircle(100, Eigen::Vector3d(0, 0, -9.80665), 5.0, 4.0, 3,
+                             10, 1.2);
+  okvis::Time time(0.8 / 1.2);
+  okvis::kinematics::Transformation T_WB = wavyCircle.computeGlobalPose(time);
+  Eigen::Vector3d v_WB = wavyCircle.computeGlobalLinearVelocity(time);
+  double h = 1e-6;
+  okvis::kinematics::Transformation T_WBdelta = wavyCircle.computeGlobalPose(time + okvis::Duration(h));
+  Eigen::Vector3d v_numeric = (T_WBdelta.r() - T_WB.r())/ h;
+
+  EXPECT_LT((v_numeric - v_WB).lpNorm<Eigen::Infinity>(), 5e-6);
+}
+
+TEST(WavyCircle, LinearAcceleration) {
+  Eigen::Vector3d gw(0, 0, -9.80665);
+  imu::WavyCircle wavyCircle(100, gw, 5.0, 4.0, 3,
+                             10, 1.2);
+  okvis::Time time(0.8 / 1.2);
+  Eigen::Vector3d a_WB = wavyCircle.computeGlobalLinearAcceleration(time);
+  Eigen::Vector3d v_WB = wavyCircle.computeGlobalLinearVelocity(time);
+  double h = 1e-6;
+  Eigen::Vector3d v_WBdelta = wavyCircle.computeGlobalLinearVelocity(time + okvis::Duration(h));
+  Eigen::Vector3d a_numeric = (v_WBdelta - v_WB) / h;
+
+  EXPECT_LT((a_numeric - gw - a_WB).lpNorm<Eigen::Infinity>(), 5e-6);
 }

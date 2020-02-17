@@ -1,7 +1,10 @@
 #include "msckf/ImuSimulator.h"
-#include "vio/Sample.h"
-
 #include <glog/logging.h>
+
+#include "ceres/internal/autodiff.h"
+
+#include "vio/Sample.h"
+#include <msckf/JacobianHelpers.hpp>
 
 DEFINE_double(sim_sigma_g_c, 1.2e-3, "simulated gyro noise density");
 DEFINE_double(sim_sigma_a_c, 8e-3, "simulated accelerometer noise density");
@@ -91,7 +94,7 @@ void CircularSinusoidalTrajectory::getSampleTimes(
 
 // compute angular rate in the global frame
 Eigen::Vector3d CircularSinusoidalTrajectory::computeGlobalAngularRate(
-    const okvis::Time time) {
+    const okvis::Time time) const {
   double dTime = time.toSec();
   double thetaZDot = maxThetaZ * cos(wz * dTime) * wz;
 
@@ -286,7 +289,7 @@ SphereTrajectory::SphereTrajectory(
 }
 
 Eigen::Vector3d SphereTrajectory::computeGlobalAngularRate(
-    const okvis::Time time) {
+    const okvis::Time time) const {
   double dTime = time.toSec();
   double thetaZDot = maxThetaZ * cos(wz * dTime) * wz;
 
@@ -483,7 +486,7 @@ okvis::kinematics::Transformation RoundedSquare::computeGlobalPose(
 }
 
 Eigen::Vector3d RoundedSquare::computeGlobalAngularRate(
-    const okvis::Time time) {
+    const okvis::Time time) const {
   double remainder = getPeriodRemainder(time);
   size_t j;
   double delta_t;
@@ -567,6 +570,17 @@ Eigen::Matrix2d rotMat2d(double theta) {
   double st = std::sin(theta);
   mat << ct, -st, st, ct;
   return mat;
+}
+
+template <typename T>
+Eigen::Matrix<T, 3, 3> RotX(T theta) {
+  T ct = cos(theta);
+  T st = sin(theta);
+  Eigen::Matrix<T, 3, 3> Rx;
+  Rx << T(1), T(0), T(0),
+  T(0), ct, st,
+  T(0), -st, ct;
+  return Rx;
 }
 
 // decide time slot, endEpochs_[j-1] < time_into_period <= endEpochs_[j]
@@ -708,8 +722,103 @@ void addImuNoise(const okvis::ImuParameters& imuParameters,
   }
 }
 
-// TODO(jhuai): add a pure rotation test case in which the
-// angular rate is governed by the pendulum dynamic equation
-// see https://en.wikipedia.org/wiki/Pendulum_(mathematics)
+WavyCircle::WavyCircle() {}
+
+WavyCircle::WavyCircle(double imuFreq, Eigen::Vector3d ginw, double wallRadius,
+                       double trajectoryRadius, double wallHeight,
+                       double frequencyNumber, double velocityNorm)
+    : CircularSinusoidalTrajectory(imuFreq, ginw),
+      wallRadius_(wallRadius),
+      trajectoryRadius_(trajectoryRadius),
+      wallHeight_(wallHeight),
+      frequencyNumber_(frequencyNumber),
+      waveHeightCoeff_(0.9),
+      velocity_(velocityNorm),
+      angularRate_(velocityNorm / trajectoryRadius) {
+  waveHeight_ = computeWaveHeight();
+}
+
+Eigen::Vector3d WavyCircle::computeGlobalAngularRate(const okvis::Time time) const {
+  double timeVal = time.toSec();
+  Eigen::Matrix3d R_WB = orientation(timeVal * angularRate_);
+  Eigen::Matrix<double, 9, 1> residual;
+  const double* const parameters[] = {&timeVal};
+  Eigen::Matrix<double, 9, 1> j;
+  double * jacobians[] = {j.data()};
+  ::ceres::internal::AutoDifferentiate<::ceres::internal::StaticParameterDims<1>>(
+          *this, parameters, 9, residual.data(), jacobians);
+  Eigen::Matrix3d Rprime = Eigen::Map<Eigen::Matrix3d>(j.data());
+  Eigen::Matrix3d OmegaW = Rprime * R_WB.transpose();
+  return okvis::ceres::vee(OmegaW);
+}
+
+Eigen::Vector3d WavyCircle::computeGlobalLinearAcceleration(
+    const okvis::Time time) const {
+  double t = time.toSec() * angularRate_;
+  Eigen::Vector3d a_WB_W;
+  a_WB_W << -trajectoryRadius_ * angularRate_ * angularRate_ * std::cos(t),
+      -trajectoryRadius_ * angularRate_ * angularRate_ * std::sin(t),
+      -waveHeight_ * frequencyNumber_ * frequencyNumber_ * angularRate_ *
+          angularRate_ * std::cos(frequencyNumber_ * t);
+  return a_WB_W - gw;
+}
+
+Eigen::Vector3d WavyCircle::computeGlobalLinearVelocity(
+    const okvis::Time time) const {
+  double t = time.toSec() * angularRate_;
+  Eigen::Vector3d v_WB_W;
+  v_WB_W << - trajectoryRadius_ * angularRate_ * std::sin(t),
+      trajectoryRadius_ * angularRate_ * std::cos(t),
+      - waveHeight_ * frequencyNumber_ * angularRate_ * std::sin(frequencyNumber_ * t);
+  return v_WB_W;
+}
+
+okvis::kinematics::Transformation WavyCircle::computeGlobalPose(
+    const okvis::Time time) const {
+  double t = time.toSec() * angularRate_;
+  return okvis::kinematics::Transformation(position(t),
+                                           Eigen::Quaterniond(orientation(t)));
+}
+
+Eigen::Vector3d WavyCircle::position(double t) const {
+  Eigen::Vector3d t_WB_W;
+  t_WB_W << trajectoryRadius_ * std::cos(t), trajectoryRadius_ * std::sin(t),
+      waveHeight_ * std::cos(frequencyNumber_ * t);
+  return t_WB_W;
+}
+
+double WavyCircle::nearestDepth() const {
+  return std::sqrt(wallRadius_ * wallRadius_ -
+                   trajectoryRadius_ * trajectoryRadius_);
+}
+
+double WavyCircle::computeWaveHeight() const {
+  double halfz = 0.5 * wallHeight_;
+  double nd = nearestDepth();
+  double tan_vertical_half_Fov = halfz / nd;
+
+  double wh = waveHeightCoeff_ *
+              (tan_vertical_half_Fov * trajectoryRadius_ / frequencyNumber_);
+  return wh;
+}
+
+template<typename T>
+Eigen::Matrix<T, 3, 3> WavyCircle::orientation(T t) const {
+  Eigen::Matrix<T, 3, 1> F(
+      -T(trajectoryRadius_) * sin(t), T(trajectoryRadius_) * cos(t),
+      -T(waveHeight_) * T(frequencyNumber_) * sin(T(frequencyNumber_) * t));
+  F.normalize();
+  Eigen::Matrix<T, 3, 1> L(-cos(t), -sin(t), T(0));
+  Eigen::Matrix<T, 3, 1> U = F.cross(L);
+  U.normalize();
+  Eigen::Matrix<T, 3, 3> R_WB;
+  R_WB.col(0) = F;
+  R_WB.col(1) = L;
+  R_WB.col(2) = U;
+  // add rotation about another axis.
+  Eigen::Matrix<T, 3, 3> Rx = RotX(T(30 * M_PI / 180) * sin(T(5) * t));
+  R_WB = R_WB * Rx;
+  return R_WB;
+}
 
 }  // namespace imu

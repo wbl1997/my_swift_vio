@@ -40,6 +40,25 @@ box_landmark_grid();
 
 end
 
+function rotation_differentiation_test()
+% compute angular rate by rotation symbolic differentation.
+syms t real
+syms r h f positive
+
+R = orientation(t, r, h, f);
+Rprime = diff(R, t);
+Rprime = simplify(Rprime)
+
+t = 0.2;
+r = 4;
+h = 0.18;
+f = 10;
+valR = double(subs(R))
+valRprime = double(subs(Rprime));
+valOmega = valR' * valRprime
+assert(norm(valOmega + valOmega') < 1e-10);
+end
+
 % structure 1
 function cylinder_landmark_grid()
 step = 2*pi/40;

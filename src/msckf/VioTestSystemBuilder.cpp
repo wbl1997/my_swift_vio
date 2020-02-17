@@ -12,14 +12,15 @@ void VioTestSystemBuilder::createVioSystem(
     std::string projOptModelName, std::string extrinsicModelName,
     int cameraModelId,
     CameraOrientation cameraOrientationId, double td, double tr,
+    double landmarkRadius,
     std::string imuLogFile,
     std::string pointFile) {
   const double DURATION = 300.0;  // length of motion in seconds
   double pCB_std = 2e-2;
   double ba_std = 2e-2;
   double Ta_std = 5e-3;
-  bool zeroCameraIntrinsicParamNoise = !testSetting.addSystemError;
-  bool zeroImuIntrinsicParamNoise = !testSetting.addSystemError;
+  bool zeroCameraIntrinsicParamNoise = false; // !testSetting.addSystemError;
+  bool zeroImuIntrinsicParamNoise = false; // !testSetting.addSystemError;
   okvis::ExtrinsicsEstimationParameters extrinsicsEstimationParameters;
   initCameraNoiseParams(&extrinsicsEstimationParameters, pCB_std,
                         zeroCameraIntrinsicParamNoise);
@@ -52,10 +53,20 @@ void VioTestSystemBuilder::createVioSystem(
           imuParameters.rate, Eigen::Vector3d(0, 0, -imuParameters.g),
           okvis::Time(0, 0), 1e-3, 0, 0.8e-3));
       break;
+    case 5:
+      circularSinusoidalTrajectory.reset(new imu::WavyCircle(
+          imuParameters.rate, Eigen::Vector3d(0, 0, -imuParameters.g)));
+      break;
+    case 6:
+      circularSinusoidalTrajectory.reset(new imu::WavyCircle(
+          imuParameters.rate, Eigen::Vector3d(0, 0, -imuParameters.g)));
+      break;
     case 1:
-    default:
       circularSinusoidalTrajectory.reset(new imu::SphereTrajectory(
           imuParameters.rate, Eigen::Vector3d(0, 0, -imuParameters.g)));
+      break;
+    default:
+      LOG(ERROR) << "Unknown trajectory id " << trajectoryId;
       break;
   }
 
@@ -171,6 +182,7 @@ void VioTestSystemBuilder::createVioSystem(
 
   frontend.reset(new okvis::SimulationFrontend(trueCameraSystem_->numCameras(),
                                                testSetting.addImageNoise, 60,
+                                               landmarkRadius,
                                                constraintScheme, pointFile));
 
   estimator->addImu(imuParameters);

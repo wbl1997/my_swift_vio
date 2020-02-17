@@ -208,7 +208,7 @@ class CircularSinusoidalTrajectory {
                               std::vector<okvis::Time>& vTime) final;
 
   // compute angular rate in the global frame, $\omega_{WB}^{W}$
-  virtual Eigen::Vector3d computeGlobalAngularRate(const okvis::Time time);
+  virtual Eigen::Vector3d computeGlobalAngularRate(const okvis::Time time) const;
 
   // $a_{WB}^W$, applied force
   virtual Eigen::Vector3d computeGlobalLinearAcceleration(
@@ -247,7 +247,7 @@ class SphereTrajectory : public CircularSinusoidalTrajectory {
   SphereTrajectory();
   SphereTrajectory(double imuFreq, Eigen::Vector3d ginw);
   virtual ~SphereTrajectory() {}
-  virtual Eigen::Vector3d computeGlobalAngularRate(const okvis::Time time);
+  virtual Eigen::Vector3d computeGlobalAngularRate(const okvis::Time time) const;
 
   virtual Eigen::Vector3d computeGlobalLinearAcceleration(
       const okvis::Time time) const;
@@ -265,9 +265,9 @@ public:
   RoundedSquare();
   RoundedSquare(double imuFreq, Eigen::Vector3d ginw,
                 okvis::Time startEpoch = okvis::Time(0, 0), double radius = 1.0,
-                double sideLength = 2, double velocityNorm = 0.8);
+                double sideLength = 6.0, double velocityNorm = 1.2);
 
-  virtual Eigen::Vector3d computeGlobalAngularRate(const okvis::Time time);
+  virtual Eigen::Vector3d computeGlobalAngularRate(const okvis::Time time) const;
 
   virtual Eigen::Vector3d computeGlobalLinearAcceleration(
       const okvis::Time time) const;
@@ -307,6 +307,99 @@ public:
       beginPoints_;
 };
 
+class WavyCircle : public CircularSinusoidalTrajectory {
+ public:
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+  WavyCircle();
+  WavyCircle(double imuFreq, Eigen::Vector3d ginw, double wallRadius = 5.0,
+             double trajectoryRadius = 4.0, double wallHeight = 3,
+             double frequencyNumber = 10, double velocityNorm = 1.2);
+
+  virtual Eigen::Vector3d computeGlobalAngularRate(const okvis::Time time) const;
+
+  virtual Eigen::Vector3d computeGlobalLinearAcceleration(
+      const okvis::Time time) const;
+
+  virtual Eigen::Vector3d computeGlobalLinearVelocity(
+      const okvis::Time time) const;
+
+  virtual okvis::kinematics::Transformation computeGlobalPose(
+      const okvis::Time time) const;
+
+  template<typename T>
+  Eigen::Matrix<T, 3, 3> orientation(T t) const;
+
+  template <typename T>
+  bool operator()(const T* time, T* R_WB_coeffs) const {
+    Eigen::Map<Eigen::Matrix<T, 3, 3>> R_WB(R_WB_coeffs);
+    T theta = time[0] * T(angularRate_);
+    R_WB = orientation(theta);
+    return true;
+  }
+
+  double waveHeight() const {
+    return waveHeight_;
+  }
+
+  double angularRate() const {
+    return angularRate_;
+  }
+
+ private:
+  double wallRadius_;
+  double trajectoryRadius_;
+  double wallHeight_;
+  double frequencyNumber_;   // wave frequency
+  double waveHeightCoeff_;  // decrease the coefficient to make more point
+                             // visible.
+
+  double velocity_;
+  double angularRate_;
+  double waveHeight_;
+
+  Eigen::Vector3d position(double t) const;
+
+  double nearestDepth() const;
+
+  double computeWaveHeight() const;
+};
+
+class Motionless : public CircularSinusoidalTrajectory {
+ public:
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+  Motionless() {}
+  Motionless(double imuFreq, Eigen::Vector3d ginw)
+      : CircularSinusoidalTrajectory(imuFreq, ginw) {}
+
+  virtual Eigen::Vector3d computeGlobalAngularRate(
+      const okvis::Time /*time*/) const {
+    return Eigen::Vector3d::Zero();
+  }
+
+  virtual Eigen::Vector3d computeGlobalLinearAcceleration(
+      const okvis::Time /*time*/) const {
+    return Eigen::Vector3d::Zero() - gw;
+  }
+
+  virtual Eigen::Vector3d computeGlobalLinearVelocity(
+      const okvis::Time /*time*/) const {
+    return Eigen::Vector3d::Zero();
+  }
+
+  virtual okvis::kinematics::Transformation computeGlobalPose(
+      const okvis::Time /*time*/) const {
+    return okvis::kinematics::Transformation();
+  }
+};
+
+template <typename T>
+Eigen::Matrix<T, 3, 3> RotX(T theta);
+
+/**
+ * @brief rotMat2d This is in effect RotZ(theta + 90).
+ * @param theta
+ * @return
+ */
 Eigen::Matrix2d rotMat2d(double theta);
 
 /**

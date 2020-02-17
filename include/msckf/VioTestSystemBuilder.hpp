@@ -18,6 +18,7 @@ public:
                        std::string projOptModelName, std::string extrinsicModelName,
                        int cameraModelId,
                        CameraOrientation cameraOrientationId, double td, double tr,
+                       double landmarkRadius,
                        std::string imuLogFile, std::string pointFile);
 
 public:

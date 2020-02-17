@@ -232,12 +232,13 @@ void check_tail_nees(const Eigen::Vector3d &nees_tail) {
 }
 
 std::vector<std::string> trajectoryIdToLabel{
-    "Torus", "Ball", "Squircle", "Circle", "Dot", "Uncanny",
+    "Torus", "Ball", "Squircle", "Circle", "Dot", "WavyCircle", "Motionless"
 };
 
 std::map<std::string, int> trajectoryLabelToId{
     {"Torus", 0},  {"Ball", 1}, {"Squircle", 2},
-    {"Circle", 3}, {"Dot", 4},  {"Uncanny", 5},
+  {"Circle", 3}, {"Dot", 4},  {"WavyCircle", 5},
+  {"Motionless", 6},
 };
 
 std::string landmarkModelIdToShorthand(int landmarkModelId) {
@@ -281,7 +282,7 @@ std::string cameraOrientationIdToShorthand(
  * @param outputPath
  * @param runs
  * @param trajectoryId: 0: yarn torus, 1: yarn ball, 2: rounded square,
- *     3: circle, 4: dot
+ *     3: circle, 4: dot, 5, wavycircle, 6, motionless
  * @param cameraOrientationId
  */
 void testHybridFilterSinusoid(const std::string& outputPath,
@@ -291,7 +292,8 @@ void testHybridFilterSinusoid(const std::string& outputPath,
                                   simul::CameraOrientation::Forward,
                               bool useEpipolarConstraint = false,
                               int cameraObservationModelId = 0,
-                              int landmarkModelId = 0) {
+                              int landmarkModelId = 0,
+                              double landmarkRadius = 5) {
 
   // definition of NEES in Huang et al. 2007 Generalized Analysis and
   // Improvement of the consistency of EKF-based SLAM
@@ -382,6 +384,7 @@ void testHybridFilterSinusoid(const std::string& outputPath,
                                      projOptModelName, extrinsicModelName,
                                      cameraModelId,
                                      cameraOrientationId, timeOffset, readoutTime,
+                                     landmarkRadius,
                                      bVerbose ? imuSampleFile : "",
                                      bVerbose ? pointFile : "");
     int projOptModelId = okvis::ProjectionOptNameToId(projOptModelName);
@@ -821,3 +824,28 @@ TEST(MSCKFWithEuclidean, Torus) {
                            trajectoryLabelToId["Torus"],
                            simul::CameraOrientation::Forward, false, 0, 0);
 }
+
+TEST(MSCKF, WavyCircle) {
+  okvis::EstimatorAlgorithm algorithmId =
+      okvis::EstimatorAlgorithmNameToId("MSCKF");
+  testHybridFilterSinusoid(FLAGS_log_dir, algorithmId, 5,
+                           trajectoryLabelToId["WavyCircle"],
+                           simul::CameraOrientation::Forward, false, 0, 1);
+}
+
+TEST(MSCKF, Motionless) {
+  okvis::EstimatorAlgorithm algorithmId =
+      okvis::EstimatorAlgorithmNameToId("MSCKF");
+  testHybridFilterSinusoid(FLAGS_log_dir, algorithmId, 5,
+                           trajectoryLabelToId["Motionless"],
+                           simul::CameraOrientation::Forward, false, 0, 1);
+}
+
+TEST(MSCKF, CircleFarPoints) {
+  okvis::EstimatorAlgorithm algorithmId =
+      okvis::EstimatorAlgorithmNameToId("MSCKF");
+  testHybridFilterSinusoid(FLAGS_log_dir, algorithmId, 5,
+                           trajectoryLabelToId["Circle"],
+                           simul::CameraOrientation::Forward, false, 0, 1, 25);
+}
+

@@ -129,11 +129,13 @@ void testPointLandmarkJacobian(std::string projOptModelName,
                                  cameraObservationModelId, landmarkModelId);
   int trajectoryId = 0; // Torus
   int cameraModelId = 0;
+  double landmarkRadius = 5;
   simul::CameraOrientation cameraOrientationId = simul::CameraOrientation::Forward;
   vioSystemBuilder.createVioSystem(testSetting, trajectoryId,
                                    projOptModelName, extrinsicModelName,
                                    cameraModelId,
                                    cameraOrientationId, timeOffset, readoutTime,
+                                   landmarkRadius,
                                    "", "");
   std::vector<uint64_t> multiFrameIds;
   size_t kale = 0;  // imu data counter

@@ -32,6 +32,7 @@ class SimulationFrontend {
    * @param numCameras Number of cameras in the sensor configuration.
    */
   SimulationFrontend(size_t numCameras, bool addImageNoise, int maxTrackLength,
+                     double landmarkRadius,
                      VisualConstraints constraintScheme, std::string pointFile);
   virtual ~SimulationFrontend() {}
 
@@ -73,6 +74,10 @@ class SimulationFrontend {
   // output the distribution of number of features in images
   void printNumFeatureDistribution(std::ofstream& stream) const;
 
+  static const double imageNoiseMag_; // pixel unit
+  static const double fourthRoot2_; // sqrt(sqrt(2))
+
+  static const double kRangeThreshold; // This value determines when far landmarks are used.
 
  private:
 
@@ -98,8 +103,7 @@ class SimulationFrontend {
   std::vector<uint64_t> lmIds_;
   std::vector<Eigen::Vector4d, Eigen::aligned_allocator<Eigen::Vector4d>>
       noisyHomogeneousPoints_;
-  static const double imageNoiseMag_; // pixel unit
-  static const double fourthRoot2_; // sqrt(sqrt(2))
+
 
   struct LandmarkKeypointMatch {
     KeypointIdentifier currentKeypoint;
