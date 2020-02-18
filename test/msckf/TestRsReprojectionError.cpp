@@ -33,6 +33,7 @@
 // approaches. Other than that, the rest Jacobians by the three method when tr
 // is zero are roughly the same.
 
+namespace {
 void setupPoseOptProblem(bool perturbPose, bool rollingShutter,
                          bool noisyKeypoint) {
   // srand((unsigned int) time(0));
@@ -489,6 +490,7 @@ void setupPoseOptProblem(bool perturbPose, bool rollingShutter,
   EXPECT_LT((T_WS.r() - poseParameterBlock.estimate().r()).norm(), 1e-1)
       << "translation not close enough";
 }
+}  // embedded namespace
 
 TEST(CeresErrorTerms, ReprojectionErrorNoiseFree) {
   setupPoseOptProblem(false, false, false);

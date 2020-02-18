@@ -58,7 +58,7 @@ void VioTestSystemBuilder::createVioSystem(
           imuParameters.rate, Eigen::Vector3d(0, 0, -imuParameters.g)));
       break;
     case 6:
-      circularSinusoidalTrajectory.reset(new imu::WavyCircle(
+      circularSinusoidalTrajectory.reset(new imu::Motionless(
           imuParameters.rate, Eigen::Vector3d(0, 0, -imuParameters.g)));
       break;
     case 1:

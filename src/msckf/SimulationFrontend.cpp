@@ -447,6 +447,8 @@ int SimulationFrontend::addMatchToEstimator(
           raySigma, true);
 
       if (valid) {
+        // For filtering methods with delayed initialization, landmarks need
+        // not be initialized successfully at construction.
         prevFrames->setLandmarkId(landmarkMatch.previousKeypoint.cameraIndex,
                                   landmarkMatch.previousKeypoint.keypointIndex,
                                   landmarkMatch.landmarkId);
@@ -501,7 +503,7 @@ int SimulationFrontend::matchToFrame(
     const std::vector<int>& previousLm2Kp = previousKeypointIndices[im];
     const std::vector<int>& currentLm2Kp = currentKeypointIndices[im];
     CHECK_EQ(previousLm2Kp.size(), currentLm2Kp.size())
-        << "Numner of scene landmarks should be constant";
+        << "Number of scene landmarks should be constant";
     for (size_t lm = 0; lm < previousLm2Kp.size(); ++lm) {
       if (previousLm2Kp[lm] != -1 && currentLm2Kp[lm] != -1) {
         LandmarkKeypointMatch lmKpMatch;
