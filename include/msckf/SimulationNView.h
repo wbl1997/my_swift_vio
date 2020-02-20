@@ -130,8 +130,8 @@ class SimulationNView {
   static bool projectAIDP(const okvis::kinematics::Transformation& T_WC,
                           const okvis::kinematics::Transformation& T_WA,
                       const Eigen::Vector4d ab1rho, Eigen::Vector2d* xyatz1,
-                      Eigen::Matrix<double, 2, 12>* Hx,
-                      Eigen::Matrix<double, 2, 3>* Hf) {
+                      Eigen::Matrix<double, 2, 12>* /*Hx*/,
+                      Eigen::Matrix<double, 2, 3>* /*Hf*/) {
     Eigen::Vector4d rhopinC = T_WC.inverse() * T_WA * ab1rho;
     if (rhopinC[2] / rhopinC[3] < 0) {
       return false;

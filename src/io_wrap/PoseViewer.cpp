@@ -69,7 +69,7 @@ void PoseViewer::publishFullStateAsCallback(
 }
 
 void PoseViewer::publishLandmarksCallback(
-    const okvis::Time &, const okvis::MapPointVector &landmarks,
+    const okvis::Time &, const okvis::MapPointVector &/*landmarks*/,
     const okvis::MapPointVector &) {
   // LOG(INFO)<<"landmark publishing"<<landmarks.size();
 }
