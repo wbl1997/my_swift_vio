@@ -25,6 +25,11 @@ namespace simul {
         std::cout << ref.transpose() << std::endl;                         \
       else                                                                 \
         std::cout << ref << std::endl;                                     \
+      std::cout << #computed << std::endl;                                 \
+      if (computed.cols() == 1)                                            \
+        std::cout << computed.transpose() << std::endl;                    \
+      else                                                                 \
+        std::cout << computed << std::endl;                                \
       std::cout << '(' << #ref << '-' << #computed << ").cwiseAbs"         \
                 << std::endl;                                              \
       if (ref.cols() == 1)                                                 \

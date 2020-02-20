@@ -71,7 +71,7 @@ public:
  /**
   * @brief initialize
   * @param T_WSs
-  * @param obsDirections a list of [x, y, 1]
+  * @param obsDirections a list of image coordinates at z=1, [x, y, 1]
   * @param T_BC0
   * @param anchorSeqId main anchor, associate anchor id
   * @return
