@@ -457,6 +457,7 @@ public:
      std::shared_ptr<msckf::PointSharedData> pointDataPtr,
      std::shared_ptr<DistortedPinholeCameraGeometry> cameraGeometry,
      Eigen::Vector2d imagePoint,
+     int observationIndex,
      int krd)
      : costFunctionPtr_(costFunctionPtr),
        poseBlocks_(poseBlocks),
@@ -465,7 +466,7 @@ public:
        cameraParameterBlocks_(cameraParameterBlocks),
        speedAndBiasBlocks_(speedAndBiasBlocks),
        positionAndVelocityLpList_(positionAndVelocityLpList),
-       parameters_{poseBlocks_[2]->parameters(),
+       parameters_{poseBlocks_[observationIndex]->parameters(),
                    poseBlocks_[0]->parameters(),
                    poseBlocks_[1]->parameters(),
                    pointLandmark_->data(),
@@ -474,12 +475,13 @@ public:
                    cameraParameterBlocks_[1]->parameters(),
                    cameraParameterBlocks_[2]->parameters(),
                    cameraParameterBlocks_[3]->parameters(),
-                   speedAndBiasBlocks_[2]->parameters(),
+                   speedAndBiasBlocks_[observationIndex]->parameters(),
                    speedAndBiasBlocks_[0]->parameters(),
                    speedAndBiasBlocks_[1]->parameters()},
        pointDataPtr_(pointDataPtr),
        cameraGeometryBase_(cameraGeometry),
        imagePoint_(imagePoint),
+       observationIndex_(observationIndex),
        krd_(krd) {
    refResidual_.resize(krd);
    costFunctionPtr_->EvaluateWithMinimalJacobians(
@@ -578,7 +580,7 @@ public:
 
    // compute N_{i,j}.
    okvis::kinematics::Transformation T_WBtij =
-       pointDataPtr_->T_WBtij(2);
+       pointDataPtr_->T_WBtij(observationIndex_);
    okvis::kinematics::Transformation T_WBtmi =
        pointDataPtr_->T_WBtij(0);
    okvis::kinematics::Transformation T_WBtai =
@@ -637,7 +639,7 @@ public:
    Eigen::Vector3d delta;
    Eigen::VectorXd residual(krd_);
 
-   if (krd_ == 2) {
+   if (krd_ == 2 && observationIndex_ != 0) {
      Eigen::Vector2d mimicResidual;
      computeReprojectionWithPapResidual(&mimicResidual, nullptr);
      EXPECT_LT((mimicResidual - refResidual_).lpNorm<Eigen::Infinity>(), 1e-8);
@@ -758,7 +760,7 @@ public:
          parameters_, residual.data(), nullptr, nullptr);
    *de_dtr = (residual - refResidual_) / h;
    // reset
-   cameraParameterBlocks_[2]->parameters()[0] += refReadoutTime;
+   cameraParameterBlocks_[2]->parameters()[0] = refReadoutTime;
    pointDataPtr_->computePoseAndVelocityAtObservation();
    pointDataPtr_->computePoseAndVelocityForJacobians(useFirstEstimate);
    pointDataPtr_->computeSharedJacobians(cameraObservationModelId);
@@ -778,7 +780,7 @@ public:
          parameters_, residual.data(), nullptr, nullptr);
    *de_dtd = (residual - refResidual_) / h;
    // reset
-   cameraParameterBlocks_[3]->parameters()[0] += refCameraDelay;
+   cameraParameterBlocks_[3]->parameters()[0] = refCameraDelay;
    pointDataPtr_->computePoseAndVelocityAtObservation();
    pointDataPtr_->computePoseAndVelocityForJacobians(useFirstEstimate);
    pointDataPtr_->computeSharedJacobians(cameraObservationModelId);
@@ -803,6 +805,7 @@ public:
  std::shared_ptr<msckf::PointSharedData> pointDataPtr_;
  std::shared_ptr<DistortedPinholeCameraGeometry> cameraGeometryBase_;
  Eigen::Vector2d imagePoint_;
+ const int observationIndex_; // 0 main anchor, 1 associate anchor, 2 other observing frame
  const int krd_;
  Eigen::VectorXd refResidual_;
  static const double h;
@@ -818,6 +821,8 @@ void CameraObservationJacobianTest::verifyJacobians(
     std::shared_ptr<DistortedPinholeCameraGeometry> cameraGeometry,
     const Eigen::Vector2d& imagePoint) const {
   // compare numerical and analytic Jacobians and residuals
+  std::cout << "Main anchor 0 associate anchor 1 observationIndex "
+            << observationIndex << " landmark index " << landmarkIndex << std::endl;
   const double* const parameters[] = {
       poseBlocks_[observationIndex]->parameters(),
       poseBlocks_[0]->parameters(),
@@ -957,14 +962,21 @@ void CameraObservationJacobianTest::verifyJacobians(
   NumericJacobian nj(costFunctionPtr, poseBlocks_, visibleLandmarks_[landmarkIndex],
                      extrinsicBlock_, cameraParameterBlocks_, speedAndBiasBlocks_,
                      positionAndVelocityLp_, pointDataPtr, cameraGeometry,
-                     imagePoint, krd);
-  std::vector<int> maj_to_jma_index{1, 2, 0};
-  for (int j = 0; j < 3; ++j) {
-    nj.computeNumericJacobianForPose(j, &de_deltaTWB_numeric[maj_to_jma_index[j]],
-                                     &de_deltaTWB_minimal_numeric[maj_to_jma_index[j]]);
+                     imagePoint, observationIndex, krd);
+
+  // main and associate frame
+  for (int j = 1; j < 3; ++j) {
+    nj.computeNumericJacobianForPose(j-1, &de_deltaTWB_numeric[j],
+                                     &de_deltaTWB_minimal_numeric[j]);
     nj.computeNumericJacobianForSpeedAndBias(
-        j, &de_dSpeedAndBias_numeric[maj_to_jma_index[j]]);
+        j-1, &de_dSpeedAndBias_numeric[j]);
   }
+  // observing frame
+  nj.computeNumericJacobianForPose(observationIndex, &de_deltaTWB_numeric[0],
+                                   &de_deltaTWB_minimal_numeric[0]);
+  nj.computeNumericJacobianForSpeedAndBias(
+      observationIndex, &de_dSpeedAndBias_numeric[0]);
+
   nj.computeNumericJacobianForPoint(&de_dPoint_numeric,
                                     &de_dPoint_minimal_numeric);
   nj.computeNumericJacobianForExtrinsic(&de_dExtrinsic_numeric,
@@ -974,11 +986,21 @@ void CameraObservationJacobianTest::verifyJacobians(
   nj.computeNumericJacobianForDistortion(&de_dDistortion_numeric);
   nj.computeNumericJacobianForReadoutTime(&de_dtr_numeric);
   nj.computeNumericJacobianForCameraDelay(&de_dtd_numeric);
-
-  for (int j = 0; j < 3; ++j) {
-    ARE_MATRICES_CLOSE(de_deltaTWB_numeric[j], de_deltaTWB[j], tol);
-    ARE_MATRICES_CLOSE(de_deltaTWB_minimal_numeric[j], de_deltaTWB_minimal[j],
-                       5e-3);
+  double poseTol = 5e-3;
+  ARE_MATRICES_CLOSE(de_deltaTWB_numeric[0], de_deltaTWB[0], poseTol);
+  ARE_MATRICES_CLOSE(de_deltaTWB_numeric[1], de_deltaTWB[1], 1e-2);
+  ARE_MATRICES_CLOSE(de_deltaTWB_numeric[2].leftCols<3>(), de_deltaTWB[2].leftCols<3>(), poseTol);
+  if (observationIndex != 1) {
+    EXPECT_LT(de_deltaTWB_numeric[2].rightCols<4>().lpNorm<Eigen::Infinity>(), 5e-2);
+  }
+  ARE_MATRICES_CLOSE(de_deltaTWB_minimal_numeric[0], de_deltaTWB_minimal[0],
+                     1e-2);
+  ARE_MATRICES_CLOSE(de_deltaTWB_minimal_numeric[1], de_deltaTWB_minimal[1],
+                     5e-3);
+  ARE_MATRICES_CLOSE(de_deltaTWB_minimal_numeric[2].leftCols<3>(), de_deltaTWB_minimal[2].leftCols<3>(),
+                     5e-3);
+  if (observationIndex != 1) {
+    EXPECT_LT(de_deltaTWB_minimal_numeric[2].rightCols<3>().lpNorm<Eigen::Infinity>(), 5e-2);
   }
   ARE_MATRICES_CLOSE(de_dPoint_numeric, de_dPoint, tol);
   ARE_MATRICES_CLOSE(de_dPoint_minimal_numeric, de_dPoint_minimal, tol);
@@ -1000,11 +1022,10 @@ void CameraObservationJacobianTest::verifyJacobians(
         de_dSpeedAndBias_numeric[0].topRightCorner(krd, 3);
 
     ARE_MATRICES_CLOSE(de_dSpeed_numeric, de_dSpeed, tol);
-    EXPECT_LT((de_dGyroBias_numeric - de_dGyroBias).lpNorm<Eigen::Infinity>(),
-              5e-2)
+    EXPECT_LT(de_dGyroBias.lpNorm<Eigen::Infinity>(), 1e-9);
+    EXPECT_LT((de_dGyroBias_numeric).lpNorm<Eigen::Infinity>(), 3)
         << "de_dGyroBias_numeric\n"
-        << de_dGyroBias_numeric << "\nde_dGyroBias\n"
-        << de_dGyroBias;
+        << de_dGyroBias_numeric;
     EXPECT_LT((de_dAccelBias_numeric - de_dAccelBias).lpNorm<Eigen::Infinity>(),
               5e-3)
         << "de_dAccelBias_numeric\n"
@@ -1042,7 +1063,8 @@ void CameraObservationJacobianTest::solveAndCheck() {
 }
 
 void setupPoseOptProblem(bool perturbPose, bool rollingShutter,
-                         bool noisyKeypoint, int cameraObservationModelId) {
+                         bool noisyKeypoint, int cameraObservationModelId,
+                         bool R_WCnmf = false) {
   // srand((unsigned int) time(0));
   CameraObservationOptions coo;
   coo.perturbPose = perturbPose;
@@ -1167,7 +1189,7 @@ void setupPoseOptProblem(bool perturbPose, bool rollingShutter,
     pointDataPtr->computeSharedJacobians(cameraObservationModelId);
 
     // add landmark observations (residuals) to the problem.
-    for (int observationIndex = 2; observationIndex < 3; ++observationIndex) {
+    for (int observationIndex = 0; observationIndex < 3; ++observationIndex) {
       std::shared_ptr<::ceres::CostFunction> costFunctionPtr;
       std::shared_ptr<okvis::ceres::ErrorInterface> errorInterface;
       switch (cameraObservationModelId) {
@@ -1180,7 +1202,7 @@ void setupPoseOptProblem(bool perturbPose, bool rollingShutter,
                       DistortedPinholeCameraGeometry,
                       okvis::ProjectionOptFXY_CXY, okvis::Extrinsic_p_CB>(
                       cameraGeometry, pointObservationList[i][observationIndex],
-                      covariance, observationIndex, pointDataPtr));
+                      covariance, observationIndex, pointDataPtr, R_WCnmf));
           costFunctionPtr = std::static_pointer_cast<::ceres::CostFunction>(localCostFunctionPtr);
           errorInterface = std::static_pointer_cast<okvis::ceres::ErrorInterface>(localCostFunctionPtr);
           break;
@@ -1201,8 +1223,11 @@ void setupPoseOptProblem(bool perturbPose, bool rollingShutter,
         }
       }
       CHECK(costFunctionPtr) << "Null cost function not allowed!";
-      jacTest.addResidual(costFunctionPtr, observationIndex, i);
-
+      if (observationIndex == 2) {
+        // TODO(jhuai): when one of the anchor is the observing frame,
+        // duplicate parameters are not allowed by ceres cost function.
+        jacTest.addResidual(costFunctionPtr, observationIndex, i);
+      }
       if (i % 20 == 0) {
         jacTest.verifyJacobians(errorInterface, observationIndex, i, pointDataPtr, cameraGeometry,
                                 pointObservationList[i][observationIndex]);
@@ -1214,16 +1239,26 @@ void setupPoseOptProblem(bool perturbPose, bool rollingShutter,
 }
 }  // namespace
 
-TEST(CeresErrorTerms, ReprojectionErrorWithPapNoiseFree) {
+TEST(ReprojectionErrorWithPap, NoiseFree) {
   setupPoseOptProblem(false, false, false,
                       okvis::cameras::kReprojectionErrorWithPapId);
 }
 
-TEST(CeresErrorTerms, ChordalDistanceNoiseFree) {
+TEST(ChordalDistance, NoiseFree) {
   setupPoseOptProblem(false, false, false, okvis::cameras::kChordalDistanceId);
 }
 
-TEST(CeresErrorTerms, ReprojectionErrorWithPapNoisy) {
+TEST(ChordalDistanceRWC, NoiseFree) {
+  setupPoseOptProblem(false, false, false, okvis::cameras::kChordalDistanceId,
+                      true);
+}
+
+TEST(ReprojectionErrorWithPap, Noisy) {
   setupPoseOptProblem(true, true, true,
                       okvis::cameras::kReprojectionErrorWithPapId);
+}
+
+TEST(ChordalDistance, Noisy) {
+  setupPoseOptProblem(true, true, true,
+                      okvis::cameras::kChordalDistanceId);
 }

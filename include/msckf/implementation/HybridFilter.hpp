@@ -166,8 +166,9 @@ HybridFilter::computeCameraObservationJacobians(
           CameraGeometry, ProjectionIntrinsicModel, ExtrinsicModel,
           msckf::ParallaxAngleParameterization, ImuModel>
           CameraErrorModel;
+      bool R_WCnmf = false;
       observationError.reset(new CameraErrorModel(
-          argCameraGeometry, obs, obsCov, observationIndex, pointDataPtr));
+          argCameraGeometry, obs, obsCov, observationIndex, pointDataPtr, R_WCnmf));
       std::vector<int> anchorObservationIndices =
           pointDataPtr->anchorObservationIds();
       std::vector<std::shared_ptr<const okvis::ceres::ParameterBlock>>

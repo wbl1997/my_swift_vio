@@ -15,7 +15,7 @@
 #include <okvis/ceres/PoseParameterBlock.hpp>
 #include <okvis/ceres/SpeedAndBiasParameterBlock.hpp>
 
-TEST(CeresErrorTerms, EpipolarFactor) {
+TEST(EpipolarFactor, Jacobians) {
   typedef okvis::cameras::PinholeCamera<
       okvis::cameras::RadialTangentialDistortion>
       DistortedPinholeCameraGeometry;
@@ -24,6 +24,7 @@ TEST(CeresErrorTerms, EpipolarFactor) {
   // create two view geometry poses, imu meas, from a simulation trajectory
   bool addPriorNoise = false;
   bool addSystemError = false;
+  bool addImageNoise = true;
   double bg_std = 5e-3;
   double ba_std = 2e-2;
   double Ta_std = 5e-3;
@@ -97,6 +98,10 @@ TEST(CeresErrorTerms, EpipolarFactor) {
     if (projectionOk) {
       okvis::kinematics::Transformation T_WC0 = two_T_WS[0] * T_SC;
       allPointW.push_back(T_WC0.C() * pC[0] + T_WC0.r());
+      if (addImageNoise) {
+        ipC[0] += Eigen::Vector2d::Random();
+        ipC[1] += Eigen::Vector2d::Random();
+      }
       imagePointPairs.push_back(ipC[0]);
       imagePointPairs.push_back(ipC[1]);
       ++numValidPoint;
@@ -266,21 +271,18 @@ TEST(CeresErrorTerms, EpipolarFactor) {
                              residualMat, &de_dtd_numeric);
 
     double tol = 1e-5;
-    ARE_MATRICES_CLOSE(de_dT_WS_numeric[0], de_dT_WS[0], tol);
-    ARE_MATRICES_CLOSE(de_dT_WS_numeric[1], de_dT_WS[1], tol);
-    ARE_MATRICES_CLOSE(de_dT_SC_numeric, de_dT_SC, tol);
+    ARE_MATRICES_CLOSE(de_dT_WS_numeric[0], de_dT_WS[0], 5e-2);
+    ARE_MATRICES_CLOSE(de_dT_WS_numeric[1], de_dT_WS[1], 5e-2);
+    ARE_MATRICES_CLOSE(de_dT_SC_numeric, de_dT_SC, 5e-5);
     ARE_MATRICES_CLOSE(de_dT_WS_minimal_numeric[0], de_dT_WS_minimal[0], tol);
     ARE_MATRICES_CLOSE(de_dT_WS_minimal_numeric[1], de_dT_WS_minimal[1], tol);
-    ARE_MATRICES_CLOSE(de_dT_SC_minimal_numeric, de_dT_SC_minimal, tol);
-    ARE_MATRICES_CLOSE(de_dproj_intrinsic_numeric, de_dproj_intrinsic, tol);
-    ARE_MATRICES_CLOSE(de_ddistortion_numeric, de_ddistortion, tol);
+    ARE_MATRICES_CLOSE(de_dT_SC_minimal_numeric, de_dT_SC_minimal, 5e-2);
+    ARE_MATRICES_CLOSE(de_dproj_intrinsic_numeric, de_dproj_intrinsic, 5e-5);
+    ARE_MATRICES_CLOSE(de_ddistortion_numeric, de_ddistortion, 1e-4);
     // Surprisingly, the numeric Jacobians for tr td speed and biases are zeros.
     tol = 1e-6;
     ARE_MATRICES_CLOSE(de_dtr_numeric, de_dtr, tol);
     ARE_MATRICES_CLOSE(de_dtd_numeric, de_dtd, tol);
-    LOG(INFO) << "de_dtr " << de_dtr << " numeric " << de_dtr_numeric;
-    LOG(INFO) << "de_dtd " << de_dtd << " numeric " << de_dtd_numeric;
-
-    // TODO(jhuai): add to the ceres solver for optimization
+    // TODO(jhuai): add to the ceres solver for optimization.
   }
 }
