@@ -85,8 +85,30 @@ else export USE_PROC=$(($(nproc)/2)) ;
 fi
 
 catkin config --cmake-args -DUSE_ROS=ON -DBUILD_TESTS=ON
-catkin build vio_common msckf -DUSE_ROS=ON -DBUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Release -j$USE_PROC
+catkin build vio_common msckf -DUSE_ROS=ON -DBUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Release -j$USE_PROC 
+# -DEIGEN3_INCLUDE_DIR=$HOME/slam_devel/include/eigen3 -DEIGEN_INCLUDE_DIR=$HOME/slam_devel/include/eigen3
 ```
+Setting EIGEN_INCLUDE_DIR is necessary for Ubuntu 16.04 because
+the system wide Eigen lib is usually 3.2 which does not 
+meet the requirements of the ceres solver depended by this package.
+Therefore, the eigen library 3.3.4 should be downloaded from 
+[here](https://github.com/eigenteam/eigen-git-mirror/releases)
+and installed in a local directory with the below commands.
+In a low bandwidth environment, wget is significantly slower than 
+downloading from the webpage with the browser.
+```
+mkdir -p $HOME/slam_src
+cd $HOME/slam_src
+wget https://github.com/eigenteam/eigen-git-mirror/archive/3.3.4.zip
+unzip 3.3.4.zip
+mv eigen-git-mirror-3.3.4 eigen-3.3.4
+cd $HOME/slam_src/eigen-3.3.4
+mkdir build
+cd build
+cmake .. -DCMAKE_INSTALL_PREFIX="$HOME/slam_devel"
+make install
+```
+
 TODO(jhuai): the progress percentage in building msckf jumps back and forth with catkin build.
 This effect is not observed with OKVIS_ROS. 
 An comparison of the CMakeLists.txt between msckf and okvis_ros does not reveal suspicious differences.
