@@ -9,6 +9,11 @@ if nargin < 3
     plot3d = 0;
 end
 data = readmatrix(data_file, 'NumHeaderLines', 1);
+if data(1, 1) > 1e9
+    data(:, 1) = data(:, 1) * 0.000000001;
+end
+data(:, 1) = data(:, 1) - data(1, 1);
+
 close all;
 dimen = length(indices);
 figure;

@@ -65,7 +65,13 @@ imu_params:
 
 # Estimator parameters
 numKeyframes: 5 # number of keyframes in optimisation window
-numImuFrames: 3 # number of frames linked by most recent nonlinear IMU error terms
+numImuFrames: 10 # number of frames linked by most recent nonlinear IMU error terms
+optimization:
+    triangulationMaxDepth: 1000.0
+    algorithm: "MSCKF"
+    useEpipolarConstraint: false
+    cameraObservationModelId: 2
+    landmarkModelId: 2
 
 # ceres optimization options
 ceres_options:
