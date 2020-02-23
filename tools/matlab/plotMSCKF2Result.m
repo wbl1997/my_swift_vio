@@ -87,10 +87,6 @@ original_data = data;
 startTime = data(1, 1);
 endTime = data(end, 1);
 
-nominal_intrinsics = data(1, msckf_index_server.fxy_cxy);
-disp('The nominal fxy cxy is set to ');
-disp(nominal_intrinsics);
-
 sec_to_nanos = 1e9;
 if ~exist('cmp_data_file','var')
     % eg., 'Seagate/temp/parkinglot/opt_states.txt';
@@ -234,15 +230,22 @@ if(~isempty(gt))
     plot(gt(:,1), gt(:,6), '--r');
     plot(gt(:,1), gt(:,7), '--g');
     plot(gt(:,1), gt(:,8), '--b');
+    legend('qx', 'qy', 'qz', 'gt qx', 'gt qy', 'gt qz');
+else
+    legend('qx', 'qy', 'qz');
 end
 xlabel('time[sec]');
-legend('qx', 'qy', 'qz', 'gt qx', 'gt qy', 'gt qz');
+ylabel('q xyz[1]');
 grid on;
 outputfig = [output_dir, '/qxyz_GB.eps'];
 if exist(outputfig, 'file')==2
   delete(outputfig);
 end
 export_fig(outputfig);
+
+if msckf_index_server.v_std(1) > size(data, 2)
+    return;
+end
 
 figure;
 draw_ekf_triplet_with_std(data, msckf_index_server.v, msckf_index_server.v_std);
@@ -283,6 +286,10 @@ if exist(outputfig, 'file')==2
 end
 export_fig(outputfig);
 end
+
+nominal_intrinsics = data(1, msckf_index_server.fxy_cxy);
+disp('The nominal fxy cxy is set to ');
+disp(nominal_intrinsics);
 
 if ~isempty(msckf_index_server.fxy_cxy_std)
 figure;

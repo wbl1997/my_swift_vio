@@ -45,7 +45,11 @@ def load_file_with_nanosecs(data_csv):
 def plot3d_trajectory(data, xyz_cols, label, cmp_data=None, cmp_label='', result_fig=''):
   fig = plt.figure()
   ax = fig.gca(projection='3d')
-  ax.axis('equal')
+  try:  
+    ax.axis('equal') # This line caused exception in python3.
+  except NotImplementedError as err:
+    print(err)
+
   # ax.set_aspect('equal')
 
   x = data[:, xyz_cols[0]]
@@ -57,6 +61,8 @@ def plot3d_trajectory(data, xyz_cols, label, cmp_data=None, cmp_label='', result
     y = cmp_data[:, xyz_cols[1]]
     z = cmp_data[:, xyz_cols[2]]
     ax.plot(x, y, z, label=cmp_label)
+  ax.plot([x[0]], [y[0]], [z[0]], marker='o', ms=14, markerfacecolor="None", label='start')
+  ax.plot([x[-1]], [y[-1]], [z[-1]], marker='s', ms=14, markerfacecolor="None", label='end')
   ax.legend()
   ax.set_xlabel('x (m)')
   ax.set_ylabel('y (m)')
@@ -76,7 +82,36 @@ def plot3d_trajectory(data, xyz_cols, label, cmp_data=None, cmp_label='', result
   # plt.show()
 
   if result_fig:
-    os.remove(result_fig)
+    if os.path.exists(result_fig):
+      os.remove(result_fig)
     plt.savefig(result_fig)
 
+def plot2d_trajectory(data, xy_cols, label, cmp_data=None, cmp_label='', result_fig=''):
+  fig, ax = plt.subplots()
+  try:
+    ax.axis('equal') # This line caused exception in python3.
+  except NotImplementedError as err:
+    print(err)
+
+  x = data[:, xy_cols[0]]
+  y = data[:, xy_cols[1]]
+ 
+  ax.plot(x, y, label=label)
+  if cmp_data is not None:
+    x = cmp_data[:, xy_cols[0]]
+    y = cmp_data[:, xy_cols[1]]
+    ax.plot(x, y, label=cmp_label)
+  ax.plot([x[0]], [y[0]], marker='o', ms=14, markerfacecolor="None", label='start')
+  ax.plot([x[-1]], [y[-1]], marker='s', ms=14, markerfacecolor="None", label='end')
+  ax.legend()
+  ax.set_xlabel('x (m)')
+  ax.set_ylabel('y (m)')
   
+  plt.grid()
+  # plt.show()
+
+  if result_fig:
+    if os.path.exists(result_fig):
+      os.remove(result_fig)
+    plt.savefig(result_fig)
+
