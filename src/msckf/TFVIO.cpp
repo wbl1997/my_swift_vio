@@ -203,7 +203,8 @@ void TFVIO::optimize(size_t /*numIter*/, size_t /*numThreads*/, bool verbose) {
             pceu.computeCorrection(T_H, r_q, R_q, &totalCorrection);
         computeKalmanGainTimer.stop();
         updateStates(deltax);
-        if (deltax.lpNorm<Eigen::Infinity>() < updateVecNormTermination_)
+        double deltaNorm = deltax.lpNorm<Eigen::Infinity>();
+        if (deltaNorm < updateVecNormTermination_)
           break;
         ++numIteration;
       }
