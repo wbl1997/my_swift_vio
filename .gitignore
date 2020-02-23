@@ -33,3 +33,5 @@ documentation/html/
 CMakeLists\.txt\.user
 
 *.m~
+
+*.pyc
