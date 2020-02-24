@@ -127,10 +127,10 @@ void VioTestSystemBuilder::createVioSystem(
   // create the map
   // TODO(jhuai): when the evaluationCallback is given to the map,
   // OKVIS estimator crashes at problem solve().
-//  msckf::VioEvaluationCallback evaluationCallback;
-//  std::shared_ptr<okvis::ceres::Map> mapPtr(new okvis::ceres::Map(&evaluationCallback));
+  evaluationCallback_.reset(new msckf::VioEvaluationCallback());
+  std::shared_ptr<okvis::ceres::Map> mapPtr(new okvis::ceres::Map(evaluationCallback_.get()));
 
-  std::shared_ptr<okvis::ceres::Map> mapPtr(new okvis::ceres::Map());
+  // std::shared_ptr<okvis::ceres::Map> mapPtr(new okvis::ceres::Map());
 
   simul::CameraSystemCreator csc(cameraModelId, cameraOrientationId, projOptModelName,
                                  extrinsicModelName, td, tr);

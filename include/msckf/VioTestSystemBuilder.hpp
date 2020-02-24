@@ -68,6 +68,7 @@ public:
 
 private:
   std::shared_ptr<okvis::Estimator> estimator;
+  std::shared_ptr<::ceres::EvaluationCallback> evaluationCallback_;
   std::shared_ptr<okvis::SimulationFrontend> frontend;
   std::shared_ptr<imu::CircularSinusoidalTrajectory> circularSinusoidalTrajectory;
   std::string distortionType_;
