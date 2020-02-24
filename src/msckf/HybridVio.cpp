@@ -858,21 +858,25 @@ void HybridVio::publisherLoop() {
       return;
 
     // call all user callbacks
-    if (stateCallback_ && !result.onlyPublishLandmarks)
+    if (stateCallback_ && !result.onlyPublishLandmarks) {
       stateCallback_(result.stamp, result.T_WS);
+    }
     if (!result.onlyPublishLandmarks/* && result.isKeyframe*/) {
-      if (fullStateCallback_)
+      if (fullStateCallback_) {
         fullStateCallback_(result.stamp, result.T_WS, result.speedAndBiases,
                            result.omega_S, result.frameIdInSource);
-      else if (fullStateCallbackWithExtrinsics_)
+      }
+      if (fullStateCallbackWithExtrinsics_) {
         fullStateCallbackWithExtrinsics_(
             result.stamp, result.T_WS, result.speedAndBiases, result.omega_S,
             result.frameIdInSource, result.vector_of_T_SCi);
-      else if (fullStateCallbackWithAllCalibration_)
-        fullStateCallbackWithAllCalibration_(
+      }
+      if (fullStateCallbackWithAllCalibration_) {
+          fullStateCallbackWithAllCalibration_(
             result.stamp, result.T_WS, result.speedAndBiases, result.omega_S,
             result.frameIdInSource, result.opt_T_SCi_coeffs, result.imuExtraParams_,
             result.cameraParams_, result.stateVariance_);
+      }
     }
     if (landmarksCallback_ && !result.landmarksVector.empty())
       // TODO(gohlp): why two maps?
