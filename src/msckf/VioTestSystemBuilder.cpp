@@ -6,6 +6,16 @@
 
 #include <gflags/gflags.h>
 
+DEFINE_bool(zero_camera_intrinsic_param_noise, true,
+            "Set the variance of the camera intrinsic parameters zero."
+            " Otherwise, these parameters will be estimated by the filter."
+            "If addSystemNoise is true, this parameter will have no effect.");
+
+DEFINE_bool(zero_imu_intrinsic_param_noise, true,
+            "Set the variance of the IMU augmented intrinsic parameters zero."
+            " Otherwise, these parameters will be estimated by the filter."
+            "If addSystemNoise is true, this parameter will have no effect.");
+
 namespace simul {
 void VioTestSystemBuilder::createVioSystem(
     const okvis::TestSetting& testSetting, int trajectoryId,
@@ -19,8 +29,12 @@ void VioTestSystemBuilder::createVioSystem(
   double pCB_std = 2e-2;
   double ba_std = 2e-2;
   double Ta_std = 5e-3;
-  bool zeroCameraIntrinsicParamNoise = false; // !testSetting.addSystemError;
-  bool zeroImuIntrinsicParamNoise = false; // !testSetting.addSystemError;
+  bool zeroCameraIntrinsicParamNoise = FLAGS_zero_camera_intrinsic_param_noise;
+  bool zeroImuIntrinsicParamNoise = FLAGS_zero_imu_intrinsic_param_noise;
+  if (testSetting.addSystemError) {
+    zeroCameraIntrinsicParamNoise = false;
+    zeroImuIntrinsicParamNoise = false;
+  }
   okvis::ExtrinsicsEstimationParameters extrinsicsEstimationParameters;
   initCameraNoiseParams(&extrinsicsEstimationParameters, pCB_std,
                         zeroCameraIntrinsicParamNoise);
@@ -127,10 +141,10 @@ void VioTestSystemBuilder::createVioSystem(
   // create the map
   // TODO(jhuai): when the evaluationCallback is given to the map,
   // OKVIS estimator crashes at problem solve().
-//  msckf::VioEvaluationCallback evaluationCallback;
-//  std::shared_ptr<okvis::ceres::Map> mapPtr(new okvis::ceres::Map(&evaluationCallback));
+  evaluationCallback_.reset(new msckf::VioEvaluationCallback());
+  std::shared_ptr<okvis::ceres::Map> mapPtr(new okvis::ceres::Map(evaluationCallback_.get()));
 
-  std::shared_ptr<okvis::ceres::Map> mapPtr(new okvis::ceres::Map());
+  // std::shared_ptr<okvis::ceres::Map> mapPtr(new okvis::ceres::Map());
 
   simul::CameraSystemCreator csc(cameraModelId, cameraOrientationId, projOptModelName,
                                  extrinsicModelName, td, tr);
