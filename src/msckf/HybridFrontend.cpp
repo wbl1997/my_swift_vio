@@ -1082,17 +1082,8 @@ int HybridFrontend::runRansac2d2d(okvis::HybridFilter& estimator,
 
     // failure?
     if (!rotation_only_success && !translation_only_success) {
-      LOG(INFO) << "2D-2D RANSAC failed";
       continue;
     }
-//    else {
-//      okvis::Time olderTime = estimator.timestamp(olderFrameId);
-//      okvis::Time currentTime = estimator.timestamp(currentFrameId);
-//      okvis::Duration gap = currentTime - olderTime;
-//      LOG(INFO) << "2D-2D RANSAC "
-//                << (translation_only_success ? "rel pose" : "rot only")
-//                << " frame distance in time " << gap.toSec();
-//    }
 
     // otherwise: kick out outliers!
     std::shared_ptr<okvis::MultiFrame> multiFrame = estimator.multiFrame(
