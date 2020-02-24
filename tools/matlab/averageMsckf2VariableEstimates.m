@@ -27,8 +27,9 @@ end
 startIndex = find(abs(startTime + avg_since_start*sec_to_nanos - msckf2_data(:,1)) ...
     < sticky_time_range, 1);
 if(isempty(startIndex))
-    disp(['unable to locate start index at time since start ', num2str(startTime)]);
-    return;
+    disp(['Unable to locate start index at time since start ', num2str(startTime)]);
+    disp('Start from the first entry instead.');
+    startIndex = 1;
 end
 
 estimate_average = mean(msckf2_data(startIndex:endIndex, :), 1);

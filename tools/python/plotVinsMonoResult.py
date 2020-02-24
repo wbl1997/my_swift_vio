@@ -20,15 +20,18 @@ def draw_vinsmono_result(vins_result_dir):
   vinsmono_data = loadAndPlot3dPath.load_file_with_nanosecs(vinsmono_csv)
   vinsmono_loop_data = loadAndPlot3dPath.load_file_with_nanosecs(vinsmono_loop_csv)
   
-  result_fig  = os.path.join(vins_result_dir, 'p_GB.svg')
-  loadAndPlot3dPath.plot3d_trajectory(vinsmono_data, [1,2,3], "vins mono", 
-      cmp_data=vinsmono_loop_data, cmp_label="vins mono loop", result_fig=result_fig)
-  print('p_GB saved at {}'.format(result_fig))
+  if vinsmono_data.size != 0:
+    result_fig  = os.path.join(vins_result_dir, 'p_GB.svg')
+    loadAndPlot3dPath.plot3d_trajectory(vinsmono_data, [1,2,3], "vins mono", 
+        cmp_data=vinsmono_loop_data, cmp_label="vins mono loop", result_fig=result_fig)
+    print('p_GB saved at {}'.format(result_fig))
 
-  result_fig  = os.path.join(vins_result_dir, 'p_GB_xy.svg')
-  loadAndPlot3dPath.plot2d_trajectory(vinsmono_data, [1,2], "vins mono", 
-      cmp_data=vinsmono_loop_data, cmp_label="vins mono loop", result_fig=result_fig)
-  print('p_GB_xy saved at {}'.format(result_fig))
+    result_fig  = os.path.join(vins_result_dir, 'p_GB_xy.svg')
+    loadAndPlot3dPath.plot2d_trajectory(vinsmono_data, [1,2], "vins mono", 
+        cmp_data=vinsmono_loop_data, cmp_label="vins mono loop", result_fig=result_fig)
+    print('p_GB_xy saved at {}'.format(result_fig))
+  else:
+    print('Skip plotting figures for {}\n which is empty.'.format(vinsmono_csv))
 
 def draw_okvis_result(okvis_csv):
   okvis_data = loadAndPlot3dPath.load_file_with_nanosecs(okvis_csv)
