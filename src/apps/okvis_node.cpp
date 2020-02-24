@@ -19,56 +19,18 @@
 #include <image_transport/image_transport.h>
 #include "sensor_msgs/Imu.h"
 
-#include <gflags/gflags.h>
 #include <glog/logging.h>
 
 #include <okvis/Parameters.hpp>
 #include <okvis/ThreadedKFVio.hpp>
 
+#include <io_wrap/CommonGflags.hpp>
 #include <io_wrap/StreamHelper.hpp>
 #include <io_wrap/Player.hpp>
 #include <io_wrap/Publisher.hpp>
 #include <io_wrap/RosParametersReader.hpp>
 #include <io_wrap/Subscriber.hpp>
 #include <msckf/HybridVio.hpp>
-
-DEFINE_int32(
-    dump_output_option, 3,
-    "0, direct results to ROS publishers, other options save results to csvs"
-    "1, save states, 2, save states and camera extrinsics, "
-    "3, save states, and all calibration parameters, 4, save states,"
-    "all calibration parameters, feature tracks, and landmarks."
-    "3 currently do not support okvis");
-
-DEFINE_int32(load_input_option, 1,
-             "0, get input by subscribing to ros topics"
-             "1, get input by reading files on a hard drive");
-
-DEFINE_string(output_dir, "", "the directory to dump results");
-
-DEFINE_string(image_folder, "", "folder of an input image sequence");
-
-DEFINE_string(video_file, "", "full name of an input video file");
-
-DEFINE_string(time_file, "",
-              "full name of an input time file containing"
-              " timestamps for each image seq. frame");
-
-DEFINE_string(imu_file, "", "full name of an input IMU file");
-
-DEFINE_int32(start_index, 0, "index of the first frame to be processed");
-
-DEFINE_int32(finish_index, 0, "index of the last frame to be processed");
-
-bool setInputParameters(okvis::InputData *input) {
-  input->videoFile = FLAGS_video_file;
-  input->imageFolder = FLAGS_image_folder;
-  input->imuFile = FLAGS_imu_file;
-  input->timeFile = FLAGS_time_file;
-  input->startIndex = FLAGS_start_index;
-  input->finishIndex = FLAGS_finish_index;
-  return true;
-}
 
 int main(int argc, char **argv) {
   google::ParseCommandLineFlags(&argc, &argv, true);  // true to strip gflags
@@ -79,9 +41,7 @@ int main(int argc, char **argv) {
 
   ros::init(argc, argv, "okvis_node");
   ros::NodeHandle nh("okvis_node");
-  okvis::Publisher publisher(
-      nh,
-      okvis::FULL_STATE_WITH_ALL_CALIBRATION);
+  okvis::Publisher publisher(nh);
 
   std::string configFilename;
   if (argc >= 2) {
@@ -93,26 +53,14 @@ int main(int argc, char **argv) {
                  " config_filename in the command line,"
               << " or use rosparam e.g.," << std::endl
               << "rosparam set /okvis_node/config_filename "
-              << "/path/to/config/config_fpga_p2_euroc.yaml" << std::endl
-              << "To remap the topics in terminal during rosbag play, "
-                 "in our case, "
-              << std::endl
-              << "rosbag play --pause --start=0.0 --rate=1.0 MH_01_easy.bag"
-                 " /cam0/image_raw:=/camera0 /imu0:=/imu"
-              << std::endl;
-    std::cout << "To run the tests, go to terminal," << std::endl
-              << " catkin_make tests msckf" << std::endl
-              << "then to run them " << std::endl
-              << "rosrun run_tests msckf" << std::endl;
-    std::cout << "To visualize it in RVIZ "
-              << "rosrun rviz rviz -d config/rviz.rviz" << std::endl;
+              << "/path/to/config/config_fpga_p2_euroc.yaml" << std::endl;
     std::cout << "To run msckf on image sequences or a video and their "
                  "associated inertial data, "
               << std::endl
               << "set load_input_option properly as an input argument, then"
                  " in a terminal, input "
               << std::endl
-              << "msckf /path/to/config/file.yaml" << std::endl;
+              << argv[0] << " /path/to/config/file.yaml" << std::endl;
     std::cout << "Set publishing_options.publishImuPropagatedState to false "
                  "in the settings.yaml to only save optimized states"
               << std::endl;
@@ -125,7 +73,7 @@ int main(int argc, char **argv) {
   okvis::RosParametersReader vio_parameters_reader(configFilename);
   okvis::VioParameters parameters;
   vio_parameters_reader.getParameters(parameters);
-  setInputParameters(&parameters.input);
+  okvis::setInputParameters(&parameters.input);
 
   std::shared_ptr<okvis::VioInterface> okvis_estimator;
   switch (parameters.optimization.algorithm) {
@@ -147,60 +95,48 @@ int main(int argc, char **argv) {
   std::string path = FLAGS_output_dir;
   path = okvis::removeTrailingSlash(path);
   int camIdx = 0;
-  if (FLAGS_dump_output_option == 0) {
-    okvis_estimator->setFullStateCallback(
-        std::bind(&okvis::Publisher::publishFullStateAsCallback, &publisher,
-                  std::placeholders::_1, std::placeholders::_2,
-                  std::placeholders::_3, std::placeholders::_4));
-    okvis_estimator->setLandmarksCallback(std::bind(
-        &okvis::Publisher::publishLandmarksAsCallback, &publisher,
-        std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
-  } else {
-    std::string headerLine;
-    okvis::StreamHelper::composeHeaderLine(parameters.imu.model_type,
-                      parameters.nCameraSystem.projOptRep(camIdx),
-                      parameters.nCameraSystem.extrinsicOptRep(camIdx),
-                      parameters.nCameraSystem.cameraGeometry(camIdx)->distortionType(),
-                      okvis::FULL_STATE_WITH_ALL_CALIBRATION,
-                      &headerLine);
-    publisher.setCsvFile(path + "/msckf_estimates.csv", headerLine);
-    if (FLAGS_dump_output_option == 1) {
-      // save estimates of evolving states: position, velocity, attitude, bg, ba
-      okvis_estimator->setFullStateCallback(std::bind(
-          &okvis::Publisher::csvSaveFullStateAsCallback, &publisher,
-          std::placeholders::_1, std::placeholders::_2, std::placeholders::_3,
-          std::placeholders::_4, std::placeholders::_5));
-    } else if (FLAGS_dump_output_option == 2) {
-      // save estimates of evolving states, and camera extrinsics
-      okvis_estimator->setFullStateCallbackWithExtrinsics(
-          std::bind(&okvis::Publisher::csvSaveFullStateWithExtrinsicsAsCallback,
-                    &publisher, std::placeholders::_1, std::placeholders::_2,
-                    std::placeholders::_3, std::placeholders::_4,
-                    std::placeholders::_5, std::placeholders::_6));
-    } else if (FLAGS_dump_output_option == 3 || FLAGS_dump_output_option == 4) {
-      // save estimates of evolving states, camera extrinsics,
-      // and all other calibration parameters
-      okvis_estimator->setFullStateCallbackWithAllCalibration(std::bind(
-          &okvis::Publisher::csvSaveFullStateWithAllCalibrationAsCallback,
-          &publisher, std::placeholders::_1, std::placeholders::_2,
-          std::placeholders::_3, std::placeholders::_4, std::placeholders::_5,
-          std::placeholders::_6, std::placeholders::_7, std::placeholders::_8,
-          std::placeholders::_9));
-      if (FLAGS_dump_output_option == 4) {
-        okvis_estimator->setImuCsvFile(path + "/imu0_data.csv");
-        const unsigned int numCameras = parameters.nCameraSystem.numCameras();
-        for (size_t i = 0; i < numCameras; ++i) {
-          std::stringstream num;
-          num << i;
-          okvis_estimator->setTracksCsvFile(
-              i, path + "/cam" + num.str() + "_tracks.csv");
-        }
-        publisher.setLandmarksCsvFile(path + "/okvis_estimator_landmarks.csv");
-        okvis_estimator->setLandmarksCallback(
-            std::bind(&okvis::Publisher::csvSaveLandmarksAsCallback, &publisher,
-                      std::placeholders::_1, std::placeholders::_2,
-                      std::placeholders::_3));
+
+  okvis_estimator->setFullStateCallback(
+      std::bind(&okvis::Publisher::publishFullStateAsCallback, &publisher,
+                std::placeholders::_1, std::placeholders::_2,
+                std::placeholders::_3, std::placeholders::_4));
+  okvis_estimator->setLandmarksCallback(std::bind(
+      &okvis::Publisher::publishLandmarksAsCallback, &publisher,
+      std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
+
+  std::string stateFilename = path + "/msckf_estimates.csv";
+  std::string headerLine;
+  okvis::StreamHelper::composeHeaderLine(
+      parameters.imu.model_type, parameters.nCameraSystem.projOptRep(camIdx),
+      parameters.nCameraSystem.extrinsicOptRep(camIdx),
+      parameters.nCameraSystem.cameraGeometry(camIdx)->distortionType(),
+      okvis::FULL_STATE_WITH_ALL_CALIBRATION, &headerLine);
+  publisher.setCsvFile(stateFilename, headerLine);
+  if (FLAGS_dump_output_option == 2) {
+    // save estimates of evolving states, and camera extrinsics
+    okvis_estimator->setFullStateCallbackWithExtrinsics(std::bind(
+        &okvis::Publisher::csvSaveFullStateWithExtrinsicsAsCallback, &publisher,
+        std::placeholders::_1, std::placeholders::_2, std::placeholders::_3,
+        std::placeholders::_4, std::placeholders::_5, std::placeholders::_6));
+  } else if (FLAGS_dump_output_option == 3 || FLAGS_dump_output_option == 4) {
+    // save estimates of evolving states, camera extrinsics,
+    // and all other calibration parameters
+    okvis_estimator->setFullStateCallbackWithAllCalibration(std::bind(
+        &okvis::Publisher::csvSaveFullStateWithAllCalibrationAsCallback,
+        &publisher, std::placeholders::_1, std::placeholders::_2,
+        std::placeholders::_3, std::placeholders::_4, std::placeholders::_5,
+        std::placeholders::_6, std::placeholders::_7, std::placeholders::_8,
+        std::placeholders::_9));
+    if (FLAGS_dump_output_option == 4) {
+      okvis_estimator->setImuCsvFile(path + "/imu0_data.csv");
+      const unsigned int numCameras = parameters.nCameraSystem.numCameras();
+      for (size_t i = 0; i < numCameras; ++i) {
+        std::stringstream num;
+        num << i;
+        okvis_estimator->setTracksCsvFile(
+            i, path + "/cam" + num.str() + "_tracks.csv");
       }
+      publisher.setLandmarksCsvFile(path + "/okvis_estimator_landmarks.csv");
     }
   }
 

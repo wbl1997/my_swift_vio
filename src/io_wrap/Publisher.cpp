@@ -64,8 +64,8 @@ DECLARE_string(datafile_separator);
 namespace okvis {
 
 // Default constructor.
-Publisher::Publisher(const DUMP_RESULT_OPTION dro)
-    : nh_(nullptr), ctr2_(0), result_option_(dro) {}
+Publisher::Publisher()
+    : nh_(nullptr), ctr2_(0) {}
 
 Publisher::~Publisher() {
   // close file
@@ -90,8 +90,8 @@ Publisher::~Publisher() {
 }
 
 // Constructor. Calls setNodeHandle().
-Publisher::Publisher(ros::NodeHandle &nh, const DUMP_RESULT_OPTION dro)
-    : Publisher(dro) {
+Publisher::Publisher(ros::NodeHandle &nh)
+    : Publisher() {
   setNodeHandle(nh);
 }
 

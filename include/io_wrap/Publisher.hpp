@@ -77,14 +77,14 @@ class Publisher
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
  public:
   /// \brief Default constructor.
-  explicit Publisher(const DUMP_RESULT_OPTION dro=FULL_STATE);
+  explicit Publisher();
   ~Publisher();
 
   /**
    * @brief Constructor. Calls setNodeHandle().
    * @param nh The ROS node handle for publishing.
    */
-  Publisher(ros::NodeHandle& nh, const DUMP_RESULT_OPTION dro=FULL_STATE);
+  Publisher(ros::NodeHandle& nh);
 
   /// \name Setters
   /// \{
@@ -331,7 +331,6 @@ class Publisher
 
   std::shared_ptr<std::fstream> csvFile_; ///< CSV file to save state in.
   std::shared_ptr<std::fstream> csvLandmarksFile_;  ///< CSV file to save landmarks in.
-  DUMP_RESULT_OPTION result_option_;
 };
 
 }

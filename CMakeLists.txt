@@ -95,6 +95,7 @@ add_definitions(-fPIC -march=native -Wextra -Winit-self -Woverloaded-virtual
 LIST(APPEND SOURCEFILES
     src/feature_tracker/feature_tracker.cpp
 
+    src/io_wrap/CommonGflags.cpp
     src/io_wrap/Player.cpp
     src/io_wrap/PoseViewer.cpp
     src/io_wrap/Publisher.cpp
