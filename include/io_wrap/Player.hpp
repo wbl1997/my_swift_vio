@@ -55,6 +55,9 @@ class Player {
          const okvis::VioParameters& param_reader);
 
   void Run();
+  // Block if previous processing has not finished.
+  void RunBlocking();
+
   std::atomic<bool> mbFinished;
 
  protected:

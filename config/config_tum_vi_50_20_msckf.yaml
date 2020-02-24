@@ -7,13 +7,15 @@ cameras:
           0.0, 0.0, 0.0, 1.0],
         image_dimension: [512, 512],
         distortion_coefficients: [0.0034823894022493434, 0.0007150348452162257, -0.0020532361418706202, 0.00020293673591811182],
-        distortion_type: radialtangential,
+        distortion_type: equidistant,
+        projection_opt_mode: FXY_CXY,
+        extrinsic_opt_mode: P_CB,
         focal_length: [190.97847715128717, 190.9733070521226],
         principal_point: [254.93170605935475, 256.8974428996504]}
 
 
 camera_params:
-    camera_rate: 15 # just to manage the expectations of when there should be frames arriving
+    camera_rate: 20 # just to manage the expectations of when there should be frames arriving
     sigma_absolute_translation: 2e-2 # The standard deviation of the camera extrinsics translation, e.g. 1.0e-10 for online-calib [m].
     sigma_absolute_orientation: 0.0 # The standard deviation of the camera extrinsics orientation, e.g. 1.0e-3 for online-calib [rad].
     sigma_c_relative_translation: 0.0 # The std. dev. of the cam. extr. transl. change between frames, e.g. 1.0e-6 for adaptive online calib (not less for numerics) [m].
@@ -28,8 +30,8 @@ camera_params:
 imu_params:
     a_max: 176.0 # acceleration saturation [m/s^2]
     g_max: 7.8 # gyro saturation [rad/s]
-    sigma_g_c: 0.0004 #12.0e-4 # gyro noise density [rad/s/sqrt(Hz)]
-    sigma_a_c: 0.007 #8.0e-3 # accelerometer noise density [m/s^2/sqrt(Hz)]
+    sigma_g_c: 0.001 #12.0e-4 # gyro noise density [rad/s/sqrt(Hz)]
+    sigma_a_c: 0.02 #8.0e-3 # accelerometer noise density [m/s^2/sqrt(Hz)]
     sigma_bg: 0.03 # gyro bias prior [rad/s]
     sigma_ba: 0.1 # accelerometer bias prior [m/s^2]
     sigma_gw_c: 0.0000110 # gyro drift noise density [rad/s^s/sqrt(Hz)]
@@ -50,7 +52,13 @@ imu_params:
     sigma_TAElement: 5e-3
 # Estimator parameters
 numKeyframes: 5 # number of keyframes in optimisation window
-numImuFrames: 3 # number of frames linked by most recent nonlinear IMU error terms
+numImuFrames: 10 # number of frames linked by most recent nonlinear IMU error terms
+optimization:
+    triangulationMaxDepth: 1000.0
+    algorithm: "MSCKF"
+    useEpipolarConstraint: false
+    cameraObservationModelId: 0
+    landmarkModelId: 1
 
 # ceres optimization options
 ceres_options:
@@ -68,7 +76,7 @@ detection_options:
 imageDelay: 0.0  # in case you are using a custom setup, you will have to calibrate this. 0 for the VISensor.
 
 # display debug images?
-displayImages: true  # displays debug video and keyframe matches. May be slow.
+displayImages: false  # displays debug video and keyframe matches. May be slow.
 
 # use direct driver
 useDriver: false 

@@ -48,6 +48,8 @@
 #include <iostream>
 #include <memory>
 
+#include <gflags/gflags.h>
+
 #include "sensor_msgs/Imu.h"
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wnon-virtual-dtor"
@@ -56,88 +58,157 @@
 #pragma GCC diagnostic ignored "-Woverloaded-virtual"
 #include <opencv2/opencv.hpp>
 #pragma GCC diagnostic pop
-#include <io_wrap/Publisher.hpp>
-#include <io_wrap/RosParametersReader.hpp>
-#include <io_wrap/Subscriber.hpp>
-#include <okvis/ThreadedKFVio.hpp>
 
 #include "rosbag/bag.h"
 #include "rosbag/chunked_file.h"
 #include "rosbag/view.h"
 
+#include <io_wrap/CommonGflags.hpp>
+#include <io_wrap/Player.hpp>
+#include <io_wrap/Publisher.hpp>
+#include <io_wrap/RosParametersReader.hpp>
+#include <io_wrap/Subscriber.hpp>
+#include <okvis/ThreadedKFVio.hpp>
+#include <msckf/HybridVio.hpp>
+
+DEFINE_double(skip_first_seconds, 0, "Number of seconds to skip from the beginning!");
+
+DEFINE_string(bagname, "", "Bag filename.");
+
 // this is just a workbench. most of the stuff here will go into the Frontend
 // class.
 int main(int argc, char **argv) {
-  ros::init(argc, argv, "okvis_node_synchronous");
-
+  google::ParseCommandLineFlags(&argc, &argv, true);  // true to strip gflags
   google::InitGoogleLogging(argv[0]);
+  FLAGS_logtostderr = 1;
   FLAGS_stderrthreshold = 0;  // INFO: 0, WARNING: 1, ERROR: 2, FATAL: 3
   FLAGS_colorlogtostderr = 1;
 
-  if (argc != 3 && argc != 4) {
-    LOG(ERROR)
-        << "Usage: ./" << argv[0]
-        << " configuration-yaml-file bag-to-read-from [skip-first-seconds]";
-    return -1;
-  }
-
-  okvis::Duration deltaT(0.0);
-  if (argc == 4) {
-    deltaT = okvis::Duration(atof(argv[3]));
-  }
-
+  ros::init(argc, argv, "okvis_node_synchronous");
   // set up the node
   ros::NodeHandle nh("okvis_node");
 
   // publisher
   okvis::Publisher publisher(nh);
 
-  // read configuration file
-  std::string configFilename(argv[1]);
+  std::string configFilename;
+  if (argc >= 2) {
+    configFilename = argv[1];
+  } else {
+    std::cout << "You can either invoke okvis_node_synchronous through a ros launch file,"
+                 " or through Qt debug. "
+              << "In the latter case, you either need to provide the"
+                 " config_filename in the command line,"
+              << " or use rosparam e.g.," << std::endl
+              << "rosparam set /okvis_node/config_filename "
+              << "/path/to/config/config_fpga_p2_euroc.yaml" << std::endl;
+    std::cout << "To run msckf on image sequences or a video and their "
+                 "associated inertial data, "
+              << std::endl
+              << "set load_input_option properly as an input argument, then"
+                 " in a terminal, input "
+              << std::endl
+              << argv[0] <<" /path/to/config/file.yaml" << std::endl;
+    std::cout << "Set publishing_options.publishImuPropagatedState to false "
+                 "in the settings.yaml to only save optimized states"
+              << std::endl;
+
+    if (!nh.getParam("config_filename", configFilename)) {
+      LOG(ERROR) << "Please specify filename of configuration!";
+      return 1;
+    }
+  }
 
   okvis::RosParametersReader vio_parameters_reader(configFilename);
   okvis::VioParameters parameters;
   vio_parameters_reader.getParameters(parameters);
+  okvis::setInputParameters(&parameters.input);
 
-  okvis::ThreadedKFVio okvis_estimator(parameters);
+  std::shared_ptr<okvis::VioInterface> okvis_estimator;
+  switch (parameters.optimization.algorithm) {
+    case okvis::EstimatorAlgorithm::OKVIS:
+    case okvis::EstimatorAlgorithm::General:
+    case okvis::EstimatorAlgorithm::Priorless:
+      // http://eigen.tuxfamily.org/bz/show_bug.cgi?id=1049
+      okvis_estimator.reset(new okvis::ThreadedKFVio(parameters));
+      break;
+    case okvis::EstimatorAlgorithm::MSCKF:
+    case okvis::EstimatorAlgorithm::TFVIO:
+      okvis_estimator.reset(new okvis::HybridVio(parameters));
+      break;
+    default:
+      LOG(ERROR) << "Estimator not implemented!";
+      return 1;
+  }
 
-  okvis_estimator.setFullStateCallback(
+  std::string path = FLAGS_output_dir;
+  path = okvis::removeTrailingSlash(path);
+  int camIdx = 0;
+
+  okvis_estimator->setFullStateCallback(
       std::bind(&okvis::Publisher::publishFullStateAsCallback, &publisher,
                 std::placeholders::_1, std::placeholders::_2,
                 std::placeholders::_3, std::placeholders::_4));
-  okvis_estimator.setLandmarksCallback(std::bind(
+  okvis_estimator->setLandmarksCallback(std::bind(
       &okvis::Publisher::publishLandmarksAsCallback, &publisher,
       std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
-  okvis_estimator.setStateCallback(
-      std::bind(&okvis::Publisher::publishStateAsCallback, &publisher,
-                std::placeholders::_1, std::placeholders::_2));
-  okvis_estimator.setBlocking(true);
-  publisher.setParameters(parameters);  // pass the specified publishing stuff
 
-  // extract the folder path
-  std::string bagname(argv[2]);
-  size_t pos = bagname.find_last_of("/");
-  std::string path;
-  if (pos == std::string::npos)
-    path = ".";
-  else
-    path = bagname.substr(0, pos);
-
-  const unsigned int numCameras = parameters.nCameraSystem.numCameras();
-
-  // setup files to be written
-  publisher.setCsvFile(path + "/okvis_estimator_output.csv");
-  publisher.setLandmarksCsvFile(path + "/okvis_estimator_landmarks.csv");
-  okvis_estimator.setImuCsvFile(path + "/imu0_data.csv");
-  for (size_t i = 0; i < numCameras; ++i) {
-    std::stringstream num;
-    num << i;
-    okvis_estimator.setTracksCsvFile(i,
-                                     path + "/cam" + num.str() + "_tracks.csv");
+  std::string stateFilename = path + "/msckf_estimates.csv";
+  std::string headerLine;
+  okvis::StreamHelper::composeHeaderLine(
+      parameters.imu.model_type, parameters.nCameraSystem.projOptRep(camIdx),
+      parameters.nCameraSystem.extrinsicOptRep(camIdx),
+      parameters.nCameraSystem.cameraGeometry(camIdx)->distortionType(),
+      okvis::FULL_STATE_WITH_ALL_CALIBRATION, &headerLine);
+  publisher.setCsvFile(stateFilename, headerLine);
+  if (FLAGS_dump_output_option == 2) {
+    // save estimates of evolving states, and camera extrinsics
+    okvis_estimator->setFullStateCallbackWithExtrinsics(std::bind(
+        &okvis::Publisher::csvSaveFullStateWithExtrinsicsAsCallback, &publisher,
+        std::placeholders::_1, std::placeholders::_2, std::placeholders::_3,
+        std::placeholders::_4, std::placeholders::_5, std::placeholders::_6));
+  } else if (FLAGS_dump_output_option == 3 || FLAGS_dump_output_option == 4) {
+    // save estimates of evolving states, camera extrinsics,
+    // and all other calibration parameters
+    okvis_estimator->setFullStateCallbackWithAllCalibration(std::bind(
+        &okvis::Publisher::csvSaveFullStateWithAllCalibrationAsCallback,
+        &publisher, std::placeholders::_1, std::placeholders::_2,
+        std::placeholders::_3, std::placeholders::_4, std::placeholders::_5,
+        std::placeholders::_6, std::placeholders::_7, std::placeholders::_8,
+        std::placeholders::_9));
+    if (FLAGS_dump_output_option == 4) {
+      okvis_estimator->setImuCsvFile(path + "/imu0_data.csv");
+      const unsigned int numCameras = parameters.nCameraSystem.numCameras();
+      for (size_t i = 0; i < numCameras; ++i) {
+        std::stringstream num;
+        num << i;
+        okvis_estimator->setTracksCsvFile(
+            i, path + "/cam" + num.str() + "_tracks.csv");
+      }
+      publisher.setLandmarksCsvFile(path + "/okvis_estimator_landmarks.csv");
+    }
   }
 
+  okvis_estimator->setStateCallback(
+      std::bind(&okvis::Publisher::publishStateAsCallback, &publisher,
+                std::placeholders::_1, std::placeholders::_2));
+  okvis_estimator->setBlocking(true);
+  publisher.setParameters(parameters);  // pass the specified publishing stuff
+
+  if (FLAGS_bagname.empty()) {
+    // player to grab messages directly from files on a hard drive
+    okvis::Player player(okvis_estimator.get(), parameters);
+    player.RunBlocking();
+    std::string filename = path + "/feature_statistics.txt";
+    okvis_estimator->saveStatistics(filename);
+    return 0;
+  }
+
+  okvis::Duration deltaT(FLAGS_skip_first_seconds);
+  const unsigned int numCameras = parameters.nCameraSystem.numCameras();
+
   // open the bag
-  rosbag::Bag bag(argv[2], rosbag::bagmode::Read);
+  rosbag::Bag bag(FLAGS_bagname, rosbag::bagmode::Read);
   // views on topics. the slash is needs to be correct, it's ridiculous...
   std::string imu_topic("/imu0");
   rosbag::View view_imu(bag, rosbag::TopicQuery(imu_topic));
@@ -179,7 +250,7 @@ int main(int argc, char **argv) {
   okvis::Time start(0.0);
   while (ros::ok()) {
     ros::spinOnce();
-    okvis_estimator.display();
+    okvis_estimator->display();
 
     // check if at the end
     if (view_imu_iterator == view_imu.end()) {
@@ -241,13 +312,13 @@ int main(int argc, char **argv) {
         }
         // add the IMU measurement for (blocking) processing
         if (t_imu - start > deltaT)
-          okvis_estimator.addImuMeasurement(t_imu, acc, gyr);
+          okvis_estimator->addImuMeasurement(t_imu, acc, gyr);
 
         view_imu_iterator++;
       } while (view_imu_iterator != view_imu.end() && t_imu <= t);
 
       // add the image to the frontend for (blocking) processing
-      if (t - start > deltaT) okvis_estimator.addImage(t, i, filtered);
+      if (t - start > deltaT) okvis_estimator->addImage(t, i, filtered);
 
       view_cam_iterators[i]++;
     }
