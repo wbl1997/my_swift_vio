@@ -41,6 +41,8 @@ DEFINE_bool(
     "bias, imu misalignment matrices, extrinsic parameters, camera projection "
     "and distortion intrinsic parameters, td, tr");
 
+DEFINE_int32(num_runs, 5, "How many times to run one simulation?");
+
 DECLARE_bool(use_mahalanobis);
 
 typedef boost::iterator_range<std::vector<std::pair<double, double>>::iterator>
@@ -72,8 +74,8 @@ inline bool isFilteringMethod(okvis::EstimatorAlgorithm algorithmId) {
  * @param v_WS_true
  * @param ref_measurement
  * @param ref_camera_geometry
- * @param normalizedError nees in position, nees in orientation, nees in pose
- * @param rmsError rmse in xyz, \alpha, v_WS, bg, ba, Tg, Ts, Ta, p_CB,
+ * @param normalizedSquaredError normalized squared error in position, orientation, and pose
+ * @param squaredError squared error in xyz, \alpha, v_WS, bg, ba, Tg, Ts, Ta, p_CB,
  *  (fx, fy), (cx, cy), k1, k2, p1, p2, td, tr
  */
 void computeErrors(
@@ -83,10 +85,10 @@ void computeErrors(
     const Eigen::Vector3d& v_WS_true,
     const okvis::ImuSensorReadings& ref_measurement,
     std::shared_ptr<const okvis::cameras::CameraBase> ref_camera_geometry,
-    const int projOptModelId, Eigen::Vector3d* normalizedError,
-    Eigen::VectorXd* rmsError) {
+    const int projOptModelId, Eigen::Vector3d* normalizedSquaredError,
+    Eigen::VectorXd* squaredError) {
   int projOptModelDim = okvis::ProjectionOptGetMinimalDim(projOptModelId);
-  rmsError->resize(51 + projOptModelDim);
+  squaredError->resize(51 + projOptModelDim);
 
   okvis::kinematics::Transformation T_WS_est;
   uint64_t currFrameId = estimator->currentFrameId();
@@ -101,40 +103,40 @@ void computeErrors(
 
   estimator->computeCovariance(&covariance);
 
-  (*normalizedError)[0] =
+  (*normalizedSquaredError)[0] =
       delta.transpose() * covariance.topLeftCorner<3, 3>().inverse() * delta;
-  (*normalizedError)[1] =
+  (*normalizedSquaredError)[1] =
       alpha.transpose() * covariance.block<3, 3>(3, 3).inverse() * alpha;
   Eigen::Matrix<double, 6, 1> tempPoseError =
       covariance.topLeftCorner<6, 6>().ldlt().solve(deltaPose);
-  (*normalizedError)[2] = deltaPose.transpose() * tempPoseError;
+  (*normalizedSquaredError)[2] = deltaPose.transpose() * tempPoseError;
 
   Eigen::Matrix<double, 9, 1> eye;
   eye << 1, 0, 0, 0, 1, 0, 0, 0, 1;
   int index = 0;
-  rmsError->head<3>() = delta.cwiseAbs2();
+  squaredError->head<3>() = delta.cwiseAbs2();
   index += 3;
-  rmsError->segment<3>(index) = alpha.cwiseAbs2();
+  squaredError->segment<3>(index) = alpha.cwiseAbs2();
   index += 3;
   okvis::SpeedAndBias speedAndBias_est;
   estimator->getSpeedAndBias(currFrameId, 0, speedAndBias_est);
   Eigen::Vector3d deltaV = speedAndBias_est.head<3>() - v_WS_true;
-  rmsError->segment<3>(index) = deltaV.cwiseAbs2();
+  squaredError->segment<3>(index) = deltaV.cwiseAbs2();
   index += 3;
-  rmsError->segment<3>(index) =
+  squaredError->segment<3>(index) =
       (speedAndBias_est.segment<3>(3) - ref_measurement.gyroscopes).cwiseAbs2();
   index += 3;
-  rmsError->segment<3>(index) =
+  squaredError->segment<3>(index) =
       (speedAndBias_est.tail<3>() - ref_measurement.accelerometers).cwiseAbs2();
   index += 3;
 
   if (isFilter) {
     Eigen::Matrix<double, 27, 1> extraParamDeviation =
         estimator->computeImuAugmentedParamsError();
-    rmsError->segment<27>(index) = extraParamDeviation.cwiseAbs2();
+    squaredError->segment<27>(index) = extraParamDeviation.cwiseAbs2();
     index += 27;
   } else {
-    rmsError->segment<27>(index).setZero();
+    squaredError->segment<27>(index).setZero();
     index += 27;
   }
   Eigen::Matrix<double, 3, 1> p_CB_est;
@@ -143,7 +145,7 @@ void computeErrors(
       currFrameId, 0, okvis::HybridFilter::SensorStates::Camera,
       okvis::HybridFilter::CameraSensorStates::T_SCi, T_SC_est);
   p_CB_est = T_SC_est.inverse().r();
-  rmsError->segment<3>(index) = p_CB_est.cwiseAbs2();
+  squaredError->segment<3>(index) = p_CB_est.cwiseAbs2();
   index += 3;
   Eigen::VectorXd intrinsics_true;
   ref_camera_geometry->getIntrinsics(intrinsics_true);
@@ -162,7 +164,7 @@ void computeErrors(
       okvis::ProjectionOptGlobalToLocal(projOptModelId, intrinsics_true,
                                         &local_opt_params);
 
-      rmsError->segment(index, projOptModelDim) =
+      squaredError->segment(index, projOptModelDim) =
           (projectionIntrinsic - local_opt_params).cwiseAbs2();
       index += projOptModelDim;
     }
@@ -173,7 +175,7 @@ void computeErrors(
         currFrameId, 0, okvis::HybridFilter::SensorStates::Camera,
         okvis::HybridFilter::CameraSensorStates::Distortion,
         cameraDistortion_est);
-    rmsError->segment(index, nDistortionCoeffDim) =
+    squaredError->segment(index, nDistortionCoeffDim) =
         (cameraDistortion_est - distIntrinsic_true).cwiseAbs2();
     index += nDistortionCoeffDim;
 
@@ -181,16 +183,16 @@ void computeErrors(
     estimator->getSensorStateEstimateAs<okvis::ceres::CameraTimeParamBlock>(
         currFrameId, 0, okvis::HybridFilter::SensorStates::Camera,
         okvis::HybridFilter::CameraSensorStates::TD, td_est);
-    (*rmsError)[index] = td_est * td_est;
+    (*squaredError)[index] = td_est * td_est;
     ++index;
 
     estimator->getSensorStateEstimateAs<okvis::ceres::CameraTimeParamBlock>(
         currFrameId, 0, okvis::HybridFilter::SensorStates::Camera,
         okvis::HybridFilter::CameraSensorStates::TR, tr_est);
-    (*rmsError)[index] = tr_est * tr_est;
+    (*squaredError)[index] = tr_est * tr_est;
     ++index;
   } else {
-    rmsError->segment(index, projOptModelDim + nDistortionCoeffDim + 2)
+    squaredError->segment(index, projOptModelDim + nDistortionCoeffDim + 2)
         .setZero();
   }
 }
@@ -245,16 +247,16 @@ std::string cameraObservationModelToShorthand(int cameraObservationId) {
   std::string suffix;
   switch (cameraObservationId) {
     case okvis::cameras::kReprojectionErrorId:
-      suffix = "Proj";
+      suffix = "_Proj";
       break;
     case okvis::cameras::kEpipolarFactorId:
-      suffix = "Epi";
+      suffix = "_Epi";
       break;
     case okvis::cameras::kChordalDistanceId:
-      suffix = "Chord";
+      suffix = "_Chord";
       break;
     case okvis::cameras::kReprojectionErrorWithPapId:
-      suffix = "ProjPap";
+      suffix = "_ProjPap";
       break;
     default:
       LOG(ERROR) << "Unknown camera observation model " << cameraObservationId;
@@ -453,6 +455,9 @@ void testHybridFilterSinusoid(const std::string& outputPath,
         cameraSystem0->cameraGeometry(0);
     nees.clear();
     rmse.clear();
+    int expectedNumFrames = times.size() / cameraIntervalRatio + 1;
+    nees.reserve(expectedNumFrames);
+    rmse.reserve(expectedNumFrames);
     try {
       for (auto iter = times.begin(), iterEnd = times.end(); iter != iterEnd;
            iter += cameraIntervalRatio, kale += cameraIntervalRatio,
@@ -551,16 +556,16 @@ void testHybridFilterSinusoid(const std::string& outputPath,
                       << " 0 0" << std::endl;
         }
 
-        Eigen::Vector3d normalizedError;
-        Eigen::VectorXd rmsError;
+        Eigen::Vector3d normalizedSquaredError;
+        Eigen::VectorXd squaredError;
         computeErrors(estimator.get(), estimatorAlgorithm, T_WS, v_WS_true,
                       trueBiasIter->measurement, cameraGeometry0,
-                      projOptModelId, &normalizedError, &rmsError);
+                      projOptModelId, &normalizedSquaredError, &squaredError);
 
-        nees.push_back(std::make_pair(*iter, normalizedError));
-        rmse.push_back(std::make_pair(*iter, rmsError));
+        nees.push_back(std::make_pair(*iter, normalizedSquaredError));
+        rmse.push_back(std::make_pair(*iter, squaredError));
         lastKFTime = currentKFTime;
-      }  // every keyframe
+      }  // every frame
 
       if (neesSum.empty()) {
         neesSum = nees;
@@ -642,194 +647,197 @@ void testHybridFilterSinusoid(const std::string& outputPath,
 //  MSCKF with parallax angle and reprojection errors,
 //  TFVIO (roughly MSCKF with only epipolar constraints),
 //  OKVIS, General estimator}
+
+const int kNumRuns = FLAGS_num_runs;
+
 TEST(MSCKFWithPAP, Torus) {
-  testHybridFilterSinusoid(FLAGS_log_dir, "MSCKF", 5,
+  testHybridFilterSinusoid(FLAGS_log_dir, "MSCKF", kNumRuns,
                            trajectoryLabelToId["Torus"],
                            simul::CameraOrientation::Forward, false, 2, 2);
 }
 
 TEST(MSCKF, WavyCircle) {
-  testHybridFilterSinusoid(FLAGS_log_dir, "MSCKF", 5,
+  testHybridFilterSinusoid(FLAGS_log_dir, "MSCKF", kNumRuns,
                            trajectoryLabelToId["WavyCircle"],
                            simul::CameraOrientation::Forward, false, 0, 1);
 }
 
 TEST(General, WavyCircle) {
-  testHybridFilterSinusoid(FLAGS_log_dir, "General", 5,
+  testHybridFilterSinusoid(FLAGS_log_dir, "General", kNumRuns,
                            trajectoryLabelToId["WavyCircle"],
                            simul::CameraOrientation::Forward, false, 0, 0);
 }
 
 TEST(OKVIS, WavyCircle) {
-  testHybridFilterSinusoid(FLAGS_log_dir, "OKVIS", 5,
+  testHybridFilterSinusoid(FLAGS_log_dir, "OKVIS", kNumRuns,
                            trajectoryLabelToId["WavyCircle"],
                            simul::CameraOrientation::Forward, false, 0, 0);
 }
 
 TEST(MSCKFWithEpipolarConstraint, WavyCircle) {
-  testHybridFilterSinusoid(FLAGS_log_dir, "MSCKF", 5,
+  testHybridFilterSinusoid(FLAGS_log_dir, "MSCKF", kNumRuns,
                            trajectoryLabelToId["WavyCircle"],
                            simul::CameraOrientation::Forward, true, 0, 1);
 }
 
 TEST(MSCKFWithPAP, WavyCircle) {
-  testHybridFilterSinusoid(FLAGS_log_dir, "MSCKF", 5,
+  testHybridFilterSinusoid(FLAGS_log_dir, "MSCKF", kNumRuns,
                            trajectoryLabelToId["WavyCircle"],
                            simul::CameraOrientation::Forward, false, 2, 2);
 }
 
 TEST(MSCKFWithReprojectionErrorPAP, WavyCircle) {
-  testHybridFilterSinusoid(FLAGS_log_dir, "MSCKF", 5,
+  testHybridFilterSinusoid(FLAGS_log_dir, "MSCKF", kNumRuns,
                            trajectoryLabelToId["WavyCircle"],
                            simul::CameraOrientation::Forward, false, 3, 2);
 }
 
 TEST(MSCKFWithEuclidean, WavyCircle) {
-  testHybridFilterSinusoid(FLAGS_log_dir, "MSCKF", 5,
+  testHybridFilterSinusoid(FLAGS_log_dir, "MSCKF", kNumRuns,
                            trajectoryLabelToId["WavyCircle"],
                            simul::CameraOrientation::Forward, false, 0, 0);
 }
 
 TEST(TFVIO, WavyCircle) {
-  testHybridFilterSinusoid(FLAGS_log_dir, "TFVIO", 5,
+  testHybridFilterSinusoid(FLAGS_log_dir, "TFVIO", kNumRuns,
                            trajectoryLabelToId["WavyCircle"],
                            simul::CameraOrientation::Forward, false, 1, 0);
 }
 
 TEST(MSCKF, Squircle) {
-  testHybridFilterSinusoid(FLAGS_log_dir, "MSCKF", 5,
+  testHybridFilterSinusoid(FLAGS_log_dir, "MSCKF", kNumRuns,
                            trajectoryLabelToId["Squircle"],
                            simul::CameraOrientation::Forward, false, 0, 1);
 }
 
 TEST(OKVIS, Squircle) {
-  testHybridFilterSinusoid(FLAGS_log_dir, "OKVIS", 5,
+  testHybridFilterSinusoid(FLAGS_log_dir, "OKVIS", kNumRuns,
                            trajectoryLabelToId["Squircle"],
                            simul::CameraOrientation::Forward, false, 0, 0);
 }
 
 TEST(MSCKFWithEpipolarConstraint, Squircle) {
-  testHybridFilterSinusoid(FLAGS_log_dir, "MSCKF", 5,
+  testHybridFilterSinusoid(FLAGS_log_dir, "MSCKF", kNumRuns,
                            trajectoryLabelToId["Squircle"],
                            simul::CameraOrientation::Forward, true, 0, 1);
 }
 
 TEST(TFVIO, Squircle) {
-  testHybridFilterSinusoid(FLAGS_log_dir, "TFVIO", 5,
+  testHybridFilterSinusoid(FLAGS_log_dir, "TFVIO", kNumRuns,
                            trajectoryLabelToId["Squircle"],
                            simul::CameraOrientation::Forward, false, 1, 0);
 }
 
 TEST(MSCKFWithPAP, Squircle) {
-  testHybridFilterSinusoid(FLAGS_log_dir, "MSCKF", 5,
+  testHybridFilterSinusoid(FLAGS_log_dir, "MSCKF", kNumRuns,
                            trajectoryLabelToId["Squircle"],
                            simul::CameraOrientation::Forward, false, 2, 2);
 }
 
 TEST(MSCKFWithPAP, SquircleBackward) {
-  testHybridFilterSinusoid(FLAGS_log_dir, "MSCKF", 5,
+  testHybridFilterSinusoid(FLAGS_log_dir, "MSCKF", kNumRuns,
                            trajectoryLabelToId["Squircle"],
                            simul::CameraOrientation::Backward, false, 2, 2);
 }
 
 TEST(MSCKFWithPAP, SquircleSideways) {
-  testHybridFilterSinusoid(FLAGS_log_dir, "MSCKF", 5,
+  testHybridFilterSinusoid(FLAGS_log_dir, "MSCKF", kNumRuns,
                            trajectoryLabelToId["Squircle"],
                            simul::CameraOrientation::Right, false, 2, 2);
 }
 
 TEST(MSCKF, Circle) {
-  testHybridFilterSinusoid(FLAGS_log_dir, "MSCKF", 5,
+  testHybridFilterSinusoid(FLAGS_log_dir, "MSCKF", kNumRuns,
                            trajectoryLabelToId["Circle"],
                            simul::CameraOrientation::Forward, false, 0, 1);
 }
 
 TEST(OKVIS, Circle) {
-  testHybridFilterSinusoid(FLAGS_log_dir, "OKVIS", 5,
+  testHybridFilterSinusoid(FLAGS_log_dir, "OKVIS", kNumRuns,
                            trajectoryLabelToId["Circle"],
                            simul::CameraOrientation::Forward, false, 0, 0);
 }
 
 TEST(MSCKFWithEpipolarConstraint, Circle) {
-  testHybridFilterSinusoid(FLAGS_log_dir, "MSCKF", 5,
+  testHybridFilterSinusoid(FLAGS_log_dir, "MSCKF", kNumRuns,
                            trajectoryLabelToId["Circle"],
                            simul::CameraOrientation::Forward, true, 0, 1);
 }
 
 TEST(TFVIO, Circle) {
-  testHybridFilterSinusoid(FLAGS_log_dir, "TFVIO", 5,
+  testHybridFilterSinusoid(FLAGS_log_dir, "TFVIO", kNumRuns,
                            trajectoryLabelToId["Circle"],
                            simul::CameraOrientation::Forward, false, 1, 0);
 }
 
 TEST(MSCKF, Dot) {
-  testHybridFilterSinusoid(FLAGS_log_dir, "MSCKF", 5,
+  testHybridFilterSinusoid(FLAGS_log_dir, "MSCKF", kNumRuns,
                            trajectoryLabelToId["Dot"],
                            simul::CameraOrientation::Forward, false, 0, 1);
 }
 
 TEST(TFVIO, Dot) {
-  testHybridFilterSinusoid(FLAGS_log_dir, "TFVIO", 5,
+  testHybridFilterSinusoid(FLAGS_log_dir, "TFVIO", kNumRuns,
                            trajectoryLabelToId["Dot"],
                            simul::CameraOrientation::Forward, false, 1, 0);
 }
 
 TEST(MSCKFWithEpipolarConstraint, Dot) {
-  testHybridFilterSinusoid(FLAGS_log_dir, "MSCKF", 5,
+  testHybridFilterSinusoid(FLAGS_log_dir, "MSCKF", kNumRuns,
                            trajectoryLabelToId["Dot"],
                            simul::CameraOrientation::Forward, true, 0, 1);
 }
 
 TEST(OKVIS, Dot) {
-  testHybridFilterSinusoid(FLAGS_log_dir, "OKVIS", 5,
+  testHybridFilterSinusoid(FLAGS_log_dir, "OKVIS", kNumRuns,
                            trajectoryLabelToId["Dot"],
                            simul::CameraOrientation::Forward, false, 0, 0);
 }
 
 TEST(MSCKFWithPAP, Dot) {
-  testHybridFilterSinusoid(FLAGS_log_dir, "MSCKF", 5,
+  testHybridFilterSinusoid(FLAGS_log_dir, "MSCKF", kNumRuns,
                            trajectoryLabelToId["Dot"],
                            simul::CameraOrientation::Forward, false, 2, 2);
 }
 
 TEST(MSCKF, Motionless) {
-  testHybridFilterSinusoid(FLAGS_log_dir, "MSCKF", 5,
+  testHybridFilterSinusoid(FLAGS_log_dir, "MSCKF", kNumRuns,
                            trajectoryLabelToId["Motionless"],
                            simul::CameraOrientation::Forward, false, 0, 1);
 }
 
 TEST(MSCKFWithEpipolarConstraint, Motionless) {
-  testHybridFilterSinusoid(FLAGS_log_dir, "MSCKF", 5,
+  testHybridFilterSinusoid(FLAGS_log_dir, "MSCKF", kNumRuns,
                            trajectoryLabelToId["Motionless"],
                            simul::CameraOrientation::Forward, true, 0, 1);
 }
 
 TEST(MSCKFWithPAP, Motionless) {
-  testHybridFilterSinusoid(FLAGS_log_dir, "MSCKF", 5,
+  testHybridFilterSinusoid(FLAGS_log_dir, "MSCKF", kNumRuns,
                            trajectoryLabelToId["Motionless"],
                            simul::CameraOrientation::Forward, false, 2, 2);
 }
 
 TEST(OKVIS, Motionless) {
-  testHybridFilterSinusoid(FLAGS_log_dir, "OKVIS", 5,
+  testHybridFilterSinusoid(FLAGS_log_dir, "OKVIS", kNumRuns,
                            trajectoryLabelToId["Motionless"],
                            simul::CameraOrientation::Forward, false, 0, 0);
 }
 
 TEST(TFVIO, Motionless) {
-  testHybridFilterSinusoid(FLAGS_log_dir, "TFVIO", 5,
+  testHybridFilterSinusoid(FLAGS_log_dir, "TFVIO", kNumRuns,
                            trajectoryLabelToId["Motionless"],
                            simul::CameraOrientation::Forward, false, 1, 0);
 }
 
 TEST(MSCKF, CircleFarPoints) {
-  testHybridFilterSinusoid(FLAGS_log_dir, "MSCKF", 5,
+  testHybridFilterSinusoid(FLAGS_log_dir, "MSCKF", kNumRuns,
                            trajectoryLabelToId["Circle"],
                            simul::CameraOrientation::Forward, false, 0, 1, 50);
 }
 
 TEST(MSCKFWithEpipolarConstraint, CircleFarPoints) {
-  testHybridFilterSinusoid(FLAGS_log_dir, "MSCKF", 5,
+  testHybridFilterSinusoid(FLAGS_log_dir, "MSCKF", kNumRuns,
                            trajectoryLabelToId["Circle"],
                            simul::CameraOrientation::Forward, true, 0, 1);
 }
