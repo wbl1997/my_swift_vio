@@ -1,4 +1,4 @@
-function draw_simul_results(est_file, cmp_file, maxindex)
+function draw_simul_results(est_file, cmp_file)
 
 [result_dir, name_est, ext] = fileparts(est_file);
 [~, name_cmp, ext] = fileparts(cmp_file);
@@ -24,6 +24,7 @@ if isfile(cmp_file)
 else
     cmp_data = [];
 end
+maxindex = max(size(est_data, 1), size(cmp_data, 1));
 data_range=1:maxindex;
 truth_data = readmatrix(truth_file, 'NumHeaderLines', 1);
 close all;
