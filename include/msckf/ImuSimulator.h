@@ -417,7 +417,8 @@ Eigen::Matrix2d rotMat2d(double theta);
 void initImuNoiseParams(
     okvis::ImuParameters* imuParameters, bool addPriorNoise,
     bool addSystemError,
-    double sigma_bg, double sigma_ba, double std_Ta_elem,
+    double sigma_bg, double sigma_ba, double std_Tg_elem,
+    double std_Ts_elem, double std_Ta_elem,
     bool fixImuInternalParams);
 
 /**

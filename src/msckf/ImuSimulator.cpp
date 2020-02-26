@@ -605,7 +605,10 @@ double RoundedSquare::getPeriodRemainder(const okvis::Time time) const {
 void initImuNoiseParams(
     okvis::ImuParameters* imuParameters, bool addPriorNoise,
     bool addSystemError,
-    double sigma_bg, double sigma_ba, double std_Ta_elem,
+    double sigma_bg, double sigma_ba,
+    double std_Tg_elem,
+    double std_Ts_elem,
+    double std_Ta_elem,
     bool fixImuInternalParams) {
   imuParameters->g = 9.81;
   imuParameters->a_max = 1000.0;
@@ -633,8 +636,8 @@ void initImuNoiseParams(
     imuParameters->sigma_TAElement = 0;
   } else {
     // std for every element in shape matrix T_g
-    imuParameters->sigma_TGElement = 5e-3;
-    imuParameters->sigma_TSElement = 1e-3;
+    imuParameters->sigma_TGElement = std_Tg_elem;
+    imuParameters->sigma_TSElement = std_Ts_elem;
     imuParameters->sigma_TAElement = std_Ta_elem;
   }
   imuParameters->model_type = "BG_BA_TG_TS_TA";
