@@ -16,7 +16,7 @@
 
 DECLARE_bool(use_IEKF);
 DEFINE_int32(
-    two_view_obs_seq_type, 2,
+    two_view_obs_seq_type, 0,
     "0 the entire feature track of a landmark is used to "
     "compose two-view constraints which are used in one filter update step "
     "as the landmark disappears; "

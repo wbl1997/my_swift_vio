@@ -42,7 +42,7 @@ DEFINE_double(max_proj_tolerance, 7,
               "maximum tolerable discrepancy between predicted and measured "
               "point coordinates in image in pixel units");
 
-DEFINE_double(image_noise_cov_multiplier, 4.0,
+DEFINE_double(image_noise_cov_multiplier, 5.0,
               "Enlarge the image observation noise covariance by this "
               "multiplier for epipolar constraints to weaken their effect.");
 
@@ -3048,11 +3048,12 @@ bool HybridFilter::featureJacobianEpipolar(
   size_t trackLength = mp.observations.size();
   double headObsCovModifier[2] = {1.0, 1.0};
   headObsCovModifier[0] =
-      seqType == LATEST_TWO
-          ? 1.0 : (static_cast<double>(trackLength - minTrackLength_ + 2u));
+      seqType == HEAD_TAIL
+          ? (static_cast<double>(trackLength - minTrackLength_ + 2u))
+          : 1.0;
 
   std::vector<std::pair<int, int>> featurePairs =
-      TwoViewPair::getFramePairs(numValidDirectionJac, TwoViewPair::FIXED_HEAD_RECEDING_TAIL);
+      TwoViewPair::getFramePairs(numValidDirectionJac, TwoViewPair::SINGLE_HEAD_TAIL);
   const int numConstraints = featurePairs.size();
   int featureVariableDimen = Hi->cols();
   Hi->resize(numConstraints, Eigen::NoChange);
