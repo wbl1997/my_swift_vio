@@ -103,16 +103,11 @@ void computeFeatureMeasJacobian(
 
   // set the imu parameters
   okvis::ImuParameters imuParameters;
-  imuParameters.a0.setZero();
   imuParameters.g = 9.81;
-  imuParameters.a_max = 1000.0;
-  imuParameters.g_max = 1000.0;
-  imuParameters.rate = 100;
   imuParameters.sigma_g_c = 6.0e-4;
   imuParameters.sigma_a_c = 2.0e-3;
   imuParameters.sigma_gw_c = 3.0e-6;
   imuParameters.sigma_aw_c = 2.0e-5;
-  imuParameters.tau = 3600.0;
 
   imuParameters.sigma_bg = 1e-2;  ///< Initial gyroscope bias.
   imuParameters.sigma_ba = 5e-2;  ///< Initial accelerometer bias

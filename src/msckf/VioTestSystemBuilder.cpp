@@ -105,7 +105,6 @@ void VioTestSystemBuilder::createVioSystem(
   Eigen::Vector3d p_WS = truePose.r();
   Eigen::Vector3d v_WS = circularSinusoidalTrajectory->computeGlobalLinearVelocity(startEpoch);
   if (testSetting.addPriorNoise) {
-    //                p_WS += 0.1*Eigen::Vector3d::Random();
     v_WS += vio::Sample::gaussian(1, 3).cwiseProduct(initialNavState_.std_v_WS);
   }
 
@@ -123,10 +122,10 @@ void VioTestSystemBuilder::createVioSystem(
                "z[m/s^2], and noisy gxyz, acc xyz"
             << std::endl;
       }
-      imu::addImuNoise(imuParameters, &imuMeasurements_, &trueBiases_,
-                       testSetting.sim_ga_noise_factor,
-                       testSetting.sim_ga_bias_noise_factor,
-                       inertialStream.get());
+      imu::addNoiseToImuReadings(imuParameters, &imuMeasurements_, &trueBiases_,
+                                 testSetting.sim_ga_noise_factor,
+                                 testSetting.sim_ga_bias_noise_factor,
+                                 inertialStream.get());
   } else {
     trueBiases_ = imuMeasurements_;
     for (size_t i = 0; i < imuMeasurements_.size(); ++i) {

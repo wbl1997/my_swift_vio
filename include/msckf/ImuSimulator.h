@@ -422,19 +422,19 @@ void initImuNoiseParams(
     bool fixImuInternalParams);
 
 /**
- * @brief addImuNoise
+ * @brief addNoiseToImuReadings
  * @param imuParameters
  * @param imuMeasurements as input original perfect imu measurement,
  *     as output imu measurements with added bias and noise
  * @param trueBiases output added biases
  * @param inertialStream
  */
-void addImuNoise(const okvis::ImuParameters& imuParameters,
-                 okvis::ImuMeasurementDeque* imuMeasurements,
-                 okvis::ImuMeasurementDeque* trueBiases,
-                 double gyroAccelNoiseFactor,
-                 double gyroAccelBiasNoiseFactor,
-                 std::ofstream* inertialStream);
+void addNoiseToImuReadings(const okvis::ImuParameters& imuParameters,
+                           okvis::ImuMeasurementDeque* imuMeasurements,
+                           okvis::ImuMeasurementDeque* trueBiases,
+                           double gyroAccelNoiseFactor,
+                           double gyroAccelBiasNoiseFactor,
+                           std::ofstream* inertialStream);
 
 } // namespace imu
 #endif

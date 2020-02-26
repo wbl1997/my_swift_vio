@@ -670,17 +670,19 @@ void initImuNoiseParams(
   }
 }
 
-void addImuNoise(const okvis::ImuParameters& imuParameters,
-                 okvis::ImuMeasurementDeque* imuMeasurements,
-                 okvis::ImuMeasurementDeque* trueBiases,
-                 double gyroAccelNoiseFactor,
-                 double gyroAccelBiasNoiseFactor,
-                 std::ofstream* inertialStream) {
+void addNoiseToImuReadings(const okvis::ImuParameters& imuParameters,
+                           okvis::ImuMeasurementDeque* imuMeasurements,
+                           okvis::ImuMeasurementDeque* trueBiases,
+                           double gyroAccelNoiseFactor,
+                           double gyroAccelBiasNoiseFactor,
+                           std::ofstream* inertialStream) {
   double noiseFactor = gyroAccelNoiseFactor;
   double biasNoiseFactor = gyroAccelBiasNoiseFactor;
   LOG(INFO) << "noise downscale factor " << noiseFactor
             << " bias noise downscale factor " << biasNoiseFactor;
   *trueBiases = (*imuMeasurements);
+  // The expected means of the prior of biases, imuParameters.g0 and a0,
+  // fed to the estimator, are different from the true biases.
   Eigen::Vector3d bgk = Eigen::Vector3d::Zero();
   Eigen::Vector3d bak = Eigen::Vector3d::Zero();
 
