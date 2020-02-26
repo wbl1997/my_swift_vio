@@ -1,34 +1,27 @@
-function draw_rmse(est_file, cmp_file)
-if nargin < 2
-    cmp_file = est_file;
-end
-est_line_style = {'r', 'g', 'b'};
-cmp_line_style = {'--r', '--g', '--b'};
-[result_dir, name_est, ext] = fileparts(est_file);
-[result_dir, name_cmp, ext] = fileparts(cmp_file);
+function draw_rmse(est_files)
+line_styles = {{'-r', '-g', '-b'}, {'--r', '--g', '--b'},...
+    {'-.r', '-.g', '-.b'}, {':r', ':g', ':b'}, ...
+    {'-m', '-y', '-k'}, {'--m', '--y', '--k'}};
+
 indices = 2:4;
-est_data = readmatrix(est_file, 'NumHeaderLines', 1);
-cmp_data = readmatrix(cmp_file, 'NumHeaderLines', 1);
-figure;
-draw_data_columns(est_data, indices, 1.0, false, est_line_style);
-draw_data_columns(cmp_data, indices, 1.0, false, cmp_line_style);
-leg = legend([name_est, '-px'], [name_est, '-py'], [name_est, '-pz'], ...
-    [name_cmp, '-px'], [name_cmp, '-py'], [name_cmp, '-pz']);
-set(leg,'Interpreter', 'none');
-
+draw_rmse_columns(est_files, line_styles, indices, {'-px', '-py', '-pz'});
 indices = 5:7;
-figure;
-draw_data_columns(est_data, indices, 1.0, false, est_line_style);
-draw_data_columns(cmp_data, indices, 1.0, false, cmp_line_style);
-leg = legend([name_est, '-qx'], [name_est, '-qy'], [name_est, '-qz'], ...
-    [name_cmp, '-qx'], [name_cmp, '-qy'], [name_cmp, '-qz']);
-set(leg,'Interpreter', 'none');
-
+draw_rmse_columns(est_files, line_styles, indices, {'-qx', '-qy', '-qz'});
 indices = 8:10;
+draw_rmse_columns(est_files, line_styles, indices, {'-vx', '-vy', '-vz'});
+end
+
+function draw_rmse_columns(est_files, line_styles, indices, labels)
 figure;
-draw_data_columns(est_data, indices, 1.0, false, est_line_style);
-draw_data_columns(cmp_data, indices, 1.0, false, cmp_line_style);
-leg = legend([name_est, '-vx'], [name_est, '-vy'], [name_est, '-vz'], ...
-    [name_cmp, '-vx'], [name_cmp, '-vy'], [name_cmp, '-vz']);
-set(leg,'Interpreter', 'none');
+legend_list = {};
+for i = 1:length(est_files)
+    est_file = est_files{i};
+    [result_dir, name_est, ext] = fileparts(est_file);
+    est_data = readmatrix(est_file, 'NumHeaderLines', 1);
+    est_line_style = line_styles{i};
+    draw_data_columns(est_data, indices, 1.0, false, est_line_style);
+    legend_list = {legend_list{:}, [name_est, labels{1}], ...
+        [name_est, labels{2}], [name_est, labels{3}]};
+end
+legend(legend_list);
 end

@@ -50,6 +50,9 @@ std::vector<std::pair<int, int>> TwoViewPair::getFramePairs(
         framePairs.emplace_back(j, halfFeatures);
       }
       break;
+    case SINGLE_HEAD_TAIL:
+      framePairs.emplace_back(0, numFeatures - 1);
+      break;
     case MAX_GAP_EVEN_CHANCE:
     default:
       if (numFeatures < static_cast<int>(pairs_lut.size())) {

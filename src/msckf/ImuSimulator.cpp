@@ -605,7 +605,10 @@ double RoundedSquare::getPeriodRemainder(const okvis::Time time) const {
 void initImuNoiseParams(
     okvis::ImuParameters* imuParameters, bool addPriorNoise,
     bool addSystemError,
-    double sigma_bg, double sigma_ba, double std_Ta_elem,
+    double sigma_bg, double sigma_ba,
+    double std_Tg_elem,
+    double std_Ts_elem,
+    double std_Ta_elem,
     bool fixImuInternalParams) {
   imuParameters->g = 9.81;
   imuParameters->a_max = 1000.0;
@@ -633,8 +636,8 @@ void initImuNoiseParams(
     imuParameters->sigma_TAElement = 0;
   } else {
     // std for every element in shape matrix T_g
-    imuParameters->sigma_TGElement = 5e-3;
-    imuParameters->sigma_TSElement = 1e-3;
+    imuParameters->sigma_TGElement = std_Tg_elem;
+    imuParameters->sigma_TSElement = std_Ts_elem;
     imuParameters->sigma_TAElement = std_Ta_elem;
   }
   imuParameters->model_type = "BG_BA_TG_TS_TA";
@@ -667,17 +670,19 @@ void initImuNoiseParams(
   }
 }
 
-void addImuNoise(const okvis::ImuParameters& imuParameters,
-                 okvis::ImuMeasurementDeque* imuMeasurements,
-                 okvis::ImuMeasurementDeque* trueBiases,
-                 double gyroAccelNoiseFactor,
-                 double gyroAccelBiasNoiseFactor,
-                 std::ofstream* inertialStream) {
+void addNoiseToImuReadings(const okvis::ImuParameters& imuParameters,
+                           okvis::ImuMeasurementDeque* imuMeasurements,
+                           okvis::ImuMeasurementDeque* trueBiases,
+                           double gyroAccelNoiseFactor,
+                           double gyroAccelBiasNoiseFactor,
+                           std::ofstream* inertialStream) {
   double noiseFactor = gyroAccelNoiseFactor;
   double biasNoiseFactor = gyroAccelBiasNoiseFactor;
   LOG(INFO) << "noise downscale factor " << noiseFactor
             << " bias noise downscale factor " << biasNoiseFactor;
   *trueBiases = (*imuMeasurements);
+  // The expected means of the prior of biases, imuParameters.g0 and a0,
+  // fed to the estimator, are different from the true biases.
   Eigen::Vector3d bgk = Eigen::Vector3d::Zero();
   Eigen::Vector3d bak = Eigen::Vector3d::Zero();
 

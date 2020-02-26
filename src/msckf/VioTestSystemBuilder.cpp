@@ -27,7 +27,10 @@ void VioTestSystemBuilder::createVioSystem(
     std::string pointFile) {
   const double DURATION = 300.0;  // length of motion in seconds
   double pCB_std = 2e-2;
+  double bg_std = 5e-3;
   double ba_std = 2e-2;
+  double Tg_std = 5e-3;
+  double Ts_std = 1e-3;
   double Ta_std = 5e-3;
   bool zeroCameraIntrinsicParamNoise = FLAGS_zero_camera_intrinsic_param_noise;
   bool zeroImuIntrinsicParamNoise = FLAGS_zero_imu_intrinsic_param_noise;
@@ -41,7 +44,8 @@ void VioTestSystemBuilder::createVioSystem(
 
   okvis::ImuParameters imuParameters;
   imu::initImuNoiseParams(&imuParameters, testSetting.addPriorNoise,
-                          testSetting.addSystemError, 5e-3, ba_std, Ta_std,
+                          testSetting.addSystemError, bg_std, ba_std,
+                          Tg_std, Ts_std, Ta_std,
                           zeroImuIntrinsicParamNoise);
   imuModelType_ = imuParameters.model_type;
 
@@ -101,7 +105,6 @@ void VioTestSystemBuilder::createVioSystem(
   Eigen::Vector3d p_WS = truePose.r();
   Eigen::Vector3d v_WS = circularSinusoidalTrajectory->computeGlobalLinearVelocity(startEpoch);
   if (testSetting.addPriorNoise) {
-    //                p_WS += 0.1*Eigen::Vector3d::Random();
     v_WS += vio::Sample::gaussian(1, 3).cwiseProduct(initialNavState_.std_v_WS);
   }
 
@@ -119,10 +122,10 @@ void VioTestSystemBuilder::createVioSystem(
                "z[m/s^2], and noisy gxyz, acc xyz"
             << std::endl;
       }
-      imu::addImuNoise(imuParameters, &imuMeasurements_, &trueBiases_,
-                       testSetting.sim_ga_noise_factor,
-                       testSetting.sim_ga_bias_noise_factor,
-                       inertialStream.get());
+      imu::addNoiseToImuReadings(imuParameters, &imuMeasurements_, &trueBiases_,
+                                 testSetting.sim_ga_noise_factor,
+                                 testSetting.sim_ga_bias_noise_factor,
+                                 inertialStream.get());
   } else {
     trueBiases_ = imuMeasurements_;
     for (size_t i = 0; i < imuMeasurements_.size(); ++i) {

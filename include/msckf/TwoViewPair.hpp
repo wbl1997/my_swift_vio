@@ -14,6 +14,7 @@ class TwoViewPair {
     FIXED_TAIL_RECEDING_HEAD,
     FIXED_MIDDLE,
     MAX_GAP_EVEN_CHANCE,
+    SINGLE_HEAD_TAIL,
   };
 
   /**

@@ -27,12 +27,15 @@ TEST(EpipolarFactor, Jacobians) {
   bool addImageNoise = true;
   double bg_std = 5e-3;
   double ba_std = 2e-2;
+  double Tg_std = 5e-3;
+  double Ts_std = 1e-3;
   double Ta_std = 5e-3;
   double sigma_td = 5e-3;
   bool zeroImuIntrinsicParamNoise = !addSystemError;
   okvis::ImuParameters imuParameters;
   imu::initImuNoiseParams(&imuParameters, addPriorNoise, addSystemError,
-                          bg_std, ba_std, Ta_std, zeroImuIntrinsicParamNoise);
+                          bg_std, ba_std, Tg_std, Ts_std, Ta_std,
+                          zeroImuIntrinsicParamNoise);
 
   std::shared_ptr<imu::CircularSinusoidalTrajectory> cst;
   cst.reset(new imu::RoundedSquare(imuParameters.rate,
