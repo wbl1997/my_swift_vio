@@ -6,13 +6,16 @@ function draw_all_rmse_iros2020(output_dir, index)
 % -1, sqrt(x^2 + y^2 + z^2)
 % -2, sqrt(roll^2 + pitch^2 + yaw^2)
 % to generate the IROS202O figures
-% draw_rmse_iros2020('/media/jhuai/Seagate/jhuai/RSS-2020/results/msckf_simulation', -1)
-% draw_rmse_iros2020('/media/jhuai/Seagate/jhuai/RSS-2020/results/msckf_simulation', -2)
-
+% draw_all_rmse_iros2020('/media/jhuai/Seagate/jhuai/RSS-2020/results/msckf_simulation', -1)
+% draw_all_rmse_iros2020('/media/jhuai/Seagate/jhuai/RSS-2020/results/msckf_simulation', -2)
+addpath('/media/jhuai/Seagate/jhuai/tools/export_fig/');
 background_color='None'; % set to None for paper.
 motion_list = {'WavyCircle', 'Squircle', 'Dot', 'Motionless'};
-estimator_list = {'OKVIS_Proj_Euc_F', 'MSCKF_Proj_Idp_F', 'MSCKF_Epi_Proj_Idp_F', 'TFVIO_Epi_Euc_F'};
-label_list={'OKVIS', 'MSCKF', 'Epi-MSCKF', 'TFVIO'};
+estimator_list = {'OKVIS_Proj_Euc_F', 'MSCKF_Proj_Idp_F', ...
+    'MSCKF_Epi_Proj_Idp_F', 'TFVIO_Epi_Euc_F', ...
+    'DeadreckoningM_Proj_Idp_F'};
+line_styles = {'--b', '--k', '-k', '-.k', '-b', '-c'};
+label_list={'OKVIS', 'MSCKF', 'Epi-MSCKF', 'TFVIO', 'IMU-DR'};
 radtodeg = 180 / pi;
 
 close all;
@@ -41,9 +44,9 @@ for motion_id = 1:length(motion_list)
                     disp(['Unsupported index ', num2str(index)]);
             end
         end
-        plot(rmse(:, 1) - start_time, rmse_interest); hold on;
+        plot(rmse(:, 1) - start_time, rmse_interest, line_styles{estimator_id}); hold on;
         if max(rmse_interest > 100)
-            ylim([0, 100]);
+            ylim([0, 20]);
         end
     end
     xlabel('time (sec)');
@@ -54,7 +57,11 @@ for motion_id = 1:length(motion_list)
     end
     titlestr = [motion_list{motion_id} '_rmse_' num2str(index)];
     grid on;
-    legend(label_list, 'Location', 'northwest');
+    if index == -2
+        legend(label_list, 'Location', 'northwest');
+    else
+        legend(label_list, 'Location', 'northeast');
+    end
     set(gcf, 'Color', background_color);
     outputfig = [output_dir, '/', titlestr, '.eps'];
     if exist(outputfig, 'file')==2
