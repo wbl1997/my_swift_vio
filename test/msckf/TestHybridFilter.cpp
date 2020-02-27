@@ -375,12 +375,15 @@ void testHybridFilterSinusoid(const std::string& outputPath,
   if (landmarkRadius >= okvis::SimulationFrontend::kRangeThreshold) {
     suffix += "_Far";
   }
+  std::string methodIdentifier =  estimatorLabel + suffix + "_" + trajLabel;
   LOG(INFO) << "Estimator algorithm: " << estimatorLabel << suffix
             << " trajectory " << trajLabel;
-  std::string pathEstimatorTrajectory = outputPath + "/" + estimatorLabel + suffix + "_" +
-      trajLabel;
+  std::string pathEstimatorTrajectory = outputPath + "/" + methodIdentifier;
   std::string neesFile = pathEstimatorTrajectory + "_NEES.txt";
   std::string rmseFile = pathEstimatorTrajectory + "_RMSE.txt";
+  std::string metadataFile = pathEstimatorTrajectory + "_metadata.txt";
+  std::ofstream metaStream;
+  metaStream.open(metadataFile, std::ofstream::out);
 
   // only output the ground truth and data for the first successful trial
   bool bVerbose = false;
@@ -402,11 +405,11 @@ void testHybridFilterSinusoid(const std::string& outputPath,
         estimatorAlgorithm, useEpipolarConstraint, cameraObservationModelId,
         landmarkModelId)};
 
-    LOG(INFO) << "Run " << run << " " << testSetting.print();
+    LOG(INFO) << "Run " << run << " " << methodIdentifier << " " << testSetting.print();
 
     std::string pointFile = outputPath + "/" + trajLabel + "_Points.txt";
     std::string imuSampleFile = outputPath + "/" + trajLabel + "_IMU.txt";
-
+    
     if (bVerbose) {
       truthStream.open(truthFile, std::ofstream::out);
       truthStream << "%state timestamp, frameIdInSource, T_WS(xyz, xyzw), "
@@ -595,10 +598,11 @@ void testHybridFilterSinusoid(const std::string& outputPath,
 
       check_tail_mse(rmse.back().second, projOptModelId);
       check_tail_nees(nees.back().second);
-
-      LOG(INFO) << "Run " << run << " finishes with last added frame " << frameCount
-                << " of tracked features " << trackedFeatures << std::endl;
-
+      std::stringstream ss;
+      ss << "Run " << run << " finishes with last added frame " << frameCount
+                << " of tracked features " << trackedFeatures;
+      LOG(INFO) << ss.str();
+      metaStream << ss.str() << std::endl;
       // output track length distribution
       std::ofstream trackStatStream(trackStatFile, std::ios_base::out);
       estimator->printTrackLengthHistogram(trackStatStream);
@@ -619,7 +623,10 @@ void testHybridFilterSinusoid(const std::string& outputPath,
 //      unlink(outputFile.c_str());
     }
     double elapsedTime = filterTimer.stop();
-    LOG(INFO) << "Run " << run << " using time [sec] " << elapsedTime;
+    std::stringstream sstream;
+    sstream << "Run " << run << " using time [sec] " << elapsedTime;
+    LOG(INFO) << sstream.str();
+    metaStream << sstream.str() << std::endl;
   }  // next run
 
   HistogramType hist = boost::accumulators::density(frameFeatureTally);
@@ -652,6 +659,9 @@ void testHybridFilterSinusoid(const std::string& outputPath,
   for (auto it = rmseSum.begin(); it != rmseSum.end(); ++it)
     rmseStream << it->first << " " << it->second.transpose() << std::endl;
   rmseStream.close();
+
+  metaStream << "#successful runs " << successRuns << " out of runs " << runs << std::endl;
+  metaStream.close();
 }
 
 // FLAGS_log_dir can be passed in commandline as --log_dir=/some/log/dir
