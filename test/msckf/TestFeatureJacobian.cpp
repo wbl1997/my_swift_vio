@@ -124,8 +124,9 @@ void testPointLandmarkJacobian(std::string projOptModelName,
   simul::VioTestSystemBuilder vioSystemBuilder;
   bool addPriorNoise = true;
   bool useEpipolarConstraint = false;
-  okvis::TestSetting testSetting(true, addPriorNoise, false, true, true, 0.5,
-                                 0.5, okvis::EstimatorAlgorithm::MSCKF, useEpipolarConstraint,
+  double noise_factor = 0.5 * std::sqrt(2.0);
+  okvis::TestSetting testSetting(true, addPriorNoise, false, true, true, noise_factor,
+                                 noise_factor, okvis::EstimatorAlgorithm::MSCKF, useEpipolarConstraint,
                                  cameraObservationModelId, landmarkModelId);
   int trajectoryId = 0; // Torus
   int cameraModelId = 0;

@@ -195,8 +195,8 @@ struct TestSetting {
 
   TestSetting(bool _addImuNoise = true, bool _addPriorNoise = true,
               bool _addSystemError = false, bool _addImageNoise = true,
-              bool _useImageObservs = true, double _sim_ga_noise_factor = 0.5,
-              double _sim_ga_bias_noise_factor = 0.5,
+              bool _useImageObservs = true, double _sim_ga_noise_factor = 0.70711,
+              double _sim_ga_bias_noise_factor = 0.70711,
               okvis::EstimatorAlgorithm _estimator_algorithm =
                   okvis::EstimatorAlgorithm::MSCKF,
               bool _useEpipolarConstraint = false,
