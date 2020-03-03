@@ -34,8 +34,6 @@ ENDIF()
 
 message(STATUS "Building MSCKF with ${CMAKE_BUILD_TYPE}")
 
-option(BUILD_TESTS "Builds all gtests" OFF)
-
 set(OKVIS_SOURCE_PATH okvis)
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS}  -Wall -O3 -march=native ")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -O3 -march=native")
@@ -221,28 +219,9 @@ list(APPEND TEST_SRC_FILES
     test/std/TestStdAccumulate.cpp
     )
 
-#QtCreator may not create the allTests target
-#if(CATKIN_ENABLE_TESTING)
-#  set(PROJECT_TEST_NAME ${PROJECT_NAME}_test)
-#  catkin_add_gtest(${PROJECT_TEST_NAME} ${TEST_SRC_FILES})
-#  target_link_libraries(${PROJECT_TEST_NAME} ${PROJECT_NAME} gtest gmock pthread)
-#endif()
-
-if(BUILD_TESTS)
-# The below lines cause tr1 not found issue in Ubuntu 16.04
-#  if(APPLE)
-#    add_definitions(-DGTEST_HAS_TR1_TUPLE=1)
-#  else()
-#    add_definitions(-DGTEST_HAS_TR1_TUPLE=0)
-#  endif(APPLE)
-  enable_testing()
+# In a catkin package, do not use or link gtest which is supported poorly.
+if(CATKIN_ENABLE_TESTING)
   set(PROJECT_TEST_NAME ${PROJECT_NAME}_test)
-  add_executable(${PROJECT_TEST_NAME}
-    ${TEST_SRC_FILES}
-  )
-  target_link_libraries(${PROJECT_TEST_NAME}
-    ${PROJECT_NAME}
-    gtest gmock
-    pthread)
-  add_test(test ${PROJECT_TEST_NAME})
+  catkin_add_gtest(${PROJECT_TEST_NAME} ${TEST_SRC_FILES})
+  target_link_libraries(${PROJECT_TEST_NAME} ${PROJECT_NAME})
 endif()

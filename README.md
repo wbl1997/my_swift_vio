@@ -53,14 +53,11 @@ sudo apt-get install libboost-dev libboost-filesystem-dev
 sudo apt-get install python-catkin-tools
 ```
 
-* gtest and gmock
+* gtest (**No operation required**)
 
 ros melodic will install the source files for the following three packages by default: googletest libgtest-dev google-mock.
 The googletest package includes source for both googletest and googlemock.
-The two modules can be installed by using cmake within the googletest package source directory as 
-done in [here](https://github.com/JzHuai0108/docker-headless-vnc-container/blob/master/src/ubuntu/install/gtest.sh)
-Currently both gtest and gmock are installed in the /usr/lib directory for convenience,
-as both vio_common and msckf depend on them.
+*Do not manually cmake and install gtest libraries to /usr/lib. It is a bad practice*.
 
 * vio_common
 
@@ -118,17 +115,17 @@ TODO(jhuai): the progress percentage in building msckf jumps back and forth with
 This effect is not observed with OKVIS_ROS. 
 An comparison of the CMakeLists.txt between msckf and okvis_ros does not reveal suspicious differences.
 
-## Run tests
-
+## Build and run tests
+* To build all tests
+```
+catkin build msckf --catkin-make-args run_tests # or
+catkin build --make-args tests -- msckf
+```
 * To run all tests,
 ```
-# catkin build msckf --catkin-make-args run_tests # or
+catkin build msckf --catkin-make-args run_tests # or
 rosrun msckf msckf_test
 ```
-
-TODO(jhuai): the catkin build run_tests is experimental, please check the CMakeLists.txt 
-and refer to the answer [here](https://answers.ros.org/question/293827/catkin-build-run_tests-stuck-in-a-loop/) 
-in order to improve it.
 
 * To run selected tests, e.g.,
 ```
@@ -180,19 +177,6 @@ QtCreator may not find cmake files for libraries like roscpp,
 set the path like /opt/ros/kinetic/share/roscpp/cmake. Doing similar changes for other not found ros libraries.
 
 To enable debug mode, in the Build option panel, set CMake Build Type to Debug.
-
-Then set CMake Build Key BUILD_GTEST=OFF, BUILD_GMOCK=OFF because their libs will be installed 
-in /usr/lib in the installing prerequisite packages step.
-Also set CATKIN_ENABLE_TESTING=OFF because it will cause the below error for gtest and gmock.
-
-```
-CMake Error at /opt/ros/melodic/share/catkin/cmake/test/gtest.cmake:343 (set_target_properties):
-  set_target_properties Can not find target to add properties to: gtest
-Call Stack (most recent call first):
-  /opt/ros/melodic/share/catkin/cmake/all.cmake:164 (include)
-  /opt/ros/melodic/share/catkin/cmake/catkinConfig.cmake:20 (include)
-  CMakeLists.txt:46 (find_package)
-```
 
 To start debugging, add commandline arguments in the Run option panel, then press the Run icon.
 
