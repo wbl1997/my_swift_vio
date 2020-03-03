@@ -49,6 +49,7 @@ HybridVio::HybridVio(okvis::VioParameters &parameters,
       estimator_(estimator),
       frontend_(frontend),
       parameters_(parameters),
+      viewerNamePrefix_("Feature matches for camera"),
       maxImuInputQueueSize_(60) {
   init();
 }
@@ -63,6 +64,7 @@ HybridVio::HybridVio(okvis::VioParameters &parameters)
       optimizationDone_(true),
       frontend_(parameters.nCameraSystem.numCameras()),
       parameters_(parameters),
+      viewerNamePrefix_("Feature matches for camera"),
       maxImuInputQueueSize_(2 * max_camera_input_queue_size *
                             parameters.imu.rate /
                             parameters.sensors_information.cameraRate) {
@@ -126,7 +128,7 @@ void HybridVio::init() {
   if(parameters_.visualization.displayImages){
     for (size_t im = 0; im < parameters_.nCameraSystem.numCameras(); im++) {
       std::stringstream windowname;
-      windowname << "OKVIS camera " << im;
+      windowname << viewerNamePrefix_ << " " << im;
   	  cv::namedWindow(windowname.str());
     }
   }
@@ -675,17 +677,24 @@ void HybridVio::differentialConsumerLoop() {}
 
 // Loop that visualizes completed frames.
 void HybridVio::visualizationLoop() {
-  okvis::VioVisualizer visualizer_(parameters_);
+  okvis::VioVisualizer visualizer_(parameters_, viewerNamePrefix_);
   for (;;) {
     VioVisualizer::VisualizationData::Ptr new_data;
     if (visualizationData_.PopBlocking(&new_data) == false)
       return;
     //visualizer_.showDebugImages(new_data);
+    const bool drawMatches = false;
     std::vector<cv::Mat> out_images(parameters_.nCameraSystem.numCameras());
-    for (size_t i = 0; i < parameters_.nCameraSystem.numCameras(); ++i) {
-      out_images[i] = visualizer_.drawMatches(new_data, i);
+    if (drawMatches) {
+      for (size_t i = 0; i < parameters_.nCameraSystem.numCameras(); ++i) {
+        out_images[i] = visualizer_.drawMatches(new_data, i);
+      }
+    } else {
+      for (size_t i = 0; i < parameters_.nCameraSystem.numCameras(); ++i) {
+        out_images[i] = visualizer_.drawColoredKeypoints(new_data, i);
+      }
     }
-	displayImages_.PushNonBlockingDroppingIfFull(out_images,1);
+    displayImages_.PushNonBlockingDroppingIfFull(out_images,1);
   }
 }
 
@@ -699,7 +708,7 @@ void HybridVio::display() {
   // draw
   for (size_t im = 0; im < parameters_.nCameraSystem.numCameras(); im++) {
     std::stringstream windowname;
-    windowname << "OKVIS camera " << im;
+    windowname << viewerNamePrefix_ << " " << im;
     cv::imshow(windowname.str(), out_images[im]);
   }
   cv::waitKey(1);
@@ -811,6 +820,7 @@ void HybridVio::optimizationLoop() {
             if (estimator_->isLandmarkAdded(it->landmarkId)) {
               estimator_->getLandmark(it->landmarkId, landmark);
               it->landmark_W = landmark.pointHomog;
+              it->numObservations = static_cast<int>(landmark.observations.size());
               if (estimator_->isLandmarkInitialized(it->landmarkId))
                 it->isInitialized = true;
               else

@@ -415,6 +415,8 @@ class HybridVio : public VioInterface {
 
   okvis::VioParameters parameters_;  ///< The parameters and settings.
 
+  std::string viewerNamePrefix_;
+
   /// The maximum input queue size before IMU measurements are dropped.
   /// The maximum input queue size for the camera measurements is proportionally
   /// higher depending on the ratio between IMU and camera rate.
