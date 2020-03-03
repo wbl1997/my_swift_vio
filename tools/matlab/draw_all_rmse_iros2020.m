@@ -14,7 +14,7 @@ motion_list = {'WavyCircle', 'Squircle', 'Dot', 'Motionless'};
 estimator_list = {'OKVIS_Proj_Euc_F', 'MSCKF_Proj_Idp_F', ...
     'MSCKF_Epi_Proj_Idp_F', 'TFVIO_Epi_Euc_F', ...
     'DeadreckoningM_Proj_Idp_F'};
-line_styles = {'--b', '--k', '-k', '-.k', '-b', '-c'};
+line_styles = {'-b', '-k', '-r', '-g', '-.b', '-.k'};
 label_list={'OKVIS', 'MSCKF', 'Epi-MSCKF', 'TFVIO', 'IMU-DR'};
 radtodeg = 180 / pi;
 
@@ -45,10 +45,15 @@ for motion_id = 1:length(motion_list)
             end
         end
         plot(rmse(:, 1) - start_time, rmse_interest, line_styles{estimator_id}); hold on;
-        if max(rmse_interest > 100)
-            ylim([0, 20]);
+        if index == -1
+            ylim([5e-3, 100]);
+        else
+            ylim([5e-2, 100]);
         end
+            set(gca, 'YScale', 'log');
+        xlim([-10, 310]);
     end
+    
     xlabel('time (sec)');
     if (index >= 5 || index == -2)
         ylabel('RMSE_{yaw} (^{\circ})');
@@ -57,10 +62,12 @@ for motion_id = 1:length(motion_list)
     end
     titlestr = [motion_list{motion_id} '_rmse_' num2str(index)];
     grid on;
-    if index == -2
-        legend(label_list, 'Location', 'northwest');
-    else
-        legend(label_list, 'Location', 'northeast');
+    if motion_id == 1
+        if index == -2
+            legend(label_list, 'Location', 'northwest');
+        else
+            legend(label_list, 'Location', 'northeast');
+        end
     end
     set(gcf, 'Color', background_color);
     outputfig = [output_dir, '/', titlestr, '.eps'];

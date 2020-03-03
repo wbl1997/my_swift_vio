@@ -712,7 +712,8 @@ void addNoiseToImuReadings(const okvis::ImuParameters& imuParameters,
                                3));
     // eq 51, Oliver Woodman, An introduction to inertial navigation,
     // we do not divide sqrtDeltaT by sqrtT because sigma_gw_c is bias white noise density
-    // whereas eq 51 uses bias instability having the same unit as the IMU measurements
+    // for bias random walk (BRW) whereas eq 51 uses bias instability (BS) having the
+    // same unit as the IMU measurements. also see eq 9 therein.
     bgk += vio::Sample::gaussian(
         imuParameters.sigma_gw_c * sqrtDeltaT * biasNoiseFactor, 3);
     bak += vio::Sample::gaussian(

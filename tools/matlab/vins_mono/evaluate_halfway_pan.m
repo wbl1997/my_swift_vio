@@ -38,7 +38,7 @@ end
 output_file = [root_dir, '/metric_values.csv'];
 fileID = fopen(output_file,'w');
 fprintf(fileID, ['%%folder,estimator_file,data_uration,delta_o,range,delta_s,'...
-    'delta. The last two are irrelevant for pan and standstill data.\n']);
+    'delta, The last two are irrelevant for pan and standstill data.\n']);
 for i = 1:length(folderlist)
     if contains(namelist{i}, 'vins_result_ex.csv')
         continue

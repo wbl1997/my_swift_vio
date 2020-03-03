@@ -58,22 +58,46 @@ if visualize_result == 1
     figure;
     plot3(position_data(:, 2), position_data(:, 3), position_data(:, 4), 'b-');
     hold on;
-    plot3(endpoints(1, :), endpoints(2, :), endpoints(3, :), 'k');
+    endpoints = extend_endpoints(endpoints);
+    plot3(endpoints(1, :), endpoints(2, :), endpoints(3, :), '--k');
+    % draw the loop closure error
+    start_end = position_data([1, end], 2:4);
+    markerSize = 4;
+    plot3(start_end(:, 1), start_end(:, 2), start_end(:, 3), '--b');
+    plot3(start_end(1, 1), start_end(1, 2), start_end(1, 3), 'mo', 'MarkerSize', markerSize);
+    plot3(start_end(2, 1), start_end(2, 2), start_end(2, 3), 'ms', 'MarkerSize', markerSize);
+    annotate_line_fitting(est_file);
+    
     % draw the estimated length projection
-    plot3(foot(1, 1), foot(1, 2), foot(1, 3), 'ro');
+    start_projection = [position_data(1, 2:4);...
+        foot(1, 1:3)];
+    plot3(start_projection(:, 1), start_projection(:, 2), start_projection(:, 3), '-r', 'LineWidth', 1);
     perp_farthest = [position_data(xindex, 2:4);...
         foot(xindex, 1:3)];
-    plot3(perp_farthest(:, 1), perp_farthest(:, 2), perp_farthest(:, 3), '-rs');
+    plot3(perp_farthest(:, 1), perp_farthest(:, 2), perp_farthest(:, 3), '-r', 'LineWidth', 1);
+    estimated_line = foot([1, xindex], 1:3);
+    plot3(estimated_line(:, 1), estimated_line(:, 2), estimated_line(:, 3), '-ks', 'MarkerSize', markerSize);
+    
     % draw the max length perpendicular line segment
-    perp = [position_data(dindex, 2:4);...
-        foot(dindex, 1:3)];
-    plot3(perp(:, 1), perp(:, 2), perp(:, 3), '-b+');
+%     perp = [position_data(dindex, 2:4);...
+%         foot(dindex, 1:3)];
+%     plot3(perp(:, 1), perp(:, 2), perp(:, 3), '-m+');
+    
+    % draw the parallal deviation bound
+    
+    upper_endpoints = parallel_line(endpoints, delta);
+    lower_endpoints = parallel_line(endpoints, -delta);
+    plot3(upper_endpoints(1, :), upper_endpoints(2, :), upper_endpoints(3, :), '-.k');
+    plot3(lower_endpoints(1, :), lower_endpoints(2, :), lower_endpoints(3, :), '-.k');
+    
     axis equal;
     grid on;
-    xlabel('x');
-    ylabel('y');
-    zlabel('z');
+    xlabel('x (m)');
+    ylabel('y (m)');
+    zlabel('z (m)');
+    view([90, 90]);
     titlestr = 'line_fitting';
+    set(gcf, 'Color', 'None');
     [output_dir,name,ext] = fileparts(est_file);
     outputfig = [output_dir, '/', titlestr, '.eps'];
     if exist(outputfig, 'file')==2
@@ -81,4 +105,24 @@ if visualize_result == 1
     end
     export_fig(outputfig);
 end
+end
+function new_endpoints = extend_endpoints(endpoints)
+% endpoint 3x2
+% extend left and right each by 20%
+d = norm(endpoints(:, 2) - endpoints(:, 1));
+direction = normalize(endpoints(:, 2) - endpoints(:, 1), 'norm');
+new_endpoints = [endpoints(:, 1) - direction * d * 0.2, endpoints(:, 2) + direction * d * 0.2];
+end
+
+function parallel_endpoints = parallel_line(endpoints, offset)
+% assume the normal vector has zero component along z axis.
+l = normalize(endpoints(:, 2) - endpoints(:, 1), 'norm');
+nx = l(2) / sqrt((1- l(3)^2)^2 + (l(2) * l(3))^2 + (l(1) * l(3))^2);
+ny = - nx * l(1)/l(2);
+n = [nx; ny; 0];
+assert(abs(norm(n) - 1) < 1e-7);
+assert(n' * l < 1e-7);
+assert(abs(norm(cross(n, l)) - 1) < 1e-7);
+
+parallel_endpoints = endpoints + repmat(n, 1, 2) * offset; 
 end
