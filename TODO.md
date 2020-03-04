@@ -8,8 +8,6 @@ a, FrameSynchronizer::addNewFrame() called in hybridVio.cpp, line 309, may avera
 b, places commented with //one camera assumption
 hybridFilter assumes that t_d and t_r are constant variables at least in a short span of time, therefore, for a world point observed in several frames, the t_d used in computing Jacobians for the image features are the same.
 
-3. Done! is it necessary to addParameterBlock to map? e.g., mapPtr_->addParameterBlock(poseParameterBlock,ceres::Map::Pose6d)? Yes, these blocks stores the states values.
-
 4. use akaze features instead of brisk for feature detection, description, and matching. But it may require opencv 3.0 and later. This may cause conflict with current opencv library used by msckf2. 
 
 8. There may be negative diagonal elements in the covariance matrix. Are these elements all are very small and such occurrences are very rare, e.g. for the beginning of a test? ---Solved by enforcing symmetry.
@@ -110,4 +108,9 @@ terminate called after throwing an instance of 'boost::exception_detail::clone_i
   what():  boost: mutex lock failed in pthread_mutex_lock: Invalid argument
 
 The root cause for this issue has nothing to do with the report. It is caused by a seemingly innocuous exit(1) in the codebase.
+
+36. In testHybridFilter, of DeadreckoningO some runs have zigzag ripples in the pose profile, 
+some runs have results close to the pose profile of DeadreckoningM. 
+Preliminary tests find that this issue with DeadreckoningO is not caused by applyMarginalizationStrategy.
+
 
