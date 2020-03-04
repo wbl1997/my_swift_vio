@@ -7,7 +7,7 @@
   <arg name="output_dir" default=""/>
   <arg name="config_filename" default="$(find msckf)/config/config_fpga_p2_euroc.yaml" />
   <arg name="start_into_bag" default="0"/>
-  <arg name="image_noise_cov_multiplier" default="1"/>
+  <arg name="image_noise_cov_multiplier" default="5.0"/>
   <arg name="play_rate" default="1.0"/>
   <node name="okvis_node" pkg="msckf" type="okvis_node" output="screen" 
       args="$(arg config_filename) --dump_output_option=$(arg dump_output_option) 
