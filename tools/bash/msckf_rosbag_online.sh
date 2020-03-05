@@ -3,7 +3,8 @@ MSCKF_OUTPUT_DIR=$OUTPUT_DIR/$MARS_DATA/$ALGO_NAME
 mkdir -p $MSCKF_OUTPUT_DIR
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
-source "$SCRIPT_DIR/sed_msckf_config.sh"
+source "$SCRIPT_DIR/sed_msckf_config_benchmark.sh"
+source "$SCRIPT_DIR/sed_msckf_config_cam_imu.sh"
 
 cd $MSCKF_WS
 LAUNCH_FILE="$MSCKF_WS/src/msckf/launch/okvis_node_rosbag.launch"

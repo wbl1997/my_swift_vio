@@ -66,7 +66,7 @@ if visualize_result == 1
     plot3(start_end(:, 1), start_end(:, 2), start_end(:, 3), '--b');
     plot3(start_end(1, 1), start_end(1, 2), start_end(1, 3), 'mo', 'MarkerSize', markerSize);
     plot3(start_end(2, 1), start_end(2, 2), start_end(2, 3), 'ms', 'MarkerSize', markerSize);
-    annotate_line_fitting(est_file);
+    annotate_line_fitting_iros2020(est_file);
     
     % draw the estimated length projection
     start_projection = [position_data(1, 2:4);...

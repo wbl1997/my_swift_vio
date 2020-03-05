@@ -1,4 +1,4 @@
-function annotate_line_fitting(est_file)
+function annotate_line_fitting_iros2020(est_file)
 % the below location parameters are suitable only with
 % /hailun_house/halfway_pan_init/2020_02_23_12_22_56/rel_msckf_epi_3.0/msckf_estimates.csv
 % which is used in IROS 2020 paper.

@@ -7,7 +7,8 @@ FINISH_INDEX=$(( $SESSION_DURATION*$CAMERA_RATE ))
 
 # https://stackoverflow.com/questions/59895/how-to-get-the-source-directory-of-a-bash-script-from-within-the-script-itself
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
-source "$SCRIPT_DIR/sed_msckf_config.sh"
+source "$SCRIPT_DIR/sed_msckf_config_benchmark.sh"
+source "$SCRIPT_DIR/sed_msckf_config_cam_imu.sh"
 
 cmd="$MSCKF_WS/devel/lib/msckf/okvis_node_synchronous \
  $MSCKF_TEMPLATE \

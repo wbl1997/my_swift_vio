@@ -24,16 +24,12 @@
 
 /// \brief okvis Main namespace of this package.
 namespace okvis {
+//! TFVIO class investigates the effects of epipolar constraints on VIO filter.
+//! The best strategies for VIO filtering with epipolar constraints found by TFVIO have
+//! been integrated into MSCKF2 which has extra features like redundant frame marginalization.
+//! As a result, to obtain the experiment result for TFVIO, we can use MSCKF2
+//! with useEpipolarConstraint true and epipolar_sigma_keypoint_size a very large value.
 
-//! The estimator class
-/*!
- The estimator class. This does all the backend work.
- Frames:
- W: World
- B: Body
- C: Camera
- S: Sensor (IMU)
- */
 class TFVIO : public HybridFilter {
   // landmarks are not in the EKF states in contrast to HybridFilter
  public:
