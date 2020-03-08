@@ -125,8 +125,9 @@ class HybridFilter : public Estimator {
     return covariance_.rows();
   }
 
-  virtual void computeCovariance(Eigen::MatrixXd* cov) const final {
+  virtual bool computeCovariance(Eigen::MatrixXd* cov) const final {
     *cov = covariance_;
+    return true;
   }
   ///@}
 

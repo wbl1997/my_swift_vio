@@ -188,6 +188,7 @@ list(APPEND TEST_SRC_FILES
     test/io_wrap/TestVioDatasetPlayer.cpp
 
     test/msckf/TestBoundedImuDeque.cpp
+    test/msckf/TestCovarianceEstimation.cpp
     test/msckf/TestEpipolarJacobian.cpp
     test/msckf/TestEuclideanParamError.cpp
     test/msckf/TestExtrinsicJacobian.cpp
