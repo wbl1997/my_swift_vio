@@ -175,17 +175,14 @@ struct TestSetting {
   bool addImageNoise; ///< add noise to image measurements in pixels?
   bool useImageObservs; ///< use image observations in an estimator?
 
-//  "multiply the accelerometer and gyro noise root PSD by this reduction "
-//  "factor in generating noise.\n"
-//  "As a result, the std for noises used in covariance propagation is "
-//  "slightly larger than the std used in sampling noises.\n"
-//  "This is necessary because the process model involves many other error"
-//  " sources other than the modeled noises.\n"
-//  "Optimization based estimators typically requires a smaller value, e.g., 0.2");
+  //  Mmultiply the accelerometer and gyro noise root PSD by this reduction
+  //  factor in generating noise. As a result, the std for noises used in
+  //  covariance propagation is slightly larger than the std used in sampling
+  //  noises.
   double sim_ga_noise_factor;
 
-//  "multiply the accelerometer and gyro BIAS noise root PSD by this reduction "
-//  "factor in generating noise.\n");
+  //  Multiply the accelerometer and gyro BIAS noise root PSD by this reduction
+  //  factor in generating noise.
   double sim_ga_bias_noise_factor;
 
   okvis::EstimatorAlgorithm estimator_algorithm;
@@ -195,8 +192,8 @@ struct TestSetting {
 
   TestSetting(bool _addImuNoise = true, bool _addPriorNoise = true,
               bool _addSystemError = false, bool _addImageNoise = true,
-              bool _useImageObservs = true, double _sim_ga_noise_factor = 0.70711,
-              double _sim_ga_bias_noise_factor = 0.70711,
+              bool _useImageObservs = true, double _sim_ga_noise_factor = 1.0,
+              double _sim_ga_bias_noise_factor = 1.0,
               okvis::EstimatorAlgorithm _estimator_algorithm =
                   okvis::EstimatorAlgorithm::MSCKF,
               bool _useEpipolarConstraint = false,

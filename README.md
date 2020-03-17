@@ -180,6 +180,11 @@ To enable debug mode, in the Build option panel, set CMake Build Type to Debug.
 
 To start debugging, add commandline arguments in the Run option panel, then press the Run icon.
 
+To enable building test targets inside QtCreator, you may need to turn on 
+"CATKIN_ENABLE_TESTING" in the CMake section of Building Settings and 
+select the *_test target in a newly added Build Step from the Build Steps section.
+The default target "all" may not emcompass building some test targets.
+
 ## Example running cases
 
 ### Parameter description

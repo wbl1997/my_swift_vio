@@ -17,6 +17,7 @@
 #include <msckf/PointLandmarkModels.hpp>
 #include <msckf/ProjParamOptModels.hpp>
 #include <msckf/ReprojectionErrorWithPap.hpp>
+#include <msckf/imu/BoundedImuDeque.hpp>
 #include <msckf/numeric_ceres_residual_Jacobian.hpp>
 
 #include <okvis/FrameTypedefs.hpp>

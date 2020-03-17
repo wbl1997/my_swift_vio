@@ -39,16 +39,9 @@
 #ifndef INCLUDE_MSCKF_IMU_ODOMETRY_LEGACY_HPP_
 #define INCLUDE_MSCKF_IMU_ODOMETRY_LEGACY_HPP_
 
-#include <msckf/ImuErrorModel.h>
+#include <msckf/imu/ImuErrorModel.h>
 
 #include <Eigen/Core>
-//#include <okvis/FrameTypedefs.hpp>
-//#include <okvis/Measurements.hpp>
-//#include <okvis/Variables.hpp>
-//#include <okvis/assert_macros.hpp>
-//#include <okvis/kinematics/Transformation.hpp>
-//#include <okvis/kinematics/operators.hpp>
-
 #include <vio/eigen_utils.h>  //only for rvec2quat
 #include <sophus/se3.hpp>     //only for first order propagation
 

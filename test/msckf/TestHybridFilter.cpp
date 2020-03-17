@@ -399,7 +399,7 @@ void testHybridFilterSinusoid(const std::string& outputPath,
     filterTimer.start();
 
     srand((unsigned int)time(0)); // comment out to make tests deterministic
-    double noise_factor = 0.5 * std::sqrt(2.0);
+    double noise_factor = 1.0;
     okvis::TestSetting testSetting{okvis::TestSetting(
         true, FLAGS_add_prior_noise, false, true, useImageMeasurement,
         noise_factor, noise_factor,
