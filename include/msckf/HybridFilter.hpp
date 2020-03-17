@@ -26,7 +26,7 @@
 #include <okvis/timing/Timer.hpp>
 
 #include <msckf/CameraRig.hpp>
-#include <msckf/ImuOdometry.h>
+#include <msckf/imu/ImuOdometry.h>
 #include <msckf/MotionAndStructureStats.h>
 #include <msckf/PointLandmark.hpp>
 #include <msckf/PointSharedData.hpp>

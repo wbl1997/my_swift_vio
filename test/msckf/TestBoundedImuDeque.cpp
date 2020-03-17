@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 
-#include <msckf/BoundedImuDeque.hpp>
+#include <msckf/imu/BoundedImuDeque.hpp>
 
 okvis::ImuMeasurementDeque createMeasDeque(int start, int end) {
   okvis::ImuMeasurementDeque imu_meas_deque;

@@ -1,8 +1,8 @@
 
 #include <gtest/gtest.h>
 
-#include "msckf/ImuErrorModel.h"
-#include <msckf/ImuOdometry.h>
+#include "msckf/imu/ImuErrorModel.h"
+#include <msckf/imu/ImuOdometry.h>
 #include <msckf/ImuOdometryLegacy.hpp>
 
 #include <okvis/ceres/ImuError.hpp>

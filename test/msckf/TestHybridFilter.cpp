@@ -24,7 +24,6 @@
 #include <msckf/CameraTimeParamBlock.hpp>
 #include <msckf/EuclideanParamBlock.hpp>
 
-#include <msckf/ImuOdometry.h>
 #include <msckf/PointLandmarkModels.hpp>
 #include <msckf/ProjParamOptModels.hpp>
 #include <msckf/VioTestSystemBuilder.hpp>

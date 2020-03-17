@@ -3,7 +3,7 @@
 
 #include <vector>
 #include <msckf/CameraRig.hpp>
-#include <msckf/ImuRig.hpp>
+#include <msckf/imu/ImuRig.hpp>
 #include <msckf/PointSharedData.hpp>
 #include <okvis/ceres/ParameterBlock.hpp>
 

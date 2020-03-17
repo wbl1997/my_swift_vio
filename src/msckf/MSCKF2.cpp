@@ -15,7 +15,7 @@
 #include <msckf/EuclideanParamBlock.hpp>
 #include <msckf/FeatureTriangulation.hpp>
 #include <msckf/FilterHelper.hpp>
-#include <msckf/ImuOdometry.h>
+
 #include <msckf/MeasurementJacobianMacros.hpp>
 #include <msckf/PointLandmark.hpp>
 #include <msckf/PointLandmarkModels.hpp>

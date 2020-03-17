@@ -7,7 +7,7 @@
 
 #include <vio/eigen_utils.h>
 
-#include <msckf/odeHybrid.hpp>
+#include <msckf/imu/odeHybrid.hpp>
 
 DEFINE_double(max_inc_tol, 2,
               "the tolerance of the lpNorm of an EKF state update");

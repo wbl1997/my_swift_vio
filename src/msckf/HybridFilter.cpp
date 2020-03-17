@@ -21,7 +21,7 @@
 #include <msckf/ExtrinsicModels.hpp>
 
 #include <msckf/FilterHelper.hpp>
-#include <msckf/ImuOdometry.h>
+#include <msckf/imu/ImuOdometry.h>
 #include <msckf/PointLandmark.hpp>
 #include <msckf/PointLandmarkModels.hpp>
 #include <msckf/PointSharedData.hpp>

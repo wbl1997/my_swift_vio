@@ -55,7 +55,7 @@
 #include <okvis/FrameTypedefs.hpp>
 #include <msckf/CameraRig.hpp>
 #include <msckf/ExtrinsicModels.hpp>
-#include <msckf/ImuRig.hpp>
+#include <msckf/imu/ImuRig.hpp>
 #include <msckf/ProjParamOptModels.hpp>
 
 DECLARE_string(datafile_separator);

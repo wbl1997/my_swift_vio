@@ -5,7 +5,6 @@
 
 #include <msckf/ImuSimulator.h>
 #include <msckf/memory.h>
-#include <msckf/BoundedImuDeque.hpp>
 #include <msckf/CameraRig.hpp>
 #include <msckf/CameraSystemCreator.hpp>
 #include <msckf/CameraTimeParamBlock.hpp>
