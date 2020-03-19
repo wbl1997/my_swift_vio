@@ -44,17 +44,17 @@
 #include <fstream>
 #include <memory>
 
-//#include <pcl/point_types.h>
+#include <pcl/point_types.h>
 
 #include <geometry_msgs/PoseStamped.h>
-//#include <sensor_msgs/PointCloud2.h>
+#include <sensor_msgs/PointCloud2.h>
 #include <visualization_msgs/Marker.h>
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wnon-virtual-dtor"
 #include <opencv2/core/core.hpp>
 #include <ros/ros.h>
 #include <tf/transform_broadcaster.h>
-// #include <pcl_ros/point_cloud.h>
+#include <pcl_ros/point_cloud.h>
 #pragma GCC diagnostic pop
 #include <nav_msgs/Odometry.h>
 #include <nav_msgs/Path.h>
@@ -76,8 +76,9 @@ class Publisher
 {
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
  public:
+
   /// \brief Default constructor.
-  explicit Publisher();
+  Publisher();
   ~Publisher();
 
   /**
@@ -294,7 +295,7 @@ class Publisher
   ros::Publisher pubObometry_;  ///< The publisher for the odometry.
   ros::Publisher pubPath_;  ///< The publisher for the path.
   ros::Publisher pubTransform_; ///< The publisher for the transform.
-//  ros::Publisher pubMesh_; ///< The publisher for a robot / camera mesh.
+  ros::Publisher pubMesh_; ///< The publisher for a robot / camera mesh.
   std::vector<image_transport::Publisher> pubImagesVector_; ///< The publisher for the images.
   std::vector<image_transport::ImageTransport> imageTransportVector_; ///< The image transporters.
 
@@ -306,18 +307,17 @@ class Publisher
   geometry_msgs::TransformStamped poseMsg_; ///< Pose message.
   nav_msgs::Odometry odometryMsg_;  ///< Odometry message.
   okvis::MapPointVector pointsMatched2_;  ///< Matched points vector.
-//  pcl::PointCloud<pcl::PointXYZRGB> pointsMatched_; ///< Point cloud for matched points.
-//  pcl::PointCloud<pcl::PointXYZRGB> pointsUnmatched_; ///< Point cloud for unmatched points.
-//  pcl::PointCloud<pcl::PointXYZRGB> pointsTransferred_; ///< Point cloud for transferred/marginalised points.
+  pcl::PointCloud<pcl::PointXYZRGB> pointsMatched_; ///< Point cloud for matched points.
+  pcl::PointCloud<pcl::PointXYZRGB> pointsUnmatched_; ///< Point cloud for unmatched points.
+  pcl::PointCloud<pcl::PointXYZRGB> pointsTransferred_; ///< Point cloud for transferred/marginalised points.
 
-  visualization_msgs::Marker pointsMatched_; ///< Point cloud for matched points.
-  visualization_msgs::Marker pointsUnmatched_; ///< Point cloud for unmatched points.
-  visualization_msgs::Marker pointsTransferred_; ///< Point cloud for transferred/marginalised points.
-
+//  visualization_msgs::Marker pointsMatched_; ///< Point cloud for matched points.
+//  visualization_msgs::Marker pointsUnmatched_; ///< Point cloud for unmatched points.
+//  visualization_msgs::Marker pointsTransferred_; ///< Point cloud for transferred/marginalised points.
 
   std::vector<cv::Mat> images_; ///< The images.
   nav_msgs::Path path_; ///< The path message.
-//  visualization_msgs::Marker meshMsg_; ///< Mesh message.
+  visualization_msgs::Marker meshMsg_; ///< Mesh message.
 
   /// @}
 
@@ -331,6 +331,7 @@ class Publisher
 
   std::shared_ptr<std::fstream> csvFile_; ///< CSV file to save state in.
   std::shared_ptr<std::fstream> csvLandmarksFile_;  ///< CSV file to save landmarks in.
+
 };
 
 }
