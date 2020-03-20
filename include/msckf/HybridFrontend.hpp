@@ -73,7 +73,7 @@ class HybridFrontend {
    * @warning This method is not threadsafe.
    * @warning This method uses the estimator. Make sure to not access it in
    * another thread.
-   * @param estimator       HybridFilter.
+   * @param estimator       Estimator.
    * @param T_WS_propagated Pose of sensor at image capture time.
    * @param params          Configuration parameters.
    * @param map             Unused.
@@ -83,7 +83,7 @@ class HybridFrontend {
    * @return True if successful.
    */
   virtual bool dataAssociationAndInitialization(
-      okvis::HybridFilter& estimator,
+      okvis::Estimator& estimator,
       okvis::kinematics::Transformation& T_WS_propagated,
       const okvis::VioParameters& params,
       const std::shared_ptr<okvis::MapPointVector> map,
@@ -318,7 +318,7 @@ class HybridFrontend {
    * @return True if it should be a new keyframe.
    */
   bool doWeNeedANewKeyframe(
-      const okvis::HybridFilter& estimator,
+      const okvis::Estimator& estimator,
       std::shared_ptr<okvis::MultiFrame>
           currentFrame);  // based on some overlap area heuristics
 
@@ -343,7 +343,7 @@ class HybridFrontend {
    */
   template <class MATCHING_ALGORITHM>
   int matchToKeyframes(
-      okvis::HybridFilter& estimator,
+      okvis::Estimator& estimator,
       const okvis::VioParameters& params, const uint64_t currentFrameId,
       bool& rotationOnly, bool usePoseUncertainty = true,
       double* uncertainMatchFraction = 0,
@@ -351,7 +351,7 @@ class HybridFrontend {
           true);  // for wide-baseline matches (good initial guess)
 
   template <class CAMERA_GEOMETRY_T>
-  int matchToLastFrameKLT(okvis::HybridFilter& estimator,
+  int matchToLastFrameKLT(okvis::Estimator& estimator,
                           const okvis::VioParameters& params,
                           std::shared_ptr<okvis::MultiFrame> framesInOut,
                           bool& rotationOnly, bool usePoseUncertainty = true,
@@ -372,7 +372,7 @@ class HybridFrontend {
    */
   template <class MATCHING_ALGORITHM>
   int matchToLastFrame(
-      okvis::HybridFilter& estimator,
+      okvis::Estimator& estimator,
       const okvis::VioParameters& params, const uint64_t currentFrameId,
       bool& rotationOnly,
       bool usePoseUncertainty = true, bool removeOutliers = true);
@@ -388,7 +388,7 @@ class HybridFrontend {
    */
   template <class MATCHING_ALGORITHM>
   void matchStereo(
-      okvis::HybridFilter& estimator,
+      okvis::Estimator& estimator,
       std::shared_ptr<okvis::MultiFrame> multiFrame);
 
   /**
@@ -401,7 +401,7 @@ class HybridFrontend {
    * @return Number of inliers.
    */
   int runRansac3d2d(
-      okvis::HybridFilter& estimator,
+      okvis::Estimator& estimator,
       const okvis::cameras::NCameraSystem& nCameraSystem,
       std::shared_ptr<okvis::MultiFrame> currentFrame, bool removeOutliers);
 
@@ -422,7 +422,7 @@ class HybridFrontend {
    * @return Number of inliers.
    */
   int runRansac2d2d(
-      okvis::HybridFilter& estimator,
+      okvis::Estimator& estimator,
       const okvis::VioParameters& params, uint64_t currentFrameId,
       uint64_t olderFrameId, bool initializePose, bool removeOutliers,
       bool& rotationOnly);
@@ -441,7 +441,7 @@ class HybridFrontend {
    * @param asKeyframe
    * @return
    */
-  int runRansac2d2d(okvis::HybridFilter& estimator,
+  int runRansac2d2d(okvis::Estimator& estimator,
                     const okvis::VioParameters& params, uint64_t currentFrameId,
                     uint64_t olderFrameId, bool removeOutliers,
                     bool* asKeyframe);

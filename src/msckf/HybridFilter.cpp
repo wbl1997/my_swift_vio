@@ -2402,22 +2402,6 @@ void HybridFilter::optimize(size_t /*numIter*/, size_t /*numThreads*/,
   }
 }
 
-// getters
-bool HybridFilter::getImageDelay(uint64_t poseId, int camIdx,
-                                okvis::Duration* td) const {
-  double tdd;
-  if (!getSensorStateEstimateAs<ceres::CameraTimeParamBlock>(
-          poseId, camIdx, SensorStates::Camera, CameraSensorStates::TD, tdd)) {
-    return false;
-  }
-  *td = okvis::Duration(tdd);
-  return true;
-}
-
-int HybridFilter::getCameraExtrinsicOptType(size_t cameraIdx) const {
-  return camera_rig_.getExtrinsicOptMode(cameraIdx);
-}
-
 // private stuff
 size_t HybridFilter::gatherMapPointObservations(
     const MapPoint& mp,

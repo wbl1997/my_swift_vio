@@ -404,7 +404,7 @@ class HybridVio : public VioInterface {
   okvis::MockVioBackendInterface& estimator_;
   okvis::MockVioFrontendInterface& frontend_;
 #else
-  std::shared_ptr<okvis::HybridFilter> estimator_;  ///< The backend estimator.
+  std::shared_ptr<okvis::Estimator> estimator_;  ///< The backend estimator.
   okvis::HybridFrontend frontend_;  ///< The frontend.
 #endif
 

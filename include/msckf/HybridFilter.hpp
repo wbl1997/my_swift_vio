@@ -117,10 +117,6 @@ class HybridFilter : public Estimator {
   /// @name Getters
   ///\{
 
-  bool getImageDelay(uint64_t poseId, int camIdx, okvis::Duration *td) const;
-
-  int getCameraExtrinsicOptType(size_t cameraIdx) const;
-
   virtual int getEstimatedVariableMinimalDim() const final {
     return covariance_.rows();
   }
@@ -131,7 +127,6 @@ class HybridFilter : public Estimator {
   }
   ///@}
 
- public:
   /**
    * @brief gatherMapPointObservations
    * @param mp
@@ -273,34 +268,19 @@ class HybridFilter : public Estimator {
 
   virtual void printTrackLengthHistogram(std::ostream &stream) const final;
 
-  /**
-   * @brief getCameraCalibrationEstimate get the latest estimate of camera
-   * calibration parameters
-   * @param cameraParams[out] including projection and distortion intrinsic
-   * parameters and time delay and readout time.
-   * @return
-   */
-  void getCameraCalibrationEstimate(
-      int cameraIndex, Eigen::Matrix<double, Eigen::Dynamic, 1>* cameraParams) const;
-
   std::vector<std::shared_ptr<const okvis::ceres::ParameterBlock>>
       getCameraTimeParameterPtrs() const;
 
   std::vector<std::shared_ptr<const okvis::ceres::ParameterBlock>>
       getImuAugmentedParameterPtrs() const;
 
-  /**
-   * @brief getImuAugmentedStatesEstimate get the lastest estimate of IMU augmented params.
-   * @param extraParams excluding biases.
-   * @return
-   */
-  void getImuAugmentedStatesEstimate(Eigen::Matrix<double, Eigen::Dynamic, 1>* extraParams) const;
+  virtual void getCameraCalibrationEstimate(
+      int cameraIndex, Eigen::Matrix<double, Eigen::Dynamic, 1>* cameraParams) const final;
 
-  /**
-   * @brief get variance for nav state (p,q,v), imu(bg ba etc), camera extrinsic, intrinsic, td, tr
-   * @param variances
-   */
-  void getStateVariance(Eigen::Matrix<double, Eigen::Dynamic, 1>* variances) const;
+  virtual void getImuAugmentedStatesEstimate(
+      Eigen::Matrix<double, Eigen::Dynamic, 1>* extraParams) const final;
+
+  virtual void getStateVariance(Eigen::Matrix<double, Eigen::Dynamic, 1>* variances) const final;
 
   virtual void setKeyframeRedundancyThresholds(double dist, double angle,
                                        double trackingRate,

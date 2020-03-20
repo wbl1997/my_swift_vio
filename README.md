@@ -73,6 +73,33 @@ cd msckf_ws/src
 git clone --recursive https://JzHuai0108@bitbucket.org/JzHuai0108/msckf.git
 ```
 
+* gtsam (optional)
+Installation of gtsam refers to [Kimera-VIO](https://github.com/MIT-SPARK/Kimera-VIO/blob/master/docs/kimera_vio_install.md).
+
+```
+sudo apt-get install libtbb-dev
+cd $HOME/Documents/slam_src
+git clone https://github.com/borglab/gtsam.git
+cd gtsam
+git checkout 342f30d148fae84c92ff71705c9e50e0a3683bda
+mkdir build
+cd build
+# EIGEN_INCLUDE_DIR is needed for ubuntu 16 for a reason detailed later on.
+cmake -DCMAKE_INSTALL_PREFIX=$HOME/Documents/slam_devel -DCMAKE_BUILD_TYPE=Release \
+  -DGTSAM_TANGENT_PREINTEGRATION=OFF -DGTSAM_POSE3_EXPMAP=ON -DGTSAM_ROT3_EXPMAP=ON \
+  -DGTSAM_USE_SYSTEM_EIGEN=ON ..
+# -DEIGEN3_INCLUDE_DIR=$HOME/slam_devel/include/eigen3 -DEIGEN_INCLUDE_DIR=$HOME/slam_devel/include/eigen3
+
+make -j $(nproc) check # (optional, runs unit tests)
+sudo make -j $(nproc) install
+```
+
+If you get an error while loading shared libraries libmetis.soat run or test time, 
+you may need to add the lib path for gtsam to LD_LIBRARY_PATH as below inside the incumbent terminal.
+```
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$HOME/Documents/slam_devel/lib
+```
+
 ## Build the project
 
 ```
@@ -81,15 +108,18 @@ if [[ "x$(nproc)" = "x1" ]] ; then export USE_PROC=1 ;
 else export USE_PROC=$(($(nproc)/2)) ; 
 fi
 
-export ROS_VERSION=kinetic # melodic
+export ROS_VERSION=melodic # kinetic
 catkin init
 catkin config --merge-devel # Necessary for catkin_tools >= 0.4.
 catkin config --extend /opt/ros/$ROS_VERSION
-catkin config --cmake-args -DUSE_ROS=ON -DBUILD_TESTS=ON 
+catkin config --cmake-args -DUSE_ROS=ON -DBUILD_TESTS=ON \
+ -DGTSAM_DIR=$HOME/Documents/slam_devel/lib/cmake/GTSAM
 # -DEIGEN3_INCLUDE_DIR=$HOME/slam_devel/include/eigen3 -DEIGEN_INCLUDE_DIR=$HOME/slam_devel/include/eigen3
-catkin build vio_common msckf -DUSE_ROS=ON -DBUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Release -j$USE_PROC 
 
+
+catkin build vio_common msckf -DUSE_ROS=ON -DBUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Release -j$USE_PROC
 ```
+
 Setting EIGEN_INCLUDE_DIR is necessary for Ubuntu 16.04 because
 the system wide Eigen library (usually 3.2) does not 
 meet the requirements of the ceres solver depended by this package.
@@ -193,7 +223,7 @@ Parameters through command line
 |  Command line arguments | Description | Default |
 |---|---|---|
 |  load_input_option |  0 subscribe to rostopics, 1 load video and IMU csv |  1 |
-| dump_output_option | 0 publish to rostopics, 1 save nav states to csv, 3 save nav states and calibration parameters to csv. 0 and others do not work simultaneously | 3 |
+| dump_output_option | 0 only publish to rostopics, 1 also save nav states to csv, 2, also save nav states and extrinsic parameters, 3 also save nav states and all calibration parameters to csv. | 3 |
 | feature_tracking_method | 0 BRISK brute force in OKVIS with 3d2d RANSAC, 1 KLT back-to-back, 2 BRISK back-to-back | 0 |
 | use_IEKF | true iterated EKF, false EKF. For filters only | false |
 | max_inc_tol | the maximum infinity norm of the filter correction. 10.0 for outdoors, 2.0 for indoors, though its value should be insensitive | 2.0 |

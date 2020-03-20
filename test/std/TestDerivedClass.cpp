@@ -65,7 +65,9 @@ TEST(StandardC, DerivedClass) {
   EXPECT_EQ(b.valAt(4), 5);
 
   foo.get(d);
-  foo.set(d); // will use the base::set
+  // set() will use the base::set for the derived object,
+  // but it will not slice the derived instance.
+  foo.set(d);
   d.print();
   EXPECT_EQ(d.valAt(0), 6);
   EXPECT_EQ(d.valAt(1), 100);

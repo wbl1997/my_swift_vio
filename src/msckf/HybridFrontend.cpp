@@ -92,7 +92,7 @@ bool HybridFrontend::detectAndDescribe(
 
 // Matching as well as initialization of landmarks and state.
 bool HybridFrontend::dataAssociationAndInitialization(
-    okvis::HybridFilter& estimator,
+    okvis::Estimator& estimator,
     // TODO(sleutenegger): why is this not used here?
     okvis::kinematics::Transformation& /*T_WS_propagated*/,
     const okvis::VioParameters& params,
@@ -375,7 +375,7 @@ bool HybridFrontend::propagation(
 
 // Decision whether a new frame should be keyframe or not.
 bool HybridFrontend::doWeNeedANewKeyframe(
-    const okvis::HybridFilter& estimator,
+    const okvis::Estimator& estimator,
     std::shared_ptr<okvis::MultiFrame> currentFrame) {
 
   if (estimator.numFrames() < 2) {
@@ -453,7 +453,7 @@ bool HybridFrontend::doWeNeedANewKeyframe(
 // Match a new multiframe to existing keyframes
 template <class MATCHING_ALGORITHM>
 int HybridFrontend::matchToKeyframes(
-    okvis::HybridFilter& estimator,
+    okvis::Estimator& estimator,
     const okvis::VioParameters& params,
     const uint64_t currentFrameId,
     bool& rotationOnly, 
@@ -550,7 +550,7 @@ int HybridFrontend::matchToKeyframes(
 // Match a new multiframe to the last frame.
 template <class CAMERA_GEOMETRY_T>
 int HybridFrontend::matchToLastFrameKLT(
-    okvis::HybridFilter& estimator,
+    okvis::Estimator& estimator,
     const okvis::VioParameters& /*params*/,
     std::shared_ptr<okvis::MultiFrame> framesInOut,
     bool& rotationOnly,
@@ -614,7 +614,7 @@ int HybridFrontend::matchToLastFrameKLT(
 // Match a new multiframe to the last frame.
 template <class MATCHING_ALGORITHM>
 int HybridFrontend::matchToLastFrame(
-    okvis::HybridFilter& estimator,
+    okvis::Estimator& estimator,
     const okvis::VioParameters& params, const uint64_t currentFrameId,
     bool& rotationOnly,
     bool usePoseUncertainty, bool removeOutliers) {
@@ -673,7 +673,7 @@ int HybridFrontend::matchToLastFrame(
 // new landmarks.
 template <class MATCHING_ALGORITHM>
 void HybridFrontend::matchStereo(
-    okvis::HybridFilter& estimator,
+    okvis::Estimator& estimator,
     std::shared_ptr<okvis::MultiFrame> multiFrame) {
   const size_t camNumber = multiFrame->numFrames();
   const uint64_t mfId = multiFrame->id();
@@ -726,7 +726,7 @@ void HybridFrontend::matchStereo(
 
 // Perform 3D/2D RANSAC.
 int HybridFrontend::runRansac3d2d(
-    okvis::HybridFilter& estimator,
+    okvis::Estimator& estimator,
     const okvis::cameras::NCameraSystem& nCameraSystem,
     std::shared_ptr<okvis::MultiFrame> currentFrame,
     bool removeOutliers) {
@@ -800,7 +800,7 @@ int HybridFrontend::runRansac3d2d(
 
 // Perform 2D/2D RANSAC.
 int HybridFrontend::runRansac2d2d(
-    okvis::HybridFilter& estimator,
+    okvis::Estimator& estimator,
     const okvis::VioParameters& params, 
     uint64_t currentFrameId, uint64_t olderFrameId,
     bool initializePose,
@@ -969,7 +969,7 @@ int HybridFrontend::runRansac2d2d(
   return 0;
 }
 
-int HybridFrontend::runRansac2d2d(okvis::HybridFilter& estimator,
+int HybridFrontend::runRansac2d2d(okvis::Estimator& estimator,
                                   const okvis::VioParameters& params,
                                   uint64_t currentFrameId,
                                   uint64_t olderFrameId, bool removeOutliers,

@@ -1,28 +1,6 @@
 cmake_minimum_required(VERSION 2.8.3)
 project(msckf)
 
-# { Begin: special handling for building with QtCreator
-if(NOT CMAKE_SOURCE_DIR MATCHES "src$" AND NOT CMAKE_BINARY_DIR MATCHES "build$")
-# If catkin_make is to be invoked, CMAKE_SOURCE_DIR will be like <workspace>/src
-# and CMAKE_BINARY_DIR will be like <workspace>/build
-# If Build within QtCreator is invoked, CMAKE_SOURCE_DIR will be like <workspace>/src/msckf
-# and CMAKE_BINARY_DIR will be like <workspace>/build/msckf
-
-get_filename_component(SUPER_SOURCE_DIR ${CMAKE_SOURCE_DIR} DIRECTORY)
-get_filename_component(SUPER_BINARY_DIR ${CMAKE_BINARY_DIR} DIRECTORY)
-if(NOT SUPER_SOURCE_DIR MATCHES "src$" OR NOT SUPER_BINARY_DIR MATCHES "build$")
-    message(WARNING "CMAKE_SOURCE_DIR is ${CMAKE_SOURCE_DIR} and"
-        " CMAKE_BINARY_DIR is ${CMAKE_BINARY_DIR}.\n"
-        "They should look like <workspace>/src/${PROJECT_NAME}"
-        " and <workspace>/build/${PROJECT_NAME}")
-endif()
-
-get_filename_component(WORKSPACE_DIR ${SUPER_SOURCE_DIR} DIRECTORY)
-set(CATKIN_DEVEL_PREFIX ${WORKSPACE_DIR}/devel) # this ensures binaries are put into correct location of catkin_ws
-endif()
-# } End
-message("CATKIN_DEVEL_PREFIX ${CATKIN_DEVEL_PREFIX}")
-
 IF(NOT CMAKE_BUILD_TYPE)
   SET(CMAKE_BUILD_TYPE Release)
 ENDIF()
@@ -96,7 +74,7 @@ else()
 endif()
 
 find_package(GTSAM)
-if (GTSAM_FOUND)
+if(GTSAM_FOUND)
   add_definitions(-DHAVE_GTSAM)
   include_directories(${GTSAM_INCLUDE_DIR})
   list(APPEND LINK_LIBRARIES
@@ -254,6 +232,12 @@ list(APPEND TEST_SRC_FILES
     test/std/TestSizeof.cpp
     test/std/TestStdAccumulate.cpp
 )
+
+if(GTSAM_FOUND)
+list(APPEND TEST_SRC_FILES
+    test/gtsam/testIncrementalFixedLagSmoother.cpp
+)
+endif(GTSAM_FOUND)
 
 # In a catkin package, do not use or link gtest which is supported poorly.
 if(CATKIN_ENABLE_TESTING)
