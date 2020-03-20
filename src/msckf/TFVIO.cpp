@@ -39,7 +39,7 @@ TFVIO::~TFVIO() {}
 
 bool TFVIO::applyMarginalizationStrategy(
     size_t /*numKeyframes*/, size_t /*numImuFrames*/,
-    okvis::MapPointVector& /*removedLandmarks*/) {
+    okvis::MapPointVector& removedLandmarks) {
   std::vector<uint64_t> removeFrames;
   std::map<uint64_t, States>::reverse_iterator rit = statesMap_.rbegin();
   while (rit != statesMap_.rend()) {
@@ -68,6 +68,7 @@ bool TFVIO::applyMarginalizationStrategy(
         mfp->second->setLandmarkId(kpi.cameraIndex, kpi.keypointIndex, 0);
       }
       mapPtr_->removeParameterBlock(pit->first);
+      removedLandmarks.push_back(pit->second);
       pit = landmarksMap_.erase(pit);
     } else {
       ++pit;

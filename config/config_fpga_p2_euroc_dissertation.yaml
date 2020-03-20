@@ -70,8 +70,8 @@ optimization:
     triangulationMaxDepth: 1000.0
     algorithm: "MSCKF"
     useEpipolarConstraint: false
-    cameraObservationModelId: 2
-    landmarkModelId: 2
+    cameraObservationModelId: 0
+    landmarkModelId: 1
 
 # ceres optimization options
 ceres_options:

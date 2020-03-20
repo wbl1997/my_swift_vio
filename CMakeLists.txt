@@ -34,18 +34,27 @@ ENDIF()
 
 message(STATUS "Building MSCKF with ${CMAKE_BUILD_TYPE}")
 
-set(OKVIS_SOURCE_PATH okvis)
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS}  -Wall -O3 -march=native ")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -O3 -march=native")
+if(APPLE)
+  # The clang compiler (on osx) is somehow much more strict
+  # than the compilers on ubuntu and so this does not seem
+  # possible on OSX just yet.
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native -Wall -std=c++11 -fPIC")
+else()
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native -Wall -std=c++11 -fPIC")
+endif()
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mssse3")
-MESSAGE ("ssse3 ON")
+if(${CMAKE_HOST_SYSTEM_PROCESSOR} MATCHES "arm*")
+  message(STATUS "ARM processor detected, will attempt to use NEON.")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mfpu=neon")
+else()
+  message(STATUS "Assuming SSE instructions available.")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mssse3")
+endif()
 
 find_package(catkin REQUIRED  
+  pcl_conversions
+  pcl_ros
   roscpp
-  rosbag
-  tf
-  std_msgs
   sensor_msgs
   image_transport
   cv_bridge
@@ -56,15 +65,12 @@ find_package(catkin REQUIRED
 
 find_package(vio_common)
 
-set(CERES_INCLUDE_DIRS ${CMAKE_BINARY_DIR}/include)
-
 # generate dynamic reconfigure stuff
 generate_dynamic_reconfigure_options(cfg/Camera.cfg)
 
 catkin_package(
     DEPENDS
-    CATKIN_DEPENDS rosbag tf roscpp cv_bridge message_runtime 
-        std_msgs sensor_msgs vio_common
+    CATKIN_DEPENDS
     INCLUDE_DIRS include
     LIBRARIES ${PROJECT_NAME}
 )
@@ -77,13 +83,34 @@ file(MAKE_DIRECTORY ${CATKIN_DEVEL_PREFIX}/include)
 set(BUILD_SHARED_LIBS OFF)
 add_subdirectory(okvis)
 
-list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
-find_package(Eigen REQUIRED)
+# libvisensor
+list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/okvis/cmake")
+find_package(VISensor)
 
+if(VISENSORDRIVER_FOUND)
+  add_definitions(-DHAVE_LIBVISENSOR)
+  message(STATUS "Found libvisensor in ROS interface.")
+  include_directories(${VISensorDriver_INCLUDE_DIR})
+else()
+  message(WARNING "libvisensor not found")
+endif()
+
+find_package(GTSAM)
+if (GTSAM_FOUND)
+  add_definitions(-DHAVE_GTSAM)
+  include_directories(${GTSAM_INCLUDE_DIR})
+  list(APPEND LINK_LIBRARIES
+    gtsam
+    gtsam_unstable)
+  message(STATUS "Found GTSAM at ${GTSAM_INCLUDE_DIR}.")
+else()
+  message(WARNING "GTSAM not found")
+endif()
+
+include_directories(include)
 include_directories(
-  include
-  ${EIGEN_INCLUDE_DIR}
   ${catkin_INCLUDE_DIRS}
+  ${CMAKE_BINARY_DIR}/include
 )
 
 # compile the ROS dependent stuff into a library
@@ -126,22 +153,6 @@ add_library(${PROJECT_NAME} STATIC
   ${SOURCEFILES}
 )
 
-include_directories(
-  ${OKVIS_SOURCE_PATH}/okvis_util/include
-  ${OKVIS_SOURCE_PATH}/okvis_kinematics/include
-  ${OKVIS_SOURCE_PATH}/okvis_time/include
-  ${OKVIS_SOURCE_PATH}/okvis_cv/include
-  ${OKVIS_SOURCE_PATH}/okvis_common/include
-  ${OKVIS_SOURCE_PATH}/okvis_ceres/include
-  ${OKVIS_SOURCE_PATH}/okvis_timing/include
-  ${OKVIS_SOURCE_PATH}/okvis_matcher/include
-  ${OKVIS_SOURCE_PATH}/okvis_frontend/include
-  ${OKVIS_SOURCE_PATH}/okvis_multisensor_processing/include
-  sophus
-  ${vio_common_INCLUDE_DIRS}
-  ${CERES_INCLUDE_DIRS}
-)
-
 add_dependencies(${PROJECT_NAME} okvis_multisensor_processing)
 
 # make sure configure headers are built before any node using them
@@ -168,12 +179,35 @@ target_link_libraries(${PROJECT_NAME}
   ${LINK_LIBRARIES}
 )
 
+if(VISENSORDRIVER_FOUND)
+  target_link_libraries(${PROJECT_NAME} ${VISensorDriver_LIBRARY})
+endif()
+
+include_directories(
+  okvis/okvis_util/include
+  okvis/okvis_kinematics/include
+  okvis/okvis_time/include
+  okvis/okvis_cv/include
+  okvis/okvis_common/include
+  okvis/okvis_ceres/include
+  okvis/okvis_timing/include
+  okvis/okvis_matcher/include
+  okvis/okvis_frontend/include 
+  okvis/okvis_multisensor_processing/include
+
+  sophus
+  ${vio_common_INCLUDE_DIRS}
+)
+
 # now the actual applications
 add_executable(okvis_node src/apps/okvis_node.cpp)
 target_link_libraries(okvis_node ${PROJECT_NAME})
 
 add_executable(okvis_node_synchronous src/apps/okvis_node_synchronous.cpp)
 target_link_libraries(okvis_node_synchronous ${PROJECT_NAME} )
+
+add_executable(dataset_convertor src/apps/dataset_convertor.cpp)
+target_link_libraries(dataset_convertor ${PROJECT_NAME} )
 
 list(APPEND TEST_SRC_FILES
     test/test_main.cpp
@@ -218,7 +252,7 @@ list(APPEND TEST_SRC_FILES
     test/std/TestModifyThisInConstMethod.cpp
     test/std/TestSizeof.cpp
     test/std/TestStdAccumulate.cpp
-    )
+)
 
 # In a catkin package, do not use or link gtest which is supported poorly.
 if(CATKIN_ENABLE_TESTING)

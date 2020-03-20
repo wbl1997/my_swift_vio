@@ -604,7 +604,7 @@ void HybridFilter::addCovForClonedStates() {
 // according to Li and Mourikis RSS 12 optimization based thesis
 bool HybridFilter::applyMarginalizationStrategy(
     size_t /*numKeyframes*/, size_t /*numImuFrames*/,
-    okvis::MapPointVector& /*removedLandmarks*/) {
+    okvis::MapPointVector& removedLandmarks) {
   /// remove features tracked no more, the feature can be in state or not
   int covDim = covariance_.rows();
   Eigen::Matrix<double, 3, Eigen::Dynamic> reparamJacobian(
@@ -650,6 +650,7 @@ bool HybridFilter::applyMarginalizationStrategy(
       }
 
       mapPtr_->removeParameterBlock(pit->first);
+      removedLandmarks.push_back(pit->second);
       pit = landmarksMap_.erase(pit);
     } else {
       /// change anchor pose for features whose anchor is not in states

@@ -429,7 +429,7 @@ void Publisher::setPoints(const okvis::MapPointVector& pointsMatched,
       continue;
 
     pointsMatched_.push_back(pcl::PointXYZRGB());
-    const Eigen::Vector4d point = T_Wc_W * pointsMatched[i].point;
+    const Eigen::Vector4d point = T_Wc_W * pointsMatched[i].pointHomog;
     pointsMatched_.back().x = point[0] / point[3];
     pointsMatched_.back().y = point[1] / point[3];
     pointsMatched_.back().z = point[2] / point[3];
@@ -469,7 +469,7 @@ void Publisher::setPoints(const okvis::MapPointVector& pointsMatched,
       continue;
 
     pointsUnmatched_.push_back(pcl::PointXYZRGB());
-    const Eigen::Vector4d point = T_Wc_W * pointsUnmatched[i].point;
+    const Eigen::Vector4d point = T_Wc_W * pointsUnmatched[i].pointHomog;
     pointsUnmatched_.back().x = point[0] / point[3];
     pointsUnmatched_.back().y = point[1] / point[3];
     pointsUnmatched_.back().z = point[2] / point[3];
@@ -508,7 +508,7 @@ void Publisher::setPoints(const okvis::MapPointVector& pointsMatched,
       continue;
 
     pointsTransferred_.push_back(pcl::PointXYZRGB());
-    const Eigen::Vector4d point = T_Wc_W * pointsTransferred[i].point;
+    const Eigen::Vector4d point = T_Wc_W * pointsTransferred[i].pointHomog;
     pointsTransferred_.back().x = point[0] / point[3];
     pointsTransferred_.back().y = point[1] / point[3];
     pointsTransferred_.back().z = point[2] / point[3];
