@@ -66,8 +66,10 @@ namespace okvis {
 // Default constructor.
 Publisher::Publisher()
     : nh_(nullptr),
-      ctr2_(0)
+      ctr2_(0), cameraPoseVisual_(0, 1, 0, 1)
 {
+  cameraPoseVisual_.setScale(1);
+  cameraPoseVisual_.setLineWidth(0.05);
 }
 
 Publisher::~Publisher()
@@ -170,6 +172,7 @@ void Publisher::setNodeHandle(ros::NodeHandle& nh)
     LOG(INFO) << "no mesh found for visualisation, set ros param mesh_file, if desired";
     meshMsg_.mesh_resource = "";
   }
+  pubCameraPoseVisual_ = nh_->advertise<visualization_msgs::MarkerArray>("camera_pose_visual", 1000);
 }
 
 // Write CSV header.
@@ -398,6 +401,26 @@ void Publisher::setOdometry(const okvis::kinematics::Transformation& T_WS,
   // linear acceleration ?? - would also need point of percussion mapping!!
 }
 
+void Publisher::setFrustum(const okvis::kinematics::Transformation& T_WB,
+                  const okvis::kinematics::Transformation& T_BC) {
+  okvis::kinematics::Transformation T; // the pose to be published. T_WS or T_WB depending on 'trackedBodyFrame'
+  if (parameters_.publishing.trackedBodyFrame == FrameName::S) {
+    odometryMsg_.header.frame_id = "world";
+    T = parameters_.publishing.T_Wc_W * T_WB;
+  } else if (parameters_.publishing.trackedBodyFrame == FrameName::B) {
+    odometryMsg_.header.frame_id = "world";
+    T = parameters_.publishing.T_Wc_W * T_WB * parameters_.imu.T_BS.inverse();
+  } else {
+    LOG(ERROR) <<
+        "Pose frame does not exist for publishing. Choose 'S' or 'B'.";
+    odometryMsg_.header.frame_id = "world";
+    T = parameters_.publishing.T_Wc_W * T_WB;
+  }
+  cameraPoseVisual_.reset();
+  okvis::kinematics::Transformation T_WC = T * T_BC;
+  cameraPoseVisual_.add_pose(T_WC.r(), T_WC.q());
+}
+
 // Set the points that are published next.
 void Publisher::setPoints(const okvis::MapPointVector& pointsMatched,
                           const okvis::MapPointVector& pointsUnmatched,
@@ -563,6 +586,7 @@ void Publisher::publishOdometry()
   if ((_t - lastOdometryTime_).toSec() < 1.0 / parameters_.publishing.publishRate)
     return;  // control the publish rate
   pubObometry_.publish(odometryMsg_);
+  cameraPoseVisual_.publish_by(pubCameraPoseVisual_, odometryMsg_.header);
   if(!meshMsg_.mesh_resource.empty())
     pubMesh_.publish(meshMsg_);  //publish stamped mesh
   lastOdometryTime_ = _t;  // remember
@@ -593,6 +617,7 @@ void Publisher::publishFullStateAsCallback(
 {
   setTime(t);
   setOdometry(T_WS, speedAndBiases, omega_S);  // TODO: provide setters for this hack
+  setFrustum(T_WS, *parameters_.nCameraSystem.T_SC(0));
   setPath(T_WS);
   publishOdometry();
   publishTransform();
@@ -606,6 +631,7 @@ void Publisher::csvSaveFullStateAsCallback(
     const Eigen::Matrix<double, 3, 1> &omega_S, const int frameIdInSource) {
   setTime(t);
   setOdometry(T_WS, speedAndBiases, omega_S);  // TODO: provide setters for this hack
+  setFrustum(T_WS, *parameters_.nCameraSystem.T_SC(0));
   if (csvFile_) {
     //LOG(INFO)<<"filePtr: ok; ";
     if (csvFile_->good()) {
@@ -646,6 +672,7 @@ void Publisher::csvSaveFullStateWithExtrinsicsAsCallback(
         &extrinsics) {
   setTime(t);
   setOdometry(T_WS, speedAndBiases, omega_S);  // TODO: provide setters for this hack
+  setFrustum(T_WS, extrinsics[0]);
   if (csvFile_) {
     if (csvFile_->good()) {
       Eigen::Vector3d p_WS_W = T_WS.r();
@@ -696,10 +723,13 @@ void Publisher::csvSaveFullStateWithAllCalibrationAsCallback(
         Eigen::aligned_allocator<Eigen::VectorXd>>& extrinsics,
     const Eigen::Matrix<double, Eigen::Dynamic, 1> &imuAugmentedParams,
     const Eigen::Matrix<double, Eigen::Dynamic, 1> &cameraParams,
-    const Eigen::Matrix<double, Eigen::Dynamic, 1> &stateVarianceDiagonal) {
+    const Eigen::Matrix<double, Eigen::Dynamic, 1> &stateVarianceDiagonal,
+    const std::vector<okvis::kinematics::Transformation,
+          Eigen::aligned_allocator<okvis::kinematics::Transformation> >& T_BC_list) {
   setTime(t);
   setOdometry(T_WS, speedAndBiases,
               omega_S);  // TODO(sleuten): provide setters for this hack
+  setFrustum(T_WS, T_BC_list[0]);
   if (csvFile_) {
     if (csvFile_->good()) {
       Eigen::Vector3d p_WS_W = T_WS.r();

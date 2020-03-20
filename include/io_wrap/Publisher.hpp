@@ -65,6 +65,7 @@
 #include <okvis/FrameTypedefs.hpp>
 #include <okvis/Time.hpp>
 #include <io_wrap/StreamHelper.hpp>
+#include <io_wrap/CameraPoseVisualization.h>
 
 /// \brief okvis Main namespace of this package.
 namespace okvis {
@@ -128,6 +129,14 @@ class Publisher
   void setOdometry(const okvis::kinematics::Transformation& T_WS,
                    const okvis::SpeedAndBiases& speedAndBiases,
                    const Eigen::Vector3d& omega_S);
+
+  /**
+   * @brief Set the pose of the latest camera frustum.
+   * @param T_WB The pose.
+   * @param T_BC
+   */
+  void setFrustum(const okvis::kinematics::Transformation& T_WB,
+                  const okvis::kinematics::Transformation& T_BC);
 
   /// \brief Set the parameters
   /// @param parameters The parameters.
@@ -240,9 +249,13 @@ class Publisher
    * @param T_WS The pose.
    * @param speedAndBiases The speeds and IMU biases.
    * @param omega_S Rotation speed of the sensor frame.
-   * @param extrinsics Camera extrinsics.
-   * @param vTgsa
-   * @param vfckptdr
+   * @param extrinsics Camera extrinsic parameters in terms of T_BC's optimized coeffs.
+   * @param vTgsa Augmented imu parameters except for biases.
+   * @param cameraParams projection intrinsics, distortion, time offset and frame readout time.
+   * @param variance variance of the states including nav states, imu parameters, 
+   *     camera extrinsic parameters, and camera intrinsic parameters and 
+   *     time offset and frame readout time.
+   * @param T_BC_list Camera extrinsic in terms of T_BC.
    */
   void csvSaveFullStateWithAllCalibrationAsCallback(
       const okvis::Time & t,
@@ -253,8 +266,10 @@ class Publisher
       const std::vector<Eigen::VectorXd,
           Eigen::aligned_allocator<Eigen::VectorXd>> & extrinsics,
       const Eigen::Matrix<double, Eigen::Dynamic, 1>& vTgsa,
-      const Eigen::Matrix<double, Eigen::Dynamic, 1>& vfckptdr,
-      const Eigen::Matrix<double, Eigen::Dynamic, 1>& vVariance);
+      const Eigen::Matrix<double, Eigen::Dynamic, 1>& cameraParams,
+      const Eigen::Matrix<double, Eigen::Dynamic, 1>& variance,
+      const std::vector<okvis::kinematics::Transformation,
+          Eigen::aligned_allocator<okvis::kinematics::Transformation> > & T_BC_list);
   /**
    * @brief Set and write landmarks to file.
    * @remark This can be registered with the VioInterface.
@@ -298,6 +313,7 @@ class Publisher
   ros::Publisher pubMesh_; ///< The publisher for a robot / camera mesh.
   std::vector<image_transport::Publisher> pubImagesVector_; ///< The publisher for the images.
   std::vector<image_transport::ImageTransport> imageTransportVector_; ///< The image transporters.
+  ros::Publisher pubCameraPoseVisual_; ///< The publisher for the camera frustum.
 
   /// @}
   /// @name To be published
@@ -328,6 +344,8 @@ class Publisher
   okvis::VioParameters parameters_; ///< All the parameters including publishing options.
 
   uint32_t ctr2_; ///< The counter for the amount of transferred points. Used for the seq parameter in the header.
+
+  CameraPoseVisualization cameraPoseVisual_; ///< List of camera frustums.
 
   std::shared_ptr<std::fstream> csvFile_; ///< CSV file to save state in.
   std::shared_ptr<std::fstream> csvLandmarksFile_;  ///< CSV file to save landmarks in.

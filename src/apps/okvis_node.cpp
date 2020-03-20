@@ -126,7 +126,7 @@ int main(int argc, char **argv) {
         &publisher, std::placeholders::_1, std::placeholders::_2,
         std::placeholders::_3, std::placeholders::_4, std::placeholders::_5,
         std::placeholders::_6, std::placeholders::_7, std::placeholders::_8,
-        std::placeholders::_9));
+        std::placeholders::_9, std::placeholders::_10));
     if (FLAGS_dump_output_option == 4) {
       okvis_estimator->setImuCsvFile(path + "/imu0_data.csv");
       const unsigned int numCameras = parameters.nCameraSystem.numCameras();

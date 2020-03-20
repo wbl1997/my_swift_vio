@@ -885,7 +885,7 @@ void HybridVio::publisherLoop() {
           fullStateCallbackWithAllCalibration_(
             result.stamp, result.T_WS, result.speedAndBiases, result.omega_S,
             result.frameIdInSource, result.opt_T_SCi_coeffs, result.imuExtraParams_,
-            result.cameraParams_, result.stateVariance_);
+            result.cameraParams_, result.stateVariance_, result.vector_of_T_SCi);
       }
     }
     if (landmarksCallback_ && !result.landmarksVector.empty())

@@ -3,11 +3,14 @@
 
 DEFINE_int32(
     dump_output_option, 3,
-    "0, direct results to ROS publishers, other options save results to csvs"
+    "0, direct results to ROS publishers, other options "
+    "ADDITIONALLY save results to a csv."
     "1, save states, 2, save states and camera extrinsics, "
     "3, save states, and all calibration parameters, 4, save states,"
     "all calibration parameters, feature tracks, and landmarks."
-    "3 currently do not support okvis");
+    "Warn: 0 or 1 does not pass T_BC so the visualized camera frustum"
+    " may be in wrong orientation. Also 3 does not support the "
+    "estimation method okvis");
 
 DEFINE_int32(load_input_option, 1,
              "0, get input by subscribing to ros topics"
