@@ -47,11 +47,16 @@ MSCKF2::MSCKF2() {}
 MSCKF2::~MSCKF2() {}
 
 void MSCKF2::findRedundantCamStates(
-    std::vector<uint64_t>* rm_cam_state_ids) {
+    std::vector<uint64_t>* rm_cam_state_ids,
+    size_t numImuFrames) {
   int closeFrames(0), oldFrames(0);
   rm_cam_state_ids->clear();
   rm_cam_state_ids->reserve(minCulledFrames_);
-  for (auto rit = ++statesMap_.rbegin(); rit != statesMap_.rend(); ++rit) {
+  auto rit = statesMap_.rbegin();
+  for (size_t j = 0; j < numImuFrames; ++j) {
+    ++rit;
+  }
+  for (; rit != statesMap_.rend(); ++rit) {
     if (rm_cam_state_ids->size() >= minCulledFrames_) {
       break;
     }
@@ -76,12 +81,12 @@ void MSCKF2::findRedundantCamStates(
   return;
 }
 
-int MSCKF2::marginalizeRedundantFrames(size_t maxClonedStates) {
-  if (statesMap_.size() < maxClonedStates) {
+int MSCKF2::marginalizeRedundantFrames(size_t numKeyframes, size_t numImuFrames) {
+  if (statesMap_.size() < numKeyframes + numImuFrames) {
     return 0;
   }
   std::vector<uint64_t> rm_cam_state_ids;
-  findRedundantCamStates(&rm_cam_state_ids);
+  findRedundantCamStates(&rm_cam_state_ids, numImuFrames);
 
   size_t nMarginalizedFeatures = 0u;
   int featureVariableDimen = cameraParamsMinimalDimen() +
@@ -292,7 +297,7 @@ bool MSCKF2::applyMarginalizationStrategy(
     ++rit;
   }
   if (removeFrames.size() == 0) {
-    marginalizeRedundantFrames(numKeyframes + numImuFrames);
+    marginalizeRedundantFrames(numKeyframes, numImuFrames);
   }
 
   // remove features tracked no more

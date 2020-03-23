@@ -141,11 +141,16 @@ private:
       Eigen::MatrixXd* R_q) const;
 
   void findRedundantCamStates(
-      std::vector<uint64_t>* rm_cam_state_ids);
+      std::vector<uint64_t>* rm_cam_state_ids,
+      size_t numImuFrames);
 
-  // param: max number of cloned frame vector states
-  // return number of marginalized frames
-  int marginalizeRedundantFrames(size_t maxClonedStates);
+  /**
+   * @brief marginalizeRedundantFrames
+   * @param numKeyframes
+   * @param numImuFrames
+   * @return number of marginalized frames
+   */
+  int marginalizeRedundantFrames(size_t numKeyframes, size_t numImuFrames);
 
   // minimum number of culled frames in each prune frame state
   // step if cloned states size hit maxClonedStates_
