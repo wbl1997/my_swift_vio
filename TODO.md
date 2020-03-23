@@ -8,7 +8,7 @@ a, FrameSynchronizer::addNewFrame() called in hybridVio.cpp, line 309, may avera
 b, places commented with //one camera assumption
 hybridFilter assumes that t_d and t_r are constant variables at least in a short span of time, therefore, for a world point observed in several frames, the t_d used in computing Jacobians for the image features are the same.
 
-4. use akaze features instead of brisk for feature detection, description, and matching. But it may require opencv 3.0 and later. This may cause conflict with current opencv library used by msckf2. 
+4. use akaze features instead of brisk for feature detection, description, and matching. But it may require opencv 3.0 and later. This may cause conflict with current opencv library used by msckf. 
 
 8. There may be negative diagonal elements in the covariance matrix. Are these elements all are very small and such occurrences are very rare, e.g. for the beginning of a test? ---Solved by enforcing symmetry.
 

@@ -1,6 +1,8 @@
 #include "msckf/VioTestSystemBuilder.hpp"
 #include <msckf/CameraSystemCreator.hpp>
 #include <msckf/GeneralEstimator.hpp>
+#include <msckf/InvariantEKF.hpp>
+#include <msckf/SlidingWindowSmoother.hpp>
 #include <msckf/TFVIO.hpp>
 #include <msckf/VioEvaluationCallback.hpp>
 
@@ -182,6 +184,12 @@ void VioTestSystemBuilder::createVioSystem(
       break;
     case okvis::EstimatorAlgorithm::TFVIO:
       estimator.reset(new okvis::TFVIO(mapPtr));
+      break;
+    case okvis::EstimatorAlgorithm::InvariantEKF:
+      estimator.reset(new okvis::InvariantEKF(mapPtr));
+      break;
+    case okvis::EstimatorAlgorithm::SlidingWindowSmoother:
+      estimator.reset(new okvis::SlidingWindowSmoother(mapPtr));
       break;
     case okvis::EstimatorAlgorithm::MSCKF:
     default:

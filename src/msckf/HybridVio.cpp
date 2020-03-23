@@ -12,6 +12,8 @@
 #include <msckf/FeatureTriangulation.hpp>
 #include <msckf/MSCKF2.hpp>
 #include <msckf/TFVIO.hpp>
+#include <msckf/InvariantEKF.hpp>
+#include <msckf/SlidingWindowSmoother.hpp>
 
 #include <okvis/assert_macros.hpp>
 #include <okvis/ceres/ImuError.hpp>
@@ -74,6 +76,12 @@ HybridVio::HybridVio(okvis::VioParameters &parameters)
       break;
     case okvis::EstimatorAlgorithm::TFVIO:
       estimator_.reset(new okvis::TFVIO());
+      break;
+    case okvis::EstimatorAlgorithm::InvariantEKF:
+      estimator_.reset(new okvis::InvariantEKF());
+      break;
+    case okvis::EstimatorAlgorithm::SlidingWindowSmoother:
+      estimator_.reset(new okvis::SlidingWindowSmoother());
       break;
     default:
       LOG(WARNING) << "The present HybridFilter is broken!";

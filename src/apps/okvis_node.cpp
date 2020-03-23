@@ -83,13 +83,9 @@ int main(int argc, char **argv) {
       // http://eigen.tuxfamily.org/bz/show_bug.cgi?id=1049
       okvis_estimator.reset(new okvis::ThreadedKFVio(parameters));
       break;
-    case okvis::EstimatorAlgorithm::MSCKF:
-    case okvis::EstimatorAlgorithm::TFVIO:
+    default:
       okvis_estimator.reset(new okvis::HybridVio(parameters));
       break;
-    default:
-      LOG(ERROR) << "Estimator not implemented!";
-      return 1;
   }
 
   std::string path = FLAGS_output_dir;

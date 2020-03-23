@@ -327,7 +327,7 @@ class HybridFrontend {
    * @tparam MATCHING_ALGORITHM Algorithm to match new keypoints to existing
    * landmarks
    * @warning As this function uses the estimator it is not threadsafe
-   * @param      estimator              HybridFilter.
+   * @param      estimator              estimator.
    * @param[in]  params                 Parameter struct.
    * @param[in]  currentFrameId         ID of the current frame that should be
    * matched against keyframes.

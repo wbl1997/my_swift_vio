@@ -113,11 +113,13 @@ LIST(APPEND SOURCEFILES
     src/msckf/HybridFrontend.cpp
     src/msckf/HybridVio.cpp
     src/msckf/ImuSimulator.cpp
+    src/msckf/InvariantEKF.cpp
     src/msckf/MotionAndStructureStats.cpp
     src/msckf/MSCKF2.cpp
     src/msckf/PointLandmark.cpp
     src/msckf/PreconditionedEkfUpdater.cpp
     src/msckf/SimulationFrontend.cpp
+    src/msckf/SlidingWindowSmoother.cpp
     src/msckf/TFVIO.cpp
     src/msckf/TwoViewPair.cpp
     src/msckf/VioEvaluationCallback.cpp
