@@ -64,7 +64,8 @@ HybridVio::HybridVio(okvis::VioParameters &parameters)
       frameSynchronizer_(okvis::FrameSynchronizer(parameters)),
       lastAddedImageTimestamp_(okvis::Time(0, 0)),
       optimizationDone_(true),
-      frontend_(parameters.nCameraSystem.numCameras()),
+      frontend_(parameters.nCameraSystem.numCameras(),
+                parameters.optimization.initializeWithoutEnoughParallax),
       parameters_(parameters),
       viewerNamePrefix_("Feature matches for camera"),
       maxImuInputQueueSize_(2 * max_camera_input_queue_size *

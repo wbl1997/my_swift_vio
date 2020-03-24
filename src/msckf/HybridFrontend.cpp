@@ -43,8 +43,9 @@ DEFINE_int32(feature_tracking_method, 0,
 namespace okvis {
 
 // Constructor.
-HybridFrontend::HybridFrontend(size_t numCameras)
+HybridFrontend::HybridFrontend(size_t numCameras, bool initializeWithoutEnoughParallax)
     : isInitialized_(false),
+      initializeWithoutEnoughParallax_(initializeWithoutEnoughParallax),
       numCameras_(numCameras),
       briskDetectionOctaves_(0),
       briskDetectionThreshold_(50.0),
@@ -116,8 +117,8 @@ bool HybridFrontend::dataAssociationAndInitialization(
                       "mixed frame types are not supported yet");
   }
   int num3dMatches = 0;
-  // always set asKeyframe true for back-to-back feature tracking methods
   if (FLAGS_feature_tracking_method == 1) {
+    // always set asKeyframe true for back-to-back feature tracking methods.
     *asKeyframe = true;
     int requiredMatches = 5;
     bool rotationOnly = false;
@@ -163,9 +164,14 @@ bool HybridFrontend::dataAssociationAndInitialization(
     }
     matchToLastFrameTimer.stop();
     if (!isInitialized_) {
+      if (initializeWithoutEnoughParallax_ || !rotationOnly) {
         isInitialized_ = true;
-        LOG(INFO) << "Frontend initialized!";
+        LOG(INFO) << "Initialized: initializeWithoutEnoughParallax ? "
+                  << initializeWithoutEnoughParallax_ << " rotationOnly ? "
+                  << rotationOnly;
+      }
     }
+
     if (num3dMatches <= requiredMatches) {
       LOG(WARNING) << "Tracking last frame failure. Number of 3d2d-matches: " << num3dMatches;
     }
@@ -231,10 +237,12 @@ bool HybridFrontend::dataAssociationAndInitialization(
     }
     matchKeyframesTimer.stop();
     if (!isInitialized_) {
-//      if (!rotationOnly) {
+      if (initializeWithoutEnoughParallax_ || !rotationOnly) {
         isInitialized_ = true;
-        LOG(INFO) << "Initialized!";
-//      }
+        LOG(INFO) << "Initialized: initializeWithoutEnoughParallax ? "
+                  << initializeWithoutEnoughParallax_ << " rotationOnly ? "
+                  << rotationOnly;
+      }
     }
 
     if (num3dMatches <= requiredMatches) {
@@ -244,18 +252,16 @@ bool HybridFrontend::dataAssociationAndInitialization(
     // keyframe decision, at the moment only landmarks that match with keyframe are initialised
     *asKeyframe = *asKeyframe || doWeNeedANewKeyframe(estimator, framesInOut);
     } else {
-        if (!isInitialized_) {
-    //      if (!rotationOnly) {
-            // TODO(jhuai): should check the motion and then initialize the filter
-            // Adding states before proper initialization of a filter like MSCKF
-            // greatly complicates states management.
-            // The following link may hints on solutions.
-            // https://github.com/ethz-asl/okvis/blob/master/okvis_multisensor_processing/src/ThreadedKFVio.cpp#L735
-            isInitialized_ = true;
-            LOG(INFO) << "Frontend initialized!";
-    //      }
+      if (!isInitialized_) {
+        if (initializeWithoutEnoughParallax_ || !rotationOnly) {
+          isInitialized_ = true;
+          LOG(INFO) << "Initialized: initializeWithoutEnoughParallax ? "
+                    << initializeWithoutEnoughParallax_ << " rotationOnly ? "
+                    << rotationOnly;
         }
-        *asKeyframe = true;
+      }
+      // always set asKeyframe true for back-to-back feature tracking methods.
+      *asKeyframe = true;
     }
     // match to last frame
     TimerSwitchable matchToLastFrameTimer("2.4.2 matchToLastFrame");
@@ -363,9 +369,6 @@ bool HybridFrontend::propagation(
         << " Normal when starting up.";
     return 0;
   }
-  // huai: this is not replaced by IMUOdometry function because it performs good
-  // for propagating only states,
-  // and it does not use imuErrorModel
   int measurements_propagated = okvis::ceres::ImuError::propagation(
       imuMeasurements, imuParams, T_WS_propagated, speedAndBiases, t_start,
       t_end, covariance, jacobian);
@@ -556,7 +559,7 @@ int HybridFrontend::matchToLastFrameKLT(
     bool& rotationOnly,
     bool /*usePoseUncertainty*/, bool /*removeOutliers*/) {
   int retCtr = 0;
-  rotationOnly = true;
+  rotationOnly = false;
 
   if (estimator.numFrames() == 1) {
     loadParameters<CAMERA_GEOMETRY_T>(framesInOut, estimator, &featureTracker_);
@@ -608,6 +611,9 @@ int HybridFrontend::matchToLastFrameKLT(
 
   addConstraintToEstimator<CAMERA_GEOMETRY_T>(
       curr_ids, framesInOut, estimator);
+
+  // TODO(jhuai): check relative motion type
+
   return retCtr;
 }
 
@@ -741,8 +747,9 @@ int HybridFrontend::runRansac3d2d(
   int numInliers = 0;
 
   // absolute pose adapter for Kneip toolchain
-  opengv::absolute_pose::FrameNoncentralAbsoluteAdapter adapter(
-      estimator, nCameraSystem, currentFrame);
+  opengv::absolute_pose::FrameNoncentralAbsoluteAdapter adapter(estimator,
+                                                                nCameraSystem,
+                                                                currentFrame);
 
   size_t numCorrespondences = adapter.getNumberCorrespondences();
   if (numCorrespondences < 5)
@@ -750,16 +757,12 @@ int HybridFrontend::runRansac3d2d(
 
   // create a RelativePoseSac problem and RANSAC
   opengv::sac::Ransac<
-      opengv::sac_problems::absolute_pose ::FrameAbsolutePoseSacProblem>
-      ransac;
+      opengv::sac_problems::absolute_pose::FrameAbsolutePoseSacProblem> ransac;
   std::shared_ptr<
-      opengv::sac_problems::absolute_pose::FrameAbsolutePoseSacProblem>
-      absposeproblem_ptr(
-          new opengv::sac_problems::absolute_pose::
-              FrameAbsolutePoseSacProblem(
-                  adapter,
-                  opengv::sac_problems::absolute_pose::
-                      FrameAbsolutePoseSacProblem::Algorithm::GP3P));
+      opengv::sac_problems::absolute_pose::FrameAbsolutePoseSacProblem> absposeproblem_ptr(
+      new opengv::sac_problems::absolute_pose::FrameAbsolutePoseSacProblem(
+          adapter,
+          opengv::sac_problems::absolute_pose::FrameAbsolutePoseSacProblem::Algorithm::GP3P));
   ransac.sac_model_ = absposeproblem_ptr;
   ransac.threshold_ = 9;
   ransac.max_iterations_ = 50;
@@ -818,8 +821,10 @@ int HybridFrontend::runRansac2d2d(
   for (size_t im = 0; im < numCameras; ++im) {
 
     // relative pose adapter for Kneip toolchain
-    opengv::relative_pose::FrameRelativeAdapter adapter(
-        estimator, params.nCameraSystem, olderFrameId, im, currentFrameId, im);
+    opengv::relative_pose::FrameRelativeAdapter adapter(estimator,
+                                                        params.nCameraSystem,
+                                                        olderFrameId, im,
+                                                        currentFrameId, im);
 
     size_t numCorrespondences = adapter.getNumberCorrespondences();
 
@@ -829,12 +834,10 @@ int HybridFrontend::runRansac2d2d(
     // try both the rotation-only RANSAC and the relative one:
 
     // create a RelativePoseSac problem and RANSAC
-    typedef opengv::sac_problems::relative_pose::
-        FrameRotationOnlySacProblem FrameRotationOnlySacProblem;
+    typedef opengv::sac_problems::relative_pose::FrameRotationOnlySacProblem FrameRotationOnlySacProblem;
     opengv::sac::Ransac<FrameRotationOnlySacProblem> rotation_only_ransac;
-    std::shared_ptr<FrameRotationOnlySacProblem>
-        rotation_only_problem_ptr(
-            new FrameRotationOnlySacProblem(adapter));
+    std::shared_ptr<FrameRotationOnlySacProblem> rotation_only_problem_ptr(
+        new FrameRotationOnlySacProblem(adapter));
     rotation_only_ransac.sac_model_ = rotation_only_problem_ptr;
     rotation_only_ransac.threshold_ = 9;
     rotation_only_ransac.max_iterations_ = 50;
@@ -848,8 +851,7 @@ int HybridFrontend::runRansac2d2d(
                                 static_cast<float>(numCorrespondences);
 
     // now the rel_pose one:
-    typedef opengv::sac_problems::relative_pose::
-        FrameRelativePoseSacProblem FrameRelativePoseSacProblem;
+    typedef opengv::sac_problems::relative_pose::FrameRelativePoseSacProblem FrameRelativePoseSacProblem;
     opengv::sac::Ransac<FrameRelativePoseSacProblem> rel_pose_ransac;
     std::shared_ptr<FrameRelativePoseSacProblem> rel_pose_problem_ptr(
         new FrameRelativePoseSacProblem(

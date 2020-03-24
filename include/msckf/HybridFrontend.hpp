@@ -46,7 +46,7 @@ class HybridFrontend {
    * @brief Constructor.
    * @param numCameras Number of cameras in the sensor configuration.
    */
-  HybridFrontend(size_t numCameras);
+  HybridFrontend(size_t numCameras, bool initializeWithoutMuchParallax);
   virtual ~HybridFrontend() {}
 
   ///@{
@@ -265,6 +265,8 @@ class HybridFrontend {
   std::vector<std::unique_ptr<std::mutex>> featureDetectorMutexes_;
 
   bool isInitialized_;       ///< Is the pose initialised?
+  ///< Initialize the frontend under insufficient parallax, e.g., during pure rotation?
+  bool initializeWithoutEnoughParallax_;
   const size_t numCameras_;  ///< Number of cameras in the configuration.
 
   /// @name BRISK detection parameters
