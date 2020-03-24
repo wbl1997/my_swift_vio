@@ -55,33 +55,33 @@ void VioTestSystemBuilder::createVioSystem(
   const okvis::Time tEnd(20 + DURATION);
 
   switch (trajectoryId) {
-    case 0:
+    case imu::TorusTrajectory::kTrajectoryId:
       circularSinusoidalTrajectory.reset(new imu::TorusTrajectory(
           imuParameters.rate, Eigen::Vector3d(0, 0, -imuParameters.g)));
       break;
-    case 2:
+    case imu::RoundedSquare::kRoundedSquareId:
       circularSinusoidalTrajectory.reset(new imu::RoundedSquare(
           imuParameters.rate, Eigen::Vector3d(0, 0, -imuParameters.g)));
       break;
-    case 3:
+    case imu::RoundedSquare::kCircleId:
       circularSinusoidalTrajectory.reset(new imu::RoundedSquare(
           imuParameters.rate, Eigen::Vector3d(0, 0, -imuParameters.g),
           okvis::Time(0, 0), 1.0, 0, 0.8));
       break;
-    case 4:
+    case imu::RoundedSquare::kDotId:
       circularSinusoidalTrajectory.reset(new imu::RoundedSquare(
           imuParameters.rate, Eigen::Vector3d(0, 0, -imuParameters.g),
           okvis::Time(0, 0), 1e-3, 0, 0.8e-3));
       break;
-    case 5:
+    case imu::WavyCircle::kTrajectoryId:
       circularSinusoidalTrajectory.reset(new imu::WavyCircle(
           imuParameters.rate, Eigen::Vector3d(0, 0, -imuParameters.g)));
       break;
-    case 6:
+    case imu::Motionless::kTrajectoryId:
       circularSinusoidalTrajectory.reset(new imu::Motionless(
           imuParameters.rate, Eigen::Vector3d(0, 0, -imuParameters.g)));
       break;
-    case 1:
+    case imu::SphereTrajectory::kTrajectoryId:
       circularSinusoidalTrajectory.reset(new imu::SphereTrajectory(
           imuParameters.rate, Eigen::Vector3d(0, 0, -imuParameters.g)));
       break;

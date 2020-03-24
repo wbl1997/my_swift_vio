@@ -74,7 +74,7 @@ git clone --recursive https://JzHuai0108@bitbucket.org/JzHuai0108/msckf.git
 ```
 
 * gtsam (optional)
-Installation of gtsam refers to [Kimera-VIO](https://github.com/MIT-SPARK/Kimera-VIO/blob/master/docs/kimera_vio_install.md).
+Its installation refers to [Kimera-VIO](https://github.com/MIT-SPARK/Kimera-VIO/blob/master/docs/kimera_vio_install.md).
 
 ```
 sudo apt-get install libtbb-dev
@@ -84,18 +84,20 @@ cd gtsam
 git checkout 342f30d148fae84c92ff71705c9e50e0a3683bda
 mkdir build
 cd build
-# EIGEN_INCLUDE_DIR is needed for ubuntu 16 for a reason detailed later on.
+
+# EIGEN_INCLUDE_DIR is needed for ubuntu 16 to preempt the incompatible system-wide Eigen.
 cmake -DCMAKE_INSTALL_PREFIX=$HOME/Documents/slam_devel -DCMAKE_BUILD_TYPE=Release \
   -DGTSAM_TANGENT_PREINTEGRATION=OFF -DGTSAM_POSE3_EXPMAP=ON -DGTSAM_ROT3_EXPMAP=ON \
   -DGTSAM_USE_SYSTEM_EIGEN=ON ..
 # -DEIGEN3_INCLUDE_DIR=$HOME/slam_devel/include/eigen3 -DEIGEN_INCLUDE_DIR=$HOME/slam_devel/include/eigen3
 
 make -j $(nproc) check # (optional, runs unit tests)
-sudo make -j $(nproc) install
+make -j $(nproc) install
 ```
 
-If you get an error while loading shared libraries libmetis.soat run or test time, 
-you may need to add the lib path for gtsam to LD_LIBRARY_PATH as below inside the incumbent terminal.
+If you get an error while loading shared libraries libmetis.so at run or test time, 
+you may need to add the lib path for gtsam to LD_LIBRARY_PATH as below inside the 
+incumbent terminal or the Run Environment in QtCreator.
 ```
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$HOME/Documents/slam_devel/lib
 ```
@@ -118,8 +120,9 @@ catkin config --cmake-args -DUSE_ROS=ON -DBUILD_TESTS=ON \
 
 
 catkin build vio_common msckf -DUSE_ROS=ON -DBUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Release -j$USE_PROC
+# -DCMAKE_PREFIX_PATH=/opt/ros/$ROS_VERSION
 ```
-
+### 1. Why is EIGEN_INCLUDE_DIR passed as a build argument?
 Setting EIGEN_INCLUDE_DIR is necessary for Ubuntu 16.04 because
 the system wide Eigen library (usually 3.2) does not 
 meet the requirements of the ceres solver depended by this package.
@@ -140,6 +143,15 @@ cd build
 cmake .. -DCMAKE_INSTALL_PREFIX="$HOME/slam_devel"
 make install
 ```
+### 2. Why is CMAKE_PREFIX_PATH passed as a build argument?
+After opening and building the project with QtCreator (see Section Debug the Project with QtCreator),
+the following warning and associated errors may come up when the project is built again by catkin in a terminal.
+
+"WARNING: Your workspace is configured to explicitly extend a workspace which
+yields a CMAKE_PREFIX_PATH which is different from the cached CMAKE_PREFIX_PATH
+used last time this workspace was built."
+
+To suppress these errors, CMAKE_PREFIX_PATH needs to be specified.
 
 TODO(jhuai): the progress percentage in building msckf jumps back and forth with catkin build.
 This effect is not observed with OKVIS_ROS. 

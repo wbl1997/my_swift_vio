@@ -55,7 +55,9 @@ typedef std::vector<StatePointerAndEstimate,
                     Eigen::aligned_allocator<StatePointerAndEstimate>>
     StatePointerAndEstimateList;
 
-//! The estimator class
+//! The HybridFilter that uses short feature track observations in the MSCKF
+//!  manner and long feature track observations in the SLAM manner, i.e.,
+//! put into the state vector.
 /*!
  The estimator class does all the backend work.
  Frames:

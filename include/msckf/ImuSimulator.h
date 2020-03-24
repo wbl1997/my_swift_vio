@@ -16,6 +16,13 @@
 #include <vector>
 
 namespace imu {
+static const std::vector<std::string> trajectoryIdToLabel{
+    "Torus", "Ball", "Squircle", "Circle", "Dot", "WavyCircle", "Motionless"};
+
+static const std::map<std::string, int> trajectoryLabelToId{
+    {"Torus", 0}, {"Ball", 1},       {"Squircle", 2},   {"Circle", 3},
+    {"Dot", 4},   {"WavyCircle", 5}, {"Motionless", 6},
+};
 /**
  *@brief interpolate IMU data given control poses and their uniform timestamps
  *@param q02n, nominal trajecotry poses,i.e., control points, q_0^w, q_1^w, ...,
@@ -237,6 +244,7 @@ class TorusTrajectory : public CircularSinusoidalTrajectory {
 
   virtual okvis::kinematics::Transformation computeGlobalPose(
       const okvis::Time time) const;
+  static const int kTrajectoryId = 0;
 };
 
 // Yarn ball
@@ -256,6 +264,7 @@ class SphereTrajectory : public CircularSinusoidalTrajectory {
 
   virtual okvis::kinematics::Transformation computeGlobalPose(
       const okvis::Time time) const;
+  static const int kTrajectoryId = 1;
 };
 
 // planar motion with constant velocity magnitude
@@ -278,6 +287,10 @@ public:
       const okvis::Time time) const;
 
   std::vector<double> getEndEpochs() { return endEpochs_; }
+
+  static const int kRoundedSquareId = 2;
+  static const int kCircleId = 3;
+  static const int kDotId = 4;
 
  private:
 
@@ -344,7 +357,7 @@ class WavyCircle : public CircularSinusoidalTrajectory {
   double angularRate() const {
     return angularRate_;
   }
-
+  static const int kTrajectoryId = 5;
  private:
   double wallRadius_;
   double trajectoryRadius_;
@@ -390,6 +403,7 @@ class Motionless : public CircularSinusoidalTrajectory {
       const okvis::Time /*time*/) const {
     return okvis::kinematics::Transformation();
   }
+  static const int kTrajectoryId = 6;
 };
 
 template <typename T>
