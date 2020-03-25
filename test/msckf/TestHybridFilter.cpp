@@ -521,7 +521,7 @@ void testHybridFilterSinusoid(const std::string& outputPath,
         size_t numKeyFrames = 5u;
         size_t numImuFrames = 5u;
         if (isFilteringMethod(estimatorAlgorithm)) {
-          numImuFrames = 10u;
+          numKeyFrames = 10u;
         }
         estimator->applyMarginalizationStrategy(numKeyFrames, numImuFrames, removedLandmarks);
         estimator->print(debugStream);

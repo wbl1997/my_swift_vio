@@ -948,9 +948,9 @@ bool HybridFilter::slamFeatureJacobian(
       double kpSize = 1.0;
       multiFramePtr->getKeypointSize(itObs->first.cameraIndex,
                                      itObs->first.keypointIndex, kpSize);
+
       R_i(0, 0) = (kpSize / 8) * (kpSize / 8);
-      R_i(1, 1) = R_i(
-          0, 0);  // image pixel noise follows that in addObservation function
+      R_i(1, 1) = R_i(0, 0);
       R_i(0, 1) = 0;
       R_i(1, 0) = 0;
       bObservedInCurrentFrame = true;
@@ -2465,7 +2465,7 @@ size_t HybridFilter::gatherMapPointObservations(
     double kpSize = 1.0;
     multiFramePtr->getKeypointSize(itObs->first.cameraIndex,
                                    itObs->first.keypointIndex, kpSize);
-    // image pixel noise follows that in addObservation function
+
     imageNoiseStd->push_back(kpSize / 8);
     imageNoiseStd->push_back(kpSize / 8);
 
@@ -2742,10 +2742,11 @@ void HybridFilter::getImuAugmentedStatesEstimate(
   okvis::getImuAugmentedStatesEstimate(TgTsTaPtr, extraParams, imu_rig_.getModelId(0));
 }
 
-void HybridFilter::getStateVariance(
+bool HybridFilter::getStateVariance(
     Eigen::Matrix<double, Eigen::Dynamic, 1>* variances) const {
   const int dim = startIndexOfClonedStates();
   *variances = covariance_.topLeftCorner(dim, dim).diagonal();
+  return true;
 }
 
 void HybridFilter::setKeyframeRedundancyThresholds(double dist, double angle,
