@@ -72,6 +72,7 @@ optimization:
     useEpipolarConstraint: false
     cameraObservationModelId: 0
     landmarkModelId: 1
+    initializeWithoutEnoughParallax: true
 
 # ceres optimization options
 ceres_options:
