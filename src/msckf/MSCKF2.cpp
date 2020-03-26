@@ -39,7 +39,7 @@ DEFINE_bool(use_IEKF, false,
 namespace okvis {
 
 MSCKF2::MSCKF2(std::shared_ptr<okvis::ceres::Map> mapPtr)
-    : HybridFilter(mapPtr) {}
+    : HybridFilter(mapPtr), minCulledFrames_(3u) {}
 
 // The default constructor.
 MSCKF2::MSCKF2() {}
@@ -997,6 +997,14 @@ bool MSCKF2::featureJacobian(const MapPoint &mp, Eigen::MatrixXd &H_oi,
     computeHTimer.stop();
     return true;
   }
+}
+
+void MSCKF2::setKeyframeRedundancyThresholds(double dist, double angle,
+                                             double trackingRate,
+                                             size_t minTrackLength) {
+  HybridFilter::setKeyframeRedundancyThresholds(dist, angle, trackingRate,
+                                                minTrackLength);
+  minCulledFrames_ = 4u - camera_rig_.numberCameras();
 }
 
 int MSCKF2::computeStackedJacobianAndResidual(

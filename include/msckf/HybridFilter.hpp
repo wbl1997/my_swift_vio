@@ -285,8 +285,8 @@ class HybridFilter : public Estimator {
   virtual bool getStateVariance(Eigen::Matrix<double, Eigen::Dynamic, 1>* variances) const final;
 
   virtual void setKeyframeRedundancyThresholds(double dist, double angle,
-                                       double trackingRate,
-                                       size_t minTrackLength) final;
+                                               double trackingRate,
+                                               size_t minTrackLength);
 
   // will remove state parameter blocks and all of their related residuals
   okvis::Time removeState(uint64_t stateId);

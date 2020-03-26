@@ -135,7 +135,11 @@ class MSCKF2 : public HybridFilter {
                   Eigen::MatrixXd& R_oi,
                   std::vector<uint64_t>* involved_frame_ids=nullptr) const;
 
-private:
+  virtual void setKeyframeRedundancyThresholds(double dist, double angle,
+                                               double trackingRate,
+                                               size_t minTrackLength) final;
+
+ private:
   int computeStackedJacobianAndResidual(
       Eigen::MatrixXd* T_H, Eigen::Matrix<double, Eigen::Dynamic, 1>* r_q,
       Eigen::MatrixXd* R_q) const;
@@ -157,7 +161,7 @@ private:
   // should be at least 3 for the monocular case so that
   // the marginalized observations can contribute innovation to the states,
   // see Sun 2017 Robust stereo appendix D
-  static const int minCulledFrames_ = 3;
+  size_t minCulledFrames_;
 };
 
 }  // namespace okvis
