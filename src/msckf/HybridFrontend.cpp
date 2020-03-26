@@ -10,6 +10,9 @@
 
 #include <brisk/brisk.h>
 
+#include <msckf/FrameMatchingStats.hpp>
+#include <msckf/FrameTranslationOnlySacProblem.hpp>
+
 #include <opencv2/imgproc/imgproc.hpp>
 
 #include <okvis/VioKeyframeWindowMatchingAlgorithm.hpp>
@@ -27,7 +30,6 @@
 #include <opengv/sac_problems/absolute_pose/FrameAbsolutePoseSacProblem.hpp>
 #include <opengv/sac_problems/relative_pose/FrameRelativePoseSacProblem.hpp>
 #include <opengv/sac_problems/relative_pose/FrameRotationOnlySacProblem.hpp>
-#include <msckf/FrameTranslationOnlySacProblem.hpp>
 
 #include <opengv/absolute_pose/FrameNoncentralAbsoluteAdapter.hpp>
 #include <opengv/relative_pose/FrameRelativeAdapter.hpp>
@@ -118,8 +120,6 @@ bool HybridFrontend::dataAssociationAndInitialization(
   }
   int num3dMatches = 0;
   if (FLAGS_feature_tracking_method == 1) {
-    // always set asKeyframe true for back-to-back feature tracking methods.
-    *asKeyframe = true;
     int requiredMatches = 5;
     bool rotationOnly = false;
     // match to last frame
@@ -176,11 +176,13 @@ bool HybridFrontend::dataAssociationAndInitialization(
       LOG(WARNING) << "Tracking last frame failure. Number of 3d2d-matches: " << num3dMatches;
     }
     if (estimator.numFrames() > 1) {
-        uint64_t currentFrameId = framesInOut->id();
-        uint64_t lastFrameId = estimator.currentKeyframeId();
-        bool removeOutliers = false;
-        runRansac2d2d(estimator, params, currentFrameId, lastFrameId,
-                      removeOutliers, asKeyframe);
+      uint64_t currentFrameId = framesInOut->id();
+      uint64_t lastKeyframeId = estimator.currentKeyframeId();
+      bool removeOutliers = false;
+      runRansac2d2d(estimator, params, currentFrameId, lastKeyframeId,
+                    removeOutliers, asKeyframe);
+    } else {
+      *asKeyframe = true;
     }
     return true;
   }
@@ -251,17 +253,6 @@ bool HybridFrontend::dataAssociationAndInitialization(
 
     // keyframe decision, at the moment only landmarks that match with keyframe are initialised
     *asKeyframe = *asKeyframe || doWeNeedANewKeyframe(estimator, framesInOut);
-    } else {
-      if (!isInitialized_) {
-        if (initializeWithoutEnoughParallax_ || !rotationOnly) {
-          isInitialized_ = true;
-          LOG(INFO) << "Initialized: initializeWithoutEnoughParallax ? "
-                    << initializeWithoutEnoughParallax_ << " rotationOnly ? "
-                    << rotationOnly;
-        }
-      }
-      // always set asKeyframe true for back-to-back feature tracking methods.
-      *asKeyframe = true;
     }
     // match to last frame
     TimerSwitchable matchToLastFrameTimer("2.4.2 matchToLastFrame");
@@ -304,8 +295,21 @@ bool HybridFrontend::dataAssociationAndInitialization(
         break;
     }
     matchToLastFrameTimer.stop();
-    if (FLAGS_feature_tracking_method != 0 && num3dMatches <= requiredMatches) {
-      LOG(WARNING) << "Tracking last frame failure. Number of 3d2d-matches: " << num3dMatches;
+    if (FLAGS_feature_tracking_method != 0) {
+      if (!isInitialized_) {
+        if (initializeWithoutEnoughParallax_ || !rotationOnly) {
+          isInitialized_ = true;
+          LOG(INFO) << "Initialized: initializeWithoutEnoughParallax ? "
+                    << initializeWithoutEnoughParallax_ << " rotationOnly ? "
+                    << rotationOnly;
+        }
+      }
+      if (num3dMatches <= requiredMatches) {
+        LOG(WARNING) << "Tracking last frame failure. Number of 3d2d-matches: " << num3dMatches;
+      }
+      // At the moment, landmarks that match with last frame are initialised so
+      // checking overlap and matching ratio will not work as well as checking relative motion.
+      *asKeyframe = *asKeyframe || doWeNeedANewKeyframePosterior(estimator, framesInOut);
     }
   } else
     *asKeyframe = true;  // first frame needs to be keyframe
@@ -441,6 +445,45 @@ bool HybridFrontend::doWeNeedANewKeyframe(
                            static_cast<double>(pointsInFrameBMatchesArea);
 
     // calculate overlap score
+    overlap = std::max(overlapArea, overlap);
+    ratio = std::max(matchingRatio, ratio);
+  }
+
+  // take a decision
+  if (overlap > keyframeInsertionOverlapThreshold_
+      && ratio > keyframeInsertionMatchingRatioThreshold_)
+    return false;
+  else
+    return true;
+}
+
+bool HybridFrontend::doWeNeedANewKeyframePosterior(
+    const okvis::Estimator& estimator,
+    std::shared_ptr<okvis::MultiFrame> currentFrame) {
+  if (estimator.numFrames() < 2) {
+    // just starting, so yes, we need this as a new keyframe
+    return true;
+  }
+
+  if (!isInitialized_)
+    return false;
+
+  uint64_t latestKeyframeId = estimator.currentKeyframeId();
+  std::shared_ptr<okvis::MultiFrame> latestKeyframePtr =
+      estimator.multiFrame(latestKeyframeId);
+
+  double overlap = 0.0;
+  double ratio = 0.0;
+
+  // go through all the frames and try to match the initialized keypoints
+  for (size_t im = 0; im < currentFrame->numFrames(); ++im) {
+    okvis::Matches matches;
+    opengv::findMatches(estimator, latestKeyframePtr, im, currentFrame, im,
+                        &matches);
+    double overlapArea;
+    double matchingRatio;
+    opengv::computeMatchStats(matches, currentFrame, im, &overlapArea,
+                              &matchingRatio);
     overlap = std::max(overlapArea, overlap);
     ratio = std::max(matchingRatio, ratio);
   }
@@ -1117,6 +1160,8 @@ int HybridFrontend::runRansac2d2d(okvis::Estimator& estimator,
     } else {
       *asKeyframe = true;
     }
+  } else {
+    *asKeyframe = false;
   }
 
   if (translation_only_success || rotation_only_success) {

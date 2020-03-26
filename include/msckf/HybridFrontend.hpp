@@ -325,6 +325,18 @@ class HybridFrontend {
           currentFrame);  // based on some overlap area heuristics
 
   /**
+   * @brief Decision whether a new frame should be keyframe or not after the
+   * currentFrame has matched to its previous frame, by examining common
+   * landmarks between currentFrame and latest keyframe.
+   * @param estimator     const reference to the estimator.
+   * @param currentFrame  Keyframe candidate.
+   * @return True if it should be a new keyframe.
+   */
+  bool doWeNeedANewKeyframePosterior(
+      const okvis::Estimator& estimator,
+      std::shared_ptr<okvis::MultiFrame> currentFrame);
+
+  /**
    * @brief Match a new multiframe to existing keyframes
    * @tparam MATCHING_ALGORITHM Algorithm to match new keypoints to existing
    * landmarks

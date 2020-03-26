@@ -3100,14 +3100,13 @@ uint64_t HybridFilter::getMinValidStateId() const {
       continue;
 
     auto itObs = it->second.observations.begin();
-    if (itObs->first.frameId <
-        min_state_id) {  // this assume that it->second.observations is an
-                         // ordered map
+    if (itObs->first.frameId < min_state_id) {
       min_state_id = itObs->first.frameId;
     }
   }
-  OKVIS_ASSERT_LE(Exception, min_state_id, currentKeyframeId(),
-                  "Removing the current keyframe!");
+  // We keep at least one keyframe which is required for visualization.
+  uint64_t lastKeyframeId = currentKeyframeId();
+  min_state_id = min_state_id < lastKeyframeId ? min_state_id : lastKeyframeId;
   return min_state_id;
 }
 
