@@ -64,7 +64,6 @@
 #endif
 
 #include <io_wrap/Publisher.hpp>
-#include <msckf/HybridVio.hpp>
 #include <okvis/Time.hpp>
 #include <okvis/VioInterface.hpp>
 #include <okvis/VioParametersReader.hpp>
@@ -161,7 +160,7 @@ class Subscriber {
       cameraConfigReconfigureService_;  ///< dynamic reconfigure service.
 #endif
 
-  okvis::VioInterface* vioInterface_;  ///< The VioInterface. (E.g. HybridVio)
+  okvis::VioInterface* vioInterface_;  ///< The VioInterface.
   okvis::VioParameters
       vioParameters_;  ///< The parameters and settings. //huai: although
                        ///< cameraGeometry info is included but not used through

@@ -30,7 +30,8 @@
 #include <io_wrap/Publisher.hpp>
 #include <io_wrap/RosParametersReader.hpp>
 #include <io_wrap/Subscriber.hpp>
-#include <msckf/HybridVio.hpp>
+#include <msckf/VioFactoryMethods.hpp>
+#include <okvis/ThreadedKFVio.hpp>
 
 int main(int argc, char **argv) {
   google::ParseCommandLineFlags(&argc, &argv, true);  // true to strip gflags
@@ -75,28 +76,23 @@ int main(int argc, char **argv) {
   vio_parameters_reader.getParameters(parameters);
   okvis::setInputParameters(&parameters.input);
 
-  std::shared_ptr<okvis::VioInterface> okvis_estimator;
-  switch (parameters.optimization.algorithm) {
-    case okvis::EstimatorAlgorithm::OKVIS:
-    case okvis::EstimatorAlgorithm::General:
-    case okvis::EstimatorAlgorithm::Priorless:
-      // http://eigen.tuxfamily.org/bz/show_bug.cgi?id=1049
-      okvis_estimator.reset(new okvis::ThreadedKFVio(parameters));
-      break;
-    default:
-      okvis_estimator.reset(new okvis::HybridVio(parameters));
-      break;
-  }
+  std::shared_ptr<okvis::Estimator> estimator =
+      msckf::createBackend(parameters.optimization.algorithm);
+  std::shared_ptr<okvis::Frontend> frontend = msckf::createFrontend(
+      parameters.nCameraSystem.numCameras(),
+      parameters.optimization.initializeWithoutEnoughParallax,
+      parameters.optimization.algorithm);
+  okvis::ThreadedKFVio okvis_estimator(parameters, estimator, frontend);
 
   std::string path = FLAGS_output_dir;
   path = okvis::removeTrailingSlash(path);
   int camIdx = 0;
 
-  okvis_estimator->setFullStateCallback(
+  okvis_estimator.setFullStateCallback(
       std::bind(&okvis::Publisher::publishFullStateAsCallback, &publisher,
                 std::placeholders::_1, std::placeholders::_2,
                 std::placeholders::_3, std::placeholders::_4));
-  okvis_estimator->setLandmarksCallback(std::bind(
+  okvis_estimator.setLandmarksCallback(std::bind(
       &okvis::Publisher::publishLandmarksAsCallback, &publisher,
       std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
 
@@ -110,33 +106,33 @@ int main(int argc, char **argv) {
   publisher.setCsvFile(stateFilename, headerLine);
   if (FLAGS_dump_output_option == 2) {
     // save estimates of evolving states, and camera extrinsics
-    okvis_estimator->setFullStateCallbackWithExtrinsics(std::bind(
+    okvis_estimator.setFullStateCallbackWithExtrinsics(std::bind(
         &okvis::Publisher::csvSaveFullStateWithExtrinsicsAsCallback, &publisher,
         std::placeholders::_1, std::placeholders::_2, std::placeholders::_3,
         std::placeholders::_4, std::placeholders::_5, std::placeholders::_6));
   } else if (FLAGS_dump_output_option == 3 || FLAGS_dump_output_option == 4) {
     // save estimates of evolving states, camera extrinsics,
     // and all other calibration parameters
-    okvis_estimator->setFullStateCallbackWithAllCalibration(std::bind(
+    okvis_estimator.setFullStateCallbackWithAllCalibration(std::bind(
         &okvis::Publisher::csvSaveFullStateWithAllCalibrationAsCallback,
         &publisher, std::placeholders::_1, std::placeholders::_2,
         std::placeholders::_3, std::placeholders::_4, std::placeholders::_5,
         std::placeholders::_6, std::placeholders::_7, std::placeholders::_8,
         std::placeholders::_9, std::placeholders::_10));
     if (FLAGS_dump_output_option == 4) {
-      okvis_estimator->setImuCsvFile(path + "/imu0_data.csv");
+      okvis_estimator.setImuCsvFile(path + "/imu0_data.csv");
       const unsigned int numCameras = parameters.nCameraSystem.numCameras();
       for (size_t i = 0; i < numCameras; ++i) {
         std::stringstream num;
         num << i;
-        okvis_estimator->setTracksCsvFile(
+        okvis_estimator.setTracksCsvFile(
             i, path + "/cam" + num.str() + "_tracks.csv");
       }
       publisher.setLandmarksCsvFile(path + "/okvis_estimator_landmarks.csv");
     }
   }
 
-  okvis_estimator->setStateCallback(
+  okvis_estimator.setStateCallback(
       std::bind(&okvis::Publisher::publishStateAsCallback, &publisher,
                 std::placeholders::_1, std::placeholders::_2));
   publisher.setParameters(parameters);  // pass the specified publishing stuff
@@ -145,21 +141,21 @@ int main(int argc, char **argv) {
   std::shared_ptr<okvis::Player> pPlayer;
   std::shared_ptr<std::thread> ptPlayer;
   if (FLAGS_load_input_option == 0) {
-    okvis::Subscriber subscriber(nh, okvis_estimator.get(),
+    okvis::Subscriber subscriber(nh, &okvis_estimator,
                                  vio_parameters_reader);
     ros::Rate rate(20);
     while (ros::ok()) {
       ros::spinOnce();
-      okvis_estimator->display();
+      okvis_estimator.display();
       rate.sleep();
     }
   } else {
-    pPlayer.reset(new okvis::Player(okvis_estimator.get(), parameters));
+    pPlayer.reset(new okvis::Player(&okvis_estimator, parameters));
     ptPlayer.reset(new std::thread(&okvis::Player::Run, std::ref(*pPlayer)));
 
     ros::Rate rate(20);
     while (!pPlayer->mbFinished) {
-      okvis_estimator->display();
+      okvis_estimator.display();
       rate.sleep();
     }
     ptPlayer->join();
@@ -168,6 +164,6 @@ int main(int argc, char **argv) {
   }
 
   std::string filename = path + "/feature_statistics.txt";
-  okvis_estimator->saveStatistics(filename);
+  okvis_estimator.saveStatistics(filename);
   return 0;
 }

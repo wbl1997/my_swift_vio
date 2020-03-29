@@ -97,7 +97,8 @@ make -j $(nproc) install
 
 If you get an error while loading shared libraries libmetis.so at run or test time, 
 you may need to add the lib path for gtsam to LD_LIBRARY_PATH as below inside the 
-incumbent terminal or the Run Environment in QtCreator.
+incumbent terminal or the Run Environment in QtCreator. QtCreator debugger may have
+trouble understanding the symbol "$HOME", so it is preferred to replace it with its actual path.
 ```
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$HOME/Documents/slam_devel/lib
 ```

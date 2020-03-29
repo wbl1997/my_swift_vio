@@ -74,7 +74,7 @@ class Player {
 
   /// @}
 
-  okvis::VioInterface* vioInterface_;  ///< The VioInterface. (E.g. HybridVio)
+  okvis::VioInterface* vioInterface_;  ///< The VioInterface.
   okvis::VioParameters
       vioParameters_;  ///< The parameters and settings. //huai: although
                        ///< cameraGeometry info is included but not used through

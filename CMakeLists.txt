@@ -108,10 +108,10 @@ LIST(APPEND SOURCEFILES
     src/io_wrap/Subscriber.cpp
 
     src/msckf/CameraSystemCreator.cpp
+    src/msckf/VioFactoryMethods.cpp
     src/msckf/FilterHelper.cpp
     src/msckf/HybridFilter.cpp
     src/msckf/HybridFrontend.cpp
-    src/msckf/HybridVio.cpp
     src/msckf/ImuSimulator.cpp
     src/msckf/InvariantEKF.cpp
     src/msckf/MotionAndStructureStats.cpp
