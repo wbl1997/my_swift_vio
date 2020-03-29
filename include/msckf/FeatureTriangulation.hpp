@@ -337,7 +337,8 @@ static bool isValidSolution(
   }
   return is_valid_solution;
 }
-
+// TODO(jhuai): use the LM method inside ceres TinySolver and directly
+// returns anchored inverse depth parameters if needed.
 bool Feature::initializePosition() {
   // Organize camera poses and feature observations properly.
   std::vector<okvis::kinematics::Transformation,

@@ -125,4 +125,22 @@ The root cause for this issue has nothing to do with the report. It is caused by
 some runs have results close to the pose profile of DeadreckoningM. 
 Preliminary tests find that this issue with DeadreckoningO is not caused by applyMarginalizationStrategy.
 
+38. develop compatibility with multiple IMU models
+
+39. develop iSAM with monocular, and multiple camera e.g., binocular, or stereo frontend, refer to Kimera stereo VIO implementation, 
+my previous vin-csfm repo that depends on gtsam, and cpi closed_form preintegration by Eckenhoff, and 
+the structureless factor from Forster RSS2017.
+Refer to OKVIS, rovio, svo2, VINS Fusion, and MSCKF_VIO for developing stereo frontend.
+
+40. develop the invariant EKF, refer to Zhang Teng, and Ross Hartley thesis
+
+41. use FREAK besides BRISK in the frontend for feature description.
+
+42. Tune the feature descriptor extraction parameters, the number of keyframes for matching,
+ the temporal window size, and the spatial window size.
+
+43. Implement fixed lag smoother for mono and stereo data with or without IMU, refer to Kimera-VIO, [closed form preintegration](https://github.com/rpng/cpi), and 
+examples [here](https://github.com/ganlumomo/VisualInertialOdometry)
+
+44. The timing entries for waitForOptimization and waitForMatching are often unusually large.
 
