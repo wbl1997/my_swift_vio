@@ -1,6 +1,7 @@
 <launch>
   <arg name="bag_file" default="MH_03_medium.bag"/>
   <arg name="image_topic" default="/cam0/image_raw"/>
+  <arg name="image_topic1" default="/cam1/image_raw"/>
   <arg name="imu_topic" default="/imu0"/>
   <arg name="dump_output_option" default="3"/>
   <arg name="load_input_option" default="0"/>
@@ -8,13 +9,14 @@
   <arg name="config_filename" default="$(find msckf)/config/config_fpga_p2_euroc.yaml" />
   <arg name="start_into_bag" default="0"/>
   <arg name="image_noise_cov_multiplier" default="5.0"/>
+  <arg name="feature_tracking_method" default="0"/>
   <arg name="play_rate" default="1.0"/>
   <node name="okvis_node" pkg="msckf" type="okvis_node" output="screen" 
       args="$(arg config_filename) --dump_output_option=$(arg dump_output_option) 
       --load_input_option=$(arg load_input_option)
       --image_noise_cov_multiplier=$(arg image_noise_cov_multiplier)
       --output_dir=$(arg output_dir)
-      --feature_tracking_method=0
+      --feature_tracking_method=$(arg feature_tracking_method)
       --max_inc_tol=10.0">
     
     <remap from="/camera1" to="/cam1/image_raw" />
@@ -27,6 +29,7 @@
 
   <node pkg="rosbag" type="play" name="player" args="-s $(arg start_into_bag) 
      -r $(arg play_rate) $(arg bag_file) 
-     $(arg image_topic):=/camera0 $(arg imu_topic):=/imu" output="log" required="true">
+     $(arg image_topic):=/camera0 $(arg image_topic1):=/camera1
+     $(arg imu_topic):=/imu" output="log" required="true">
   </node>
 </launch>

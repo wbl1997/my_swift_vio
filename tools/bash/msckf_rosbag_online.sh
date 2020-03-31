@@ -7,7 +7,7 @@ source "$SCRIPT_DIR/sed_msckf_config_benchmark.sh"
 source "$SCRIPT_DIR/sed_msckf_config_cam_imu.sh"
 
 cd $MSCKF_WS
-LAUNCH_FILE="$MSCKF_WS/src/msckf/launch/okvis_node_rosbag.launch"
+LAUNCH_FILE="okvis_node_rosbag.launch"
 source devel/setup.bash
 cmd="roslaunch msckf $LAUNCH_FILE \
     config_filename:=$MSCKF_TEMPLATE \

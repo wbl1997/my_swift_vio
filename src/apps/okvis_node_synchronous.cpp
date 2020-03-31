@@ -75,6 +75,12 @@ DEFINE_double(skip_first_seconds, 0, "Number of seconds to skip from the beginni
 
 DEFINE_string(bagname, "", "Bag filename.");
 
+DEFINE_string(camera_topics, "/cam0/image_raw,/cam1/image_raw",
+              "Used image topics inside the bag. Should agree with the number "
+              "of cameras in the config file");
+
+DEFINE_string(imu_topic, "/imu0", "Imu topic inside the bag");
+
 // this is just a workbench. most of the stuff here will go into the Frontend
 // class.
 int main(int argc, char **argv) {
@@ -200,8 +206,10 @@ int main(int argc, char **argv) {
 
   // open the bag
   rosbag::Bag bag(FLAGS_bagname, rosbag::bagmode::Read);
+  std::vector<std::string> camera_topics =
+      okvis::parseCommaSeparatedTopics(FLAGS_camera_topics);
   // views on topics. the slash is needs to be correct, it's ridiculous...
-  std::string imu_topic("/imu0");
+  std::string imu_topic = FLAGS_imu_topic;
   rosbag::View view_imu(bag, rosbag::TopicQuery(imu_topic));
   if (view_imu.size() == 0) {
     LOG(ERROR) << "no imu topic";
@@ -215,7 +223,7 @@ int main(int argc, char **argv) {
   std::vector<okvis::Time> times;
   okvis::Time latest(0);
   for (size_t i = 0; i < numCameras; ++i) {
-    std::string camera_topic("/cam" + std::to_string(i) + "/image_raw");
+    std::string camera_topic = camera_topics[i];
     std::shared_ptr<rosbag::View> view_ptr(
         new rosbag::View(bag, rosbag::TopicQuery(camera_topic)));
     if (view_ptr->size() == 0) {

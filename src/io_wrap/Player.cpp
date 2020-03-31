@@ -163,6 +163,16 @@ void Player::RunBlocking() {
   mbFinished.store(true);
 }
 
+std::vector<std::string> parseCommaSeparatedTopics(const std::string& topic_list) {
+  std::vector<std::string> topics;
+  std::stringstream ss(topic_list);
+  std::string topic;
+  while (getline(ss, topic, ',')) {
+      topics.push_back(topic);
+  }
+  return topics;
+}
+
 // A better implementation is given here.
 // https://stackoverflow.com/questions/216823/whats-the-best-way-to-trim-stdstring
 std::string removeTrailingSlash(const std::string &path) {
