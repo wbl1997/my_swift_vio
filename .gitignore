@@ -35,3 +35,5 @@ CMakeLists\.txt\.user
 *.m~
 
 *.pyc
+
+evaluation/.idea/
