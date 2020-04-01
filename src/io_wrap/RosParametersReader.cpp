@@ -62,7 +62,12 @@ bool RosParametersReader::getCameraCalibration(
     cv::FileStorage& configurationFile) {
   bool success =
       getCalibrationViaConfig(calibrations, configurationFile["cameras"]);
-
+  bool monocularInput = false;
+  bool parseOk = parseBoolean(configurationFile["monocular_input"], monocularInput);
+  if (parseOk && monocularInput) {
+    calibrations.resize(1);
+  }
+  LOG(INFO) << "monocular_input?" << monocularInput << " #Cameras:" << calibrations.size();
   if (!useDriver && !success) {
     success = getCalibrationViaRosService(calibrations);
   }
