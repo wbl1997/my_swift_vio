@@ -133,7 +133,7 @@ class RunOneVioMethod(object):
         mock = 'async' in algo_name
         roscore_manager = RoscoreManager.RosCoreManager(mock)
         roscore_manager.start_roscore()
-
+        return_code = 0
         for bag_index, bag_fullname in enumerate(self.bag_list):
             output_dir_mission = self.output_dir_list[bag_index]
             gt_file = os.path.join(output_dir_mission, 'stamped_groundtruth.txt')
@@ -165,6 +165,9 @@ class RunOneVioMethod(object):
 
                 print('Running vio method with cmd\n{}\n'.format(cmd))
                 rc, msg = utility_functions.subprocess_cmd(cmd)
+                if rc != 0:
+                    print('Error code {} with cmd:\n{}\nand error msg:{}\n'.format(rc, cmd, msg))
+                    return_code = rc
                 vio_estimate_csv = os.path.join(output_dir_trial, 'msckf_estimates.csv')
                 converted_vio_file = os.path.join(
                     output_dir_mission, "stamped_traj_estimate{}.txt".format(index_str))
@@ -172,5 +175,4 @@ class RunOneVioMethod(object):
                     format(pose_conversion_script, vio_estimate_csv, converted_vio_file)
                 utility_functions.subprocess_cmd(cmd)
         roscore_manager.stop_roscore()
-
-        return rc, msg
+        return return_code

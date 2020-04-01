@@ -100,9 +100,9 @@ class OkvisConfigComposer(object):
         dataset_type = dataset_code(self.bag_fullname)
         imu_calib_file, camera_calib_files = self.get_calib_files()
         if dataset_type == 0:
-            self.create_config_for_euroc(self, imu_calib_file, camera_calib_files)
+            self.create_config_for_euroc(imu_calib_file, camera_calib_files)
         elif dataset_type == 1:
-            self.create_config_for_uzh_fpv(self, imu_calib_file, camera_calib_files)
+            self.create_config_for_uzh_fpv(imu_calib_file, camera_calib_files)
         else:
             raise Exception("Unknown dataset type {}".format(dataset_type))
 

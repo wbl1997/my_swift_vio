@@ -1,14 +1,26 @@
 import subprocess
 
-def subprocess_cmd(command, block=True):
+def subprocess_cmd_check(command):
     """Run command in a subprocess shell and wait until completion by default"""
-    process = subprocess.Popen(command,stdout=subprocess.PIPE, shell=True)
-    proc_stdout = process.communicate()[0].strip()
-    # TODO(jhuai): This risks deadlock caused by wait(), see
-    # https://docs.python.org/3/library/subprocess.html
-    if block:
-        process.wait()
-    return process.returncode, proc_stdout
+    try:
+        output = subprocess.check_output(command, stderr=subprocess.STDOUT, shell=True)
+    except subprocess.CalledProcessError as err:
+        print('Error code {} in running command {} with output:\n{}\n'.format(err.returncode, command, err))
+        return err.returncode, err.output
+    except Exception as err:
+        print("Unexpected error:{}".format(err))
+        return 1, "Unexpected error"
+    return 0, output
+
+
+def subprocess_cmd(cmd):
+    process = subprocess.Popen(cmd, shell=True,
+                               stdout=subprocess.PIPE,
+                               stderr=subprocess.PIPE)
+    # wait for the process to terminate
+    out, err = process.communicate()
+    return process.returncode, out.strip()
+
 
 def de_underscore(strin):
     return strin.replace('_', '-')
