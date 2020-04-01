@@ -11,8 +11,6 @@ ROS_TOPICS = [["/cam0/image_raw", "/cam1/image_raw", "/imu0"],
               ["/snappy_cam/stereo_l", "/snappy_cam/stereo_r", "/snappy_imu"]]
 
 
-
-
 class RunOneVioMethod(object):
     """Run one vio method on a number of data missions"""
     def __init__(self, catkin_ws, vio_config_template,
@@ -23,7 +21,7 @@ class RunOneVioMethod(object):
 
         :param catkin_ws:
         :param vio_config_template:
-        :param algo_code_flags: [algo_code, algo_cmd_flags, numkeyframes, numImuFrames, ]
+        :param algo_code_flags: {algo_code, algo_cmd_flags, numkeyframes, numImuFrames, }
         :param num_trials:
         :param bag_list:
         :param gt_list:
@@ -34,8 +32,8 @@ class RunOneVioMethod(object):
         self.catkin_ws = catkin_ws
         self.vio_config_template = vio_config_template
         self.algo_code_flags = algo_code_flags
-        self.num_keyframes = algo_code_flags[2]
-        self.num_imuframes = algo_code_flags[3]
+        self.num_keyframes = algo_code_flags["numKeyframes"]
+        self.num_imuframes = algo_code_flags["numImuFrames"]
         self.num_trials = num_trials
         self.bag_list = bag_list
         self.gt_list = gt_list
@@ -66,13 +64,15 @@ class RunOneVioMethod(object):
             config_composer.create_config_for_mission()
 
             # apply algorithm parameters
-            algo_code = self.algo_code_flags[0]
+            algo_code = self.algo_code_flags["algo_code"]
             sed_algo = r'sed -i "/algorithm/c\    algorithm: {}" {};'.\
                 format(algo_code, vio_yaml_mission)
             sed_kf = r'sed -i "/numImuFrames:/c\numImuFrames: {}" {};'.\
                 format(self.num_imuframes, vio_yaml_mission)
             sed_imuframes = r'sed -i "/numKeyframes:/c\numKeyframes: {}" {};'.\
                 format(self.num_keyframes, vio_yaml_mission)
+            sed_imuframes = r'sed -i "/monocular_input:/c\monocular_input: {}" {};'. \
+                format(self.algo_code_flags["monocular_input"], vio_yaml_mission)
             sed_display = r'sed -i "/displayImages:/c\displayImages: false" {};'.\
                 format(vio_yaml_mission)
 
@@ -93,14 +93,14 @@ class RunOneVioMethod(object):
               " --bagname={} {} {}".format(
             self.get_sync_exe(), custom_vio_config, vio_trial_output_dir,
             bag_fullname, arg_topics,
-            self.algo_code_flags[1])
+            self.algo_code_flags["extra_gflags"])
         return export_lib_cmd + cmd
 
     def create_async_command(self, custom_vio_config, vio_trial_output_dir, bag_fullname):
         launch_file = "okvis_node_rosbag.launch"
         setup_bash_file = os.path.join(self.catkin_ws, "devel/setup.bash")
         arg_val_str = utility_functions.get_arg_value_from_gflags(
-            self.algo_code_flags[1], "feature_tracking_method")
+            self.algo_code_flags["extra_gflags"], "feature_tracking_method")
         if arg_val_str is None:
             arg_feature_method = ''
         else:
@@ -148,7 +148,7 @@ class RunOneVioMethod(object):
                     index_str = '{}'.format(trial_index)
 
                 output_dir_trial = os.path.join(
-                    output_dir_mission, '{}{}'.format(self.algo_code_flags[0], index_str))
+                    output_dir_mission, '{}{}'.format(self.algo_code_flags["algo_code"], index_str))
                 dir_utility_functions.mkdir_p(output_dir_trial)
 
                 if 'async' in algo_name:
@@ -173,6 +173,7 @@ class RunOneVioMethod(object):
                     output_dir_mission, "stamped_traj_estimate{}.txt".format(index_str))
                 cmd = "python3 {} {} --outfile={} --output_delimiter=' '". \
                     format(pose_conversion_script, vio_estimate_csv, converted_vio_file)
+                print('Converting pose file with cmd\n{}\n'.format(cmd))
                 utility_functions.subprocess_cmd(cmd)
         roscore_manager.stop_roscore()
         return return_code

@@ -52,6 +52,7 @@ class OkvisConfigComposer(object):
         """create vio_yaml_mission with vio_config_template and sensor
         calibration files for euroc data
         see https://github.com/MIT-SPARK/Kimera-VIO/blob/master/kalibr/config2kimeravio.py
+        and https://github.com/ethz-asl/kalibr/blob/master/aslam_offline_calibration/kalibr/python/exporters/kalibr_okvis_config
         for how to load kalibr output
         """
         # TODO(jhuai)
@@ -81,7 +82,7 @@ class OkvisConfigComposer(object):
         use Loader like "yaml.load(f, Loader=yaml.FullLoader)".
 
         To test the function use test_okvis_config_composer.py in Nosetests or pytest of python2 or 3.
-        A okvis template is at /msckf/config/config_fpga_p2_euroc_dissertation.yaml
+        A okvis template is at /msckf/config/config_fpga_p2_euroc.yaml
         """
         # TODO(jhuai):
         # imu_calib = load_kalibr_imu_calib()

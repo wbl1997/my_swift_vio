@@ -122,6 +122,7 @@ import rpg_eval_tool_wrap
 
 import ResultsDirManager
 import RunOneVioMethod
+import AlgoConfig
 
 from colorama import init, Fore
 init(autoreset=True)
@@ -135,17 +136,19 @@ if __name__ == '__main__':
     for index, gt in enumerate(gt_list):
         print('{}: {}'.format(bag_list[index], gt))
 
-    algo_name_code_flags_dict = {'OKVIS': ['OKVIS', '', 5, 3]}
+    algo_name_code_flags_dict = {'OKVIS': AlgoConfig.create_algo_config(['OKVIS', '', 5, 3]),
+                                 'OKVIS_nframe': AlgoConfig.create_algo_config(['OKVIS', '', 5, 3, 0])}
 
     algo_name_list = list(algo_name_code_flags_dict.keys())
 
     results_dir = os.path.join(args.output_dir, "okvis")
     eval_output_dir = os.path.join(args.output_dir, "okvis_eval")
-    dir_utility_functions.mkdir_p(eval_output_dir)
 
     results_dir_manager = ResultsDirManager.ResultsDirManager(results_dir, bag_list, algo_name_list)
     results_dir_manager.create_results_dir()
     results_dir_manager.create_eval_config_yaml()
+    results_dir_manager.create_eval_output_dir(eval_output_dir)
+
     returncode = 0
     for name, code_flags in algo_name_code_flags_dict.items():
         runner = RunOneVioMethod.RunOneVioMethod(
@@ -165,7 +168,7 @@ if __name__ == '__main__':
         print(Fore.RED + "Error code {} in run_rpg_evaluation: {}".format(rc, streamdata))
         sys.exit(1)
 
-    rpg_eval_tool_wrap.check_eval_result(args.cmp_results_dir)
+    rpg_eval_tool_wrap.check_eval_result(eval_output_dir, args.cmp_eval_output_dir)
 
     print('Successfully finished testing methods in msckf project!')
     sys.exit(0)

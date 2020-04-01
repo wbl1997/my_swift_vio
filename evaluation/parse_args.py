@@ -3,6 +3,7 @@ import os
 import sys
 
 def check_common_args(args):
+    assert os.path.isfile(args.vio_config_yaml)
     euroc_exist = os.path.exists(args.euroc_dir)
     uzh_fpv_exist = os.path.exists(args.uzh_fpv_dir)
     homebrew_exist = os.path.exists(args.homebrew_data_dir)
@@ -20,8 +21,8 @@ def parse_args():
         description='''Evaluate algorithms inside msckf project on many EUROC 
         and UZH-FPV missions with ground truth.''')
     parser.add_argument('vio_config_yaml', type=str,
-                        help="path to yaml configuration file. Its content may be"
-                             " modified in running the program.")
+                        help="path to vio template config yaml. Its content "
+                             "will NOT be modified in running the program.")
     parser.add_argument(
         '--euroc_dir', type=str,
         help="Folder containing the EUROC dataset with a structure layout "
@@ -50,7 +51,7 @@ def parse_args():
         default=rpg_tool_path)
 
     parser.add_argument(
-        '--cmp_results_dir', help='base folder with the results to compare',
+        '--cmp_eval_output_dir', help='base folder with the evaluation output to compare',
         default='')
     parser.add_argument(
         '--num_trials', type=int,

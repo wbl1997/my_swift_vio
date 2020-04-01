@@ -19,7 +19,9 @@ def subprocess_cmd(cmd):
                                stderr=subprocess.PIPE)
     # wait for the process to terminate
     out, err = process.communicate()
-    return process.returncode, out.strip()
+    if process.returncode != 0:
+        print('cmd {}\nreturn code:{} stdout:{}\nstderr:{}\n'.format(cmd, process.returncode, out.strip(), err.strip()))
+    return process.returncode, err.strip()
 
 
 def de_underscore(strin):
