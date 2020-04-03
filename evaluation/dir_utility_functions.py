@@ -92,3 +92,37 @@ def find_all_bags_with_gt(euroc_dir, uzh_fpv_dir):
     # gt_list = euroc_gt_list
     # gt_list.extend(uzh_fpv_gt_list)
     return bag_list, gt_list
+
+
+def find_rpg_est_gt_pairs(results_dir):
+    """
+    Find all pairs of (stamped_groundtruth.txt, stamped_traj_estimateX.txt) under results_dir
+    :param results_dir:
+    :return:
+    """
+    est_gt_list = []
+    for dir_name, subdir_list, file_list in os.walk(results_dir):
+        for fname in file_list:
+            if 'stamped_traj_estimate' in fname and fname.endswith('.txt'):
+                gt_file = os.path.join(dir_name, "stamped_groundtruth.txt")
+                assert os.path.isfile(gt_file), "gt file {} not found!".format(gt_file)
+                est_gt_list.append((os.path.join(dir_name, fname), gt_file))
+    return est_gt_list
+
+def get_rpg_est_file_suffix(est_file):
+    """
+
+    :param est_file:
+    :return:
+    """
+    key = "stamped_traj_estimate"
+    ext = ".txt"
+    index = est_file.find(key)
+    assert index != -1, "wrong rpg est_file names"
+    index += len(key)
+    if est_file[index] is '.':
+        return ''
+    else:
+        return est_file[index]
+
+
