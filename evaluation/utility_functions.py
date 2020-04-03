@@ -1,7 +1,10 @@
 import subprocess
 
 def subprocess_cmd_check(command):
-    """Run command in a subprocess shell and wait until completion by default"""
+    """
+    Run command in a subprocess shell and wait until completion by default.
+    This is a reference implementation for debugging.
+    """
     try:
         output = subprocess.check_output(command, stderr=subprocess.STDOUT, shell=True)
     except subprocess.CalledProcessError as err:
@@ -13,15 +16,27 @@ def subprocess_cmd_check(command):
     return 0, output
 
 
-def subprocess_cmd(cmd):
+def subprocess_cmd(cmd, out_stream=subprocess.PIPE, err_stream=subprocess.PIPE):
+    """
+    Run command in a subprocess shell and wait until completion.
+    If subprocess cmd is going to produce much output, then do not use
+    subprocess.PIPE for out_stream or err_stream which may cause deadlock.
+
+    :param cmd: string of multiple semi-colon separated bash commands
+    :param out_stream:
+    :param err_stream:
+    :return:
+    """
+
     process = subprocess.Popen(cmd, shell=True,
-                               stdout=subprocess.PIPE,
-                               stderr=subprocess.PIPE)
+                               stdout=out_stream,
+                               stderr=err_stream)
     # wait for the process to terminate
     out, err = process.communicate()
     if process.returncode != 0:
-        print('cmd {}\nreturn code:{} stdout:{}\nstderr:{}\n'.format(cmd, process.returncode, out.strip(), err.strip()))
-    return process.returncode, err.strip()
+        print('cmd {}\nreturn code:{} stdout:{}\nstderr:{}\n'.format(
+            cmd, process.returncode, out, err))
+    return process.returncode, err
 
 
 def de_underscore(strin):

@@ -7,7 +7,7 @@ import subprocess
 class RosCoreManager(object):
     def __init__(self, mock):
         self.mock = mock
-        self.kill_at_end = True
+        self.kill_at_end = False
 
     def start_roscore(self):
         if self.mock:

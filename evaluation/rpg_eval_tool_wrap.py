@@ -20,8 +20,16 @@ def run_rpg_evaluation(rpg_eval_dir, eval_config_yaml, num_trials,
           "--odometry_error_per_dataset --plot_trajectories --recalculate_errors " \
           "--rmse_table --rmse_boxplot --mul_trials={} --overall_odometry_error". \
         format(analyze_traj_script, eval_config_yaml, eval_output_dir, results_dir, num_trials)
-    print('cmd to rpg eval tool\n{}'.format(cmd))
-    return utility_functions.subprocess_cmd(cmd)
+    user_msg = 'cmd to rpg eval tool\n{}\n'.format(cmd)
+    out_stream = open(os.path.join(eval_output_dir, "out.log"), 'w')
+    err_stream = open(os.path.join(eval_output_dir, "err.log"), 'w')
+    print(user_msg)
+    out_stream.write(user_msg)
+    rc , err = utility_functions.subprocess_cmd(cmd, out_stream, err_stream)
+    out_stream.close()
+    err_stream.close()
+    return rc, err
+
 
 def find_and_load_rel_errors(eval_output_dir):
     """

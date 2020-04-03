@@ -18,7 +18,7 @@ if __name__ == '__main__':
     gt_list = dir_utility_functions.get_original_euroc_gt_files(bag_list)
     for gt_file in gt_list:
         baldname = os.path.splitext(gt_file)[0]
-        cmd = "python3 {} {} --outfile={}.txt --output_delimiter=' '".\
+        cmd = "python3 {} {} --outfile={}.txt --output_delimiter=' ' --in_quat_order=wxyz".\
             format(to_pose_script, gt_file, baldname)
         utility_functions.subprocess_cmd(cmd)
     print('Converted ground truth for {} EUROC missions'.format(len(gt_list)))

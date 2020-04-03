@@ -44,6 +44,7 @@ class RunOneVioMethod(object):
             os.path.dirname(os.path.abspath(__file__)), "config/eval_cfg.yaml")
         self.extra_lib_path = extra_library_path
 
+
     def get_sync_exe(self):
         return os.path.join(self.catkin_ws, "devel/lib/msckf/okvis_node_synchronous")
 
@@ -151,6 +152,9 @@ class RunOneVioMethod(object):
                     output_dir_mission, '{}{}'.format(self.algo_code_flags["algo_code"], index_str))
                 dir_utility_functions.mkdir_p(output_dir_trial)
 
+                out_stream = open(os.path.join(output_dir_trial, "out.log"), 'w')
+                err_stream = open(os.path.join(output_dir_trial, "err.log"), 'w')
+
                 if 'async' in algo_name:
                     cmd = self.create_async_command(custom_vio_config, output_dir_trial, bag_fullname)
                     # We put all commands in a bash script because source
@@ -163,8 +167,10 @@ class RunOneVioMethod(object):
                 else:
                     cmd = self.create_sync_command(custom_vio_config, output_dir_trial, bag_fullname)
 
-                print('Running vio method with cmd\n{}\n'.format(cmd))
-                rc, msg = utility_functions.subprocess_cmd(cmd)
+                user_msg = 'Running vio method with cmd\n{}\n'.format(cmd)
+                print(user_msg)
+                out_stream.write(user_msg)
+                rc, msg = utility_functions.subprocess_cmd(cmd, out_stream, err_stream)
                 if rc != 0:
                     print('Error code {} with cmd:\n{}\nand error msg:{}\n'.format(rc, cmd, msg))
                     return_code = rc
@@ -173,7 +179,12 @@ class RunOneVioMethod(object):
                     output_dir_mission, "stamped_traj_estimate{}.txt".format(index_str))
                 cmd = "python3 {} {} --outfile={} --output_delimiter=' '". \
                     format(pose_conversion_script, vio_estimate_csv, converted_vio_file)
-                print('Converting pose file with cmd\n{}\n'.format(cmd))
-                utility_functions.subprocess_cmd(cmd)
+                user_msg = 'Converting pose file with cmd\n{}\n'.format(cmd)
+                print(user_msg)
+                out_stream.write(user_msg)
+                utility_functions.subprocess_cmd(cmd, out_stream, err_stream)
+                out_stream.close()
+                err_stream.close()
+
         roscore_manager.stop_roscore()
         return return_code
