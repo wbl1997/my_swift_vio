@@ -1,26 +1,24 @@
 import subprocess
 
-def subprocess_cmd_check(command):
+def subprocess_cmd(command, out_stream=subprocess.STDOUT, err_stream=subprocess.STDOUT):
     """
     Run command in a subprocess shell and wait until completion by default.
     This is a reference implementation for debugging.
     """
     try:
-        output = subprocess.check_output(command, stderr=subprocess.STDOUT, shell=True)
-    except subprocess.CalledProcessError as err:
-        print('Error code {} in running command {} with output:\n{}\n'.format(err.returncode, command, err))
-        return err.returncode, err.output
+        rc = subprocess.call(command, stdout=out_stream, stderr=err_stream, shell=True, close_fds=True)
     except Exception as err:
         print("Unexpected error:{}".format(err))
         return 1, "Unexpected error"
-    return 0, output
+    return rc, ""
 
 
-def subprocess_cmd(cmd, out_stream=subprocess.PIPE, err_stream=subprocess.PIPE):
+def subprocess_cmd_unsafe(cmd, out_stream=subprocess.PIPE, err_stream=subprocess.PIPE):
     """
     Run command in a subprocess shell and wait until completion.
     If subprocess cmd is going to produce much output, then do not use
     subprocess.PIPE for out_stream or err_stream which may cause deadlock.
+    Even so, Popen occasionally deadlocks.
 
     :param cmd: string of multiple semi-colon separated bash commands
     :param out_stream:
@@ -30,7 +28,8 @@ def subprocess_cmd(cmd, out_stream=subprocess.PIPE, err_stream=subprocess.PIPE):
 
     process = subprocess.Popen(cmd, shell=True,
                                stdout=out_stream,
-                               stderr=err_stream)
+                               stderr=err_stream,
+                               close_fds=True)
     # wait for the process to terminate
     out, err = process.communicate()
     if process.returncode != 0:
