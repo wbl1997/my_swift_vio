@@ -1,6 +1,8 @@
 import os
 import shutil
 
+import kalibr_okvis_config
+
 """If the bagname keyword is found in the bag's full path, then the 
 corresponding calibration files will be used in creating okvis config yaml"""
 BAGKEY_CALIBRATION = {
@@ -48,62 +50,15 @@ class OkvisConfigComposer(object):
                 break
         return imu_calib_file, camera_calib_files
 
-    def create_config_for_euroc(self, imu_calib_file, camera_calib_files):
-        """create vio_yaml_mission with vio_config_template and sensor
-        calibration files for euroc data
-        see https://github.com/MIT-SPARK/Kimera-VIO/blob/master/kalibr/config2kimeravio.py
-        and https://github.com/ethz-asl/kalibr/blob/master/aslam_offline_calibration/kalibr/python/exporters/kalibr_okvis_config
-        for how to load kalibr output
-        """
-        # TODO(jhuai)
-        # imu_calib = load_kalibr_imu_calib()
-        # cameras_calib = load_kalibr_cameras_calib()
-        # okvis_config = OkvisConfigManager()
-        # okvis_config.load_okvis_config(self.vio_config_template)
-        # okvis_config.apply_imu_calib_euroc(imu_calib)
-        # okvis_config.apply_cameras_calib_euroc(cameras_calib)
-        # okvis_config.save(self.vio_yaml_mission)
-        pass
-
-    def create_config_for_uzh_fpv(self, imu_calib_file, camera_calib_file):
-        """create vio_yaml_mission with vio_config_template and sensor
-        calibration files for uzh-fpv data
-
-        use the scripts inside Kimero-VIO to load kalibr output
-        https://github.com/MIT-SPARK/Kimera-VIO/blob/master/kalibr/config2kimeravio.py
-
-        python config2kimeravio.py -config_option "stereo-equi" -input_cam \
-         /home/jhuai/Documents/docker/msckf_ws/src/msckf/evaluation/calibration/uzh_fpv/camchain-imucam-..indoor_45_calib_snapdragon_imu.yaml \
-         -input_imu /home/jhuai/Documents/docker/msckf_ws/src/msckf/evaluation/calibration/uzh_fpv/imu-snapdragon_imu.yaml \
-         -output /home/jhuai/Desktop/temp/indoor_45 -responsible "J. Huai" -date '03.31.2020' \
-         -camera "Snapdragon Flight" -IMU "Snapdragon Flight"
-
-        To deal with warnings of config2kimeravio.py "LoadWarning: calling yaml.load() without Loader=... is deprecated"
-        use Loader like "yaml.load(f, Loader=yaml.FullLoader)".
-
-        To test the function use test_okvis_config_composer.py in Nosetests or pytest of python2 or 3.
-        A okvis template is at /msckf/config/config_fpga_p2_euroc.yaml
-        """
-        # TODO(jhuai):
-        # imu_calib = load_kalibr_imu_calib()
-        # cameras_calib = load_kalibr_cameras_calib()
-        # okvis_config = OkvisConfigManager()
-        # okvis_config.load_okvis_config(self.vio_config_template)
-        # okvis_config.apply_imu_calib_kalibr(imu_calib)
-        # okvis_config.apply_cameras_calib_kalibr(cameras_calib)
-        # okvis_config.save(self.vio_yaml_mission)
-        pass
-
     def create_config_for_mission(self):
-        # TODO(jhuai): adapt the vio yaml output to different dataset according to bag_fullname
-        shutil.copy2(self.vio_config_template, self.vio_yaml_mission)
-
         dataset_type = dataset_code(self.bag_fullname)
         imu_calib_file, camera_calib_files = self.get_calib_files()
         if dataset_type == 0:
-            self.create_config_for_euroc(imu_calib_file, camera_calib_files)
+            calib_format = "euroc"
         elif dataset_type == 1:
-            self.create_config_for_uzh_fpv(imu_calib_file, camera_calib_files)
+            calib_format = "kalibr"
         else:
             raise Exception("Unknown dataset type {}".format(dataset_type))
-
+        kalibr_okvis_config.create_okvis_config_yaml(
+            self.vio_config_template, calib_format, camera_calib_files,
+            imu_calib_file, self.vio_yaml_mission)

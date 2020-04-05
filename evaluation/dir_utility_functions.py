@@ -63,37 +63,6 @@ def mkdir_p(dirname):
         pass
 
 
-def find_all_bags_with_gt(euroc_dir, uzh_fpv_dir):
-    euroc_bags = find_bags(euroc_dir, '.bag', discount_key='calibration')
-    euroc_gt_list = get_converted_euroc_gt_files(euroc_bags)
-
-    uzh_fpv_bags = find_bags_with_gt(uzh_fpv_dir, 'snapdragon_with_gt.bag')
-    uzh_fpv_gt_list = get_uzh_fpv_gt_files(uzh_fpv_bags)
-
-    for gt_file in euroc_gt_list:
-        if not os.path.isfile(gt_file):
-            raise Exception(Fore.RED + "Ground truth file {} deos not exist. Do you "
-                                       "forget to convert data.csv to data.txt, e.g.,"
-                                       " with convert_euroc_gt_csv.py}".format(gt_file))
-
-    for gt_file in uzh_fpv_gt_list:
-        if not os.path.isfile(gt_file):
-            raise Exception(Fore.RED + "Ground truth file {} deos not exist. Do you "
-                                       "forget to extract gt from bag files, e.g.,"
-                                       " with extract_uzh_fpv_gt.py}".format(gt_file))
-
-    print(Fore.RED + "We use only one mission from each dataset for debugging purpose")
-    bag_list = [euroc_bags[0], uzh_fpv_bags[0]]
-    gt_list = [euroc_gt_list[0], uzh_fpv_gt_list[0]]
-    bag_list = euroc_bags
-    gt_list = euroc_gt_list
-    # bag_list = euroc_bags
-    # bag_list.extend(uzh_fpv_bags)
-    # gt_list = euroc_gt_list
-    # gt_list.extend(uzh_fpv_gt_list)
-    return bag_list, gt_list
-
-
 def find_rpg_est_gt_pairs(results_dir):
     """
     Find all pairs of (stamped_groundtruth.txt, stamped_traj_estimateX.txt) under results_dir

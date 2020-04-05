@@ -127,17 +127,48 @@ import AlgoConfig
 from colorama import init, Fore
 init(autoreset=True)
 
+
+def find_all_bags_with_gt(euroc_dir, uzh_fpv_dir):
+    euroc_bags = dir_utility_functions.find_bags(euroc_dir, '.bag', discount_key='calibration')
+    euroc_gt_list = dir_utility_functions.get_converted_euroc_gt_files(euroc_bags)
+
+    uzh_fpv_bags = dir_utility_functions.find_bags_with_gt(uzh_fpv_dir, 'snapdragon_with_gt.bag')
+    uzh_fpv_gt_list = dir_utility_functions.get_uzh_fpv_gt_files(uzh_fpv_bags)
+
+    for gt_file in euroc_gt_list:
+        if not os.path.isfile(gt_file):
+            raise Exception(Fore.RED + "Ground truth file {} deos not exist. Do you "
+                                       "forget to convert data.csv to data.txt, e.g.,"
+                                       " with convert_euroc_gt_csv.py}".format(gt_file))
+
+    for gt_file in uzh_fpv_gt_list:
+        if not os.path.isfile(gt_file):
+            raise Exception(Fore.RED + "Ground truth file {} deos not exist. Do you "
+                                       "forget to extract gt from bag files, e.g.,"
+                                       " with extract_uzh_fpv_gt.py}".format(gt_file))
+
+    print(Fore.RED + "We use only one mission from each dataset for debugging purpose")
+
+    bag_list = uzh_fpv_bags
+    bag_list.extend(euroc_bags)
+    gt_list = uzh_fpv_gt_list
+    gt_list.extend(euroc_gt_list)
+    return bag_list, gt_list
+
+
 if __name__ == '__main__':
     args = parse_args.parse_args()
 
-    bag_list, gt_list = dir_utility_functions.find_all_bags_with_gt(
+    bag_list, gt_list = find_all_bags_with_gt(
         args.euroc_dir, args.uzh_fpv_dir)
     print('For evaluation, #bags {} #gtlist {}'.format(len(bag_list), len(gt_list)))
     for index, gt in enumerate(gt_list):
         print('{}: {}'.format(bag_list[index], gt))
 
     algo_name_code_flags_dict = {'OKVIS': AlgoConfig.create_algo_config(['OKVIS', '', 5, 3]),
-                                 'OKVIS_nframe': AlgoConfig.create_algo_config(['OKVIS', '', 5, 3, 0])}
+                                 'OKVIS_nframe': AlgoConfig.create_algo_config(['OKVIS', '', 5, 3, 0]),
+                                 'MSCKF_i': AlgoConfig.create_algo_config(['MSCKF', '--use_IEKF=true', 10, 3]),
+                                 'MSCKF': AlgoConfig.create_algo_config(['MSCKF', '', 10, 3])}
 
     algo_name_list = list(algo_name_code_flags_dict.keys())
 

@@ -28,9 +28,6 @@ init(autoreset=True)
 if __name__ == '__main__':
     args = parse_args.parse_args()
 
-    bag_list, gt_list = dir_utility_functions.find_all_bags_with_gt(
-        args.euroc_dir, args.uzh_fpv_dir)
-    
     euroc_bags = dir_utility_functions.find_bags(args.euroc_dir, '.bag', discount_key='calibration')
     euroc_gt_list = dir_utility_functions.get_converted_euroc_gt_files(euroc_bags)
     bag_list = [euroc_bags[0]]
@@ -42,7 +39,9 @@ if __name__ == '__main__':
 
     algo_name_code_flags_dict = {
         'OKVIS': AlgoConfig.create_algo_config(['OKVIS', '', 5, 3]),
-        'MSCKF': AlgoConfig.create_algo_config(['MSCKF', '--use_IEKF=true', 10, 3]),
+        'OKVIS_nframe': AlgoConfig.create_algo_config(['OKVIS', '', 5, 3, 0]),
+        'MSCKF_i': AlgoConfig.create_algo_config(['MSCKF', '--use_IEKF=true', 10, 3]),
+        'MSCKF': AlgoConfig.create_algo_config(['MSCKF', '', 10, 3]),
         'MSCKF_brisk_b2b': AlgoConfig.create_algo_config(['MSCKF', '--feature_tracking_method=2', 10, 3]),
         'MSCKF_klt': AlgoConfig.create_algo_config(['MSCKF', '--feature_tracking_method=1', 10, 3]),
         'MSCKF_async': AlgoConfig.create_algo_config(['MSCKF', '', 10, 3])}

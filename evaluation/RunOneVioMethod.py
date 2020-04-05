@@ -18,14 +18,15 @@ class RunOneVioMethod(object):
                  num_trials, bag_list, gt_list,
                  vio_output_dir_list, extra_library_path=''):
         """
-
-        :param catkin_ws:
-        :param vio_config_template:
+        :param catkin_ws: workspace containing executables
+        :param vio_config_template: the template config yaml for running this algorithm.
+            New config yaml will be created for each data mission considering the
+            sensor calibration parameters.
         :param algo_code_flags: {algo_code, algo_cmd_flags, numkeyframes, numImuFrames, }
         :param num_trials:
         :param bag_list:
-        :param gt_list:
-        :param vio_output_dir_list:
+        :param gt_list: If not None, gt files will be copied to proper locations for evaluation.
+        :param vio_output_dir_list: list of dirs to put the estimation results for every data mission.
         :param extra_library_path: It is necessary when some libraries cannot be found.
         """
 
@@ -78,7 +79,11 @@ class RunOneVioMethod(object):
                 format(vio_yaml_mission)
 
             sed_cmd = sed_algo + sed_kf + sed_imuframes + sed_display
-            utility_functions.subprocess_cmd(sed_cmd)
+            out_stream = open(os.path.join(output_dir_mission, "sed_out.log"), 'w')
+            err_stream = open(os.path.join(output_dir_mission, "sed_err.log"), 'w')
+            utility_functions.subprocess_cmd(sed_cmd, out_stream, err_stream)
+            out_stream.close()
+            err_stream.close()
             vio_yaml_list.append(vio_yaml_mission)
         self.custom_vio_config_list = vio_yaml_list
 
@@ -122,11 +127,7 @@ class RunOneVioMethod(object):
 
     def run_method(self, algo_name, pose_conversion_script):
         '''
-        run methods in the msckf project, mainly okvis, msckf.
-        :param bag_list:
-        :param gt_list: gt files will be copied to proper locations for evaluation.
-        :param config_yaml: the yaml config file for running all algorithms, may be modified.
-        :param results_dir: dir to put the estimation results
+        run a method
         :return:
         '''
         self.create_vio_config_yaml()
@@ -138,7 +139,8 @@ class RunOneVioMethod(object):
         for bag_index, bag_fullname in enumerate(self.bag_list):
             output_dir_mission = self.output_dir_list[bag_index]
             gt_file = os.path.join(output_dir_mission, 'stamped_groundtruth.txt')
-            shutil.copy2(self.gt_list[bag_index], gt_file)
+            if self.gt_list:
+                shutil.copy2(self.gt_list[bag_index], gt_file)
             eval_config_file = os.path.join(output_dir_mission, 'eval_cfg.yaml')
             shutil.copy2(self.eval_cfg_template, eval_config_file)
             custom_vio_config = self.custom_vio_config_list[bag_index]
