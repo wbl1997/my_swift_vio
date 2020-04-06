@@ -122,6 +122,7 @@ catkin config --cmake-args -DUSE_ROS=ON -DBUILD_TESTS=ON \
 
 catkin build vio_common msckf -DUSE_ROS=ON -DBUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Release -j$USE_PROC
 # -DCMAKE_PREFIX_PATH=/opt/ros/$ROS_VERSION
+# -DDO_TIMING
 ```
 ### 1. Why is EIGEN_INCLUDE_DIR passed as a build argument?
 Setting EIGEN_INCLUDE_DIR is necessary for Ubuntu 16.04 because
@@ -155,8 +156,11 @@ used last time this workspace was built."
 To suppress these errors, CMAKE_PREFIX_PATH needs to be specified.
 
 TODO(jhuai): the progress percentage in building msckf jumps back and forth with catkin build.
-This effect is not observed with OKVIS_ROS. 
+This effect is not observed with OKVIS_ROS.
 An comparison of the CMakeLists.txt between msckf and okvis_ros does not reveal suspicious differences.
+
+### 3. DO_TIMING
+Add this cmake flag to enable timing statistics.
 
 ## Build and run tests
 * To build all tests
@@ -207,21 +211,12 @@ source /opt/ros/kinetic/setup.zsh
 ```
 
 Then, open msckf_ws/src/msckf/CMakeLists.txt in QtCreator. 
-For the first time, configure the DEFAULT output path for the project in QtCreator 
-as msckf_ws/build/msckf.
-For subsequent times, you may encounter a dialog warning that 
-"the CMakeCache.txt file or the project configuration has changed",
-and two options are given, "Overwrite Changes in CMake" and 
+
+If a dialog warning "the CMakeCache.txt file or the project configuration has changed",
+comes up with two buttons, "Overwrite Changes in CMake" and 
 "Apply Changes to Project" with the former being the default one. 
-To avoid building the project anew with every project opening later on,
-the overwrite option is recommended.
-
-QtCreator may not find cmake files for libraries like roscpp, 
-set the path like /opt/ros/kinetic/share/roscpp/cmake. Doing similar changes for other not found ros libraries.
-
-To enable debug mode, in the Build option panel, set CMake Build Type to Debug.
-
-To start debugging, add commandline arguments in the Run option panel, then press the Run icon.
+To avoid adding CMAKE_PREFIX_PATH in future builds with catkin in a terminal,
+the "Apply Changes to Project" option is recommended.
 
 To enable building test targets inside QtCreator, you may need to turn on 
 "CATKIN_ENABLE_TESTING" in the CMake section of Building Settings and 
