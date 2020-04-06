@@ -34,8 +34,6 @@ you may want to decrease the detection threshold increase octaves and maxNoKeypo
 set output in the local hard drive rather than a USB drive may improve performance.
 The IMU specs has a important role in convergence, esp sigma_g_c, you may want to enlarge (e.g. x2) the values from the spec sheet.
 
-16. CAVEAT: don't put print functions in estimator::optimizationLoop which is already too strained
-
 18. I believe anchored inverse depth parameterization can handle these special
 motions just like deferred triangulation SLAM(DTSLAM) by Herrena 2014, and Jia
 Chao online camera gyroscope calibration.

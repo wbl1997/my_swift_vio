@@ -136,7 +136,11 @@ int main(int argc, char **argv) {
       parameters.nCameraSystem.numCameras(),
       parameters.optimization.initializeWithoutEnoughParallax,
       parameters.optimization.algorithm);
-  okvis::ThreadedKFVio okvis_estimator(parameters, estimator, frontend);
+  okvis::LoopClosureParameters lcParams;
+  std::shared_ptr<okvis::LoopClosureMethod> loopClosureMethod =
+      msckf::createLoopClosureMethod(lcParams);
+  okvis::ThreadedKFVio okvis_estimator(parameters, estimator, frontend,
+                                       loopClosureMethod);
 
   std::string path = FLAGS_output_dir;
   path = okvis::removeTrailingSlash(path);

@@ -8,9 +8,13 @@ IF(CMAKE_BUILD_TYPE MATCHES Release)
   ADD_DEFINITIONS(-DNDEBUG)
 ENDIF()
 
-# ADD_DEFINITIONS(-DDEACTIVATE_TIMERS)
-
 message(STATUS "Building MSCKF with ${CMAKE_BUILD_TYPE}")
+
+option(DO_TIMING "Time routines." OFF)
+if(NOT DO_TIMING)
+  add_definitions(-DDEACTIVATE_TIMERS)
+  message(STATUS "Deactivating timers.")
+endif()
 
 if(APPLE)
   # The clang compiler (on osx) is somehow much more strict
@@ -146,6 +150,7 @@ list(APPEND LINK_LIBRARIES
     okvis_time
     okvis_cv
     okvis_common
+    loop_closure
     okvis_ceres
     okvis_timing
     okvis_matcher
@@ -170,6 +175,7 @@ include_directories(
   okvis/okvis_time/include
   okvis/okvis_cv/include
   okvis/okvis_common/include
+  okvis/loop_closure/include
   okvis/okvis_ceres/include
   okvis/okvis_timing/include
   okvis/okvis_matcher/include

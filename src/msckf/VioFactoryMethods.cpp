@@ -8,6 +8,8 @@
 #include <msckf/GeneralEstimator.hpp>
 #include <msckf/PriorlessEstimator.hpp>
 
+#include <okvis/LoopClosureParameters.hpp>
+
 namespace msckf {
 std::shared_ptr<okvis::Frontend> createFrontend(
     int numCameras, bool initializeWithoutEnoughParallax,
@@ -54,4 +56,16 @@ std::shared_ptr<okvis::Estimator> createBackend(okvis::EstimatorAlgorithm algori
   }
   return std::shared_ptr<okvis::Estimator>();
 }
+
+std::shared_ptr<okvis::LoopClosureMethod> createLoopClosureMethod(
+    const okvis::LoopClosureParameters& lcParams) {
+  if (lcParams.methodId == okvis::LoopClosureMethod::kMethodId) {
+    return std::shared_ptr<okvis::LoopClosureMethod>(
+        new okvis::LoopClosureMethod(lcParams));
+  } else {
+    return std::shared_ptr<okvis::LoopClosureMethod>(
+        new okvis::LoopClosureMethod(lcParams));
+  }
+}
+
 }  // namespace msckf
