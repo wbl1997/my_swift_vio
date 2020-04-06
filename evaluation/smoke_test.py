@@ -37,12 +37,13 @@ if __name__ == '__main__':
     for index, gt in enumerate(gt_list):
         print('{}: {}'.format(bag_list[index], gt))
 
+    # rpg eval tool supports evaluating 6 algorithms at the same time, see len(PALLETE)
     algo_name_code_flags_dict = {
         'OKVIS': AlgoConfig.create_algo_config(['OKVIS', '', 5, 3]),
         'OKVIS_nframe': AlgoConfig.create_algo_config(['OKVIS', '', 5, 3, 0]),
         'MSCKF_i': AlgoConfig.create_algo_config(['MSCKF', '--use_IEKF=true', 10, 3]),
         'MSCKF': AlgoConfig.create_algo_config(['MSCKF', '', 10, 3]),
-        'MSCKF_brisk_b2b': AlgoConfig.create_algo_config(['MSCKF', '--feature_tracking_method=2', 10, 3]),
+        # 'MSCKF_brisk_b2b': AlgoConfig.create_algo_config(['MSCKF', '--feature_tracking_method=2', 10, 3]),
         'MSCKF_klt': AlgoConfig.create_algo_config(['MSCKF', '--feature_tracking_method=1', 10, 3]),
         'MSCKF_async': AlgoConfig.create_algo_config(['MSCKF', '', 10, 3])}
 
