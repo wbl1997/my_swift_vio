@@ -323,6 +323,8 @@ class HybridFilter : public Estimator {
   static const int kClonedStateMinimalDimen = 9;
 
  protected:
+  virtual bool getOdometryConstraintsForKeyframe(
+      std::shared_ptr<okvis::LoopQueryKeyframeMessage> queryKeyframe) const final;
 
   // using latest state estimates set imu_rig_ and camera_rig_ which are then
   // used in computing Jacobians of all feature observations

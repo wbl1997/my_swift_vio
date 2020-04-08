@@ -3110,4 +3110,45 @@ uint64_t HybridFilter::getMinValidStateId() const {
   return min_state_id;
 }
 
+bool HybridFilter::getOdometryConstraintsForKeyframe(
+    std::shared_ptr<okvis::LoopQueryKeyframeMessage> queryKeyframe) const {
+  int j = 0;
+  queryKeyframe->odometryConstraintList_.reserve(
+      maxOdometryConstraintForAKeyframe_);
+  okvis::kinematics::Transformation T_WBr = queryKeyframe->T_WB_;
+  std::map<uint64_t, int>::const_iterator kfCovIndexIter =
+      mStateID2CovID_.find(queryKeyframe->id_);
+  int clonedStatesStart = startIndexOfClonedStates();
+  int cov_T_WBr_start =
+      clonedStatesStart + kClonedStateMinimalDimen * kfCovIndexIter->second;
+  queryKeyframe->cov_T_WB_ = covariance_.block<6, 6>(cov_T_WBr_start, cov_T_WBr_start);
+  auto riter = statesMap_.rbegin();
+  for (++riter;  // skip the last frame which in this case should be a keyframe.
+       riter != statesMap_.rend() && j < maxOdometryConstraintForAKeyframe_;
+       ++riter) {
+    if (riter->second.isKeyframe) {
+      okvis::kinematics::Transformation T_WBn;
+      get_T_WS(riter->first, T_WBn);
+      okvis::kinematics::Transformation T_BrBn = T_WBr.inverse() * T_WBn;
+      std::shared_ptr<okvis::NeighborConstraintMessage> odometryConstraint(
+          new okvis::NeighborConstraintMessage(
+              riter->first, riter->second.timestamp, T_BrBn));
+      odometryConstraint->core_.cov_T_BrB_.setZero(); // sentinel that cov should be computed in loop closure module.
+
+      std::map<uint64_t, int>::const_iterator poseCovIndexIter =
+          mStateID2CovID_.find(riter->first);
+      int cov_T_WBn_start = clonedStatesStart +
+          kClonedStateMinimalDimen * poseCovIndexIter->second;
+
+      odometryConstraint->cov_T_WB_ = covariance_.block<6, 6>(
+            cov_T_WBn_start, cov_T_WBn_start);
+      odometryConstraint->cov_T_WBr_T_WB_ = covariance_.block<6, 6>(
+            cov_T_WBr_start, cov_T_WBn_start);
+      queryKeyframe->odometryConstraintList_.emplace_back(odometryConstraint);
+      ++j;
+    }
+  }
+  return true;
+}
+
 }  // namespace okvis
