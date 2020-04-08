@@ -95,6 +95,32 @@ include_directories(
   ${CMAKE_BINARY_DIR}/include
 )
 
+# https://github.com/Crascit/DownloadProject/blob/master/CMakeLists.txt
+if (CMAKE_VERSION VERSION_LESS 3.2)
+    set(UPDATE_DISCONNECTED_IF_AVAILABLE "")
+else()
+    set(UPDATE_DISCONNECTED_IF_AVAILABLE "UPDATE_DISCONNECTED 1")
+endif()
+
+include("${PROJECT_SOURCE_DIR}/okvis/cmake/DownloadProject/DownloadProject.cmake")
+download_project(PROJ                DBoW2
+                 PREFIX ${CMAKE_CURRENT_BINARY_DIR}/DBoW2
+                 GIT_REPOSITORY      https://github.com/dorian3d/DBoW2.git
+                 GIT_TAG             master
+                 ${UPDATE_DISCONNECTED_IF_AVAILABLE}
+)
+
+add_subdirectory(${DBoW2_SOURCE_DIR} ${DBoW2_BINARY_DIR})
+
+# When using CMake 2.8.11 or later, header path dependencies
+# should be automatically added to the targets.
+# But this does not work for DBoW2.
+# For earlier CMake versions, we have to explicitly add the
+# required directories to the header search path ourselves.
+# if (CMAKE_VERSION VERSION_LESS 2.8.11)
+    include_directories("${DBoW2_SOURCE_DIR}/include")
+# endif()
+
 # compile the ROS dependent stuff into a library
 add_definitions(-fPIC -march=native -Wextra -Winit-self -Woverloaded-virtual
                 -Wnon-virtual-dtor -Wsign-promo -Wno-long-long -std=c++0x)
@@ -159,6 +185,7 @@ list(APPEND LINK_LIBRARIES
     okvis_frontend
     okvis_multisensor_processing
     ${vio_common_LIBRARIES}
+    DBoW2
     gflags
     pthread
 )
