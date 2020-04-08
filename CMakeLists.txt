@@ -111,6 +111,8 @@ LIST(APPEND SOURCEFILES
     src/io_wrap/StreamHelper.cpp
     src/io_wrap/Subscriber.cpp
 
+    src/loop_closure/OrbLoopClosureMethod.cpp
+
     src/msckf/CameraSystemCreator.cpp
     src/msckf/VioFactoryMethods.cpp
     src/msckf/FilterHelper.cpp

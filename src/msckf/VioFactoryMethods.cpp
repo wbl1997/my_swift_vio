@@ -9,6 +9,7 @@
 #include <msckf/PriorlessEstimator.hpp>
 
 #include <okvis/LoopClosureParameters.hpp>
+#include <loop_closure/OrbLoopClosureMethod.hpp>
 
 namespace msckf {
 std::shared_ptr<okvis::Frontend> createFrontend(
@@ -64,7 +65,7 @@ std::shared_ptr<okvis::LoopClosureMethod> createLoopClosureMethod(
         new okvis::LoopClosureMethod(lcParams));
   } else {
     return std::shared_ptr<okvis::LoopClosureMethod>(
-        new okvis::LoopClosureMethod(lcParams));
+        new okvis::OrbLoopClosureMethod(lcParams));
   }
 }
 
