@@ -3,7 +3,7 @@
 
 #include "msckf/EpipolarJacobian.hpp"
 #include "msckf/RelativeMotionJacobian.hpp"
-#include "msckf/JacobianHelpers.hpp"
+#include "okvis/kinematics/sophus_operators.hpp"
 
 TEST(EpipolarJacobian, de_dfjk) {
   srand((unsigned int)time(0));  // comment this for deterministic behavior
@@ -37,7 +37,7 @@ TEST(EpipolarJacobian, de_dfjk) {
   for (int i = 0; i < 3; ++i) {
     delta.setZero();
     delta[i] = eps;
-    Eigen::Quaterniond deltaq = okvis::ceres::expAndTheta(delta);
+    Eigen::Quaterniond deltaq = okvis::kinematics::expAndTheta(delta);
     okvis::EpipolarJacobian epj_bar((deltaq * T_CjCk.q()).toRotationMatrix(), T_CjCk.r(), fj, fk);
     de_dtheta_CjCk[i] = (epj_bar.evaluate() - epj.evaluate()) / eps;
   }

@@ -4,7 +4,7 @@
 #include "ceres/internal/autodiff.h"
 
 #include "vio/Sample.h"
-#include <msckf/JacobianHelpers.hpp>
+#include <okvis/kinematics/sophus_operators.hpp>
 
 DEFINE_double(sim_sigma_g_c, 1.2e-3, "simulated gyro noise density");
 DEFINE_double(sim_sigma_a_c, 8e-3, "simulated accelerometer noise density");
@@ -755,7 +755,7 @@ Eigen::Vector3d WavyCircle::computeGlobalAngularRate(const okvis::Time time) con
           *this, parameters, 9, residual.data(), jacobians);
   Eigen::Matrix3d Rprime = Eigen::Map<Eigen::Matrix3d>(j.data());
   Eigen::Matrix3d OmegaW = Rprime * R_WB.transpose();
-  return okvis::ceres::vee(OmegaW);
+  return okvis::kinematics::vee(OmegaW);
 }
 
 Eigen::Vector3d WavyCircle::computeGlobalLinearAcceleration(

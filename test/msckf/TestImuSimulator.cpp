@@ -1,6 +1,6 @@
 #include <glog/logging.h>
 #include <gtest/gtest.h>
-#include "msckf/JacobianHelpers.hpp"
+#include "okvis/kinematics/sophus_operators.hpp"
 #include "msckf/ImuSimulator.h"
 
 void testSquircle(double radius, double sideLength, double velocity) {
@@ -92,7 +92,7 @@ TEST(WavyCircle, AngularVelocity) {
   okvis::kinematics::Transformation T_WBdelta = wavyCircle.computeGlobalPose(time + okvis::Duration(h));
   Eigen::Matrix3d Rdelta = (T_WBdelta.C() - T_WB.C()) / h;
   Eigen::Matrix3d OmegaW = Rdelta * T_WB.C().transpose();
-  EXPECT_LT((okvis::ceres::vee(OmegaW) - omegaW).lpNorm<Eigen::Infinity>(), 5e-6);
+  EXPECT_LT((okvis::kinematics::vee(OmegaW) - omegaW).lpNorm<Eigen::Infinity>(), 5e-6);
 }
 
 TEST(WavyCircle, LinearVelocity) {

@@ -1719,7 +1719,7 @@ void HybridFilter::updateStates(
   // In effect this amounts to PoseParameterBlock::plus().
   Eigen::Vector3d deltaAlpha = deltaX.segment<3>(3);
   Eigen::Quaterniond deltaq =
-      okvis::ceres::expAndTheta(deltaAlpha);
+      okvis::kinematics::expAndTheta(deltaAlpha);
   T_WS = kinematics::Transformation(
       T_WS.r() + deltaX.head<3>(),
       deltaq * T_WS.q());
@@ -1827,7 +1827,7 @@ void HybridFilter::updateStates(
         mapPtr_->parameterBlockPtr(stateId));
     T_WS = poseParamBlockPtr->estimate();
     deltaAlpha = deltaX.segment<3>(qStart);
-    deltaq = okvis::ceres::expAndTheta(deltaAlpha);
+    deltaq = okvis::kinematics::expAndTheta(deltaAlpha);
     T_WS = kinematics::Transformation(
         T_WS.r() + deltaX.segment<3>(qStart - 3),
         deltaq * T_WS.q());

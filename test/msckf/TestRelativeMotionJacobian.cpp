@@ -2,7 +2,7 @@
 
 #include <iostream>
 #include "gtest/gtest.h"
-#include <msckf/JacobianHelpers.hpp>
+#include <okvis/kinematics/sophus_operators.hpp>
 
 TEST(RelativeMotionJacobian, de_ddelta_BC) {
   srand((unsigned int)time(0));  // comment this for deterministic behavior
@@ -38,7 +38,7 @@ TEST(RelativeMotionJacobian, de_ddelta_BC) {
     T_BC_bar.oplus(delta);
     okvis::RelativeMotionJacobian rmj_bar(T_BC_bar, T_GBj, T_GBk);
     okvis::kinematics::Transformation T_CjCk_bar = rmj_bar.relativeMotionT();
-    Eigen::Matrix<double, 6, 1> delta = okvis::ceres::ominus(T_CjCk_bar, T_CjCk) / eps;
+    Eigen::Matrix<double, 6, 1> delta = okvis::kinematics::ominus(T_CjCk_bar, T_CjCk) / eps;
     dp_ddelta_BC.col(i) = delta.head<3>();
     dtheta_ddelta_BC.col(i) = delta.tail<3>();
   }
@@ -62,7 +62,7 @@ TEST(RelativeMotionJacobian, de_ddelta_BC) {
       T_CB_bar.oplus(delta);
       okvis::RelativeMotionJacobian rmj_bar(T_CB_bar.inverse(), T_GBj, T_GBk);
       okvis::kinematics::Transformation T_CjCk_bar = rmj_bar.relativeMotionT();
-      Eigen::Matrix<double, 6, 1> delta = okvis::ceres::ominus(T_CjCk_bar, T_CjCk) / eps;
+      Eigen::Matrix<double, 6, 1> delta = okvis::kinematics::ominus(T_CjCk_bar, T_CjCk) / eps;
       dp_dt_CB.col(i) = delta.head<3>();
   }
 
@@ -106,7 +106,7 @@ TEST(RelativeMotionJacobian, de_ddelta_GBj) {
     T_GBj_bar.oplus(delta);
     okvis::RelativeMotionJacobian rmj_bar(T_BC, T_GBj_bar, T_GBk);
     okvis::kinematics::Transformation T_CjCk_bar = rmj_bar.relativeMotionT();
-    Eigen::Matrix<double, 6, 1> delta = okvis::ceres::ominus(T_CjCk_bar, T_CjCk) / eps;
+    Eigen::Matrix<double, 6, 1> delta = okvis::kinematics::ominus(T_CjCk_bar, T_CjCk) / eps;
     dp_ddelta_GBj.col(i) = delta.head<3>();
     dtheta_ddelta_GBj.col(i) = delta.tail<3>();
   }
@@ -158,7 +158,7 @@ TEST(RelativeMotionJacobian, de_ddelta_GBk) {
     T_GBk_bar.oplus(delta);
     okvis::RelativeMotionJacobian rmj_bar(T_BC, T_GBj, T_GBk_bar);
     okvis::kinematics::Transformation T_CjCk_bar = rmj_bar.relativeMotionT();
-    Eigen::Matrix<double, 6, 1> delta = okvis::ceres::ominus(T_CjCk_bar, T_CjCk) / eps;
+    Eigen::Matrix<double, 6, 1> delta = okvis::kinematics::ominus(T_CjCk_bar, T_CjCk) / eps;
     dp_ddelta_GBk.col(i) = delta.head<3>();
     dtheta_ddelta_GBk.col(i) = delta.tail<3>();
   }
