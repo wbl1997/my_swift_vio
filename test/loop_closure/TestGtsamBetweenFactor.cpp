@@ -42,3 +42,68 @@ TEST(BetweenFactor, JacobianToCustomRetract) {
   VIO::GtsamWrap::toMeasurementJacobianBetweenFactor(Tz, &J6);
   EXPECT_LT((numericJ - J6).lpNorm<Eigen::Infinity>(), eps);
 }
+
+
+TEST(BetweenFactor, JacobianToCustomRetractRandomObs) {
+  const double eps = 1e-6;
+  const double h = 1e-6;
+  gtsam::SharedNoiseModel noiseOdom =
+      gtsam::noiseModel::Isotropic::Variance(6, 0.1);
+  gtsam::Pose3 Tx(gtsam::Rot3(Eigen::Quaterniond::UnitRandom()),
+                  Eigen::Vector3d::Random());
+  gtsam::Pose3 Ty(gtsam::Rot3(Eigen::Quaterniond::UnitRandom()),
+                  Eigen::Vector3d::Random());
+
+  gtsam::Pose3 Tz = Tx.inverse() * Ty;
+  Eigen::Matrix<double, 6, 1> delta = Eigen::Matrix<double, 6, 1>::Random();
+  delta.head<3>() *= (5 * M_PI / 180);
+  Tz = gtsam::Pose3::Expmap(delta) * Tz;
+
+  gtsam::BetweenFactor<gtsam::Pose3> bf(0, 1, Tz, noiseOdom);
+  Eigen::VectorXd residual = bf.evaluateError(Tx, Ty);
+
+  Eigen::Matrix<double, 6, 6> numericJ;
+  for (int i = 0; i < 6; ++i) {
+    Eigen::Matrix<double, 6, 1> delta = Eigen::Matrix<double, 6, 1>::Zero();
+    delta[i] = h;
+    gtsam::Pose3 Tzp = VIO::GtsamWrap::retract(Tz, delta);
+    gtsam::BetweenFactor<gtsam::Pose3> bfp(0, 1, Tzp, noiseOdom);
+    Eigen::VectorXd residualp = bfp.evaluateError(Tx, Ty);
+    numericJ.col(i) = (residualp - residual) / h;
+  }
+
+  Eigen::Matrix<double, 6, 6> analJ;
+  VIO::GtsamWrap::toMeasurementJacobianBetweenFactor(Tz, Tx, Ty, &analJ);
+//  Eigen::Matrix<double, 6, 6> diff = numericJ - analJ;
+//  EXPECT_LT((diff.topRightCorner<3, 3>()).lpNorm<Eigen::Infinity>(), eps)
+//      << "numericJ.topRightCorner<3, 3>()\n"
+//      << numericJ.topRightCorner<3, 3>() << "\nanalJ.topRightCorner<3, 3>()\n"
+//      << analJ.topRightCorner<3, 3>();
+//  EXPECT_LT((diff.topLeftCorner<3, 3>()).lpNorm<Eigen::Infinity>(), eps)
+//      << "numericJ.topLeftCorner<3, 3>()\n"
+//      << numericJ.topLeftCorner<3, 3>() << "\nanalJ.topLeftCorner<3, 3>()\n"
+//      << analJ.topLeftCorner<3, 3>();
+//  EXPECT_LT((diff.bottomLeftCorner<3, 3>()).lpNorm<Eigen::Infinity>(), eps)
+//      << "numericJ.bottomLeftCorner<3, 3>()\n"
+//      << numericJ.bottomLeftCorner<3, 3>()
+//      << "\nanalJ.bottomLeftCorner<3, 3>()\n"
+//      << analJ.bottomLeftCorner<3, 3>();
+//  EXPECT_LT((diff.bottomRightCorner<3, 3>()).lpNorm<Eigen::Infinity>(), eps)
+//      << "numericJ.bottomRightCorner<3, 3>()\n"
+//      << numericJ.bottomRightCorner<3, 3>()
+//      << "\nanalJ.bottomRightCorner<3, 3>()\n"
+//      << analJ.bottomRightCorner<3, 3>();
+
+  // analytic jacobian
+  VIO::BetweenFactorPose3Wrap bfWrap(Tz, Tx, Ty);
+  Eigen::Matrix<double, 6, 6, Eigen::RowMajor> autoJ;
+  Eigen::Matrix<double, 6, 1> autoResidual;
+  bfWrap.toMeasurmentJacobian(&autoJ, &autoResidual);
+  EXPECT_LT((residual - autoResidual).lpNorm<Eigen::Infinity>(), eps)
+      << "ref residual\n" << residual.transpose()
+      << "\nautoResidual\n" << autoResidual.transpose();
+
+  EXPECT_LT((numericJ - autoJ).lpNorm<Eigen::Infinity>(), eps)
+      << "autoJ\n" << autoJ << "\nnumericJ\n" << numericJ
+      << "\ndiff\n" << (numericJ - autoJ);
+}
