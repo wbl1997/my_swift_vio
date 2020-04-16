@@ -63,7 +63,7 @@ LcdThirdPartyWrapper::LcdThirdPartyWrapper(
 
 /* ------------------------------------------------------------------------ */
 LcdThirdPartyWrapper::~LcdThirdPartyWrapper() {
-  LOG(INFO) << "LcdThirdPartyWrapper desctuctor called.";
+//  LOG(INFO) << "LcdThirdPartyWrapper desctuctor called.";
 }
 
 /* ------------------------------------------------------------------------ */
@@ -76,10 +76,10 @@ bool LcdThirdPartyWrapper::checkTemporalConstraint(const FrameId& id,
     // Check whether current island encloses latest island or vice versa
     bool cur_encloses_old =
         island.start_id_ <= latest_matched_island_.start_id_ &&
-        latest_matched_island_.start_id_ <= island.end_id_;
+        latest_matched_island_.end_id_ <= island.end_id_;
     bool old_encloses_cur =
         latest_matched_island_.start_id_ <= island.start_id_ &&
-        island.start_id_ <= latest_matched_island_.end_id_;
+        island.end_id_ <= latest_matched_island_.end_id_;
 
     bool pass_group_constraint = cur_encloses_old || old_encloses_cur;
     if (!pass_group_constraint) {
@@ -104,7 +104,7 @@ bool LcdThirdPartyWrapper::checkTemporalConstraint(const FrameId& id,
       temporal_entries_ = 1;
     }
   }
-
+  setLatestMatchedIsland(island);
   return temporal_entries_ > lcd_params_->min_temporal_matches_;
 }
 
@@ -112,8 +112,6 @@ bool LcdThirdPartyWrapper::checkTemporalConstraint(const FrameId& id,
 void LcdThirdPartyWrapper::computeIslands(
     DBoW2::QueryResults* q,
     std::vector<MatchIsland>* islands) const {
-  CHECK_NOTNULL(q);
-  CHECK_NOTNULL(islands);
   islands->clear();
 
   // The case of one island is easy to compute and is done separately

@@ -93,6 +93,22 @@ class LcdThirdPartyWrapper {
   void computeIslands(DBoW2::QueryResults* q,
                       std::vector<MatchIsland>* islands) const;
 
+  inline void setLatestQueryId(FrameId dbowId) {
+    latest_query_id_ = dbowId;
+  }
+
+  inline void setLatestMatchedIsland(const MatchIsland& island) {
+    latest_matched_island_ = island;
+  }
+
+  inline void setTemporalEntries(int temporal_consistent_groups) {
+    temporal_entries_ = temporal_consistent_groups;
+  }
+
+  inline int getTemporalEntries() const {
+    return temporal_entries_;
+  }
+
  private:
   /* ------------------------------------------------------------------------ */
   /** @brief Compute the overall score of an island.
@@ -108,7 +124,7 @@ class LcdThirdPartyWrapper {
 
  private:
   std::shared_ptr<const LoopClosureDetectorParams> lcd_params_;
-  int temporal_entries_;
+  int temporal_entries_; // number of consistent temporal islands?
   MatchIsland latest_matched_island_;
   FrameId latest_query_id_;
 };  // class LcdThirdPartyWrapper
