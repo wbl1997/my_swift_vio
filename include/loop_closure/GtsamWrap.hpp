@@ -8,12 +8,38 @@
 #include "ceres/internal/autodiff.h"
 #include "sophus/se3.hpp"
 
+#include <gtsam/linear/NoiseModel.h>
+
 #include <okvis/kinematics/Transformation.hpp>
 
 namespace VIO {
+
 /**
- * @brief compute Jacobian of the between factor unwhitened error relative
+ * @brief createNoiseModel for a BetweenFactor.
+ * We create an individual noise model for each BetweenFactor because the
+ * noise for each factor is different. This practice is found in
+ * gtsam/gtsam/slam/dataset.cpp and gtsam/tests/testNonlinearOptimizer.cpp
+ * @param cov_e covariance of the obsrevation factor.
+ * @param huber_threshold in units of sigmas.
+ * A sound value is obtained by checking the Chi2 distribution with 6DOF at alpha=5%.
+ */
+inline gtsam::SharedNoiseModel createRobustNoiseModel(
+    const Eigen::Matrix<double, 6, 6>& cov_e, double huber_threshold=std::sqrt(12.59)) {
+  bool tryToSimplify = false;
+  const gtsam::SharedNoiseModel noise_model_input =
+      gtsam::noiseModel::Gaussian::Covariance(cov_e, tryToSimplify);
+  gtsam::SharedNoiseModel noise_model_output =
+      gtsam::noiseModel::Robust::Create(
+          gtsam::noiseModel::mEstimator::Huber::Create(
+              huber_threshold, gtsam::noiseModel::mEstimator::Huber::Block),
+          noise_model_input);
+  return noise_model_output;
+}
+
+/**
+ * @brief compute Jacobian of the gtsam between factor unwhitened error relative
  * to the measurement error by autoDifferentiate.
+ * The between factor in gtsam is defined as $e = log_{SE3}(T_z^{-1} T_x^{-1} T_y)$.
  * @warning use this class sparingly as it is likely expensive.
  */
 class BetweenFactorPose3Wrap {
@@ -21,6 +47,9 @@ class BetweenFactorPose3Wrap {
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
   BetweenFactorPose3Wrap(const gtsam::Pose3& Tz, const gtsam::Pose3& Tx,
                          const gtsam::Pose3& Ty);
+
+  BetweenFactorPose3Wrap(const gtsam::Pose3& Tz,
+                         const gtsam::Pose3& Txy);
 
   explicit BetweenFactorPose3Wrap(const gtsam::Pose3& Tz);
 
@@ -45,12 +74,41 @@ class BetweenFactorPose3Wrap {
     residualp.template tail<3>() = temp;
     return true;
   }
-
+  /**
+   * @brief toMeasurmentJacobian
+   * @param autoJ de_dTz
+   * @param residual
+   */
   void toMeasurmentJacobian(Eigen::Matrix<double, 6, 6, Eigen::RowMajor>* autoJ,
                             Eigen::Matrix<double, 6, 1>* residual);
 
   const gtsam::Pose3 Tz_;
   const gtsam::Pose3 Txy_;
+};
+
+
+/**
+ * @brief compute Jacobian of the gtsam prior factor unwhitened error relative
+ * to the measurement error by autoDifferentiate.
+ * In GTSAM, the PriorFactor<Pose3> is defined as $e= log_{SE3}(T_z^{-1} T_x)$
+ */
+class PriorFactorPose3Wrap {
+ public:
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+  PriorFactorPose3Wrap(const gtsam::Pose3& Tz) : Tz_(Tz), Tx_(Tz) {}
+
+  PriorFactorPose3Wrap(const gtsam::Pose3& Tz, const gtsam::Pose3& Tx)
+      : Tz_(Tz), Tx_(Tx) {}
+
+  inline void toMeasurementJacobian(
+      Eigen::Matrix<double, 6, 6, Eigen::RowMajor>* autoJ,
+      Eigen::Matrix<double, 6, 1>* residual) {
+    BetweenFactorPose3Wrap bfw(Tz_, Tx_);
+    bfw.toMeasurmentJacobian(autoJ, residual);
+  }
+
+  const gtsam::Pose3 Tz_;
+  const gtsam::Pose3 Tx_;
 };
 
 class GtsamWrap {

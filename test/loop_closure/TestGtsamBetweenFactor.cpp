@@ -1,6 +1,7 @@
 #include "gtest/gtest.h"
 
 #include "loop_closure/GtsamWrap.hpp"
+#include <gtsam/slam/PriorFactor.h>
 
 TEST(BetweenFactor, JacobianToCustomRetract) {
   const double eps = 1e-6;
@@ -106,4 +107,22 @@ TEST(BetweenFactor, JacobianToCustomRetractRandomObs) {
   EXPECT_LT((numericJ - autoJ).lpNorm<Eigen::Infinity>(), eps)
       << "autoJ\n" << autoJ << "\nnumericJ\n" << numericJ
       << "\ndiff\n" << (numericJ - autoJ);
+}
+
+TEST(PriorFactor, definition) {
+  gtsam::SharedNoiseModel noise =
+      gtsam::noiseModel::Isotropic::Variance(6, 0.1);
+  gtsam::Pose3 Tz(gtsam::Rot3(Eigen::Quaterniond::UnitRandom()),
+                  Eigen::Vector3d::Random());
+  gtsam::Pose3 Tx(gtsam::Rot3(Eigen::Quaterniond::UnitRandom()),
+                  Eigen::Vector3d::Random());
+  gtsam::Pose3 Ty(gtsam::Rot3(Eigen::Quaterniond::UnitRandom()),
+                  Eigen::Vector3d::Random());
+  gtsam::Pose3 Txy = Tx.inverse() * Ty;
+
+  gtsam::PriorFactor<gtsam::Pose3> pf(gtsam::Symbol(0), Tz, noise);
+  Eigen::VectorXd rp = pf.evaluateError(Txy);
+  gtsam::BetweenFactor<gtsam::Pose3> bf(0, 1, Tz, noise);
+  Eigen::VectorXd rb = bf.evaluateError(Tx, Ty);
+  EXPECT_LT((rp - rb).lpNorm<Eigen::Infinity>(), 1e-8);
 }

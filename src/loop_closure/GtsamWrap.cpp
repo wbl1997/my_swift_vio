@@ -14,6 +14,10 @@ BetweenFactorPose3Wrap::BetweenFactorPose3Wrap(const gtsam::Pose3& Tz,
                                                const gtsam::Pose3& Ty)
     : Tz_(Tz), Txy_(Tx.inverse() * Ty) {}
 
+BetweenFactorPose3Wrap::BetweenFactorPose3Wrap(const gtsam::Pose3& Tz,
+                                               const gtsam::Pose3& Txy)
+    : Tz_(Tz), Txy_(Txy) {}
+
 BetweenFactorPose3Wrap::BetweenFactorPose3Wrap(const gtsam::Pose3& Tz)
     : Tz_(Tz), Txy_(Tz) {}
 
