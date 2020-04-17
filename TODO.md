@@ -14,13 +14,17 @@ b, places commented with //one camera assumption
 hybridFilter assumes that t_d and t_r are constant variables at least in a short span of time,
 therefore, for a world point observed in several frames, the t_d used in computing Jacobians for the image features are the same.
 
-4. use akaze features instead of brisk for feature detection, description, and matching. But it may require opencv 3.0 and later. This may cause conflict with current opencv library used by msckf. 
+4. use akaze features instead of brisk for feature detection, description, and matching. But it may require opencv 3.0 and later.
+This may cause conflict with current opencv library used by msckf.
 
-8. There may be negative diagonal elements in the covariance matrix. Are these elements all are very small and such occurrences are very rare, e.g. for the beginning of a test? ---Solved by enforcing symmetry.
+8. There may be negative diagonal elements in the covariance matrix. Are these elements all are very small and
+such occurrences are very rare, e.g. for the beginning of a test? ---Solved by enforcing symmetry.
 
 9. if too many observations exist in one image (>height/2), then it is desirable to create a lookup table of [p_WS, q_WS, v_WS] for every few rows. 
 
-10. gridded feature matching like in ORB-SLAM, use a motion model or inertial data to predict motion of camera and constrain search cells. Then after 2d2d matching, use 5 point algorithm to filter outliers if necessary (see SOFT: Stereo odometry based on careful feature selection and tracking).
+10. gridded feature matching like in ORB-SLAM, use a motion model or inertial data to predict motion of camera and constrain search cells.
+Then after 2d2d matching, use 5 point algorithm to
+filter outliers if necessary (see SOFT: Stereo odometry based on careful feature selection and tracking).
 
 15. to test okvis_ros with proprietary data, check the following for best performance: 
 
@@ -60,11 +64,14 @@ if not fixed, we need to modify slamFeatureJacobian (primarily) and other places
 Does Kalibr output the trajectory of the camera-IMU system? If so, this serves for better comparison.
 
 28. Implement another version of MSCKF: Fix Tg Ts Ta p_b^c, fx fy cx cy k1 k2 p1 p2 td tr, only estimate
-p_b^g, v_b^g, R_b^g, b_g, b_a. ---This can be achieved by set the noise of the fixed parameters to zero,
+p_b^g, v_b^g, R_b^g, b_g, b_a.
+Answer: This can be achieved by set the noise of the fixed parameters to zero,
 and set the noise of variable parameters nonzero.
 
 29. implement observability constrained EKF for calibration, this is similar in spirit to first estimate
 Jacobians in that it modifies the computed Jacobians only.
+Answer: This requires deriving the observability constraint from scratch.
+And it involves complicated corrections to the orientation linearization point.
 
 30. add the calibration parameters to the original OKVIS estimator, use bool flags to indicate
 if some parameters are fixed. Take a look at OKVIS camera IMU extrinsics for how to fix parameters.
@@ -141,4 +148,26 @@ Refer to OKVIS, rovio, svo2, VINS Fusion, and MSCKF_VIO for developing stereo fr
 examples [here](https://github.com/ganlumomo/VisualInertialOdometry)
 
 44. The timing entries for waitForOptimization and waitForMatching are often unusually large.
+
+45. Put covariance index in the state to ease state management. see OpenVINS.
+
+46. Extend MSCKF to work with multi camera observations.
+Also consider the extrinsic and intrinsic parameters for the extra cameras.
+
+47. Refactor IMU error model in propagation() to support at least 3 types of IMU models.
+Examine OdoErrorStateDim, ShapeMatrixParamBlock etc.
+
+48. Simulation for the rolling shutter effect.
+
+49. Write a global bundle adjustment module with existing factors. Remember removing outliers during optimization steps, see Maplab.
+
+50. OKVIS leniently add triangulated landmarks to the estimator.
+Some landmarks with small disparity may cause rank deficiency in computing the pose covarinace with ceres solver.
+OKVIS addObservation() adds observations to the landmarkMap and as residuals to the ceres problem at the same time.
+A better approach is to separate adding observations to feature tracks and adding residuals.
+
+51. improve OKVIS marginalization strategy so that the covariance for poses can be successfully computed as in SVO+GTSAM.
+Also to investigate the NEES consistency, we can test exact first estimate Jacobian which means to use first estimates in
+computing Jacobians for variables of fixed linearization points.
+Refer to Basalt and GTSAM for alternate margialization strategies.
 
