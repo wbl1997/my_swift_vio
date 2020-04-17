@@ -21,9 +21,6 @@
 #include <msckf/PointSharedData.hpp>
 #include <msckf/PreconditionedEkfUpdater.h>
 
-#include <msckf/triangulate.h>
-#include <msckf/triangulateFast.hpp>
-
 DEFINE_bool(use_combined_imu_factor, false,
             "CombinedImuFactor(PreintegratedCombinedMeasurement) or "
             "ImuFactor(PreintegratedImuMeasurement)");

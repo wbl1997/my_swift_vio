@@ -133,7 +133,7 @@ void computeFeatureMeasJacobian(
   Eigen::Quaterniond q_WS = Eigen::Quaterniond(R_WS);
 
   okvis::InitialNavState pvstd;
-  pvstd.initWithExternalSource_ = true;
+  pvstd.initWithExternalSource = true;
   pvstd.p_WS = p_WS;
   pvstd.q_WS = Eigen::Quaterniond(q_WS);
   pvstd.v_WS = v_WS;

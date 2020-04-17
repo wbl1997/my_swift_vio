@@ -23,7 +23,7 @@ TEST(Player, VioDatasetPlayer) {
   okvis::VioParameters parameters;
 
   okvis::InputData input;
-  okvis::InitialState initialState;
+  okvis::InitialNavState initialState;
   okvis::Optimization optimization;
   okvis::SensorsInformation sensors_information;
 

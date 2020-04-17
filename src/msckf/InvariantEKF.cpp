@@ -21,9 +21,6 @@
 #include <msckf/PointSharedData.hpp>
 #include <msckf/PreconditionedEkfUpdater.h>
 
-#include <msckf/triangulate.h>
-#include <msckf/triangulateFast.hpp>
-
 DECLARE_bool(use_mahalanobis);
 DECLARE_bool(use_first_estimate);
 DECLARE_bool(use_RK4);

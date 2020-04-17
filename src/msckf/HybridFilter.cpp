@@ -161,7 +161,7 @@ bool HybridFilter::addStates(okvis::MultiFramePtr multiFrame,
     tdEstimate.fromSec(camera_rig_.getImageDelay(0));
     correctedStateTime = multiFrame->timestamp() + tdEstimate;
 
-    if (pvstd_.initWithExternalSource_) {
+    if (pvstd_.initWithExternalSource) {
       T_WS = okvis::kinematics::Transformation(pvstd_.p_WS, pvstd_.q_WS);
     } else {
       bool success0 = initPoseFromImu(imuMeasurements, T_WS);
@@ -3112,8 +3112,14 @@ uint64_t HybridFilter::getMinValidStateId() const {
 
 bool HybridFilter::getOdometryConstraintsForKeyframe(
     std::shared_ptr<okvis::LoopQueryKeyframeMessage> queryKeyframe) const {
+  // overwrite T_BC with value from camera rig which contains estimated values.
+  const int camId = 0;
+  queryKeyframe->T_BC_ = *(camera_rig_.getCameraExtrinsicPtr(camId));
+
   int j = 0;
-  queryKeyframe->odometryConstraintList_.reserve(
+  std::vector<std::shared_ptr<NeighborConstraintMessage>>&
+      odometryConstraintList = queryKeyframe->odometryConstraintListMutable();
+  odometryConstraintList.reserve(
       maxOdometryConstraintForAKeyframe_);
   okvis::kinematics::Transformation T_WBr = queryKeyframe->T_WB_;
   std::map<uint64_t, int>::const_iterator kfCovIndexIter =
@@ -3132,8 +3138,8 @@ bool HybridFilter::getOdometryConstraintsForKeyframe(
       okvis::kinematics::Transformation T_BrBn = T_WBr.inverse() * T_WBn;
       std::shared_ptr<okvis::NeighborConstraintMessage> odometryConstraint(
           new okvis::NeighborConstraintMessage(
-              riter->first, riter->second.timestamp, T_BrBn));
-      odometryConstraint->core_.cov_T_BrB_.setZero(); // sentinel that cov should be computed in loop closure module.
+              riter->first, riter->second.timestamp, T_BrBn, T_WBn));
+      odometryConstraint->core_.covRawError_.setIdentity();
 
       std::map<uint64_t, int>::const_iterator poseCovIndexIter =
           mStateID2CovID_.find(riter->first);
@@ -3144,7 +3150,7 @@ bool HybridFilter::getOdometryConstraintsForKeyframe(
             cov_T_WBn_start, cov_T_WBn_start);
       odometryConstraint->cov_T_WBr_T_WB_ = covariance_.block<6, 6>(
             cov_T_WBr_start, cov_T_WBn_start);
-      queryKeyframe->odometryConstraintList_.emplace_back(odometryConstraint);
+      odometryConstraintList.emplace_back(odometryConstraint);
       ++j;
     }
   }

@@ -399,9 +399,9 @@ int HybridFrontend::matchToLastFrameKLT(
   }
 
   featureTracker_.stereoCallback(
-      framesInOut->getFrame(0),
+      framesInOut->image(0),
       framesInOut->numFrames() > 1 ?
-          framesInOut->getFrame(1) :
+          framesInOut->image(1) :
           cv::Mat(),
       feature_tracker::MessageHeader{framesInOut->timestamp()});
 

@@ -1,5 +1,4 @@
 #include <msckf/SimulationFrontend.hpp>
-#include <msckf/implementation/HybridFrontend.hpp>
 
 #include <algorithm>
 #include <list>
@@ -18,6 +17,9 @@
 #include <okvis/cameras/FovDistortion.hpp>
 #include <okvis/cameras/RadialTangentialDistortion.hpp>
 #include <okvis/cameras/RadialTangentialDistortion8.hpp>
+
+#include <msckf/PointLandmarkSimulation.hpp>
+#include <msckf/implementation/HybridFrontend.hpp>
 
 /// \brief okvis Main namespace of this package.
 namespace okvis {
@@ -194,45 +196,19 @@ int SimulationFrontend::dataAssociationAndInitialization(
   }
   int requiredMatches = 5;
 
-  size_t numFrames = framesInOut->numFrames();
   std::vector<std::vector<size_t>> frameLandmarkIndices;
-  std::vector<std::vector<cv::KeyPoint>> frame_keypoints;
-  std::vector<std::vector<int>> keypointIndices(numFrames);
-  // project landmarks onto frames of framesInOut
-  for (size_t i = 0; i < numFrames; ++i) {
-    std::vector<size_t> lmk_indices;
-    std::vector<cv::KeyPoint> keypoints;
-    std::vector<int> frameKeypointIndices(homogeneousPoints_.size(), -1);
-    // TODO(jhuai): consider the time offset and rolling shutter effect.
-    for (size_t j = 0; j < homogeneousPoints_.size(); ++j) {
-      Eigen::Vector2d projection;
-      Eigen::Vector4d point_C = cameraSystemRef->T_SC(i)->inverse() *
-                                T_WS_ref.inverse() * homogeneousPoints_[j];
-      okvis::cameras::CameraBase::ProjectionStatus status =
-          cameraSystemRef->cameraGeometry(i)->projectHomogeneous(point_C,
-                                                                 &projection);
-      if (status == okvis::cameras::CameraBase::ProjectionStatus::Successful) {
-        Eigen::Vector2d measurement(projection);
-        if (addImageNoise_) {
-          measurement[0] += vio::gauss_rand(0, imageNoiseMag_);
-          measurement[1] += vio::gauss_rand(0, imageNoiseMag_);
-        }
-        frameKeypointIndices[j] = keypoints.size();
-        keypoints.emplace_back(measurement[0], measurement[1], 8.0);
-        lmk_indices.emplace_back(j);
-      }
-    }
-    frameLandmarkIndices.emplace_back(lmk_indices);
-    frame_keypoints.emplace_back(keypoints);
-    framesInOut->resetKeypoints(i, keypoints);
-    keypointIndices[i] = frameKeypointIndices;
-  }
+  std::vector<std::vector<int>> keypointIndices;
+      PointLandmarkSimulation::projectLandmarksToNFrame(
+          homogeneousPoints_, T_WS_ref, cameraSystemRef, framesInOut,
+          &frameLandmarkIndices, &keypointIndices,
+          addImageNoise_ ? &imageNoiseMag_ : nullptr);
 
   int trackedFeatures = 0;
   if (estimator.numFrames() > 1) {
     // find matches between the previous keyframe and current frame
-    // TODO(jhuai): matching to last Keyframe may encounter zombie landmark
-    // ids for filters that remove disappearing landmarks from landmarkMap_
+    // Matching to last Keyframe should not encounter zombie landmark
+    // ids for filters because they remove disappearing landmarks from
+    // landmarkMap_ as well as landmark Ids from multiframe.
     std::vector<LandmarkKeypointMatch> landmarkKeyframeMatches;
     matchToFrame(previousKeyframeKeypointIndices_, keypointIndices,
                  previousKeyframe_->id(), framesInOut->id(),

@@ -110,7 +110,7 @@ void VioTestSystemBuilder::createVioSystem(
     v_WS += vio::Sample::gaussian(1, 3).cwiseProduct(initialNavState_.std_v_WS);
   }
 
-  initialNavState_.initWithExternalSource_ = true;
+  initialNavState_.initWithExternalSource = true;
   initialNavState_.p_WS = p_WS;
   initialNavState_.q_WS = truePose.q();
   initialNavState_.v_WS = v_WS;
