@@ -121,6 +121,38 @@ add_subdirectory(${DBoW2_SOURCE_DIR} ${DBoW2_BINARY_DIR})
     include_directories("${DBoW2_SOURCE_DIR}/include")
 # endif()
 
+### Download and unzip the vocabularly file
+if(NOT EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/vocabulary/ORBvoc.yml)
+  message(STATUS "Downloading vocabulary file from dropbox.")
+  file(DOWNLOAD
+       http://www.dropbox.com/s/lyo0qgbdxn6eg6o/ORBvoc.zip?dl=1
+       ${CMAKE_CURRENT_SOURCE_DIR}/vocabulary/ORBvoc.zip
+       SHOW_PROGRESS
+       STATUS orbvoc_download_success
+       TIMEOUT 60)
+  if(orbvoc_download_success)
+    message(STATUS "Unzipping vocabulary file.")
+
+    execute_process(COMMAND ${CMAKE_COMMAND} -E tar xzf ${CMAKE_CURRENT_SOURCE_DIR}/vocabulary/ORBvoc.zip
+                            WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/vocabulary/)
+    message(STATUS "Moving vocabulary file.")
+    execute_process(COMMAND ${CMAKE_COMMAND} -E copy_directory
+                    ${CMAKE_CURRENT_SOURCE_DIR}/vocabulary/ORBvoc/
+                    ${CMAKE_CURRENT_SOURCE_DIR}/vocabulary/)
+    execute_process(COMMAND ${CMAKE_COMMAND} -E remove_directory ${CMAKE_CURRENT_SOURCE_DIR}/vocabulary/ORBvoc/)
+  else(orbvoc_download_success)
+    message(STATUS "Failed to download vocabulary file. Please download manually.")
+  endif(orbvoc_download_success)
+else()
+  message(STATUS "Vocabulary file exists, will not download.")
+endif()
+
+if(GTSAM_FOUND)
+  add_subdirectory(Kimera-RPGO)
+  include_directories(Kimera-RPGO)
+  list(APPEND LINK_LIBRARIES KimeraRPGO)
+endif()
+
 # compile the ROS dependent stuff into a library
 add_definitions(-fPIC -march=native -Wextra -Winit-self -Woverloaded-virtual
                 -Wnon-virtual-dtor -Wsign-promo -Wno-long-long -std=c++0x)
@@ -137,7 +169,10 @@ LIST(APPEND SOURCEFILES
     src/io_wrap/StreamHelper.cpp
     src/io_wrap/Subscriber.cpp
 
-    src/loop_closure/OrbLoopClosureMethod.cpp
+    src/loop_closure/GtsamWrap.cpp
+    src/loop_closure/LoopClosureDetector.cpp
+    src/loop_closure/LoopClosureDetectorParams.cpp
+    src/loop_closure/LcdThirdPartyWrapper.cpp
 
     src/msckf/CameraSystemCreator.cpp
     src/msckf/VioFactoryMethods.cpp
@@ -153,6 +188,7 @@ LIST(APPEND SOURCEFILES
     src/msckf/SimulationFrontend.cpp
     src/msckf/SlidingWindowSmoother.cpp
     src/msckf/TFVIO.cpp
+    src/msckf/TwoViewGeometry.cpp
     src/msckf/TwoViewPair.cpp
     src/msckf/VioEvaluationCallback.cpp
 #    src/msckf/VioFrameMatchingAlgorithm.cpp

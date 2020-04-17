@@ -179,6 +179,13 @@ rosrun msckf msckf_test
 rosrun msckf msckf_test --gtest_filter="*Eigen*"
 ```
 
+* To test RPGO,
+```
+cd msckf_ws/build/msckf/Kimera-RPGO
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$HOME/Documents/slam_devel/lib
+make check
+```
+
 ## Debug the project with QtCreator
 
 Follow the below steps exactly, otherwise mysterious errors like missing generate_config file arise.

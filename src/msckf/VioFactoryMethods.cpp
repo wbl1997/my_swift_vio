@@ -9,7 +9,7 @@
 #include <msckf/PriorlessEstimator.hpp>
 
 #include <okvis/LoopClosureParameters.hpp>
-#include <loop_closure/OrbLoopClosureMethod.hpp>
+#include <loop_closure/LoopClosureDetector.h>
 
 namespace msckf {
 std::shared_ptr<okvis::Frontend> createFrontend(
@@ -59,13 +59,15 @@ std::shared_ptr<okvis::Estimator> createBackend(okvis::EstimatorAlgorithm algori
 }
 
 std::shared_ptr<okvis::LoopClosureMethod> createLoopClosureMethod(
-    const okvis::LoopClosureParameters& lcParams) {
-  if (lcParams.methodId == okvis::LoopClosureMethod::kMethodId) {
-    return std::shared_ptr<okvis::LoopClosureMethod>(
-        new okvis::LoopClosureMethod(lcParams));
-  } else {
-    return std::shared_ptr<okvis::LoopClosureMethod>(
-        new okvis::OrbLoopClosureMethod(lcParams));
+    VIO::LoopClosureMethodType methodType,
+    std::shared_ptr<VIO::LoopClosureDetectorParams> lcParams) {
+  switch (methodType) {
+    case VIO::LoopClosureMethodType::OrbBoW:
+      return std::shared_ptr<okvis::LoopClosureMethod>(
+          new VIO::LoopClosureDetector(lcParams));
+    default:
+      return std::shared_ptr<okvis::LoopClosureMethod>(
+          new okvis::LoopClosureMethod());
   }
 }
 

@@ -8,6 +8,8 @@
 #include <okvis/LoopClosureMethod.hpp>
 #include <okvis/LoopClosureParameters.hpp>
 
+#include <loop_closure/LoopClosureDetector.h>
+
 namespace msckf {
 std::shared_ptr<okvis::Frontend> createFrontend(
     int numCameras, bool initializeWithoutEnoughParallax,
@@ -15,8 +17,15 @@ std::shared_ptr<okvis::Frontend> createFrontend(
 
 std::shared_ptr<okvis::Estimator> createBackend(okvis::EstimatorAlgorithm algorithm);
 
+/**
+ * @brief createLoopClosureMethod
+ * @param methodId 0 for dummy loop closure method, 1 for closure method with ORB loop detector.
+ * @param lcParams
+ * @return
+ */
 std::shared_ptr<okvis::LoopClosureMethod> createLoopClosureMethod(
-    const okvis::LoopClosureParameters& lcParams);
+    VIO::LoopClosureMethodType methodId,
+    std::shared_ptr<VIO::LoopClosureDetectorParams> lcParams);
 
 }  // namespace msckf
 #endif // INCLUDE_MSCKF_VIOFACTORY_METHODS_HPP_

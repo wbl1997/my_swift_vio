@@ -30,6 +30,7 @@
 #include <io_wrap/Publisher.hpp>
 #include <io_wrap/RosParametersReader.hpp>
 #include <io_wrap/Subscriber.hpp>
+#include <loop_closure/LoopClosureDetectorParams.h>
 #include <msckf/VioFactoryMethods.hpp>
 #include <okvis/ThreadedKFVio.hpp>
 
@@ -82,9 +83,10 @@ int main(int argc, char **argv) {
       parameters.nCameraSystem.numCameras(),
       parameters.optimization.initializeWithoutEnoughParallax,
       parameters.optimization.algorithm);
-  okvis::LoopClosureParameters lcParams;
+  std::shared_ptr<VIO::LoopClosureDetectorParams> lcParams(
+        new VIO::LoopClosureDetectorParams());
   std::shared_ptr<okvis::LoopClosureMethod> loopClosureMethod =
-      msckf::createLoopClosureMethod(lcParams);
+      msckf::createLoopClosureMethod(VIO::LoopClosureMethodType::OrbBoW, lcParams);
   okvis::ThreadedKFVio okvis_estimator(parameters, estimator, frontend,
                                        loopClosureMethod);
 
