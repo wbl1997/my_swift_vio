@@ -3112,10 +3112,6 @@ uint64_t HybridFilter::getMinValidStateId() const {
 
 bool HybridFilter::getOdometryConstraintsForKeyframe(
     std::shared_ptr<okvis::LoopQueryKeyframeMessage> queryKeyframe) const {
-  // overwrite T_BC with value from camera rig which contains estimated values.
-  const int camId = 0;
-  queryKeyframe->T_BC_ = *(camera_rig_.getCameraExtrinsicPtr(camId));
-
   int j = 0;
   std::vector<std::shared_ptr<NeighborConstraintMessage>>&
       odometryConstraintList = queryKeyframe->odometryConstraintListMutable();
