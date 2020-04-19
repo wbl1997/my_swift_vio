@@ -2,6 +2,29 @@
 #include "okvis/kinematics/sophus_operators.hpp"
 
 namespace VIO {
+std::pair<double, double> computeRotationAndTranslationErrors(
+    const gtsam::Pose3& expectedPose, const gtsam::Pose3& actualPose,
+    const bool upToScale) {
+  // compute errors
+  gtsam::Rot3 rotErrorMat =
+      (expectedPose.rotation()).between(actualPose.rotation());
+  gtsam::Vector3 rotErrorVector = gtsam::Rot3::Logmap(rotErrorMat);
+  double rotError = rotErrorVector.norm();
+
+  gtsam::Vector3 actualTranslation = actualPose.translation().vector();
+  gtsam::Vector3 expectedTranslation = expectedPose.translation().vector();
+  if (upToScale) {
+    double normExpected = expectedTranslation.norm();
+    double normActual = actualTranslation.norm();
+    if (normActual > 1e-5)
+      actualTranslation = normExpected * actualTranslation /
+                          normActual;  // we manually add the scale here
+  }
+  gtsam::Vector3 tranErrorVector = expectedTranslation - actualTranslation;
+  double tranError = tranErrorVector.norm();
+  return std::make_pair(rotError, tranError);
+}
+
 gtsam::Pose3 GtsamWrap::retract(gtsam::Pose3 Tz,
                                 Eigen::Matrix<double, 6, 1>& delta) {
   okvis::kinematics::Transformation Tza = toTransform(Tz);

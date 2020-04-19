@@ -56,12 +56,6 @@ std::unique_ptr<T> make_unique(Args&&... args) {
   return std::unique_ptr<T>(new T(std::forward<Args>(args)...));
 }
 
-// given two gtsam::Pose3 computes the relative rotation and translation errors:
-// rotError,tranError
-std::pair<double, double> computeRotationAndTranslationErrors(
-    const gtsam::Pose3& expectedPose,
-    const gtsam::Pose3& actualPose,
-    const bool upToScale);
 
 /* ------------------------------------------------------------------------ */
 class LoopClosureDetector : public okvis::LoopClosureMethod {
