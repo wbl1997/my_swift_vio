@@ -129,7 +129,8 @@ if(NOT EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/vocabulary/ORBvoc.yml)
        ${CMAKE_CURRENT_SOURCE_DIR}/vocabulary/ORBvoc.zip
        SHOW_PROGRESS
        STATUS orbvoc_download_success
-       TIMEOUT 60)
+       TIMEOUT 60
+       EXPECTED_MD5 41c290ca05ab2b68548dc6542632d69f)
   if(orbvoc_download_success)
     message(STATUS "Unzipping vocabulary file.")
 
@@ -284,6 +285,7 @@ list(APPEND TEST_SRC_FILES
     test/msckf/TestHybridFilter.cpp
     test/msckf/TestImuOdometry.cpp
     test/msckf/TestImuSimulator.cpp
+    test/msckf/TestMatrixSqrt.cpp
     test/msckf/TestOkvisTriangulateFast.cpp
     test/msckf/TestPointLandmark.cpp
     test/msckf/TestQuaternionFromSmallAngle.cpp
