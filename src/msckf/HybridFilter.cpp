@@ -3131,11 +3131,11 @@ bool HybridFilter::getOdometryConstraintsForKeyframe(
     if (riter->second.isKeyframe) {
       okvis::kinematics::Transformation T_WBn;
       get_T_WS(riter->first, T_WBn);
-      okvis::kinematics::Transformation T_BrBn = T_WBr.inverse() * T_WBn;
+      okvis::kinematics::Transformation T_BnBr = T_WBn.inverse() * T_WBr;
       std::shared_ptr<okvis::NeighborConstraintMessage> odometryConstraint(
           new okvis::NeighborConstraintMessage(
-              riter->first, riter->second.timestamp, T_BrBn, T_WBn));
-      odometryConstraint->core_.covRawError_.setIdentity();
+              riter->first, riter->second.timestamp, T_BnBr, T_WBn));
+      odometryConstraint->core_.squareRootInfo_.setIdentity();
 
       std::map<uint64_t, int>::const_iterator poseCovIndexIter =
           mStateID2CovID_.find(riter->first);
