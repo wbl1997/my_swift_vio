@@ -26,22 +26,13 @@
 #include <DBoW2/DBoW2.h>
 
 #include <Eigen/Core>
-//#include "kimera-vio/frontend/StereoFrame.h"
-//#include "kimera-vio/logging/Logger.h"
 #include "loop_closure/LcdThirdPartyWrapper.h"
 #include "loop_closure/LoopClosureDetector-definitions.h"
 #include "loop_closure/LoopClosureDetectorParams.h"
-//#include "kimera-vio/pipeline/PipelineModule.h"
-//#include "kimera-vio/utils/ThreadsafeQueue.h"
 #include <okvis/KeyframeForLoopDetection.hpp>
 
 #include <okvis/LoopFrameAndMatches.hpp>
 #include <okvis/LoopClosureMethod.hpp>
-
-//#include <opengv/sac_problems/relative_pose/CentralRelativePoseSacProblem.hpp>
-//#include <opengv/relative_pose/CentralRelativeAdapter.hpp>
-//#include <opengv/sac_problems/point_cloud/PointCloudSacProblem.hpp>
-//#include <opengv/point_cloud/PointCloudAdapter.hpp>
 
 /* ------------------------------------------------------------------------ */
 // Forward declare KimeraRPGO, a private dependency.
@@ -76,17 +67,16 @@ class LoopClosureDetector : public okvis::LoopClosureMethod {
 
   virtual std::shared_ptr<okvis::KeyframeInDatabase> initializeKeyframeInDatabase(
       size_t dbowId,
-      std::shared_ptr<okvis::LoopQueryKeyframeMessage> queryKeyframe) const final;
+      const okvis::LoopQueryKeyframeMessage& queryKeyframe) const final;
 
   virtual bool addConstraintsAndOptimize(
-      std::shared_ptr<okvis::KeyframeInDatabase> queryKeyframeInDB,
-      std::shared_ptr<okvis::LoopFrameAndMatches> loopFrameAndMatches) final;
+      const okvis::KeyframeInDatabase& queryKeyframeInDB,
+      std::shared_ptr<const okvis::LoopFrameAndMatches> loopFrameAndMatches) final;
 
   inline std::shared_ptr<const OrbDatabase> getBoWDatabase() const { return db_BoW_; }
 
-
   void detectAndDescribe(
-      std::shared_ptr<const okvis::LoopQueryKeyframeMessage> query_keyframe,
+      const okvis::LoopQueryKeyframeMessage& query_keyframe,
       OrbDescriptorVec* descriptors_vec);
 
   /* ------------------------------------------------------------------------ */
@@ -100,7 +90,7 @@ class LoopClosureDetector : public okvis::LoopClosureMethod {
    *  false otherwise.
    */
   virtual bool detectLoop(
-      std::shared_ptr<okvis::LoopQueryKeyframeMessage> queryKeyframe,
+      std::shared_ptr<const okvis::LoopQueryKeyframeMessage> queryKeyframe,
       std::shared_ptr<okvis::KeyframeInDatabase>& queryKeyframeInDB,
       std::shared_ptr<okvis::LoopFrameAndMatches>& loopFrameAndMatches) final;
 
@@ -113,41 +103,11 @@ class LoopClosureDetector : public okvis::LoopClosureMethod {
    *  query frame, in the coordinates of the match frame.
    * @return True if the verification check passes, false otherwise.
    */
-  bool geometricVerificationCheck(const FrameId& query_id,
-                                  const FrameId& match_id,
-                                  okvis::kinematics::Transformation* camCur_T_camRef_mono);
+  bool geometricVerificationCheck(
+      const okvis::LoopQueryKeyframeMessage& queryKeyframe,
+      const FrameId query_id, const FrameId match_id,
+      std::shared_ptr<okvis::LoopFrameAndMatches>* loopFrameAndMatches);
 
-  /* ------------------------------------------------------------------------ */
-  /** @brief Determine the 3D pose betwen two frames.
-   * @param[in] query_id The frame ID of the query image in the database.
-   * @param[in] match_id The frame ID of the match image in the database.
-   * @param[in] camCur_T_camRef_mono The relative pose between the match frame
-   *  and the query frame, in the coordinates of the match frame.
-   * @param[out] bodyCur_T_bodyRef_stereo The 3D pose between the match frame
-   *  and the query frame, in the coordinates of the match frame.
-   * @return True if the pose is recovered successfully, false otherwise.
-   */
-  bool recoverPose(const FrameId& query_id,
-                   const FrameId& match_id,
-                   const gtsam::Pose3& camCur_T_camRef_mono,
-                   gtsam::Pose3* bodyCur_T_bodyRef_stereo);
-
-  /* ------------------------------------------------------------------------ */
-  /** @brief Returns the "intrinsics flag", which is true if the pipeline has
-   *  recieved the dimensions, principle point, and focal length of the images
-   *  in the frames, as well as the transformation from body to camera.
-   * @return True if the intrinsics have been recieved, false otherwise.
-   */
-  inline const bool getIntrinsicsFlag() const { return set_intrinsics_; }
-
-  /* ------------------------------------------------------------------------ */
-  /** @brief Returns the pose between the inertial world-reference frame and the
-   *  "map" frame, which is the error between the VIO and the PGO trajectories.
-   * @return The pose of the map frame relative to the world frame.
-   */
-  const gtsam::Pose3 getWPoseMap() const;
-
-  const gtsam::Pose3 getPgoOptimizedPose(size_t pose_key) const;
   /* ------------------------------------------------------------------------ */
   /** @brief Returns the values of the PGO, which is the full trajectory of the
    *  PGO.
@@ -162,22 +122,6 @@ class LoopClosureDetector : public okvis::LoopClosureMethod {
    */
   const gtsam::NonlinearFactorGraph getPGOnfg() const;
 
-  /* ------------------------------------------------------------------------ */
-  /** @brief Set the bool set_intrinsics as well as the parameter members
-   *  representing the principle point, image dimensions, focal length and
-   *  camera-to-body pose.
-   * @param[in] stereo_frame A StereoFrame with the calibration and parameters
-   *  needed to set the intrinsics.
-   */
-  // TODO(marcus): this should be private. But that makes testing harder.
-  void setIntrinsics(std::shared_ptr<const okvis::cameras::CameraBase> cam0);
-
-  /* ------------------------------------------------------------------------ */
-  /** @brief Set the OrbDatabase internal member.
-   * @param[in] db An OrbDatabase object.
-   */
-  void setDatabase(const OrbDatabase& db);
-
   /* @brief Set the vocabulary of the BoW detector.
    * @param[in] voc An OrbVocabulary object.
    */
@@ -189,81 +133,14 @@ class LoopClosureDetector : public okvis::LoopClosureMethod {
   void print() const;
 
   /* ------------------------------------------------------------------------ */
-  /** @brief Clears all keypoints and features from an input StereoFrame and
-   *  fills it with ORB features.
-   * @param[in] keypoints A vector of KeyPoints representing the ORB keypoints
-   *  identified by an ORB detector.
-   * @param[in/out] A StereoFrame initially filled with front-end features,
-   *  which is then replaced with ORB features from the keypoints parameter.
-   */
-  // TODO(marcus): utils and reorder (or just static)
-//  void rewriteStereoFrameFeatures(const std::vector<cv::KeyPoint>& keypoints,
-//                                  StereoFrame* stereo_frame) const;
-
-  /* ------------------------------------------------------------------------ */
-  /** @brief Creates an image with matched ORB features between two frames.
-   *  This is a utility for debugging the ORB feature matcher and isn't used
-   *  in the main pipeline.
-   * @param[in] query_img The image of the query frame in the database.
-   * @param[in] match_img The image of the match frame in the database.
-   * @param[in] query_id The frame ID of the query frame in the database.
-   * @param[in] match_id The frame ID of the match frame in the database.
-   * @param[in] cut_matches Determines if the Lowe Ratio Test is used to
-   *  pare down matches that are bad.
-   * @return A cv::Mat representing the matches between the two images.
-   */
-  // TODO(marcus): it would be nice if this could be a util
-  // TODO(marcus): can this be static even though it requires id? Maybe feed it
-  // descriptors instead
-  cv::Mat computeAndDrawMatchesBetweenFrames(const cv::Mat& query_img,
-                                             const cv::Mat& match_img,
-                                             const FrameId& query_id,
-                                             const FrameId& match_id,
-                                             bool cut_matches = false) const;
-
-  /* ------------------------------------------------------------------------ */
-  /** @brief Gives the transform between two frames in the body frame given
-   *  that same transform in the camera frame.
-   * @param[in] camCur_T_camRef The relative pose between two frames in the
-   *  camera coordinate frame.
-   * @param[out] bodyCur_T_bodyRef The relative pose between two frames in the
-   *  body coordinate frame.
-   */
-  // TODO(marcus): these should be private or util
-  void transformCameraPoseToBodyPose(const gtsam::Pose3& camCur_T_camRef,
-                                     gtsam::Pose3* bodyCur_T_bodyRef) const;
-
-  /* ------------------------------------------------------------------------ */
-  /** @brief The inverse of transformCameraPoseToBodyPose.
-   * @param[in] bodyCur_T_bodyRef The relative pose between two frames in the
-   *  body coordinate frame.
-   * @param[out] camCur_T_camRef The relative pose between two frames in the
-   *  camera coordinate frame.
-   * @return
-   */
-  void transformBodyPoseToCameraPose(const gtsam::Pose3& bodyCur_T_bodyRef,
-                                     gtsam::Pose3* camCur_T_camRef) const;
-
-  /* ------------------------------------------------------------------------ */
   /** @brief Adds an odometry factor to the PGO and optimizes the trajectory.
    *  No actual optimization is performed on the RPGO side for odometry.
    * @param[in] factor An OdometryFactor representing the backend's guess for
    *  odometry between two consecutive keyframes.
    */
-  void addOdometryFactorAndOptimize(std::shared_ptr<const okvis::KeyframeInDatabase> keyframeInDB);
+  void addOdometryFactors(const okvis::KeyframeInDatabase& keyframeInDB);
 
-  /* ------------------------------------------------------------------------ */
-  /** @brief Adds a loop-closure factor to the PGO and optimizes the trajectory.
-   * @param[in] factor A LoopClosureFactor representing the relative pose
-   *  between two frames that are not (necessarily) consecutive.
-   */
-  void addLoopClosureFactorAndOptimize(const LoopClosureFactor& factor);
-
-  /* ------------------------------------------------------------------------ */
-  /** @brief Initializes the RobustSolver member with no prior, or a neutral
-   *  starting pose.
-   */
-  void initializePGO();
+  void initializePGO(); ///< for test only.
 
   /* ------------------------------------------------------------------------ */
   /** @brief Initializes the RobustSolver member with an initial prior factor,
@@ -293,55 +170,13 @@ class LoopClosureDetector : public okvis::LoopClosureMethod {
    */
   void computeMatchedIndices(const FrameId& query_id,
                              const FrameId& match_id,
-                             std::vector<FrameId>* i_query,
-                             std::vector<FrameId>* i_match,
+                             std::vector<int>* i_query,
+                             std::vector<int>* i_match,
                              bool cut_matches = false) const;
-
-  /* ------------------------------------------------------------------------ */
-  /** @brief Checks geometric verification and determines a pose with
-   *  a translation up to a scale factor between two frames, using Nister's
-   *  five-point method.
-   * @param[in] query_id The frame ID of the query frame in the database.
-   * @param[in] match_id The frame ID of the match frame in the database.
-   * @param[out] camCur_T_camRef_mono The relative pose between the two frames,
-   *  with translation up to a scale factor.
-   * @return True if the verification passes, false otherwise.
-   */
-  bool geometricVerificationNister(const FrameId& query_id,
-                                   const FrameId& match_id,
-                                   gtsam::Pose3* camCur_T_camRef_mono);
-
-  /* ------------------------------------------------------------------------ */
-  /** @brief Checks geometric verification and determines a pose that is
-   *  "stereo" - correct in translation scale using Arun's three-point method.
-   * 3d-3d RANSAC
-   * @param[in] query_id The frame ID of the query frame in the database.
-   * @param[in] match_id The frame ID of the match frame in the database.
-   * @param[out] bodyCur_T_bodyRef The relative pose between the two frames.
-   * @return True if the verification passes, false otherwise.
-   */
-  bool recoverPoseArun(const FrameId& query_id,
-                       const FrameId& match_id,
-                       gtsam::Pose3* bodyCur_T_bodyRef);
-
-  /* ------------------------------------------------------------------------ */
-  /** @brief Checks geometric verification and determines a pose that is
-   *  "stereo" - correct in translation scale using the median of all
-   *  3D keypoints matched between the frames.
-   * @param[in] query_id The frame ID of the query frame in the database.
-   * @param[in] match_id The frame ID of the match frame in the database.
-   * @param[out] bodyCur_T_bodyRef The relative pose between the two frames.
-   * @return True if the verification passes, false otherwise.
-   */
-//  bool recoverPoseGivenRot(const FrameId& query_id,
-//                           const FrameId& match_id,
-//                           const gtsam::Pose3& camCur_T_camRef_mono,
-//                           gtsam::Pose3* bodyCur_T_bodyRef);
 
  private:
   // Parameter members
   std::shared_ptr<LoopClosureDetectorParams> lcd_params_;
-  bool set_intrinsics_ = {false};
 
   std::shared_ptr<const okvis::cameras::CameraBase> cameraGeometry_;
 

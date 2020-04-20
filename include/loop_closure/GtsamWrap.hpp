@@ -67,6 +67,7 @@ inline gtsam::SharedNoiseModel createRobustNoiseModelSqrtR(
  * @brief compute Jacobian of the gtsam between factor unwhitened error relative
  * to the measurement error by autoDifferentiate.
  * The between factor in gtsam is defined as $e = log_{SE3}(T_z^{-1} T_x^{-1} T_y)$.
+ * The measurement error is defined as in OKVIS which is used by VIO estimator.
  * @warning use this class sparingly as it is likely expensive.
  */
 class BetweenFactorPose3Wrap {

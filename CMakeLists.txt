@@ -273,6 +273,11 @@ list(APPEND TEST_SRC_FILES
     test/eigen/TestEigenQR.cpp
 
     test/io_wrap/TestVioDatasetPlayer.cpp
+    test/loop_closure/TestGtsamBetweenFactor.cpp
+    test/loop_closure/TestLcdThirdPartyWrapper.cpp
+    test/loop_closure/TestLoopClosureMethod.cpp
+    test/loop_closure/TestRPGO.cpp
+    test/loop_closure/TestSimpleProjectionFactor.cpp
 
     test/msckf/TestBoundedImuDeque.cpp
     test/msckf/TestCovarianceEstimation.cpp

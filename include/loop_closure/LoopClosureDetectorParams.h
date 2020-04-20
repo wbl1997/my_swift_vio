@@ -57,7 +57,7 @@ class LoopClosureDetectorParams : public okvis::LoopClosureParameters {
       double ransac_inlier_threshold_mono = 0.5,
 
       PoseRecoveryOption pose_recovery_option = PoseRecoveryOption::GIVEN_ROT,
-      int max_ransac_iterations_stereo = 500,
+      int max_ransac_iterations_stereo = 50,
       double ransac_probability_stereo = 0.995,
       double ransac_threshold_stereo = 0.15,
       bool ransac_randomize_stereo = false,
