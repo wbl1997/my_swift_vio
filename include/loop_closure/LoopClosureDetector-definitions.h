@@ -40,16 +40,6 @@ typedef uint64_t FrameId;
 typedef okvis::Time Timestamp;
 typedef std::unordered_map<FrameId, Timestamp> FrameIDTimestampMap;
 
-enum class LCDStatus : int {
-  LOOP_DETECTED,
-  NO_MATCHES,
-  LOW_NSS_FACTOR,
-  LOW_SCORE,
-  NO_GROUPS,
-  FAILED_TEMPORAL_CONSTRAINT,
-  FAILED_GEOM_VERIFICATION,
-  FAILED_POSE_RECOVERY
-};
 
 enum class GeomVerifOption : int { NISTER, NONE };
 
@@ -131,12 +121,24 @@ struct MatchIsland {
   double best_score_;
 };  // struct MatchIsland
 
-struct LoopResult {
+class LCDStatus {
+ public:
+  enum {
+    LOOP_DETECTED = 0,
+    NO_MATCHES,
+    LOW_NSS_FACTOR,
+    LOW_SCORE,
+    NO_GROUPS,
+    FAILED_TEMPORAL_CONSTRAINT,
+    FAILED_GEOM_VERIFICATION,
+    FAILED_POSE_RECOVERY
+  } status_;
+
   inline bool isLoop() const { return status_ == LCDStatus::LOOP_DETECTED; }
 
-  static std::string asString(const LCDStatus& status) {
+  std::string asString() {
     std::string status_str = "";
-    switch (status) {
+    switch (status_) {
       case LCDStatus::LOOP_DETECTED: {
         status_str = "LOOP_DETECTED";
         break;
@@ -172,18 +174,13 @@ struct LoopResult {
     }
     return status_str;
   }
-
-  LCDStatus status_;
-  FrameId query_id_;
-  FrameId match_id_;
-  gtsam::Pose3 relative_pose_; // match_T_query
-};  // struct LoopResult
+};
 
 struct LcdDebugInfo {
   LcdDebugInfo() = default;
 
   Timestamp timestamp_;
-  LoopResult loop_result_;
+  LCDStatus loop_result_;
 
   size_t mono_input_size_;
   size_t mono_inliers_;
@@ -197,17 +194,6 @@ struct LcdDebugInfo {
   size_t pgo_lc_count_;
   size_t pgo_lc_inliers_;
 };  // struct LcdDebugInfo
-
-struct OdometryFactor {
-  OdometryFactor(const FrameId& cur_key,
-                 const gtsam::Pose3& W_Pose_Blkf,
-                 const gtsam::SharedNoiseModel& noise)
-      : cur_key_(cur_key), W_Pose_Blkf_(W_Pose_Blkf), noise_(noise) {}
-
-  const FrameId cur_key_;
-  const gtsam::Pose3 W_Pose_Blkf_;
-  const gtsam::SharedNoiseModel noise_;
-};  // struct OdometryFactor
 
 struct LoopClosureFactor {
   LoopClosureFactor(const FrameId& ref_key,

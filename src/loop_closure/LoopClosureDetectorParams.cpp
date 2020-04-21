@@ -35,11 +35,6 @@ LoopClosureDetectorParams::LoopClosureDetectorParams(
 
     GeomVerifOption geom_check,
     int min_correspondences,
-    int max_ransac_iterations_mono,
-    double ransac_probability_mono,
-    double ransac_threshold_mono,
-    bool ransac_randomize_mono,
-    double ransac_inlier_threshold_mono,
 
     PoseRecoveryOption pose_recovery_option,
     int max_ransac_iterations_stereo,
@@ -48,6 +43,7 @@ LoopClosureDetectorParams::LoopClosureDetectorParams(
     bool ransac_randomize_stereo,
     double ransac_inlier_threshold_stereo,
     bool use_mono_rot,
+    double relative_pose_info_damper,
 
     double lowe_ratio,
     int matcher_type,
@@ -84,11 +80,6 @@ LoopClosureDetectorParams::LoopClosureDetectorParams(
 
       geom_check_(geom_check),
       min_correspondences_(min_correspondences),
-      max_ransac_iterations_mono_(max_ransac_iterations_mono),
-      ransac_probability_mono_(ransac_probability_mono),
-      ransac_threshold_mono_(ransac_threshold_mono),
-      ransac_randomize_mono_(ransac_randomize_mono),
-      ransac_inlier_threshold_mono_(ransac_inlier_threshold_mono),
 
       pose_recovery_option_(pose_recovery_option),
       max_ransac_iterations_stereo_(max_ransac_iterations_stereo),
@@ -97,6 +88,7 @@ LoopClosureDetectorParams::LoopClosureDetectorParams(
       ransac_randomize_stereo_(ransac_randomize_stereo),
       ransac_inlier_threshold_stereo_(ransac_inlier_threshold_stereo),
       use_mono_rot_(use_mono_rot),
+      relative_pose_info_damper_(relative_pose_info_damper),
 
       lowe_ratio_(lowe_ratio),
       matcher_type_(matcher_type),
@@ -149,14 +141,6 @@ bool LoopClosureDetectorParams::parseYAML(const std::string& filepath) {
       break;
   }
   yaml_parser.getYamlParam("min_correspondences", &min_correspondences_);
-  yaml_parser.getYamlParam("max_ransac_iterations_mono",
-                           &max_ransac_iterations_mono_);
-  yaml_parser.getYamlParam("ransac_probability_mono",
-                           &ransac_probability_mono_);
-  yaml_parser.getYamlParam("ransac_threshold_mono", &ransac_threshold_mono_);
-  yaml_parser.getYamlParam("ransac_randomize_mono", &ransac_randomize_mono_);
-  yaml_parser.getYamlParam("ransac_inlier_threshold_mono",
-                           &ransac_inlier_threshold_mono_);
 
   int pose_recovery_option_id;
   yaml_parser.getYamlParam("pose_recovery_option_id", &pose_recovery_option_id);
@@ -183,6 +167,8 @@ bool LoopClosureDetectorParams::parseYAML(const std::string& filepath) {
   yaml_parser.getYamlParam("ransac_inlier_threshold_stereo",
                            &ransac_inlier_threshold_stereo_);
   yaml_parser.getYamlParam("use_mono_rot", &use_mono_rot_);
+  yaml_parser.getYamlParam("relative_pose_info_damper",
+                           &relative_pose_info_damper_);
   yaml_parser.getYamlParam("lowe_ratio", &lowe_ratio_);
   yaml_parser.getYamlParam("matcher_type", &matcher_type_);
   yaml_parser.getYamlParam("nfeatures", &nfeatures_);
@@ -237,13 +223,6 @@ void LoopClosureDetectorParams::print() const {
 
       << "geom_check_: " << static_cast<unsigned int>(geom_check_) << '\n'
       << "min_correspondences_: " << min_correspondences_ << '\n'
-      << "max_ransac_iterations_mono_: " << max_ransac_iterations_mono_
-      << '\n'
-      << "ransac_probability_mono_: " << ransac_probability_mono_ << '\n'
-      << "ransac_threshold_mono_: " << ransac_threshold_mono_ << '\n'
-      << "ransac_randomize_mono_: " << ransac_randomize_mono_ << '\n'
-      << "ransac_inlier_threshold_mono_: " << ransac_inlier_threshold_mono_
-      << '\n'
 
       << "pose_recovery_option_: "
       << static_cast<unsigned int>(pose_recovery_option_) << '\n'
@@ -255,6 +234,7 @@ void LoopClosureDetectorParams::print() const {
       << "ransac_inlier_threshold_stereo_: "
       << ransac_inlier_threshold_stereo_ << '\n'
       << "use_mono_rot_:" << use_mono_rot_ << '\n'
+      << "relative_pose_info_damper_:" << relative_pose_info_damper_ << '\n'
 
       << "lowe_ratio_: " << lowe_ratio_ << '\n'
       << "matcher_type_:" << static_cast<unsigned int>(matcher_type_) << '\n'

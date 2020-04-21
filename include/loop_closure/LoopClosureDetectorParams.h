@@ -50,19 +50,15 @@ class LoopClosureDetectorParams : public okvis::LoopClosureParameters {
 
       GeomVerifOption geom_check = GeomVerifOption::NISTER,
       int min_correspondences = 12,
-      int max_ransac_iterations_mono = 500,
-      double ransac_probability_mono = 0.99,
-      double ransac_threshold_mono = 1e-6,
-      bool ransac_randomize_mono = false,
-      double ransac_inlier_threshold_mono = 0.5,
 
       PoseRecoveryOption pose_recovery_option = PoseRecoveryOption::GIVEN_ROT,
       int max_ransac_iterations_stereo = 50,
       double ransac_probability_stereo = 0.995,
-      double ransac_threshold_stereo = 0.15,
+      double ransac_threshold_stereo = 9,
       bool ransac_randomize_stereo = false,
-      double ransac_inlier_threshold_stereo = 0.5,
+      double ransac_inlier_threshold_stereo = 0.3,
       bool use_mono_rot = true,
+      double relative_pose_info_damper = 0.9,
 
       double lowe_ratio = 0.7,
       int matcher_type = cv::DescriptorMatcher::BRUTEFORCE_HAMMING,
@@ -111,11 +107,6 @@ class LoopClosureDetectorParams : public okvis::LoopClosureParameters {
 
       geom_check_== rhs.geom_check_ &&
       min_correspondences_== rhs.min_correspondences_ &&
-      max_ransac_iterations_mono_== rhs.max_ransac_iterations_mono_ &&
-      ransac_probability_mono_== rhs.ransac_probability_mono_ &&
-      ransac_threshold_mono_== rhs.ransac_threshold_mono_ &&
-      ransac_randomize_mono_== rhs.ransac_randomize_mono_ &&
-      ransac_inlier_threshold_mono_== rhs.ransac_inlier_threshold_mono_ &&
 
       pose_recovery_option_== rhs.pose_recovery_option_ &&
       max_ransac_iterations_stereo_== rhs.max_ransac_iterations_stereo_ &&
@@ -124,6 +115,7 @@ class LoopClosureDetectorParams : public okvis::LoopClosureParameters {
       ransac_randomize_stereo_== rhs.ransac_randomize_stereo_ &&
       ransac_inlier_threshold_stereo_== rhs.ransac_inlier_threshold_stereo_ &&
       use_mono_rot_== rhs.use_mono_rot_ &&
+      relative_pose_info_damper_ == rhs.relative_pose_info_damper_ &&
 
       lowe_ratio_== rhs.lowe_ratio_ &&
       matcher_type_== rhs.matcher_type_ &&
@@ -153,7 +145,9 @@ class LoopClosureDetectorParams : public okvis::LoopClosureParameters {
 
   //////////////////////////// Loop Detection Params ///////////////////////////
   bool use_nss_;              // Use normalized similarity score? (3) DBoW2 T-RO.
-  float alpha_;               // Alpha threshold for matches, (3) DBoW2 T-RO.
+  float alpha_;               // Alpha threshold for matches, A frame match
+  // \f$v_{tj}\f$ needs to have a relative score greater than alpha_. see (3) DBoW2 T-RO.
+  // Relative score \f$\eta = s(v_t, v_{tj}) / s(v_t, v_{t - \Delta t})\f$.
   int min_temporal_matches_;  // Min consistent matches to pass temporal check
   int dist_local_;            // Distance between entries to be consider a match
   int max_db_results_;    // Max number of results from db queries to consider
@@ -167,21 +161,17 @@ class LoopClosureDetectorParams : public okvis::LoopClosureParameters {
   /////////////////////// Geometrical Verification Params //////////////////////
   GeomVerifOption geom_check_;  // Geometrical check
   int min_correspondences_;     // Min number of inliers when computing a pose
-  int max_ransac_iterations_mono_;       // Max number of iterations of RANSAC
-  double ransac_probability_mono_;       // Success probability of RANSAC
-  double ransac_threshold_mono_;         // Threshold for 5-pt algorithm
-  bool ransac_randomize_mono_;           // Randomize seed for ransac
-  double ransac_inlier_threshold_mono_;  // Threshold for ransac inliers
   //////////////////////////////////////////////////////////////////////////////
 
   /////////////////////////// 3D Pose Recovery Params //////////////////////////
   PoseRecoveryOption pose_recovery_option_;
   int max_ransac_iterations_stereo_;
   double ransac_probability_stereo_;
-  double ransac_threshold_stereo_;
+  double ransac_threshold_stereo_; ///< ransac squared distance threshold to declare inliers.
   bool ransac_randomize_stereo_;
-  double ransac_inlier_threshold_stereo_;
+  double ransac_inlier_threshold_stereo_; ///< inlier ratio threshold to accept pose hypothesis.
   bool use_mono_rot_;
+  double relative_pose_info_damper_; ///< reduce the relative pose info on ground of uncertainties in landmark positions.
   //////////////////////////////////////////////////////////////////////////////
 
   ///////////////////////// ORB feature matching params ////////////////////////

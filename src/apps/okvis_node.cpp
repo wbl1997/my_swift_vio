@@ -21,18 +21,15 @@
 
 #include <glog/logging.h>
 
-#include <okvis/Parameters.hpp>
 #include <okvis/ThreadedKFVio.hpp>
 
 #include <io_wrap/CommonGflags.hpp>
-#include <io_wrap/StreamHelper.hpp>
 #include <io_wrap/Player.hpp>
-#include <io_wrap/Publisher.hpp>
 #include <io_wrap/RosParametersReader.hpp>
 #include <io_wrap/Subscriber.hpp>
 #include <loop_closure/LoopClosureDetectorParams.h>
 #include <msckf/VioFactoryMethods.hpp>
-#include <okvis/ThreadedKFVio.hpp>
+#include "VioSystemWrap.hpp"
 
 int main(int argc, char **argv) {
   google::ParseCommandLineFlags(&argc, &argv, true);  // true to strip gflags
@@ -41,37 +38,21 @@ int main(int argc, char **argv) {
   FLAGS_stderrthreshold = 0;  // INFO: 0, WARNING: 1, ERROR: 2, FATAL: 3
   FLAGS_colorlogtostderr = 1;
 
-  ros::init(argc, argv, "okvis_node");
-  ros::NodeHandle nh("okvis_node");
-  okvis::Publisher publisher(nh);
+  const std::string nodeName = "okvis_node";
+  ros::init(argc, argv, nodeName);
+  ros::NodeHandle nh(nodeName);
+
 
   std::string configFilename;
   if (argc >= 2) {
     configFilename = argv[1];
   } else {
-    std::cout << "You can either invoke okvis_node through a ros launch file,"
-                 " or through Qt debug. "
-              << "In the latter case, you either need to provide the"
-                 " config_filename in the command line,"
-              << " or use rosparam e.g.," << std::endl
-              << "rosparam set /okvis_node/config_filename "
-              << "/path/to/config/config_fpga_p2_euroc.yaml" << std::endl;
-    std::cout << "To run msckf on image sequences or a video and their "
-                 "associated inertial data, "
-              << std::endl
-              << "set load_input_option properly as an input argument, then"
-                 " in a terminal, input "
-              << std::endl
-              << argv[0] << " /path/to/config/file.yaml" << std::endl;
-    std::cout << "Set publishing_options.publishImuPropagatedState to false "
-                 "in the settings.yaml to only save optimized states"
-              << std::endl;
-
     if (!nh.getParam("config_filename", configFilename)) {
       LOG(ERROR) << "Please specify filename of configuration!";
       return 1;
     }
   }
+
   okvis::RosParametersReader vio_parameters_reader(configFilename);
   okvis::VioParameters parameters;
   vio_parameters_reader.getParameters(parameters);
@@ -90,60 +71,14 @@ int main(int argc, char **argv) {
   okvis::ThreadedKFVio okvis_estimator(parameters, estimator, frontend,
                                        loopClosureMethod);
 
-  std::string path = FLAGS_output_dir;
-  path = okvis::removeTrailingSlash(path);
-  int camIdx = 0;
+  okvis::Publisher publisher(nh);
+  publisher.setParameters(parameters);
+  okvis::PgoPublisher pgoPublisher;
+  okvis::VioSystemWrap::registerCallbacks(
+      FLAGS_output_dir, parameters, &okvis_estimator, &publisher,
+      &pgoPublisher);
 
-  okvis_estimator.setFullStateCallback(
-      std::bind(&okvis::Publisher::publishFullStateAsCallback, &publisher,
-                std::placeholders::_1, std::placeholders::_2,
-                std::placeholders::_3, std::placeholders::_4));
-  okvis_estimator.setLandmarksCallback(std::bind(
-      &okvis::Publisher::publishLandmarksAsCallback, &publisher,
-      std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
-
-  std::string stateFilename = path + "/msckf_estimates.csv";
-  std::string headerLine;
-  okvis::StreamHelper::composeHeaderLine(
-      parameters.imu.model_type, parameters.nCameraSystem.projOptRep(camIdx),
-      parameters.nCameraSystem.extrinsicOptRep(camIdx),
-      parameters.nCameraSystem.cameraGeometry(camIdx)->distortionType(),
-      okvis::FULL_STATE_WITH_ALL_CALIBRATION, &headerLine);
-  publisher.setCsvFile(stateFilename, headerLine);
-  if (FLAGS_dump_output_option == 2) {
-    // save estimates of evolving states, and camera extrinsics
-    okvis_estimator.setFullStateCallbackWithExtrinsics(std::bind(
-        &okvis::Publisher::csvSaveFullStateWithExtrinsicsAsCallback, &publisher,
-        std::placeholders::_1, std::placeholders::_2, std::placeholders::_3,
-        std::placeholders::_4, std::placeholders::_5, std::placeholders::_6));
-  } else if (FLAGS_dump_output_option == 3 || FLAGS_dump_output_option == 4) {
-    // save estimates of evolving states, camera extrinsics,
-    // and all other calibration parameters
-    okvis_estimator.setFullStateCallbackWithAllCalibration(std::bind(
-        &okvis::Publisher::csvSaveFullStateWithAllCalibrationAsCallback,
-        &publisher, std::placeholders::_1, std::placeholders::_2,
-        std::placeholders::_3, std::placeholders::_4, std::placeholders::_5,
-        std::placeholders::_6, std::placeholders::_7, std::placeholders::_8,
-        std::placeholders::_9, std::placeholders::_10));
-    if (FLAGS_dump_output_option == 4) {
-      okvis_estimator.setImuCsvFile(path + "/imu0_data.csv");
-      const unsigned int numCameras = parameters.nCameraSystem.numCameras();
-      for (size_t i = 0; i < numCameras; ++i) {
-        std::stringstream num;
-        num << i;
-        okvis_estimator.setTracksCsvFile(
-            i, path + "/cam" + num.str() + "_tracks.csv");
-      }
-      publisher.setLandmarksCsvFile(path + "/okvis_estimator_landmarks.csv");
-    }
-  }
-
-  okvis_estimator.setStateCallback(
-      std::bind(&okvis::Publisher::publishStateAsCallback, &publisher,
-                std::placeholders::_1, std::placeholders::_2));
-  publisher.setParameters(parameters);  // pass the specified publishing stuff
-
-  // player to grab messages directly from files on a hard drive
+  // player to grab messages directly from files on a hard drive.
   std::shared_ptr<okvis::Player> pPlayer;
   std::shared_ptr<std::thread> ptPlayer;
   if (FLAGS_load_input_option == 0) {
@@ -169,7 +104,8 @@ int main(int argc, char **argv) {
         std::chrono::seconds(5));  // in case the optimizer lags
   }
 
-  std::string filename = path + "/feature_statistics.txt";
+  std::string filename =
+      okvis::removeTrailingSlash(FLAGS_output_dir) + "/feature_statistics.txt";
   okvis_estimator.saveStatistics(filename);
   return 0;
 }

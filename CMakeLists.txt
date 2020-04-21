@@ -163,6 +163,7 @@ LIST(APPEND SOURCEFILES
 
     src/io_wrap/CameraPoseVisualization.cpp
     src/io_wrap/CommonGflags.cpp
+    src/io_wrap/PgoPublisher.cpp
     src/io_wrap/Player.cpp
     src/io_wrap/PoseViewer.cpp
     src/io_wrap/Publisher.cpp
@@ -253,10 +254,11 @@ include_directories(
 )
 
 # now the actual applications
-add_executable(okvis_node src/apps/okvis_node.cpp)
+add_executable(okvis_node src/apps/okvis_node.cpp src/apps/VioSystemWrap.cpp)
 target_link_libraries(okvis_node ${PROJECT_NAME})
 
-add_executable(okvis_node_synchronous src/apps/okvis_node_synchronous.cpp)
+add_executable(okvis_node_synchronous src/apps/okvis_node_synchronous.cpp
+    src/apps/VioSystemWrap.cpp)
 target_link_libraries(okvis_node_synchronous ${PROJECT_NAME} )
 
 add_executable(dataset_convertor src/apps/dataset_convertor.cpp)

@@ -25,7 +25,11 @@
 
 #include <Eigen/Core>
 
+#include "io_wrap/CommonGflags.hpp"
+#include "io_wrap/StreamHelper.hpp"
+
 #include "msckf/ceres/tiny_solver.h"
+#include "msckf/RemoveFromVector.hpp"
 
 #include <eigen/matrix_sqrt.hpp>
 #include <opengv/sac/Ransac.hpp>
@@ -56,13 +60,11 @@ LoopClosureDetector::LoopClosureDetector(
     std::shared_ptr<LoopClosureDetectorParams> lcd_params)
     : okvis::LoopClosureMethod(),
       lcd_params_(lcd_params),
-//      set_intrinsics_(false),
       orb_feature_detector_(),
       descriptor_matcher_(),
       db_BoW_(nullptr),
       lcd_tp_wrapper_(nullptr),
       latest_bowvec_(),
-      B_Pose_camLrect_(),
       pgo_(nullptr) {
   // Initialize the ORB feature detector object:
   orb_feature_detector_ = cv::ORB::create(lcd_params_->nfeatures_,
@@ -93,13 +95,12 @@ LoopClosureDetector::LoopClosureDetector(
 
   // Initialize the thirdparty wrapper:
   lcd_tp_wrapper_ = VIO::make_unique<LcdThirdPartyWrapper>(lcd_params);
-  // Initialize db_BoW_:
+
   db_BoW_ = std::make_shared<OrbDatabase>(vocab);
-  // Initialize pgo_:
-  // TODO(marcus): parametrize the verbosity of PGO params
+
   KimeraRPGO::RobustSolverParams pgo_params;
-  // TODO(jhuai): Pcm3D uses PoseWithCovariance to check consistency of loop constraints
-  // where as PcmSimple3D uses Pose for this purpose.
+  // TODO(jhuai): Pcm3D uses Mahalanobis test with PoseWithCovariance to check
+  // consistency of loop constraints while PcmSimple3D uses hard thresholds and Poses.
   // pgo_params.setPcm3DParams(pgo_odom_mahal_threshold_, pgo_lc_mahal_threshold_);
   pgo_params.setPcmSimple3DParams(lcd_params_->pgo_trans_threshold_,
                                   lcd_params_->pgo_rot_threshold_,
@@ -111,10 +112,41 @@ LoopClosureDetector::~LoopClosureDetector() {
   LOG(INFO) << "LoopClosureDetector desctuctor called.";
 }
 
+void LoopClosureDetector::saveFinalPgoResults() {
+  if (FLAGS_output_dir.empty()) {
+    return;
+  }
+  std::string output_csv = okvis::removeTrailingSlash(FLAGS_output_dir) + "/final_pgo.csv" ;
+  std::ofstream stream(output_csv, std::ios_base::out);
+  if (!stream.is_open()) {
+    return;
+  }
+  const char delimiter = ' ';
+  stream << "timestamp[sec] T_WB(x y z qx qy qz qw)\n";
+  gtsam::Values estimates = pgo_->calculateEstimate();
+  for (auto keyframeInDB : db_frames_) {
+    gtsam::Pose3 T_WB = estimates.at<gtsam::Pose3>(
+          gtsam::Symbol(keyframeInDB->dbowId_));
+    const Eigen::Vector3d& r = T_WB.translation();
+    Eigen::Quaterniond q = T_WB.rotation().toQuaternion();
+    stream << keyframeInDB->stamp_ << delimiter << r[0] << delimiter << r[1]
+           << delimiter << r[2] << delimiter << q.x() << delimiter << q.y()
+           << delimiter << q.z() << delimiter << q.w() << "\n";
+  }
+  stream.close();
+  LOG(INFO) << "Saved final PGO results to " << output_csv;
+}
+
+gtsam::Pose3 LoopClosureDetector::getPgoPoseEstimate(size_t dbowId) const {
+  gtsam::Values estimates = pgo_->calculateEstimate();
+  return estimates.at<gtsam::Pose3>(gtsam::Symbol(dbowId));
+}
+
 /* ------------------------------------------------------------------------ */
 bool LoopClosureDetector::addConstraintsAndOptimize(
     const okvis::KeyframeInDatabase& queryKeyframeInDB,
-    std::shared_ptr<const okvis::LoopFrameAndMatches> loopFrameAndMatches) {
+    std::shared_ptr<const okvis::LoopFrameAndMatches> loopFrameAndMatches,
+    okvis::PgoResult& pgoResult) {
   // Initialize PGO with first frame if needed.
   if (queryKeyframeInDB.constraintList().size() == 0u) {
     const Eigen::Matrix<double, 6, 6>& cov_z = queryKeyframeInDB.cov_vio_T_WB_;
@@ -127,10 +159,21 @@ bool LoopClosureDetector::addConstraintsAndOptimize(
     gtsam::SharedNoiseModel shared_noise_model =
         gtsam::noiseModel::Gaussian::Covariance(cov_e, tryToSimplify);
 
-    OdometryFactor odom_factor(queryKeyframeInDB.dbowId_,
-                               GtsamWrap::toPose3(queryKeyframeInDB.vio_T_WB_),
-                               shared_noise_model);
-    initializePGO(odom_factor);
+    gtsam::NonlinearFactorGraph init_nfg;
+    gtsam::Values init_val;
+    init_val.insert(gtsam::Symbol(queryKeyframeInDB.dbowId_),
+                    GtsamWrap::toPose3(queryKeyframeInDB.vio_T_WB_));
+    init_nfg.add(gtsam::PriorFactor<gtsam::Pose3>(
+        gtsam::Symbol(queryKeyframeInDB.dbowId_),
+        GtsamWrap::toPose3(queryKeyframeInDB.vio_T_WB_), shared_noise_model));
+    pgo_->update(init_nfg, init_val);
+
+    pgoResult.stamp_ = queryKeyframeInDB.stamp_;
+    pgoResult.T_WB_ =
+        GtsamWrap::toTransform(getPgoPoseEstimate(queryKeyframeInDB.dbowId_));
+
+    latestLoopKeyframe_.reset(new LoopKeyframeMetadata(
+        queryKeyframeInDB.dbowId_, queryKeyframeInDB.vio_T_WB_));
     return true;
   }
 
@@ -150,10 +193,20 @@ bool LoopClosureDetector::addConstraintsAndOptimize(
                                                noiseModel));
 
     pgo_->update(nfg);
+
+    pgoResult.stamp_ = queryKeyframeInDB.stamp_;
+    pgoResult.T_WB_ =
+        GtsamWrap::toTransform(getPgoPoseEstimate(queryKeyframeInDB.dbowId_));
+
+    latestLoopKeyframe_.reset(new LoopKeyframeMetadata(
+        queryKeyframeInDB.dbowId_, queryKeyframeInDB.vio_T_WB_));
+  } else {
+    gtsam::Pose3 pgo_T_WBl = getPgoPoseEstimate(latestLoopKeyframe_->dbowId_);
+    okvis::kinematics::Transformation vio_T_BlBq =
+        latestLoopKeyframe_->vio_T_WB_.inverse() * queryKeyframeInDB.vio_T_WB_;
+    pgoResult.stamp_ = queryKeyframeInDB.stamp_;
+    pgoResult.T_WB_ = GtsamWrap::toTransform(pgo_T_WBl) * vio_T_BlBq;
   }
-  // TODO(jhuai): Construct output payload.
-  // option 1: save the pose for the newly added keyframe
-  // option 2: save the entire pose graph estimates for all keyframes
   return false;
 }
 
@@ -211,22 +264,15 @@ bool LoopClosureDetector::detectLoop(
     std::shared_ptr<const okvis::LoopQueryKeyframeMessage> input,
     std::shared_ptr<okvis::KeyframeInDatabase>& queryKeyframeInDB,
     std::shared_ptr<okvis::LoopFrameAndMatches>& loopFrameAndMatches) {
-  // One time initialization from camera parameters.
-//  if (!set_intrinsics_) {
-//    setIntrinsics(input->cameraGeometry());
-//  }
 
   size_t dbowId = db_frames_.size();
   queryKeyframeInDB = initializeKeyframeInDatabase(dbowId, *input);
   db_frames_.push_back(queryKeyframeInDB);
   vioIdToDbowId_.emplace(queryKeyframeInDB->id_, dbowId);
-  // Process the StereoFrame and check for a loop closure with previous ones.
-  LoopResult loop_result;
 
   OrbDescriptorVec descriptors_vec;
   detectAndDescribe(*input, &descriptors_vec);
-  FrameId frame_id = dbowId;
-  loop_result.query_id_ = frame_id;
+  size_t frame_id = dbowId;
 
   // Create BOW representation of descriptors.
   DBoW2::BowVector bow_vec;
@@ -246,19 +292,21 @@ bool LoopClosureDetector::detectLoop(
   // Add current BoW vector to database.
   db_BoW_->add(bow_vec);
 
+  LCDStatus lcdStatus;
+
   if (query_result.empty()) {
-    loop_result.status_ = LCDStatus::NO_MATCHES;
+    lcdStatus.status_ = LCDStatus::NO_MATCHES;
   } else {
     double nss_factor = 1.0;
     if (lcd_params_->use_nss_) {
       nss_factor = db_BoW_->getVocabulary()->score(bow_vec, latest_bowvec_);
       if (latest_bowvec_.size() == 0) {
-        LOG(INFO) << "When ref bowvec is empty, the score is expected to be 0 ? " << nss_factor;
+        CHECK_EQ(nss_factor, 0) << "When ref bowvec is empty, the score is expected to be 0!";
       }
     }
 
     if (lcd_params_->use_nss_ && nss_factor < lcd_params_->min_nss_factor_) {
-      loop_result.status_ = LCDStatus::LOW_NSS_FACTOR;
+      lcdStatus.status_ = LCDStatus::LOW_NSS_FACTOR;
     } else {
       // Remove low scores from the QueryResults based on nss.
       DBoW2::QueryResults::iterator query_it =
@@ -272,17 +320,14 @@ bool LoopClosureDetector::detectLoop(
 
       // Begin grouping and checking matches.
       if (query_result.empty()) {
-        loop_result.status_ = LCDStatus::LOW_SCORE;
+        lcdStatus.status_ = LCDStatus::LOW_SCORE;
       } else {
-        // Set best candidate to highest scorer.
-        loop_result.match_id_ = query_result[0].Id;
-
         // Compute islands in the matches.
         std::vector<MatchIsland> islands;
         lcd_tp_wrapper_->computeIslands(&query_result, &islands);
 
         if (islands.empty()) {
-          loop_result.status_ = LCDStatus::NO_GROUPS;
+          lcdStatus.status_ = LCDStatus::NO_GROUPS;
         } else {
           // Find the best island grouping using MatchIsland sorting.
           const MatchIsland& best_island =
@@ -293,15 +338,15 @@ bool LoopClosureDetector::detectLoop(
               lcd_tp_wrapper_->checkTemporalConstraint(frame_id, best_island);
 
           if (!pass_temporal_constraint) {
-            loop_result.status_ = LCDStatus::FAILED_TEMPORAL_CONSTRAINT;
+            lcdStatus.status_ = LCDStatus::FAILED_TEMPORAL_CONSTRAINT;
           } else {
             bool pass_geometric_verification = geometricVerificationCheck(
                   *input, frame_id, best_island.best_id_, &loopFrameAndMatches);
 
             if (!pass_geometric_verification) {
-              loop_result.status_ = LCDStatus::FAILED_GEOM_VERIFICATION;
+              lcdStatus.status_ = LCDStatus::FAILED_GEOM_VERIFICATION;
             } else {
-              loop_result.status_ = LCDStatus::LOOP_DETECTED;
+              lcdStatus.status_ = LCDStatus::LOOP_DETECTED;
             }
           }
         }
@@ -316,19 +361,21 @@ bool LoopClosureDetector::detectLoop(
     VLOG(0) << "LoopClosureDetector: Not enough frames processed.";
   }
 
-  if (loop_result.isLoop()) {
-    VLOG(0) << "LoopClosureDetector: LOOP CLOSURE detected from keyframe "
-            << loop_result.match_id_ << " to keyframe "
-            << loop_result.query_id_;
+  if (lcdStatus.isLoop()) {
+    VLOG(0) << "LoopClosureDetector: LOOP CLOSURE detected between loop keyframe "
+            << loopFrameAndMatches->id_ << " with dbow id "
+            << loopFrameAndMatches->dbowId_ << " and query keyframe "
+            << loopFrameAndMatches->queryKeyframeId_ << " with dbow id "
+            << loopFrameAndMatches->queryKeyframeDbowId_;
   } else {
     VLOG(0) << "LoopClosureDetector: No loop closure detected. Reason: "
-            << LoopResult::asString(loop_result.status_);
+            << lcdStatus.asString();
   }
   lcd_tp_wrapper_->setLatestQueryId(dbowId);
-  return loop_result.isLoop();
+  return lcdStatus.isLoop();
 }
 
-/* ------------------------------------------------------------------------ */
+
 bool LoopClosureDetector::geometricVerificationCheck(
     const okvis::LoopQueryKeyframeMessage& queryKeyframe,
     const FrameId query_id, const FrameId match_id,
@@ -338,7 +385,7 @@ bool LoopClosureDetector::geometricVerificationCheck(
   std::vector<DMatchVec> matches;
   // match descriptors associated with earlier landmarks to descriptors of query
   // keyframe.
-  descriptor_matcher_->knnMatch(loopFrame->frontendDescriptors(),
+  descriptor_matcher_->knnMatch(loopFrame->frontendDescriptorsWithLandmarks(),
                                 queryKeyframe.getDescriptors(), matches, 2u);
   double lowe_ratio = lcd_params_->lowe_ratio_;
 
@@ -354,23 +401,22 @@ bool LoopClosureDetector::geometricVerificationCheck(
       keypointIndices.push_back(match[0].trainIdx);
     }
   }
-  // RANSAC 3d 2d WITH OpenGV, alternatively, use opencv solvePnPRansac().
+
+  loopFrameAndMatches->reset();
+  int numInliers = 0;
+  // Absolute pose ransac with OpenGV. An alternate is opencv solvePnPRansac().
   // The camera intrinsics are carried inside nframe.
   // If the estimator estimates the camera parameters, it is possible to
   // update these parameters in nframe before passing it to the loop closure
   // module.
-
-  loopFrameAndMatches->reset();
-  int numInliers = 0;
-
-  // absolute pose adapter for Kneip toolchain
   opengv::absolute_pose::FrameNoncentralAbsoluteAdapter adapter(
       loopFrame->landmarkPositionList(), pointIndices, keypointIndices,
       okvis::LoopQueryKeyframeMessage::kQueryCameraIndex,
       queryKeyframe.NFrame());
 
   size_t numCorrespondences = adapter.getNumberCorrespondences();
-  if (numCorrespondences >= 5) {
+  CHECK_EQ(numCorrespondences, pointIndices.size());
+  if ((int)numCorrespondences >= lcd_params_->min_correspondences_) {
     // create a RelativePoseSac problem and RANSAC
     opengv::sac::Ransac<
         opengv::sac_problems::absolute_pose::FrameAbsolutePoseSacProblem>
@@ -383,16 +429,14 @@ bool LoopClosureDetector::geometricVerificationCheck(
                     adapter, opengv::sac_problems::absolute_pose::
                                  FrameAbsolutePoseSacProblem::Algorithm::GP3P));
     ransac.sac_model_ = absposeproblem_ptr;
-    ransac.threshold_ = 9;
+    ransac.threshold_ = lcd_params_->ransac_threshold_stereo_;
     ransac.max_iterations_ = lcd_params_->max_ransac_iterations_stereo_;
     // initial guess not needed...
     // run the ransac
     bool ransac_success = ransac.computeModel(0);
-
     if (!ransac_success) {
-      VLOG(3) << "LoopClosureDetector Failure: RANSAC 3D/2D could not solve.";
+      VLOG(0) << "LoopClosureDetector Failure: RANSAC 3D/2D could not solve.";
     } else {
-      // assign transformation
       numInliers = ransac.inliers_.size();
       double inlier_percentage =
           static_cast<double>(numInliers) / numCorrespondences;
@@ -411,12 +455,14 @@ bool LoopClosureDetector::geometricVerificationCheck(
 
           // LM optimization of T_BlBq.
           StackedProjectionFactorDynamic stackedProjectionFactor(
-                pointInliers, bearingInliers, *queryKeyframe.NFrame()->T_SC(
+              pointInliers, bearingInliers,
+              *queryKeyframe.NFrame()->T_SC(
                   okvis::LoopQueryKeyframeMessage::kQueryCameraIndex));
           Eigen::Matrix<double, 7, 1> estimated_T_BlBq_coeffs = T_BlBq.coeffs();
 
           GtsamPose3Parameterization localParameterization;
-          msckf::ceres::TinySolver<StackedProjectionFactorDynamic> solver(&localParameterization);
+          msckf::ceres::TinySolver<StackedProjectionFactorDynamic> solver(
+              &localParameterization);
           solver.options.max_num_iterations = 15;
           solver.Solve(stackedProjectionFactor, &estimated_T_BlBq_coeffs);
           okvis::kinematics::Transformation estimated_T_WS;
@@ -424,60 +470,80 @@ bool LoopClosureDetector::geometricVerificationCheck(
           LOG(INFO) << "T_BlBq: opengv:" << T_BlBq.coeffs().transpose()
                     << "\nTiny Solver: " << estimated_T_WS.coeffs().transpose();
           if (solver.summary.status !=
-                           msckf::ceres::TinySolver<
-                               StackedProjectionFactorDynamic>::Status::HIT_MAX_ITERATIONS) {
-          // compute info of T_BlBq.
-          Eigen::Matrix<double, -1, 6> jacColMajor(numInliers * 2, 6);
-          Eigen::Matrix<double, -1, 1> residuals(numInliers * 2, 1);
-          stackedProjectionFactor(T_BlBq.coeffs().data(), residuals.data(), jacColMajor.data());
+              msckf::ceres::TinySolver<
+                  StackedProjectionFactorDynamic>::Status::HIT_MAX_ITERATIONS) {
+            // compute info of T_BlBq.
+            Eigen::Matrix<double, -1, 6> jacColMajor(numInliers * 2, 6);
+            Eigen::Matrix<double, -1, 1> residuals(numInliers * 2, 1);
+            stackedProjectionFactor(T_BlBq.coeffs().data(), residuals.data(),
+                                    jacColMajor.data());
 
-          // info (inverse of covariance) of T_BlBq's perturbation as defined in
-          // gtsam::Pose3.
-          Eigen::Matrix<double, 6, 6> lambda_B = jacColMajor.transpose() * jacColMajor;
+            // info (inverse of covariance) of T_BlBq's perturbation as defined
+            // in gtsam::Pose3.
+            Eigen::Matrix<double, 6, 6> lambda_B =
+                jacColMajor.transpose() * jacColMajor;
 
-          Eigen::Matrix<double, 6, 6> choleskyFactor;
-          sm::eigen::computeMatrixSqrt(lambda_B, choleskyFactor);
-          loopFrameAndMatches->reset(new okvis::LoopFrameAndMatches(
-              db_frames_[match_id]->id_, db_frames_[match_id]->stamp_, match_id,
-              db_frames_[query_id]->id_, db_frames_[query_id]->stamp_, query_id,
-              T_BlBq));
-          gtsam::Values estimates = pgo_->calculateEstimate();
-          bool keyExist = estimates.exists(match_id);
-          if (keyExist) {
-             gtsam::Pose3 pgo_T_WBl = estimates.at<gtsam::Pose3>(match_id);
-             (*loopFrameAndMatches)->pgo_T_WBl_ = GtsamWrap::toTransform(pgo_T_WBl);
-          } else {
-             (*loopFrameAndMatches)->pgo_T_WBl_ = loopFrame->vio_T_WB_;
-             LOG(WARNING) << "Pose of dbow key " << match_id << " not found in PGO estimates!";
-          }
+            Eigen::Matrix<double, 6, 6> choleskyFactor;
+            sm::eigen::computeMatrixSqrt(lambda_B, choleskyFactor);
+            Eigen::Matrix<double, 6, 6> sqrtInfo = choleskyFactor.transpose() *
+                lcd_params_->relative_pose_info_damper_;
+            loopFrameAndMatches->reset(new okvis::LoopFrameAndMatches(
+                db_frames_[match_id]->id_, db_frames_[match_id]->stamp_,
+                match_id, db_frames_[query_id]->id_,
+                db_frames_[query_id]->stamp_, query_id, T_BlBq));
+            gtsam::Values estimates = pgo_->calculateEstimate();
+            bool keyExist = estimates.exists(gtsam::Symbol(match_id));
+            if (keyExist) {
+              gtsam::Pose3 pgo_T_WBl = estimates.at<gtsam::Pose3>(gtsam::Symbol(match_id));
+              (*loopFrameAndMatches)->pgo_T_WBl_ =
+                  GtsamWrap::toTransform(pgo_T_WBl);
+            } else {
+              (*loopFrameAndMatches)->pgo_T_WBl_ = loopFrame->vio_T_WB_;
+              LOG(WARNING) << "Pose of dbow key " << match_id
+                           << " not found in PGO estimates!";
+            }
 
-          (*loopFrameAndMatches)->setPoseCovariance(loopFrame->cov_vio_T_WB_);
-          // The perturbation in T_BlBq equals the perturbation in
-          // gtsam::BetweenFactor's unwhitened error by first order
-          // approximation. so we let them have the same covariance/sqrt info.
-          (*loopFrameAndMatches)
-              ->setRelativePoseSqrtInfo(choleskyFactor.transpose());
+            (*loopFrameAndMatches)->setPoseCovariance(loopFrame->cov_vio_T_WB_);
+            // The perturbation in T_BlBq equals the perturbation in
+            // gtsam::BetweenFactor's unwhitened error by first order
+            // approximation. so we let them have the same covariance/sqrt info.
+            (*loopFrameAndMatches)
+                ->setRelativePoseSqrtInfo(sqrtInfo);
 
-          // Also record loop factor in queryKeyframeInDB constraint list.
-          std::shared_ptr<okvis::KeyframeInDatabase> queryFrameInDB =
-              db_frames_[query_id];
-          std::shared_ptr<const okvis::KeyframeInDatabase> matchFrameInDB =
-              db_frames_[match_id];
-          std::shared_ptr<okvis::NeighborConstraintInDatabase> constraint(
-                new  okvis::NeighborConstraintInDatabase(
-                  matchFrameInDB->id_, matchFrameInDB->stamp_,
-                  T_BlBq, okvis::PoseConstraintType::LoopClosure));
-          constraint->squareRootInfo_ = choleskyFactor.transpose();
-          queryFrameInDB->addLoopConstraint(constraint);
+            createMatchedKeypoints(loopFrameAndMatches->get());
+
+            // Also record loop factor in queryKeyframeInDB constraint list.
+            std::shared_ptr<okvis::KeyframeInDatabase> queryFrameInDB =
+                db_frames_[query_id];
+            std::shared_ptr<const okvis::KeyframeInDatabase> matchFrameInDB =
+                db_frames_[match_id];
+            std::shared_ptr<okvis::NeighborConstraintInDatabase> constraint(
+                new okvis::NeighborConstraintInDatabase(
+                    matchFrameInDB->id_, matchFrameInDB->stamp_, T_BlBq,
+                    okvis::PoseConstraintType::LoopClosure));
+            constraint->squareRootInfo_ = sqrtInfo;
+            queryFrameInDB->addLoopConstraint(constraint);
           }
         }
       }
     }
   }
-
   return loopFrameAndMatches == nullptr;
 }
 
+/**
+ * @brief createMatchedKeypoints which will be used by VIO estimator for relocalisation.
+ * @param[in, out] loopFrameAndMatches the loop frame and its matches message
+ */
+void LoopClosureDetector::createMatchedKeypoints(okvis::LoopFrameAndMatches* /*loopFrameAndMatches*/) const {
+  // get loop frame keypoints
+  // get query frame keypoints
+  // windowed match query frame keypoints to loop frame keypoints
+  // epipolar constraint to check inliers because we know their relative pose.
+  // for loop
+  // get landmark positions for matched loop frame keypoints if applicable.
+  // emplace back to loopFrame
+}
 
 /* ------------------------------------------------------------------------ */
 const gtsam::Values LoopClosureDetector::getPGOTrajectory() const {
@@ -499,59 +565,12 @@ void LoopClosureDetector::print() const {
   // TODO(marcus): implement
 }
 
-/* ------------------------------------------------------------------------ */
-void LoopClosureDetector::computeMatchedIndices(const FrameId& query_id,
-                                                const FrameId& match_id,
-                                                std::vector<int>* i_query,
-                                                std::vector<int>* i_match,
-                                                bool cut_matches) const {
-  CHECK_NOTNULL(i_query);
-  CHECK_NOTNULL(i_match);
-
-  // Get two best matches between frame descriptors.
-  std::vector<DMatchVec> matches;
-  double lowe_ratio = 1.0;
-  if (cut_matches) lowe_ratio = lcd_params_->lowe_ratio_;
-
-  descriptor_matcher_->knnMatch(db_frames_[query_id]->frontendDescriptors(),
-                                 db_frames_[match_id]->frontendDescriptors(),
-                                 matches,
-                                 2u);
-
-  // We reserve instead of resize because some of the matches will be pruned.
-  const size_t& n_matches = matches.size();
-  i_query->reserve(n_matches);
-  i_match->reserve(n_matches);
-  for (size_t i = 0; i < n_matches; i++) {
-    const DMatchVec& match = matches[i];
-    CHECK_EQ(match.size(), 2);
-    if (match[0].distance < lowe_ratio * match[1].distance) {
-      i_query->push_back(match[0].queryIdx);
-      i_match->push_back(match[0].trainIdx);
-    }
-  }
-}
-
-
 void LoopClosureDetector::initializePGO() {
   gtsam::NonlinearFactorGraph init_nfg;
   gtsam::Values init_val;
   init_val.insert(gtsam::Symbol(0), gtsam::Pose3());
 
   CHECK(pgo_);
-  pgo_->update(init_nfg, init_val);
-}
-
-/* ------------------------------------------------------------------------ */
-void LoopClosureDetector::initializePGO(const OdometryFactor& factor) {
-  gtsam::NonlinearFactorGraph init_nfg;
-  gtsam::Values init_val;
-
-  init_val.insert(gtsam::Symbol(0), factor.W_Pose_Blkf_);
-
-  init_nfg.add(gtsam::PriorFactor<gtsam::Pose3>(
-      gtsam::Symbol(0), factor.W_Pose_Blkf_, factor.noise_));
-
   pgo_->update(init_nfg, init_val);
 }
 
@@ -592,6 +611,4 @@ void LoopClosureDetector::addOdometryFactors(
   // no optimization will be performed.
   pgo_->update(nfg, value, KimeraRPGO::FactorType::NONSEQUENTIAL_ODOMETRY);
 }
-
-
 }  // namespace VIO

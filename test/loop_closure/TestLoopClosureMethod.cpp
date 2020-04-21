@@ -224,7 +224,8 @@ class LCDFixture :public ::testing::Test {
       neighborMessage->core_.squareRootInfo_.setIdentity();
       queryKeyframe->odometryConstraintListMutable().push_back(neighborMessage);
     }
-    queryKeyframe->keypointIndexForLandmarkListMutable() = matchedLeftKeypointIndices_[nframe->id()];
+    queryKeyframe->keypointIndexForLandmarkListMutable() =
+        matchedLeftKeypointIndices_[nframe->id()];
     queryKeyframe->landmarkPositionListMutable() = triangulatedLandmarks_[nframe->id()];
     return queryKeyframe;
   }
@@ -232,16 +233,19 @@ class LCDFixture :public ::testing::Test {
   void stereoMatchingAndInitialization(
       std::shared_ptr<okvis::MultiFrame> nframe) {
     // knnMatch + 2d2d RANSAC + stereo triangulation.
+    bool visualize = false;
+    std::string windowName = "stereo matches";
     std::vector<int> leftIndices;
     std::vector<int> rightIndices;
     double lowe_ratio = 1.0;
     if (cut_matches_lowe_) lowe_ratio = lcd_params_->lowe_ratio_;
-    cv::Mat img_matches =
-        nframe->computeIntraMatches(feature_matcher_, &leftIndices, &rightIndices, lowe_ratio, true);
-//    std::string windowName;
-//    cv::namedWindow(windowName);
-//    cv::imshow(windowName, img_matches);
-//    cv::waitKey(pauseMillisec);
+    cv::Mat img_matches = nframe->computeIntraMatches(
+        feature_matcher_, &leftIndices, &rightIndices, lowe_ratio, true);
+    if (visualize) {
+      cv::namedWindow(windowName);
+      cv::imshow(windowName, img_matches);
+      cv::waitKey(pauseMillisec);
+    }
 
     removeIntraMatchOutliers(nframe, 0, 1, &leftIndices, &rightIndices, epipolarThreshold_);
     triangulatedLandmarks_[nframe->id()] =
@@ -254,10 +258,12 @@ class LCDFixture :public ::testing::Test {
     for (size_t k = 0 ; k < leftIndices.size(); ++k) {
         good_matches.emplace_back(leftIndices[k], rightIndices[k], 1.0f);
     }
-//    cv::Mat img_matches_rest = nframe->drawStereoMatches(good_matches);
-//    cv::namedWindow(windowName);
-//    cv::imshow(windowName, img_matches_rest);
-//    cv::waitKey(pauseMillisec);
+    if (visualize) {
+      cv::Mat img_matches_rest = nframe->drawStereoMatches(good_matches);
+      cv::namedWindow(windowName);
+      cv::imshow(windowName, img_matches_rest);
+      cv::waitKey(pauseMillisec);
+    }
   }
 
   void initializeKeyframe(okvis::Time stamp, uint64_t id,
@@ -346,9 +352,7 @@ class LCDFixture :public ::testing::Test {
     initializeKeyframe(timestamp_cur2_, id_cur2_, img_name_cur2_left,
                        img_name_cur2_right, cur2_T_WB, &stereo_frames_[3]);
 
-    // Set intrinsics for essential matrix calculation:
     CHECK(lcd_detector_);
-//    lcd_detector_->setIntrinsics(stereo_frames_[0]->geometry(0u));
   }
 
   // Standard gtest methods, unnecessary for now
@@ -430,7 +434,6 @@ TEST_F(LCDFixture, detectLoop) {
       PoseRecoveryOption::GIVEN_ROT;
 
   /* Test the detectLoop method against two images without closure */
-  LoopResult loop_result_0, loop_result_1, loop_result_2;
 
   std::shared_ptr<okvis::LoopFrameAndMatches> output_0;
   std::shared_ptr<okvis::KeyframeInDatabase> queryKeyframeInDatabase;
@@ -515,7 +518,8 @@ TEST_F(LCDFixture, spinOnce) {
 
   lcd_detector_->detectLoop(kf_ref1, queryKeyframeInDatabase, output_0);
   LOG(INFO) << "Add constraints";
-  lcd_detector_->addConstraintsAndOptimize(*queryKeyframeInDatabase, output_0);
+  okvis::PgoResult pgoResult;
+  lcd_detector_->addConstraintsAndOptimize(*queryKeyframeInDatabase, output_0, pgoResult);
   LOG(INFO) << "finish adding constraint and optimize";
   CHECK(stereo_frames_[2]);
   std::shared_ptr<okvis::LoopQueryKeyframeMessage> kf_ref2 =
@@ -525,7 +529,7 @@ TEST_F(LCDFixture, spinOnce) {
   LOG(INFO) << "Detect loop 1";
   lcd_detector_->detectLoop(kf_ref2, queryKeyframeInDatabase, output_1);
   LOG(INFO) << "Add constraints 1";
-  lcd_detector_->addConstraintsAndOptimize(*queryKeyframeInDatabase, output_1);
+  lcd_detector_->addConstraintsAndOptimize(*queryKeyframeInDatabase, output_1, pgoResult);
 
   LOG(INFO) << "Create loop query message 2";
   std::shared_ptr<okvis::LoopQueryKeyframeMessage> kf_cur1 =
@@ -535,7 +539,7 @@ TEST_F(LCDFixture, spinOnce) {
   LOG(INFO) << "Detect loop 2";
   lcd_detector_->detectLoop(kf_cur1, queryKeyframeInDatabase, output_2);
   LOG(INFO) << "Add constraints 2";
-  lcd_detector_->addConstraintsAndOptimize(*queryKeyframeInDatabase, output_2);
+  lcd_detector_->addConstraintsAndOptimize(*queryKeyframeInDatabase, output_2, pgoResult);
 
 //  EXPECT_EQ(output_0->is_loop_closure_, false);
 //  EXPECT_EQ(output_0->timestamp_kf_, 0);
