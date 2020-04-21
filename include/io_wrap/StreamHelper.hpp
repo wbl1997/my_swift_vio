@@ -2,6 +2,7 @@
 #define INCLUDE_IO_WRAP_STREAM_HELPER_HPP_
 #include <string>
 #include <sstream>
+#include <vector>
 
 namespace okvis {
 enum DUMP_RESULT_OPTION {
@@ -27,5 +28,11 @@ class StreamHelper {
       std::string *header_line,
       bool include_frameid=true);
 };
+
+std::vector<std::string> parseCommaSeparatedTopics(
+    const std::string& topic_list);
+
+std::string removeTrailingSlash(const std::string& path);
+
 }  // namespace okvis
 #endif  // INCLUDE_IO_WRAP_STREAM_HELPER_HPP_

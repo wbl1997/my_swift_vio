@@ -94,11 +94,6 @@ class Player {
   Player& operator=(const Player&) = delete;
 };
 
-std::vector<std::string> parseCommaSeparatedTopics(
-    const std::string& topic_list);
-
-std::string removeTrailingSlash(const std::string& path);
-
 }  // namespace okvis
 
 #endif /* INCLUDE_MSCKF_PLAYER_HPP_ */
