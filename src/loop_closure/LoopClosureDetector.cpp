@@ -576,7 +576,7 @@ bool LoopClosureDetector::geometricVerificationCheck(
         }
     }
   }
-  return (*loopFrameAndMatches) == nullptr;
+  return ((*loopFrameAndMatches) != nullptr);
 }
 
 void LoopClosureDetector::createMatchedKeypoints(
