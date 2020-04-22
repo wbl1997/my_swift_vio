@@ -175,6 +175,14 @@ class LoopClosureDetector : public okvis::LoopClosureMethod {
 
   virtual void saveFinalPgoResults() final;
 
+  Eigen::Matrix<double, 6, 1> uniform_noise_sigmas() const {
+    return uniform_noise_sigmas_;
+  }
+
+  bool isUniformWeight() const {
+    return internal_pgo_uniform_weight_;
+  }
+
  private:
   // Parameter members
   std::shared_ptr<LoopClosureDetectorParams> lcd_params_;

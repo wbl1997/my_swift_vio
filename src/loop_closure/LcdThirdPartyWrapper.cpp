@@ -187,8 +187,6 @@ void LcdThirdPartyWrapper::computeIslands(
 double LcdThirdPartyWrapper::computeIslandScore(const DBoW2::QueryResults& q,
                                                 const FrameId& start_id,
                                                 const FrameId& end_id) const {
-  CHECK_GT(q.size(), start_id);
-  CHECK_GT(q.size(), end_id);
   double score_sum = 0.0;
   for (FrameId id = start_id; id <= end_id; id++) {
     score_sum += q.at(id).Score;
