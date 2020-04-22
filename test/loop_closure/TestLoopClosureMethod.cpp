@@ -115,6 +115,7 @@ class LCDFixture :public ::testing::Test {
 
  protected:
   void initializeFrontend() {
+    frontendParams_.detectionThreshold = 30;
     frontend_->setBriskDetectionOctaves(frontendParams_.detectionOctaves);
     frontend_->setBriskDetectionThreshold(frontendParams_.detectionThreshold);
     frontend_->setBriskDetectionMaximumKeypoints(

@@ -15,7 +15,7 @@ max_distance_between_queries: 2
 lowe_ratio: 0.7
 matcher_type: 4
 min_correspondences: 12
-max_ransac_iterations_stereo: 50
+max_ransac_iterations_stereo: 100
 ransac_threshold_stereo: 9
 ransac_inlier_threshold_stereo: 0.3
 relative_pose_opt_iterations: 15
