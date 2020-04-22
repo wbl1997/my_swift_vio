@@ -76,6 +76,14 @@ class LoopClosureDetector : public okvis::LoopClosureMethod {
       size_t dbowId,
       const okvis::LoopQueryKeyframeMessage& queryKeyframe) const final;
 
+  /**
+   * @brief addConstraintsAndOptimize PGO is only performed when loop occurs.
+   * No PGO is done for sequential or nonsequential odometry factors.
+   * @param queryKeyframeInDB
+   * @param loopFrameAndMatches If not empty, the pose for the loop frame after PGO will be assigned.
+   * @param pgoResult The pose estimate for the query keyframe based on PGO states.
+   * @return true which is not used yet.
+   */
   virtual bool addConstraintsAndOptimize(
       const okvis::KeyframeInDatabase& queryKeyframeInDB,
       std::shared_ptr<const okvis::LoopFrameAndMatches> loopFrameAndMatches,
@@ -117,7 +125,7 @@ class LoopClosureDetector : public okvis::LoopClosureMethod {
       std::shared_ptr<okvis::LoopFrameAndMatches>* loopFrameAndMatches);
 
   /**
-   * @brief createMatchedKeypoints which will be used by VIO estimator for relocalisation.
+   * @brief create matched keypoints which will be used by VIO estimator for relocalisation.
    * @param[in, out] loopFrameAndMatches the loop frame and its matches message
    */
   void createMatchedKeypoints(okvis::LoopFrameAndMatches* loopFrameAndMatches) const;
@@ -188,6 +196,16 @@ class LoopClosureDetector : public okvis::LoopClosureMethod {
   std::shared_ptr<LoopKeyframeMetadata>
       latestLoopKeyframe_;  ///< The latest keyframe has been optimized by PGO,
                             ///< is used for correcting online pose estimates.
+
+  bool internal_pgo_uniform_weight_;  ///< this value is determined based on
+                                      ///< user input param pgo_uniform_weight
+                                      ///< and whether the VIO estimator
+                                      ///< provides pose covariance.
+  Eigen::Matrix<double, 6, 1>
+      uniform_noise_sigmas_;  ///< sigmas of errors in poses \f$\omega, v\f$. if
+                              ///< internal_pgo_uniform_weight is true, this
+                              ///< uniform_noise_model will be used for the
+                              ///< prior factor, odometry and loop factors.
 
  private:
   using DMatchVec = std::vector<cv::DMatch>;

@@ -66,6 +66,9 @@ LoopClosureDetector::LoopClosureDetector(
       lcd_tp_wrapper_(nullptr),
       latest_bowvec_(),
       pgo_(nullptr) {
+
+  // TODO(jhuai): make these parameters accurate by learning from the covariance weighted counterpart.
+  uniform_noise_sigmas_ << 0.01, 0.01, 0.01, 0.1, 0.1, 0.1;
   // Initialize the ORB feature detector object:
   orb_feature_detector_ = cv::ORB::create(lcd_params_->nfeatures_,
                                           lcd_params_->scale_factor_,
@@ -149,16 +152,20 @@ bool LoopClosureDetector::addConstraintsAndOptimize(
     okvis::PgoResult& pgoResult) {
   // Initialize PGO with first frame if needed.
   if (queryKeyframeInDB.constraintList().size() == 0u) {
-    const Eigen::Matrix<double, 6, 6>& cov_z = queryKeyframeInDB.cov_vio_T_WB_;
-    Eigen::Matrix<double, 6, 6, Eigen::RowMajor> de_dz;
-    PriorFactorPose3Wrap pfw(GtsamWrap::toPose3(queryKeyframeInDB.vio_T_WB_));
-    Eigen::Matrix<double, 6, 1> residual;
-    pfw.toMeasurementJacobian(&de_dz, &residual);
-    Eigen::Matrix<double, 6, 6> cov_e = de_dz * cov_z * de_dz.transpose();
-    bool tryToSimplify = true;
-    gtsam::SharedNoiseModel shared_noise_model =
-        gtsam::noiseModel::Gaussian::Covariance(cov_e, tryToSimplify);
-
+    gtsam::SharedNoiseModel shared_noise_model;
+    if (internal_pgo_uniform_weight_) {
+      shared_noise_model = gtsam::noiseModel::Diagonal::Sigmas(uniform_noise_sigmas_);
+    } else {
+      const Eigen::Matrix<double, 6, 6>& cov_z = queryKeyframeInDB.cov_vio_T_WB_;
+      Eigen::Matrix<double, 6, 6, Eigen::RowMajor> de_dz;
+      PriorFactorPose3Wrap pfw(GtsamWrap::toPose3(queryKeyframeInDB.vio_T_WB_));
+      Eigen::Matrix<double, 6, 1> residual;
+      pfw.toMeasurementJacobian(&de_dz, &residual);
+      Eigen::Matrix<double, 6, 6> cov_e = de_dz * cov_z * de_dz.transpose();
+      bool tryToSimplify = true;
+      gtsam::SharedNoiseModel shared_noise_model =
+          gtsam::noiseModel::Gaussian::Covariance(cov_e, tryToSimplify);
+    }
     gtsam::NonlinearFactorGraph init_nfg;
     gtsam::Values init_val;
     init_val.insert(gtsam::Symbol(queryKeyframeInDB.dbowId_),
@@ -168,6 +175,7 @@ bool LoopClosureDetector::addConstraintsAndOptimize(
         GtsamWrap::toPose3(queryKeyframeInDB.vio_T_WB_), shared_noise_model));
     pgo_->update(init_nfg, init_val);
 
+    // save pose estimates by online pgo.
     pgoResult.stamp_ = queryKeyframeInDB.stamp_;
     pgoResult.T_WB_ =
         GtsamWrap::toTransform(getPgoPoseEstimate(queryKeyframeInDB.dbowId_));
@@ -180,10 +188,6 @@ bool LoopClosureDetector::addConstraintsAndOptimize(
   addOdometryFactors(queryKeyframeInDB);
 
   if (loopFrameAndMatches) {
-    VLOG(1) << "LoopClosureDetector: Loop closure detected from keyframe "
-            << loopFrameAndMatches->id_ << " to keyframe "
-            << loopFrameAndMatches->queryKeyframeId_;
-
     gtsam::SharedNoiseModel noiseModel =
         createRobustNoiseModelSqrtR(loopFrameAndMatches->relativePoseSqrtInfo());
     gtsam::NonlinearFactorGraph nfg;
@@ -191,9 +195,8 @@ bool LoopClosureDetector::addConstraintsAndOptimize(
                                                gtsam::Symbol(loopFrameAndMatches->queryKeyframeDbowId_),
                                                GtsamWrap::toPose3(loopFrameAndMatches->T_BlBq_),
                                                noiseModel));
-
     pgo_->update(nfg);
-
+    // save pose estimates by online pgo.
     pgoResult.stamp_ = queryKeyframeInDB.stamp_;
     pgoResult.T_WB_ =
         GtsamWrap::toTransform(getPgoPoseEstimate(queryKeyframeInDB.dbowId_));
@@ -201,13 +204,86 @@ bool LoopClosureDetector::addConstraintsAndOptimize(
     latestLoopKeyframe_.reset(new LoopKeyframeMetadata(
         queryKeyframeInDB.dbowId_, queryKeyframeInDB.vio_T_WB_));
   } else {
+    // save pose estimates by splintting online pgo and vio results.
     gtsam::Pose3 pgo_T_WBl = getPgoPoseEstimate(latestLoopKeyframe_->dbowId_);
     okvis::kinematics::Transformation vio_T_BlBq =
         latestLoopKeyframe_->vio_T_WB_.inverse() * queryKeyframeInDB.vio_T_WB_;
     pgoResult.stamp_ = queryKeyframeInDB.stamp_;
     pgoResult.T_WB_ = GtsamWrap::toTransform(pgo_T_WBl) * vio_T_BlBq;
   }
-  return false;
+  return true;
+}
+
+/* ------------------------------------------------------------------------ */
+// TODO(marcus): only add nodes if they're x dist away from previous node
+void LoopClosureDetector::addOdometryFactors(
+    const okvis::KeyframeInDatabase& keyframeInDB) {
+  auto constraintList = keyframeInDB.constraintList();
+  auto firstNeighbor = constraintList.at(0);
+  size_t dbowIdLastKf = vioIdToDbowId_.find(firstNeighbor->id_)->second;
+  CHECK_EQ(dbowIdLastKf + 1, keyframeInDB.dbowId_);
+
+  gtsam::NonlinearFactorGraph nfgSequentialOdometry;
+  gtsam::Values valueSequentialOdometry;
+  // We do not use pgo estimates to correct vio estimates for initializing
+  // a pose because its constraint will pull it to the correct pose during PGO.
+  // TODO(jhuai): do we need to correct the initial pose with latest PGO estimates?
+  valueSequentialOdometry.insert(gtsam::Symbol(keyframeInDB.dbowId_),
+                                 GtsamWrap::toPose3(keyframeInDB.vio_T_WB_));
+
+  gtsam::SharedNoiseModel noiseModel = createRobustNoiseModelSqrtR(firstNeighbor->squareRootInfo_);
+  nfgSequentialOdometry.add(gtsam::BetweenFactor<gtsam::Pose3>(gtsam::Symbol(dbowIdLastKf),
+                                             gtsam::Symbol(keyframeInDB.dbowId_),
+                                             GtsamWrap::toPose3(firstNeighbor->T_BBr_),
+                                             noiseModel));
+  // no optimization will be performed.
+  pgo_->update(nfgSequentialOdometry, valueSequentialOdometry);
+
+  // non-sequential odometry constraints.
+  gtsam::NonlinearFactorGraph nfg;
+  gtsam::Values value;
+  for (auto iter = ++constraintList.begin(); iter != constraintList.end(); ++iter) {
+    size_t dbowIdOldKf = vioIdToDbowId_.find((*iter)->id_)->second;
+    gtsam::SharedNoiseModel noiseModel = createRobustNoiseModelSqrtR((*iter)->squareRootInfo_);
+    nfg.add(gtsam::BetweenFactor<gtsam::Pose3>(
+        gtsam::Symbol(dbowIdOldKf), gtsam::Symbol(keyframeInDB.dbowId_),
+        GtsamWrap::toPose3((*iter)->T_BBr_), noiseModel));
+  }
+  // no optimization will be performed.
+  pgo_->update(nfg, value, KimeraRPGO::FactorType::NONSEQUENTIAL_ODOMETRY);
+}
+
+
+std::shared_ptr<okvis::KeyframeInDatabase>
+LoopClosureDetector::initializeKeyframeInDatabase(
+    size_t dbowId,
+    const okvis::LoopQueryKeyframeMessage& queryKeyframe) const {
+  std::shared_ptr<okvis::KeyframeInDatabase> queryKeyframeInDB =
+      LoopClosureMethod::initializeKeyframeInDatabase(dbowId, queryKeyframe);
+  if (internal_pgo_uniform_weight_) {
+    size_t j = 0u;
+    for (auto constraint : queryKeyframe.odometryConstraintList()) {
+      queryKeyframeInDB->setSquareRootInfo(j,
+                                           uniform_noise_sigmas_.asDiagonal());
+      ++j;
+    }
+  } else {
+    size_t j = 0u;
+    for (auto constraint : queryKeyframe.odometryConstraintList()) {
+      Eigen::Matrix<double, 6, 6> cov_T_BnBr;
+      constraint->computeRelativePoseCovariance(
+          queryKeyframe.T_WB_, queryKeyframe.getCovariance(), &cov_T_BnBr);
+      VIO::BetweenFactorPose3Wrap bfWrap(GtsamWrap::toPose3(constraint->core_.T_BBr_));
+      Eigen::Matrix<double, 6, 6, Eigen::RowMajor> de_dz;
+      Eigen::Matrix<double, 6, 1> autoResidual;
+      bfWrap.toMeasurmentJacobian(&de_dz, &autoResidual);
+
+      queryKeyframeInDB->setSquareRootInfoFromCovariance(
+            j, de_dz * cov_T_BnBr * de_dz.transpose());
+      ++j;
+    }
+  }
+  return queryKeyframeInDB;
 }
 
 void LoopClosureDetector::detectAndDescribe(
@@ -229,43 +305,12 @@ void LoopClosureDetector::detectAndDescribe(
   }
 }
 
-std::shared_ptr<okvis::KeyframeInDatabase>
-LoopClosureDetector::initializeKeyframeInDatabase(
-    size_t dbowId,
-    const okvis::LoopQueryKeyframeMessage& queryKeyframe) const {
-  std::shared_ptr<okvis::KeyframeInDatabase> queryKeyframeInDB =
-      LoopClosureMethod::initializeKeyframeInDatabase(dbowId, queryKeyframe);
-  if (lcd_params_->pgo_uniform_weight_ ||
-      std::fabs(queryKeyframe.cov_T_WB_(0, 0)) < 1e-8) {
-    // This second condition applies to estimators that cannot provide
-    // covariance for poses.
-    return queryKeyframeInDB;
-  } else {
-    size_t j = 0u;
-    for (auto constraint : queryKeyframe.odometryConstraintList()) {
-      Eigen::Matrix<double, 6, 6> cov_T_BnBq;
-      constraint->computeRelativePoseCovariance(
-          queryKeyframe.T_WB_, queryKeyframe.cov_T_WB_, &cov_T_BnBq);
-
-      VIO::BetweenFactorPose3Wrap bfWrap(GtsamWrap::toPose3(constraint->core_.T_BBr_));
-      Eigen::Matrix<double, 6, 6, Eigen::RowMajor> de_dz;
-      Eigen::Matrix<double, 6, 1> autoResidual;
-      bfWrap.toMeasurmentJacobian(&de_dz, &autoResidual);
-
-      queryKeyframeInDB->setSquareRootInfoFromCovariance(
-            j, de_dz * cov_T_BnBq * de_dz.transpose());
-      ++j;
-    }
-    return queryKeyframeInDB;
-  }
-}
-
 bool LoopClosureDetector::detectLoop(
     std::shared_ptr<const okvis::LoopQueryKeyframeMessage> input,
     std::shared_ptr<okvis::KeyframeInDatabase>& queryKeyframeInDB,
     std::shared_ptr<okvis::LoopFrameAndMatches>& loopFrameAndMatches) {
-
   size_t dbowId = db_frames_.size();
+  internal_pgo_uniform_weight_ = lcd_params_->pgo_uniform_weight_ || !input->hasValidCovariance();
   queryKeyframeInDB = initializeKeyframeInDatabase(dbowId, *input);
   db_frames_.push_back(queryKeyframeInDB);
   vioIdToDbowId_.emplace(queryKeyframeInDB->id_, dbowId);
@@ -276,11 +321,12 @@ bool LoopClosureDetector::detectLoop(
 
   // Create BOW representation of descriptors.
   DBoW2::BowVector bow_vec;
-  DCHECK(db_BoW_);
   db_BoW_->getVocabulary()->transform(descriptors_vec, bow_vec);
 
   int max_possible_match_id = frame_id - lcd_params_->dist_local_;
-  if (max_possible_match_id < 0) max_possible_match_id = 0;
+  if (max_possible_match_id < 0) {
+    max_possible_match_id = 0;
+  }
 
   // Query for BoW vector matches in database.
   DBoW2::QueryResults query_result;
@@ -293,7 +339,6 @@ bool LoopClosureDetector::detectLoop(
   db_BoW_->add(bow_vec);
 
   LCDStatus lcdStatus;
-
   if (query_result.empty()) {
     lcdStatus.status_ = LCDStatus::NO_MATCHES;
   } else {
@@ -301,7 +346,10 @@ bool LoopClosureDetector::detectLoop(
     if (lcd_params_->use_nss_) {
       nss_factor = db_BoW_->getVocabulary()->score(bow_vec, latest_bowvec_);
       if (latest_bowvec_.size() == 0) {
-        CHECK_EQ(nss_factor, 0) << "When ref bowvec is empty, the score is expected to be 0!";
+        LOG(INFO) << "When ref bowvec is empty, the score is expected to be 0 ? " << nss_factor;
+        CHECK_EQ(nss_factor, 0);
+      } else {
+        LOG(INFO) << "Normal nss score is expected to be close to 1 ? " << nss_factor;
       }
     }
 
@@ -357,8 +405,6 @@ bool LoopClosureDetector::detectLoop(
   // Update latest bowvec for normalized similarity scoring (NSS).
   if (static_cast<int>(frame_id + 1) > lcd_params_->dist_local_) {
     latest_bowvec_ = bow_vec;
-  } else {
-    VLOG(0) << "LoopClosureDetector: Not enough frames processed.";
   }
 
   if (lcdStatus.isLoop()) {
@@ -382,20 +428,18 @@ bool LoopClosureDetector::geometricVerificationCheck(
     std::shared_ptr<okvis::LoopFrameAndMatches>* loopFrameAndMatches) {
   std::shared_ptr<const okvis::KeyframeInDatabase> loopFrame =
       db_frames_[match_id];
+
+  // match descriptors associated with landmarks in loop keyframe to descriptors in query keyframe.
   std::vector<DMatchVec> matches;
-  // match descriptors associated with earlier landmarks to descriptors of query
-  // keyframe.
   descriptor_matcher_->knnMatch(loopFrame->frontendDescriptorsWithLandmarks(),
                                 queryKeyframe.getDescriptors(), matches, 2u);
   double lowe_ratio = lcd_params_->lowe_ratio_;
-
   const size_t n_matches = matches.size();
   std::vector<size_t> pointIndices;
   std::vector<size_t> keypointIndices;
   pointIndices.reserve(n_matches);
   keypointIndices.reserve(n_matches);
-  for (size_t i = 0; i < n_matches; i++) {
-    const DMatchVec& match = matches[i];
+  for (const DMatchVec& match : matches) {
     if (match[0].distance < lowe_ratio * match[1].distance) {
       pointIndices.push_back(match[0].queryIdx);
       keypointIndices.push_back(match[0].trainIdx);
@@ -406,9 +450,8 @@ bool LoopClosureDetector::geometricVerificationCheck(
   int numInliers = 0;
   // Absolute pose ransac with OpenGV. An alternate is opencv solvePnPRansac().
   // The camera intrinsics are carried inside nframe.
-  // If the estimator estimates the camera parameters, it is possible to
-  // update these parameters in nframe before passing it to the loop closure
-  // module.
+  // If the estimator estimates camera parameters, it is possible to update
+  // these parameters in nframe before passing it to the loop closure module.
   opengv::absolute_pose::FrameNoncentralAbsoluteAdapter adapter(
       loopFrame->landmarkPositionList(), pointIndices, keypointIndices,
       okvis::LoopQueryKeyframeMessage::kQueryCameraIndex,
@@ -416,7 +459,7 @@ bool LoopClosureDetector::geometricVerificationCheck(
 
   size_t numCorrespondences = adapter.getNumberCorrespondences();
   CHECK_EQ(numCorrespondences, pointIndices.size());
-  if ((int)numCorrespondences >= lcd_params_->min_correspondences_) {
+  if (static_cast<int>(numCorrespondences) >= lcd_params_->min_correspondences_) {
     // create a RelativePoseSac problem and RANSAC
     opengv::sac::Ransac<
         opengv::sac_problems::absolute_pose::FrameAbsolutePoseSacProblem>
@@ -438,11 +481,11 @@ bool LoopClosureDetector::geometricVerificationCheck(
       VLOG(0) << "LoopClosureDetector Failure: RANSAC 3D/2D could not solve.";
     } else {
       numInliers = ransac.inliers_.size();
-      double inlier_percentage =
-          static_cast<double>(numInliers) / numCorrespondences;
-
-      if (inlier_percentage >= lcd_params_->ransac_inlier_threshold_stereo_) {
-        if (ransac.iterations_ < lcd_params_->max_ransac_iterations_stereo_) {
+      double inlier_percentage = static_cast<double>(numInliers) /
+                                 static_cast<double>(numCorrespondences);
+      LOG(INFO) << "P3P inliers " << numInliers << " out of " << numCorrespondences;
+      if (inlier_percentage >= lcd_params_->ransac_inlier_threshold_stereo_ &&
+        ransac.iterations_ < lcd_params_->max_ransac_iterations_stereo_) {
           Eigen::Matrix4d T_BlBq_mat = Eigen::Matrix4d::Identity();
           T_BlBq_mat.topLeftCorner<3, 4>() = ransac.model_coefficients_;
           okvis::kinematics::Transformation T_BlBq(T_BlBq_mat);
@@ -458,39 +501,43 @@ bool LoopClosureDetector::geometricVerificationCheck(
               pointInliers, bearingInliers,
               *queryKeyframe.NFrame()->T_SC(
                   okvis::LoopQueryKeyframeMessage::kQueryCameraIndex));
-          Eigen::Matrix<double, 7, 1> estimated_T_BlBq_coeffs = T_BlBq.coeffs();
+          Eigen::Matrix<double, 7, 1> optimized_T_BlBq_coeffs = T_BlBq.coeffs();
 
           GtsamPose3Parameterization localParameterization;
           msckf::ceres::TinySolver<StackedProjectionFactorDynamic> solver(
               &localParameterization);
-          solver.options.max_num_iterations = 15;
-          solver.Solve(stackedProjectionFactor, &estimated_T_BlBq_coeffs);
-          okvis::kinematics::Transformation estimated_T_WS;
-          estimated_T_WS.setCoeffs(estimated_T_BlBq_coeffs);
+          solver.options.max_num_iterations =
+              lcd_params_->relative_pose_opt_iterations_;
+          solver.Solve(stackedProjectionFactor, &optimized_T_BlBq_coeffs);
+          okvis::kinematics::Transformation optimized_T_BlBq;
+          optimized_T_BlBq.setCoeffs(optimized_T_BlBq_coeffs);
           LOG(INFO) << "T_BlBq: opengv:" << T_BlBq.coeffs().transpose()
-                    << "\nTiny Solver: " << estimated_T_WS.coeffs().transpose();
+                    << "\nTiny Solver: " << optimized_T_BlBq.coeffs().transpose();
           if (solver.summary.status !=
               msckf::ceres::TinySolver<
                   StackedProjectionFactorDynamic>::Status::HIT_MAX_ITERATIONS) {
-            // compute info of T_BlBq.
+            // compute info of T_BlBq whose perturbation is defined in gtsam::Pose3.
             Eigen::Matrix<double, -1, 6> jacColMajor(numInliers * 2, 6);
             Eigen::Matrix<double, -1, 1> residuals(numInliers * 2, 1);
-            stackedProjectionFactor(T_BlBq.coeffs().data(), residuals.data(),
+            stackedProjectionFactor(optimized_T_BlBq_coeffs.data(), residuals.data(),
                                     jacColMajor.data());
 
-            // info (inverse of covariance) of T_BlBq's perturbation as defined
-            // in gtsam::Pose3.
             Eigen::Matrix<double, 6, 6> lambda_B =
                 jacColMajor.transpose() * jacColMajor;
-
             Eigen::Matrix<double, 6, 6> choleskyFactor;
             sm::eigen::computeMatrixSqrt(lambda_B, choleskyFactor);
             Eigen::Matrix<double, 6, 6> sqrtInfo = choleskyFactor.transpose() *
                 lcd_params_->relative_pose_info_damper_;
+            LOG(INFO) << "relative pose sqrt info\n" << sqrtInfo;
+            if (internal_pgo_uniform_weight_) {
+              sqrtInfo = uniform_noise_sigmas_.asDiagonal();
+            }
             loopFrameAndMatches->reset(new okvis::LoopFrameAndMatches(
                 db_frames_[match_id]->id_, db_frames_[match_id]->stamp_,
                 match_id, db_frames_[query_id]->id_,
-                db_frames_[query_id]->stamp_, query_id, T_BlBq));
+                db_frames_[query_id]->stamp_, query_id, optimized_T_BlBq));
+
+
             gtsam::Values estimates = pgo_->calculateEstimate();
             bool keyExist = estimates.exists(gtsam::Symbol(match_id));
             if (keyExist) {
@@ -515,34 +562,28 @@ bool LoopClosureDetector::geometricVerificationCheck(
             // Also record loop factor in queryKeyframeInDB constraint list.
             std::shared_ptr<okvis::KeyframeInDatabase> queryFrameInDB =
                 db_frames_[query_id];
-            std::shared_ptr<const okvis::KeyframeInDatabase> matchFrameInDB =
-                db_frames_[match_id];
             std::shared_ptr<okvis::NeighborConstraintInDatabase> constraint(
                 new okvis::NeighborConstraintInDatabase(
-                    matchFrameInDB->id_, matchFrameInDB->stamp_, T_BlBq,
+                    loopFrame->id_, loopFrame->stamp_, optimized_T_BlBq,
                     okvis::PoseConstraintType::LoopClosure));
             constraint->squareRootInfo_ = sqrtInfo;
             queryFrameInDB->addLoopConstraint(constraint);
           }
         }
-      }
     }
   }
   return loopFrameAndMatches == nullptr;
 }
 
-/**
- * @brief createMatchedKeypoints which will be used by VIO estimator for relocalisation.
- * @param[in, out] loopFrameAndMatches the loop frame and its matches message
- */
-void LoopClosureDetector::createMatchedKeypoints(okvis::LoopFrameAndMatches* /*loopFrameAndMatches*/) const {
+void LoopClosureDetector::createMatchedKeypoints(
+    okvis::LoopFrameAndMatches* /*loopFrameAndMatches*/) const {
   // get loop frame keypoints
   // get query frame keypoints
   // windowed match query frame keypoints to loop frame keypoints
   // epipolar constraint to check inliers because we know their relative pose.
   // for loop
   // get landmark positions for matched loop frame keypoints if applicable.
-  // emplace back to loopFrame
+  // emplace back to loopFrame message
 }
 
 /* ------------------------------------------------------------------------ */
@@ -574,41 +615,4 @@ void LoopClosureDetector::initializePGO() {
   pgo_->update(init_nfg, init_val);
 }
 
-/* ------------------------------------------------------------------------ */
-// TODO(marcus): only add nodes if they're x dist away from previous node
-void LoopClosureDetector::addOdometryFactors(
-    const okvis::KeyframeInDatabase& keyframeInDB) {
-  auto constraintList = keyframeInDB.constraintList();
-  auto firstNeighbor = constraintList.at(0);
-  size_t dbowIdLastKf = vioIdToDbowId_.find(firstNeighbor->id_)->second;
-  CHECK_EQ(dbowIdLastKf + 1, keyframeInDB.dbowId_);
-
-  gtsam::NonlinearFactorGraph nfgSequentialOdometry;
-  gtsam::Values valueSequentialOdometry;
-  // We do not use pgo estimates to correct vio estimates for initializing
-  // a pose because its constraint will pull it to the correct pose during PGO.
-  valueSequentialOdometry.insert(gtsam::Symbol(keyframeInDB.dbowId_),
-                                 GtsamWrap::toPose3(keyframeInDB.vio_T_WB_));
-
-  gtsam::SharedNoiseModel noiseModel = createRobustNoiseModelSqrtR(firstNeighbor->squareRootInfo_);
-  nfgSequentialOdometry.add(gtsam::BetweenFactor<gtsam::Pose3>(gtsam::Symbol(dbowIdLastKf),
-                                             gtsam::Symbol(keyframeInDB.dbowId_),
-                                             GtsamWrap::toPose3(firstNeighbor->T_BBr_),
-                                             noiseModel));
-  // no optimization will be performed.
-  pgo_->update(nfgSequentialOdometry, valueSequentialOdometry);
-
-  // non-sequential odometry constraints.
-  gtsam::NonlinearFactorGraph nfg;
-  gtsam::Values value;
-  for (auto iter = ++constraintList.begin(); iter != constraintList.end(); ++iter) {
-    size_t dbowIdOldKf = vioIdToDbowId_.find((*iter)->id_)->second;
-    gtsam::SharedNoiseModel noiseModel = createRobustNoiseModelSqrtR((*iter)->squareRootInfo_);
-    nfg.add(gtsam::BetweenFactor<gtsam::Pose3>(
-        gtsam::Symbol(dbowIdOldKf), gtsam::Symbol(keyframeInDB.dbowId_),
-        GtsamWrap::toPose3((*iter)->T_BBr_), noiseModel));
-  }
-  // no optimization will be performed.
-  pgo_->update(nfg, value, KimeraRPGO::FactorType::NONSEQUENTIAL_ODOMETRY);
-}
 }  // namespace VIO

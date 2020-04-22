@@ -3123,7 +3123,7 @@ bool HybridFilter::getOdometryConstraintsForKeyframe(
   int clonedStatesStart = startIndexOfClonedStates();
   int cov_T_WBr_start =
       clonedStatesStart + kClonedStateMinimalDimen * kfCovIndexIter->second;
-  queryKeyframe->cov_T_WB_ = covariance_.block<6, 6>(cov_T_WBr_start, cov_T_WBr_start);
+  queryKeyframe->setCovariance(covariance_.block<6, 6>(cov_T_WBr_start, cov_T_WBr_start));
   auto riter = statesMap_.rbegin();
   for (++riter;  // skip the last frame which in this case should be a keyframe.
        riter != statesMap_.rend() && j < maxOdometryConstraintForAKeyframe_;

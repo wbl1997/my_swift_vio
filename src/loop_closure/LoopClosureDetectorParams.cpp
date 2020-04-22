@@ -17,10 +17,6 @@
 namespace VIO {
 
 LoopClosureDetectorParams::LoopClosureDetectorParams(
-    int image_width,
-    int image_height,
-    double focal_length,
-    cv::Point2d principle_point,
 
     bool use_nss,
     float alpha,
@@ -33,16 +29,12 @@ LoopClosureDetectorParams::LoopClosureDetectorParams(
     int max_distance_between_groups,
     int max_distance_between_queries,
 
-    GeomVerifOption geom_check,
     int min_correspondences,
 
-    PoseRecoveryOption pose_recovery_option,
     int max_ransac_iterations_stereo,
-    double ransac_probability_stereo,
     double ransac_threshold_stereo,
-    bool ransac_randomize_stereo,
+    int relative_pose_opt_iterations,
     double ransac_inlier_threshold_stereo,
-    bool use_mono_rot,
     double relative_pose_info_damper,
 
     double lowe_ratio,
@@ -62,10 +54,6 @@ LoopClosureDetectorParams::LoopClosureDetectorParams(
     double pgo_rot_threshold,
     double pgo_trans_threshold)
     : LoopClosureParameters("Loop Closure Parameters"),
-      image_width_(image_width),
-      image_height_(image_height),
-      focal_length_(focal_length),
-      principle_point_(principle_point),
 
       use_nss_(use_nss),
       alpha_(alpha),
@@ -78,16 +66,12 @@ LoopClosureDetectorParams::LoopClosureDetectorParams(
       max_distance_between_groups_(max_distance_between_groups),
       max_distance_between_queries_(max_distance_between_queries),
 
-      geom_check_(geom_check),
       min_correspondences_(min_correspondences),
 
-      pose_recovery_option_(pose_recovery_option),
       max_ransac_iterations_stereo_(max_ransac_iterations_stereo),
-      ransac_probability_stereo_(ransac_probability_stereo),
       ransac_threshold_stereo_(ransac_threshold_stereo),
-      ransac_randomize_stereo_(ransac_randomize_stereo),
+      relative_pose_opt_iterations_(relative_pose_opt_iterations),
       ransac_inlier_threshold_stereo_(ransac_inlier_threshold_stereo),
-      use_mono_rot_(use_mono_rot),
       relative_pose_info_damper_(relative_pose_info_damper),
 
       lowe_ratio_(lowe_ratio),
@@ -127,46 +111,16 @@ bool LoopClosureDetectorParams::parseYAML(const std::string& filepath) {
   yaml_parser.getYamlParam("max_distance_between_queries",
                            &max_distance_between_queries_);
 
-  int geom_check_id;
-  yaml_parser.getYamlParam("geom_check_id", &geom_check_id);
-  switch (geom_check_id) {
-    case static_cast<unsigned int>(GeomVerifOption::NISTER):
-      geom_check_ = GeomVerifOption::NISTER;
-      break;
-    case static_cast<unsigned int>(GeomVerifOption::NONE):
-      geom_check_ = GeomVerifOption::NONE;
-      break;
-    default:
-      throw std::runtime_error("LCDparams parseYAML: wrong geom_check_id");
-      break;
-  }
   yaml_parser.getYamlParam("min_correspondences", &min_correspondences_);
 
-  int pose_recovery_option_id;
-  yaml_parser.getYamlParam("pose_recovery_option_id", &pose_recovery_option_id);
-  switch (pose_recovery_option_id) {
-    case static_cast<unsigned int>(PoseRecoveryOption::RANSAC_ARUN):
-      pose_recovery_option_ = PoseRecoveryOption::RANSAC_ARUN;
-      break;
-    case static_cast<unsigned int>(PoseRecoveryOption::GIVEN_ROT):
-      pose_recovery_option_ = PoseRecoveryOption::GIVEN_ROT;
-      break;
-    default:
-      throw std::runtime_error(
-          "LCDparams parseYAML: wrong pose_recovery_option_id");
-      break;
-  }
   yaml_parser.getYamlParam("max_ransac_iterations_stereo",
                            &max_ransac_iterations_stereo_);
-  yaml_parser.getYamlParam("ransac_probability_stereo",
-                           &ransac_probability_stereo_);
   yaml_parser.getYamlParam("ransac_threshold_stereo",
                            &ransac_threshold_stereo_);
-  yaml_parser.getYamlParam("ransac_randomize_stereo",
-                           &ransac_randomize_stereo_);
+  yaml_parser.getYamlParam("relative_pose_opt_iterations",
+                           &relative_pose_opt_iterations_);
   yaml_parser.getYamlParam("ransac_inlier_threshold_stereo",
                            &ransac_inlier_threshold_stereo_);
-  yaml_parser.getYamlParam("use_mono_rot", &use_mono_rot_);
   yaml_parser.getYamlParam("relative_pose_info_damper",
                            &relative_pose_info_damper_);
   yaml_parser.getYamlParam("lowe_ratio", &lowe_ratio_);
@@ -202,10 +156,6 @@ void LoopClosureDetectorParams::print() const {
   // TODO(marcus): print all params
   LOG(INFO)
       << "$$$$$$$$$$$$$$$$$$$$$ LCD PARAMETERS $$$$$$$$$$$$$$$$$$$$$\n"
-      << "image_width_: " << image_width_ << '\n'
-      << "image_height_: " << image_height_ << '\n'
-      << "focal_length_: " << focal_length_ << '\n'
-      << "principle_point_: " << principle_point_ << '\n'
 
       << "use_nss_: " << use_nss_ << '\n'
       << "alpha_: " << alpha_ << '\n'
@@ -221,19 +171,14 @@ void LoopClosureDetectorParams::print() const {
       << "max_distance_between_queries_: " << max_distance_between_queries_
       << '\n'
 
-      << "geom_check_: " << static_cast<unsigned int>(geom_check_) << '\n'
       << "min_correspondences_: " << min_correspondences_ << '\n'
 
-      << "pose_recovery_option_: "
-      << static_cast<unsigned int>(pose_recovery_option_) << '\n'
       << "max_ransac_iterations_stereo_: " << max_ransac_iterations_stereo_
       << '\n'
-      << "ransac_probability_stereo_: " << ransac_probability_stereo_ << '\n'
       << "ransac_threshold_stereo_: " << ransac_threshold_stereo_ << '\n'
-      << "ransac_randomize_stereo_: " << ransac_randomize_stereo_ << '\n'
+      << "relative_pose_opt_iterations_: " << relative_pose_opt_iterations_ << '\n'
       << "ransac_inlier_threshold_stereo_: "
       << ransac_inlier_threshold_stereo_ << '\n'
-      << "use_mono_rot_:" << use_mono_rot_ << '\n'
       << "relative_pose_info_damper_:" << relative_pose_info_damper_ << '\n'
 
       << "lowe_ratio_: " << lowe_ratio_ << '\n'

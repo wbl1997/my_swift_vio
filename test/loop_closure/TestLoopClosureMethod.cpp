@@ -429,10 +429,6 @@ TEST_F(LCDFixture, defaultConstructor) {
 TEST_F(LCDFixture, detectLoop) {
   std::pair<double, double> error;
 
-  CHECK(lcd_detector_);
-  lcd_detector_->loopClosureParameters()->pose_recovery_option_ =
-      PoseRecoveryOption::GIVEN_ROT;
-
   /* Test the detectLoop method against two images without closure */
 
   std::shared_ptr<okvis::LoopFrameAndMatches> output_0;
@@ -452,7 +448,6 @@ TEST_F(LCDFixture, detectLoop) {
   EXPECT_EQ(output_1.get(), nullptr);
 
   /* Test the detectLoop method against two images that are identical */
-  // TODO(marcus): why isn't geom_check working for two identical images?
   std::shared_ptr<okvis::LoopFrameAndMatches> output_2;
   lcd_detector_->detectLoop(
       createLoopQueryKeyframeMessage(stereo_frames_[0],

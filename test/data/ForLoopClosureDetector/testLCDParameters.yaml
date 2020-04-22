@@ -11,16 +11,12 @@ max_intragroup_gap: 10
 max_distance_between_groups: 3
 max_distance_between_queries: 2
 
-geom_check_id: 0
 min_correspondences: 5
 
-pose_recovery_option_id: 0
-max_ransac_iterations_stereo: 500
-ransac_probability_stereo: 0.999
+max_ransac_iterations_stereo: 50
 ransac_threshold_stereo: 9
-ransac_randomize_stereo: 0
+relative_pose_opt_iterations: 15
 ransac_inlier_threshold_stereo: 0.0
-use_mono_rot: 0
 relative_pose_info_damper: 0.9
 
 lowe_ratio: 0.7
@@ -40,10 +36,3 @@ pgo_uniform_weight: false
 pgo_rot_threshold: 0.5
 pgo_trans_threshold: 10
 
-# geom_check_id options:
-#   0: NISTER
-#   1: NONE
-
-# pose_recovery_option_id options:
-#   0: RANSAC_ARUN
-#   1: GIVEN_ROT
