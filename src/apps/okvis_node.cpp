@@ -44,8 +44,12 @@ int main(int argc, char **argv) {
 
 
   std::string configFilename;
+  std::string lcdConfigFilename;
   if (argc >= 2) {
     configFilename = argv[1];
+    if (argc >= 3) {
+      lcdConfigFilename = argv[2];
+    }
   } else {
     if (!nh.getParam("config_filename", configFilename)) {
       LOG(ERROR) << "Please specify filename of configuration!";
@@ -66,8 +70,14 @@ int main(int argc, char **argv) {
       parameters.optimization.algorithm);
   std::shared_ptr<VIO::LoopClosureDetectorParams> lcParams(
         new VIO::LoopClosureDetectorParams());
+  if (lcdConfigFilename.empty()) {
+    LOG(WARNING) << "Default parameters for loop closure will be used as no "
+                    "configuration filename is provided!";
+  } else {
+    lcParams->parseYAML(lcdConfigFilename);
+  }
   std::shared_ptr<okvis::LoopClosureMethod> loopClosureMethod =
-      msckf::createLoopClosureMethod(VIO::LoopClosureMethodType::OrbBoW, lcParams);
+      msckf::createLoopClosureMethod(lcParams);
   okvis::ThreadedKFVio okvis_estimator(parameters, estimator, frontend,
                                        loopClosureMethod);
 

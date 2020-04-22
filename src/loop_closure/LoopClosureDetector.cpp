@@ -119,7 +119,8 @@ void LoopClosureDetector::saveFinalPgoResults() {
   if (FLAGS_output_dir.empty()) {
     return;
   }
-  std::string output_csv = okvis::removeTrailingSlash(FLAGS_output_dir) + "/final_pgo.csv" ;
+  std::string output_csv =
+      okvis::removeTrailingSlash(FLAGS_output_dir) + "/final_pgo.csv";
   std::ofstream stream(output_csv, std::ios_base::out);
   if (!stream.is_open()) {
     return;
@@ -483,7 +484,10 @@ bool LoopClosureDetector::geometricVerificationCheck(
       numInliers = ransac.inliers_.size();
       double inlier_percentage = static_cast<double>(numInliers) /
                                  static_cast<double>(numCorrespondences);
-      LOG(INFO) << "P3P inliers " << numInliers << " out of " << numCorrespondences;
+      LOG(INFO) << "P3P inliers " << numInliers << " out of "
+                << numCorrespondences << " ransac iteration "
+                << ransac.iterations_ << " max iterations "
+                << lcd_params_->max_ransac_iterations_stereo_;
       if (inlier_percentage >= lcd_params_->ransac_inlier_threshold_stereo_ &&
         ransac.iterations_ < lcd_params_->max_ransac_iterations_stereo_) {
           Eigen::Matrix4d T_BlBq_mat = Eigen::Matrix4d::Identity();
@@ -572,7 +576,7 @@ bool LoopClosureDetector::geometricVerificationCheck(
         }
     }
   }
-  return loopFrameAndMatches == nullptr;
+  return (*loopFrameAndMatches) == nullptr;
 }
 
 void LoopClosureDetector::createMatchedKeypoints(

@@ -32,7 +32,7 @@ namespace VIO {
 class LoopClosureDetectorParams : public okvis::LoopClosureParameters {
  public:
   LoopClosureDetectorParams(
-
+      LoopClosureMethodType lc_method_id = LoopClosureMethodType::OrbBoW,
       bool use_nss = true,
       float alpha = 0.1,
       int min_temporal_matches = 3,
@@ -81,6 +81,7 @@ class LoopClosureDetectorParams : public okvis::LoopClosureParameters {
   bool equals(const LoopClosureDetectorParams& obj) const {
     const auto& rhs = obj;
     return
+      loop_closure_method_ == loop_closure_method_ &&
       use_nss_ == rhs.use_nss_ &&
       alpha_== rhs.alpha_ &&
       min_temporal_matches_== rhs.min_temporal_matches_ &&
@@ -121,6 +122,7 @@ class LoopClosureDetectorParams : public okvis::LoopClosureParameters {
  public:
 
   //////////////////////////// Loop Detection Params ///////////////////////////
+  LoopClosureMethodType loop_closure_method_;
   bool use_nss_;              // Use normalized similarity score? (3) DBoW2 T-RO.
   float alpha_;               // Alpha threshold for matches, A frame match
   // \f$v_{tj}\f$ needs to have a relative score greater than alpha_. see (3) DBoW2 T-RO.

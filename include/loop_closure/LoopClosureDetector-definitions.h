@@ -40,39 +40,11 @@ typedef uint64_t FrameId;
 typedef okvis::Time Timestamp;
 typedef std::unordered_map<FrameId, Timestamp> FrameIDTimestampMap;
 
-
-enum class GeomVerifOption : int { NISTER, NONE };
-
-enum class PoseRecoveryOption : int { RANSAC_ARUN, GIVEN_ROT };
-
-//struct LCDFrame {
-//  LCDFrame() {}
-//  LCDFrame(const Timestamp& timestamp,
-//           const FrameId& id,
-//           const FrameId& id_kf,
-//           const std::vector<cv::KeyPoint>& keypoints,
-//           const std::vector<gtsam::Vector3>& keypoints_3d,
-//           const OrbDescriptorVec& descriptors_vec,
-//           const OrbDescriptor& descriptors_mat,
-//           const BearingVectors& versors)
-//      : timestamp_(timestamp),
-//        id_(id),
-//        id_kf_(id_kf),
-//        keypoints_(keypoints),
-//        keypoints_3d_(keypoints_3d),
-//        descriptors_vec_(descriptors_vec),
-//        descriptors_mat_(descriptors_mat),
-//        versors_(versors) {}
-
-//  Timestamp timestamp_;
-//  FrameId id_;
-//  FrameId id_kf_;
-//  std::vector<cv::KeyPoint> keypoints_;
-//  std::vector<gtsam::Vector3> keypoints_3d_;
-//  OrbDescriptorVec descriptors_vec_;
-//  OrbDescriptor descriptors_mat_;
-//  BearingVectors versors_;
-//};  // struct LCDFrame
+enum class LoopClosureMethodType {
+  Mock = 0u,
+  //! Bag of Words approach
+  OrbBoW = 1u,
+};
 
 struct MatchIsland {
   MatchIsland()

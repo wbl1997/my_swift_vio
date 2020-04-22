@@ -17,7 +17,7 @@
 namespace VIO {
 
 LoopClosureDetectorParams::LoopClosureDetectorParams(
-
+    LoopClosureMethodType lc_method_id,
     bool use_nss,
     float alpha,
     int min_temporal_matches,
@@ -54,7 +54,7 @@ LoopClosureDetectorParams::LoopClosureDetectorParams(
     double pgo_rot_threshold,
     double pgo_trans_threshold)
     : LoopClosureParameters("Loop Closure Parameters"),
-
+      loop_closure_method_(lc_method_id),
       use_nss_(use_nss),
       alpha_(alpha),
       min_temporal_matches_(min_temporal_matches),
@@ -97,6 +97,18 @@ LoopClosureDetectorParams::LoopClosureDetectorParams(
 
 bool LoopClosureDetectorParams::parseYAML(const std::string& filepath) {
   YamlParser yaml_parser(filepath);
+
+  int lc_method_id;
+  yaml_parser.getYamlParam("loop_closure_method", &lc_method_id);
+  switch (lc_method_id) {
+    case 1:
+      loop_closure_method_ = LoopClosureMethodType::OrbBoW;
+      break;
+    case 0:
+    default:
+      loop_closure_method_ = LoopClosureMethodType::Mock;
+      break;
+  }
 
   yaml_parser.getYamlParam("use_nss", &use_nss_);
   yaml_parser.getYamlParam("alpha", &alpha_);
@@ -156,7 +168,7 @@ void LoopClosureDetectorParams::print() const {
   // TODO(marcus): print all params
   LOG(INFO)
       << "$$$$$$$$$$$$$$$$$$$$$ LCD PARAMETERS $$$$$$$$$$$$$$$$$$$$$\n"
-
+      << "loop closure method: " << (int)loop_closure_method_ << '\n'
       << "use_nss_: " << use_nss_ << '\n'
       << "alpha_: " << alpha_ << '\n'
       << "min_temporal_matches_: " << min_temporal_matches_ << '\n'

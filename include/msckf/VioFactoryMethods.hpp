@@ -19,12 +19,10 @@ std::shared_ptr<okvis::Estimator> createBackend(okvis::EstimatorAlgorithm algori
 
 /**
  * @brief createLoopClosureMethod
- * @param methodId 0 for dummy loop closure method, 1 for closure method with ORB loop detector.
  * @param lcParams
  * @return
  */
 std::shared_ptr<okvis::LoopClosureMethod> createLoopClosureMethod(
-    VIO::LoopClosureMethodType methodId,
     std::shared_ptr<VIO::LoopClosureDetectorParams> lcParams);
 
 }  // namespace msckf

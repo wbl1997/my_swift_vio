@@ -59,9 +59,8 @@ std::shared_ptr<okvis::Estimator> createBackend(okvis::EstimatorAlgorithm algori
 }
 
 std::shared_ptr<okvis::LoopClosureMethod> createLoopClosureMethod(
-    VIO::LoopClosureMethodType methodType,
     std::shared_ptr<VIO::LoopClosureDetectorParams> lcParams) {
-  switch (methodType) {
+  switch (lcParams->loop_closure_method_) {
     case VIO::LoopClosureMethodType::OrbBoW:
       return std::shared_ptr<okvis::LoopClosureMethod>(
           new VIO::LoopClosureDetector(lcParams));

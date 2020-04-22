@@ -67,9 +67,8 @@ class LCDFixture :public ::testing::Test {
     FLAGS_vocabulary_path =
         FLAGS_test_data_path +
         std::string("/ForLoopClosureDetector/small_voc.yml.gz");
-    LoopClosureMethodType method(LoopClosureMethodType::OrbBoW);
     lcd_detector_ = std::static_pointer_cast<LoopClosureDetector>(
-          msckf::createLoopClosureMethod(method, lcd_params_));
+          msckf::createLoopClosureMethod(lcd_params_));
 
     feature_matcher_ = cv::DescriptorMatcher::create(lcd_params_->matcher_type_);
 

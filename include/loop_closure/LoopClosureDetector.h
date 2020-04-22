@@ -211,9 +211,4 @@ class LoopClosureDetector : public okvis::LoopClosureMethod {
   using DMatchVec = std::vector<cv::DMatch>;
 };  // class LoopClosureDetector
 
-enum class LoopClosureMethodType {
-  Mock = 0u,
-  //! Bag of Words approach
-  OrbBoW = 1u,
-};
 }  // namespace VIO
