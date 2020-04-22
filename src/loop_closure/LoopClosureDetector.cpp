@@ -80,9 +80,10 @@ LoopClosureDetector::LoopClosureDetector(
                                           lcd_params_->patch_sze_,
                                           lcd_params_->fast_threshold_);
 
-  // Initialize our feature matching object:
+  // Initialize our feature matching object for BRISK feature.
+  // https://docs.opencv.org/master/dc/dc3/tutorial_py_matcher.html.
   descriptor_matcher_ =
-      cv::DescriptorMatcher::create(lcd_params_->matcher_type_);
+      cv::DescriptorMatcher::create(cv::DescriptorMatcher::BRUTEFORCE_HAMMING);
 
   // Load ORB vocabulary:
   std::ifstream f_vocab(FLAGS_vocabulary_path.c_str());

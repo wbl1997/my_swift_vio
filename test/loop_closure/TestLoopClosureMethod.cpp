@@ -70,7 +70,8 @@ class LCDFixture :public ::testing::Test {
     lcd_detector_ = std::static_pointer_cast<LoopClosureDetector>(
           msckf::createLoopClosureMethod(lcd_params_));
 
-    feature_matcher_ = cv::DescriptorMatcher::create(lcd_params_->matcher_type_);
+    feature_matcher_ = cv::DescriptorMatcher::create(
+        cv::DescriptorMatcher::BRUTEFORCE_HAMMING);
 
     T_WB_list_[0] = gtsam::Pose3(
         gtsam::Rot3(gtsam::Quaternion(0.338337, 0.608466, -0.535476, 0.478082)),
@@ -214,6 +215,7 @@ class LCDFixture :public ::testing::Test {
     std::shared_ptr<okvis::LoopQueryKeyframeMessage> queryKeyframe(
         new okvis::LoopQueryKeyframeMessage(nframe->id(), nframe->timestamp(),
                                             T_WB, nframe));
+    queryKeyframe->setZeroCovariance();
     if (nframe->id()) {
       std::shared_ptr<okvis::MultiFrame> neighborFrame = stereo_frames_[nframe->id() - 1];
       okvis::kinematics::Transformation T_BnBr, T_WB;
