@@ -2,6 +2,8 @@
 
 #include "loop_closure/GtsamWrap.hpp"
 #include <gtsam/slam/PriorFactor.h>
+#include <gtsam/nonlinear/NonlinearFactorGraph.h>
+#include <gtsam/nonlinear/GaussNewtonOptimizer.h>
 
 TEST(BetweenFactor, JacobianToCustomRetract) {
   const double eps = 1e-6;
@@ -125,4 +127,66 @@ TEST(PriorFactor, definition) {
   gtsam::BetweenFactor<gtsam::Pose3> bf(0, 1, Tz, noise);
   Eigen::VectorXd rb = bf.evaluateError(Tx, Ty);
   EXPECT_LT((rp - rb).lpNorm<Eigen::Infinity>(), 1e-8);
+}
+
+TEST(RobustNoiseModel, sqrtInfoR) {
+  Eigen::Matrix<double, 6, 6> sqrtInfoR;
+  Eigen::Matrix<double, 6, 1> sigmas;
+  sigmas << 0.01, 0.01, 0.01, 0.1, 0.1, 0.1;
+  sqrtInfoR = sigmas.asDiagonal();
+
+  // add a prior factor and between factor to a graph
+  using namespace gtsam;
+  Key firstKey = 0;
+  Key secondKey = 1;
+  Values initial;
+  initial.insert(firstKey, Pose3());
+  initial.insert(secondKey, Pose3());
+
+  // Add prior on the first key
+  NonlinearFactorGraph graphWithPrior;
+
+  {
+    SharedNoiseModel priorModel = VIO::createRobustNoiseModelSqrtR(sqrtInfoR);
+
+    graphWithPrior.add(PriorFactor<Pose3>(firstKey, Pose3(), priorModel));
+
+    sqrtInfoR << 5.03229,-0.0712813,0.0235663,-0.0258729,00-1.23496,0-0.329889
+        ,0,4.81623,1.03861,1.23393,0.00811096,0.0864412
+        ,0,0,1.46313,0.0854986,0-0.236276,-0.0539238
+        ,0,0,0,-0.0529346,0.276297,-0.0294727
+        ,0,0,0,0.321847,0,0.289415
+        ,0,0,0,0,0,0.298538;
+
+    sqrtInfoR << 0.01,0,0,0,0,0
+        ,0,0.01,0,0,0,0
+        ,0,0,0.01,0,0,0
+        ,0,0,0,0.1,0,0
+        ,0,0,0,0,0.1,0
+        ,0,0,0,0,0,0.1;
+
+    SharedNoiseModel noiseModel = VIO::createRobustNoiseModelSqrtR(sqrtInfoR);
+    NonlinearFactorGraph nfg;
+    nfg.add(BetweenFactor<Pose3>(firstKey, secondKey, Pose3(), noiseModel));
+
+    gtsam::BetweenFactor<gtsam::Pose3> castFactor =
+        *boost::dynamic_pointer_cast<gtsam::BetweenFactor<gtsam::Pose3>>(
+            nfg[0]);
+
+    gtsam::Pose3 pose = castFactor.measured();
+    auto castNoiseModel = boost::dynamic_pointer_cast<gtsam::noiseModel::Gaussian>(
+        castFactor.get_noiseModel());
+    EXPECT_EQ(castNoiseModel.get(), nullptr);
+//    gtsam::Matrix covar = castNoiseModel->covariance();
+
+    graphWithPrior.add(castFactor);
+  }
+
+  GaussNewtonParams params;
+  params.setVerbosity("TERMINATION"); // this will show info about stopping conditions
+  GaussNewtonOptimizer optimizer(graphWithPrior, initial, params);
+  Values result = optimizer.optimize();
+
+  EXPECT_LT(graphWithPrior.error(initial), 1e-7) << "initial error";
+  EXPECT_LT(graphWithPrior.error(result), 1e-7) << "final error";
 }

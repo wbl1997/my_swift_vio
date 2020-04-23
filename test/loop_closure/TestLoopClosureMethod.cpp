@@ -212,23 +212,38 @@ class LCDFixture :public ::testing::Test {
   std::shared_ptr<okvis::LoopQueryKeyframeMessage>
   createLoopQueryKeyframeMessage(
       std::shared_ptr<okvis::MultiFrame> nframe,
-      const okvis::kinematics::Transformation& T_WB) const {
+      const std::vector<size_t>& neighborKeyframeIds =
+          std::vector<size_t>(), bool uniform_weight = true) const {
+    uint64_t keyframeId = nframe->id();
+    okvis::kinematics::Transformation T_WBr = GtsamWrap::toTransform(T_WB_list_[keyframeId]);
     std::shared_ptr<okvis::LoopQueryKeyframeMessage> queryKeyframe(
         new okvis::LoopQueryKeyframeMessage(nframe->id(), nframe->timestamp(),
-                                            T_WB, nframe));
-    queryKeyframe->setZeroCovariance();
-    if (nframe->id()) {
-      std::shared_ptr<okvis::MultiFrame> neighborFrame = stereo_frames_[nframe->id() - 1];
-      okvis::kinematics::Transformation T_BnBr, T_WB;
+                                            T_WBr, nframe));
+    if (uniform_weight) {
+      queryKeyframe->setZeroCovariance();
+    } else {
+      queryKeyframe->setCovariance(lcd_detector_->uniform_noise_sigmas().asDiagonal() * sqrtInfoAliasFactor);
+    }
+    for (auto neighborKeyframeId : neighborKeyframeIds) {
+      std::shared_ptr<okvis::MultiFrame> neighborFrame = stereo_frames_[neighborKeyframeId];
+      okvis::kinematics::Transformation T_WBn = GtsamWrap::toTransform(T_WB_list_[neighborKeyframeId]);
+      okvis::kinematics::Transformation T_BnBr = T_WBn.inverse() * T_WBr;
       std::shared_ptr<okvis::NeighborConstraintMessage> neighborMessage(
           new okvis::NeighborConstraintMessage(
-              neighborFrame->id(), neighborFrame->timestamp(), T_BnBr, T_WB));
-      neighborMessage->core_.squareRootInfo_.setIdentity();
+              neighborFrame->id(), neighborFrame->timestamp(), T_BnBr, T_WBn));
+      if (uniform_weight) {
+        neighborMessage->core_.squareRootInfo_.setIdentity();
+      } else {
+        neighborMessage->core_.squareRootInfo_ =
+            lcd_detector_->uniform_noise_sigmas().asDiagonal() * sqrtInfoAliasFactor;
+        neighborMessage->cov_T_WB_.setIdentity();
+        neighborMessage->cov_T_WBr_T_WB_.setZero();
+      }
       queryKeyframe->odometryConstraintListMutable().push_back(neighborMessage);
     }
     queryKeyframe->keypointIndexForLandmarkListMutable() =
-        matchedLeftKeypointIndices_[nframe->id()];
-    queryKeyframe->landmarkPositionListMutable() = triangulatedLandmarks_[nframe->id()];
+        matchedLeftKeypointIndices_[keyframeId];
+    queryKeyframe->landmarkPositionListMutable() = triangulatedLandmarks_[keyframeId];
     return queryKeyframe;
   }
 
@@ -353,8 +368,6 @@ class LCDFixture :public ::testing::Test {
     okvis::kinematics::Transformation cur2_T_WB = GtsamWrap::toTransform(T_WB_list_[3]);
     initializeKeyframe(timestamp_cur2_, id_cur2_, img_name_cur2_left,
                        img_name_cur2_right, cur2_T_WB, &stereo_frames_[3]);
-
-    CHECK(lcd_detector_);
   }
 
   // Standard gtest methods, unnecessary for now
@@ -394,67 +407,40 @@ class LCDFixture :public ::testing::Test {
   const VIO::Timestamp timestamp_ref2_;
   const VIO::Timestamp timestamp_cur2_;
   const int pauseMillisec = 2000;
+  const size_t totalKeyframes = 4u;
+  const double sqrtInfoAliasFactor = 5.0;
 };  // class LCDFixture
 
 TEST_F(LCDFixture, defaultConstructor) {
   /* Test default constructor to ensure that vocabulary is loaded correctly. */
-  CHECK(lcd_detector_);
   EXPECT_GT(lcd_detector_->getBoWDatabase()->getVocabulary()->size(), 0u);
 }
-
-//TEST_F(LCDFixture, processAndAddFrame) {
-//  /* Test adding frame to database without BoW Loop CLosure Detection */
-//  CHECK(lcd_detector_);
-//  EXPECT_EQ(lcd_detector_->getFrameDatabasePtr()->size(), 0);
-
-//  FrameId id_0 = lcd_detector_->processAndAddFrame(*stereo_frames_[0]);
-
-//  EXPECT_EQ(id_0, 0);
-//  EXPECT_EQ(lcd_detector_->getFrameDatabasePtr()->size(), 1);
-//  EXPECT_EQ(lcd_detector_->getFrameDatabasePtr()->at(0).timestamp_,
-//            timestamp_ref1_);
-//  EXPECT_EQ(lcd_detector_->getFrameDatabasePtr()->at(0).id_kf_, id_ref1_);
-//  EXPECT_EQ(lcd_detector_->getFrameDatabasePtr()->at(0).keypoints_.size(),
-//            lcd_detector_->getLCDParams().nfeatures_);
-
-//  FrameId id_1 = lcd_detector_->processAndAddFrame(*stereo_frames_[1]);
-
-//  EXPECT_EQ(id_1, 1);
-//  EXPECT_EQ(lcd_detector_->getFrameDatabasePtr()->size(), 2);
-//  EXPECT_EQ(lcd_detector_->getFrameDatabasePtr()->at(1).timestamp_,
-//            timestamp_cur1_);
-//  EXPECT_EQ(lcd_detector_->getFrameDatabasePtr()->at(1).id_kf_, id_cur1_);
-//  EXPECT_EQ(lcd_detector_->getFrameDatabasePtr()->at(1).keypoints_.size(),
-//            lcd_detector_->getLCDParams().nfeatures_);
-//}
 
 TEST_F(LCDFixture, detectLoop) {
   std::pair<double, double> error;
 
   /* Test the detectLoop method against two images without closure */
-
   std::shared_ptr<okvis::LoopFrameAndMatches> output_0;
   std::shared_ptr<okvis::KeyframeInDatabase> queryKeyframeInDatabase;
 
   lcd_detector_->detectLoop(
-      createLoopQueryKeyframeMessage(stereo_frames_[2],
-                                     okvis::kinematics::Transformation()),
+      createLoopQueryKeyframeMessage(stereo_frames_[2]),
       queryKeyframeInDatabase, output_0);
   EXPECT_EQ(output_0.get(), nullptr);
 
   std::shared_ptr<okvis::LoopFrameAndMatches> output_1;
   lcd_detector_->detectLoop(
-      createLoopQueryKeyframeMessage(stereo_frames_[0],
-                                     okvis::kinematics::Transformation()),
+      createLoopQueryKeyframeMessage(stereo_frames_[0]),
       queryKeyframeInDatabase, output_1);
+  EXPECT_TRUE(lcd_detector_->isUniformWeight());
   EXPECT_EQ(output_1.get(), nullptr);
 
   /* Test the detectLoop method against two images that are identical */
   std::shared_ptr<okvis::LoopFrameAndMatches> output_2;
   lcd_detector_->detectLoop(
-      createLoopQueryKeyframeMessage(stereo_frames_[0],
-                                     okvis::kinematics::Transformation()),
+      createLoopQueryKeyframeMessage(stereo_frames_[0]),
       queryKeyframeInDatabase, output_2);
+  EXPECT_TRUE(lcd_detector_->isUniformWeight());
   EXPECT_NE(output_2.get(), nullptr);
   EXPECT_EQ(output_2->id_, 0u);
   EXPECT_EQ(output_2->queryKeyframeId_, 0u);
@@ -462,107 +448,134 @@ TEST_F(LCDFixture, detectLoop) {
       gtsam::Pose3(), VIO::GtsamWrap::toPose3(output_2->T_BlBq_), true);
   EXPECT_LT(error.first, rot_tol);
   EXPECT_LT(error.second, tran_tol);
+  EXPECT_LT((output_2->relativePoseSqrtInfo().diagonal() -
+             lcd_detector_->uniform_noise_sigmas())
+                .lpNorm<Eigen::Infinity>(),
+            1e-7);
 
   /* Test the detectLoop method against two unidentical, similar images */
   std::shared_ptr<okvis::LoopFrameAndMatches> output_3;
-  LOG(INFO) << "LCD detect loop for stereo frame 1";
   lcd_detector_->detectLoop(
-      createLoopQueryKeyframeMessage(stereo_frames_[1],
-                                     okvis::kinematics::Transformation()),
+      createLoopQueryKeyframeMessage(stereo_frames_[1]),
       queryKeyframeInDatabase, output_3);
-  LOG(INFO) << "Finished detect loop for stereo frame 1";
+  EXPECT_TRUE(lcd_detector_->isUniformWeight());
   EXPECT_NE(output_3.get(), nullptr);
-  EXPECT_EQ(output_3->id_, 0u);
-  EXPECT_EQ(output_3->queryKeyframeId_, 1u);
-
-  error = computeRotationAndTranslationErrors(
-      ref1_to_cur1_pose_, VIO::GtsamWrap::toPose3(output_3->T_BlBq_), true);
-  LOG(INFO) << "Loop frame relative pose estimation error "
-            << error.first << " " << error.second;
-  EXPECT_LT(error.first, rot_tol);
-  EXPECT_LT(error.second, tran_tol);
+  if (output_3.get()) {
+    EXPECT_EQ(output_3->id_, 0u);
+    EXPECT_EQ(output_3->queryKeyframeId_, 1u);
+    error = computeRotationAndTranslationErrors(
+        ref1_to_cur1_pose_, VIO::GtsamWrap::toPose3(output_3->T_BlBq_), true);
+    LOG(INFO) << "Loop frame relative pose estimation error " << error.first
+              << " " << error.second;
+    EXPECT_LT(error.first, rot_tol);
+    EXPECT_LT(error.second, tran_tol);
+    EXPECT_LT((output_3->relativePoseSqrtInfo().diagonal() -
+               lcd_detector_->uniform_noise_sigmas())
+                  .lpNorm<Eigen::Infinity>(),
+              1e-7);
+  }
 }
 
 TEST_F(LCDFixture, addOdometryFactors) {
   /* Test the addition of odometry factors to the PGO */
-  CHECK(lcd_detector_);
   lcd_detector_->initializePGO();
-//  lcd_detector_->addOdometryFactors(
-//      VIO::OdometryFactor(1, gtsam::Pose3(),
-//          gtsam::noiseModel::Isotropic::Variance(6, 0.1)));
-
-//  VIO::OdometryFactor odom_factor(2, T_WB_list_[0],
-//      gtsam::noiseModel::Isotropic::Variance(6, 0.1));
-//  lcd_detector_->addOdometryFactors(odom_factor);
 
   gtsam::Values pgo_trajectory = lcd_detector_->getPGOTrajectory();
   gtsam::NonlinearFactorGraph pgo_nfg = lcd_detector_->getPGOnfg();
 
-  EXPECT_EQ(pgo_trajectory.size(), 2u);
-  EXPECT_EQ(pgo_nfg.size(), 1u);
+  EXPECT_EQ(pgo_trajectory.size(), 1u);
+  EXPECT_EQ(pgo_nfg.size(), 0u);
 }
 
 TEST_F(LCDFixture, spinOnce) {
-  /* Test the full pipeline with one loop closure and full PGO optimization */
-  CHECK(lcd_detector_);
-  CHECK(stereo_frames_[0]);
-  std::shared_ptr<okvis::LoopQueryKeyframeMessage> kf_ref1 =
-      createLoopQueryKeyframeMessage(stereo_frames_[0],
-                                     okvis::kinematics::Transformation());
+  std::vector<size_t> processOrder{
+      0, 2, 1, 3};  // frame index of keyframes to be provided to the loop
+                    // closure module, namely, ref1, ref2, cur1, cur2
+  std::vector<std::vector<size_t>> neighborKeyframeIds{
+      {},
+      {0},
+      {2, 0},
+      {1, 2}};  // frame index of neighboring keyframes for each query keyframe.
+                // note the most adjacent neighbor is at the front.
+  std::shared_ptr<okvis::LoopQueryKeyframeMessage>
+      kfs[totalKeyframes];  // query keyframes fed to the loop closure module.
+  std::shared_ptr<okvis::LoopFrameAndMatches>
+      outputs[totalKeyframes];  // outputs for each query keyframe.
 
-  std::shared_ptr<okvis::LoopFrameAndMatches> output_0;
-  std::shared_ptr<okvis::KeyframeInDatabase> queryKeyframeInDatabase;
+  size_t j = 0u;
+  std::vector<size_t> expected_nfg_increment{1, 1, 2 + 1, 2 + 1};
+  size_t expected_nfg_size = expected_nfg_increment[j];
+  for (auto i : processOrder) {
+    kfs[j] = createLoopQueryKeyframeMessage(stereo_frames_[i],
+    neighborKeyframeIds[j], false);
+    std::shared_ptr<okvis::KeyframeInDatabase> queryKeyframeInDatabase;
+    LOG(INFO) << "Detect loop for keyframe " << i << " order " << j;
+    lcd_detector_->detectLoop(kfs[j], queryKeyframeInDatabase, outputs[j]);
+    EXPECT_FALSE(lcd_detector_->isUniformWeight());
+    okvis::PgoResult pgoResult;
+    LOG(INFO) << "Add constraints for keyframe " << i;
+    lcd_detector_->addConstraintsAndOptimize(*queryKeyframeInDatabase, outputs[j], pgoResult);
+    EXPECT_EQ(lcd_detector_->getPGOTrajectory().size(), j + 1);
+    EXPECT_EQ(lcd_detector_->getPGOnfg().size(), expected_nfg_size);
+    ++j;
+    expected_nfg_size += expected_nfg_increment[j];
+  }
 
-  lcd_detector_->detectLoop(kf_ref1, queryKeyframeInDatabase, output_0);
-  LOG(INFO) << "Add constraints";
-  okvis::PgoResult pgoResult;
-  lcd_detector_->addConstraintsAndOptimize(*queryKeyframeInDatabase, output_0, pgoResult);
-  LOG(INFO) << "finish adding constraint and optimize";
-  CHECK(stereo_frames_[2]);
-  std::shared_ptr<okvis::LoopQueryKeyframeMessage> kf_ref2 =
-      createLoopQueryKeyframeMessage(stereo_frames_[2],
-                                     okvis::kinematics::Transformation());
-  std::shared_ptr<okvis::LoopFrameAndMatches> output_1;
-  LOG(INFO) << "Detect loop 1";
-  lcd_detector_->detectLoop(kf_ref2, queryKeyframeInDatabase, output_1);
-  LOG(INFO) << "Add constraints 1";
-  lcd_detector_->addConstraintsAndOptimize(*queryKeyframeInDatabase, output_1, pgoResult);
+  EXPECT_EQ(outputs[0], nullptr);
 
-  LOG(INFO) << "Create loop query message 2";
-  std::shared_ptr<okvis::LoopQueryKeyframeMessage> kf_cur1 =
-      createLoopQueryKeyframeMessage(stereo_frames_[1],
-                                     okvis::kinematics::Transformation());
-  std::shared_ptr<okvis::LoopFrameAndMatches> output_2;
-  LOG(INFO) << "Detect loop 2";
-  lcd_detector_->detectLoop(kf_cur1, queryKeyframeInDatabase, output_2);
-  LOG(INFO) << "Add constraints 2";
-  lcd_detector_->addConstraintsAndOptimize(*queryKeyframeInDatabase, output_2, pgoResult);
+  EXPECT_EQ(outputs[1], nullptr);
+  size_t outputIndex = 2u;
+  EXPECT_NE(outputs[outputIndex], nullptr);
+  if (outputs[outputIndex]) {
+    EXPECT_EQ(outputs[outputIndex]->id_, 0u);
+    EXPECT_EQ(outputs[outputIndex]->dbowId_, 0u);
+    EXPECT_EQ(outputs[outputIndex]->stamp_, timestamp_ref1_);
+    EXPECT_EQ(outputs[outputIndex]->queryKeyframeId_, 1u);
+    EXPECT_EQ(outputs[outputIndex]->queryKeyframeDbowId_, 2u);
+    EXPECT_EQ(outputs[outputIndex]->queryKeyframeStamp_, timestamp_cur1_);
 
-//  EXPECT_EQ(output_0->is_loop_closure_, false);
-//  EXPECT_EQ(output_0->timestamp_kf_, 0);
-//  EXPECT_EQ(output_0->timestamp_query_, 0);
-//  EXPECT_EQ(output_0->timestamp_match_, 0);
-//  EXPECT_EQ(output_0->id_match_, 0);
-//  EXPECT_EQ(output_0->id_recent_, 0);
-//  EXPECT_EQ(output_0->states_.size(), 1);
-//  EXPECT_EQ(output_0->nfg_.size(), 1);
+    std::pair<double, double> error = computeRotationAndTranslationErrors(
+        ref1_to_cur1_pose_, VIO::GtsamWrap::toPose3(outputs[outputIndex]->T_BlBq_), true);
+    LOG(INFO) << "Loop frame relative pose ref1_to_cur1_pose_ PnP error "
+              << error.first << " " << error.second;
 
-//  EXPECT_EQ(output_1->is_loop_closure_, false);
-//  EXPECT_EQ(output_1->timestamp_kf_, 0);
-//  EXPECT_EQ(output_1->timestamp_query_, 0);
-//  EXPECT_EQ(output_1->timestamp_match_, 0);
-//  EXPECT_EQ(output_1->id_match_, 0);
-//  EXPECT_EQ(output_1->id_recent_, 0);
-//  EXPECT_EQ(output_1->states_.size(), 2);
-//  EXPECT_EQ(output_1->nfg_.size(), 2);
+    EXPECT_LT(error.first, rot_tol);
+    EXPECT_LT(error.second, tran_tol);
+  }
+  ++outputIndex;
+  EXPECT_NE(outputs[outputIndex], nullptr);
+  if (outputs[outputIndex]) {
+    EXPECT_EQ(outputs[outputIndex]->id_, 2u);
+    EXPECT_EQ(outputs[outputIndex]->dbowId_, 1u);
+    EXPECT_EQ(outputs[outputIndex]->stamp_, timestamp_ref2_);
+    EXPECT_EQ(outputs[outputIndex]->queryKeyframeId_, 3u);
+    EXPECT_EQ(outputs[outputIndex]->queryKeyframeDbowId_, 3u);
+    EXPECT_EQ(outputs[outputIndex]->queryKeyframeStamp_, timestamp_cur2_);
 
-//  EXPECT_EQ(output_2->is_loop_closure_, true);
-//  EXPECT_EQ(output_2->timestamp_kf_, timestamp_cur1_);
-//  EXPECT_EQ(output_2->timestamp_query_, timestamp_cur1_);
-//  EXPECT_EQ(output_2->timestamp_match_, timestamp_ref1_);
-//  EXPECT_EQ(output_2->id_match_, 0);
-//  EXPECT_EQ(output_2->id_recent_, 2);
-//  EXPECT_EQ(output_2->states_.size(), 3);
+    std::pair<double, double> error = computeRotationAndTranslationErrors(
+        ref2_to_cur2_pose_, VIO::GtsamWrap::toPose3(outputs[outputIndex]->T_BlBq_), true);
+    LOG(INFO) << "Loop frame relative pose ref1_to_cur1_pose_ PnP error "
+              << error.first << " " << error.second;
+    EXPECT_GT((outputs[outputIndex]->relativePoseSqrtInfo().diagonal() -
+               lcd_detector_->uniform_noise_sigmas())
+                  .lpNorm<Eigen::Infinity>(),
+              1);
+    LOG(INFO) << "relative pose sqrt info\n" << outputs[outputIndex]->relativePoseSqrtInfo();
+
+    EXPECT_LT(error.first, rot_tol);
+    EXPECT_LT(error.second, tran_tol);
+  }
+  gtsam::Values pgo_trajectory = lcd_detector_->getPGOTrajectory();
+  gtsam::NonlinearFactorGraph pgo_nfg = lcd_detector_->getPGOnfg();
+  for (size_t j = 0; j < totalKeyframes; ++j) {
+    gtsam::Pose3 T_WB = pgo_trajectory.at<gtsam::Pose3>(gtsam::Symbol(j));
+    std::pair<double, double> error = computeRotationAndTranslationErrors(
+        T_WB_list_[processOrder[j]], T_WB, true);
+    LOG(INFO) << "PGO relative pose error for " << processOrder[j]
+              << " dbowid " << j << " " << error.first << " " << error.second;
+    EXPECT_LT(error.first, rot_tol) << "rotation";
+    EXPECT_LT(error.second, tran_tol) << "translation";
+  }
 }
 
 }  // namespace VIO

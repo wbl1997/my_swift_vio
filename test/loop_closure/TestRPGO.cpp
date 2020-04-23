@@ -101,7 +101,7 @@ class RobustSolverTest {
     gtsam::NonlinearFactorGraph nfg;
     gtsam::Values est;
 
-    // initialize first (w/o prior)
+    // initialize first
     size_t priorFactorIncrement = usePriorFactor ? 1 : 0;
     gtsam::Key init_key_a = gtsam::Symbol('a', 0);
     gtsam::Values init_vals;
@@ -109,8 +109,14 @@ class RobustSolverTest {
     gtsam::Pose3 prior_pose = gtsam::Pose3(gtsam::Rot3(T_WNew.q()), T_WNew.r());
     init_vals.insert(init_key_a, prior_pose);
     gtsam::NonlinearFactorGraph priorFactorGraph;
+
+    Eigen::Matrix<double, 6, 6> sqrtInfoR;
+    sqrtInfoR = diagonalSigmas_.asDiagonal();
+    gtsam::SharedNoiseModel priorNoiseModel =
+        VIO::createRobustNoiseModelSqrtR(sqrtInfoR);
+
     priorFactorGraph.add(
-        gtsam::PriorFactor<gtsam::Pose3>(init_key_a, prior_pose, noiseModel));
+        gtsam::PriorFactor<gtsam::Pose3>(init_key_a, prior_pose, priorNoiseModel));
     if (usePriorFactor) {
       pgo->update(priorFactorGraph, init_vals);
     } else {
@@ -151,9 +157,12 @@ class RobustSolverTest {
         gtsam::Key key_new = gtsam::Symbol('a', i);
 
         odom_val.insert(key_new, VIO::GtsamWrap::toPose3(T_WNew));
-        odom_factor.add(gtsam::BetweenFactor<gtsam::Pose3>(key_prev, key_new,
-                                                           odom, noiseModel));
 
+        Eigen::Matrix<double, 6, 6> bfSqrtInfoR;
+        bfSqrtInfoR = diagonalSigmas_.asDiagonal();
+        gtsam::SharedNoiseModel bfNoiseModel = VIO::createRobustNoiseModelSqrtR(bfSqrtInfoR);
+        odom_factor.add(gtsam::BetweenFactor<gtsam::Pose3>(key_prev, key_new,
+                                                           odom, bfNoiseModel));
         bool runOpt = pgo->update(odom_factor, odom_val);
         nfg = pgo->getFactorsUnsafe();
         est = pgo->calculateEstimate();

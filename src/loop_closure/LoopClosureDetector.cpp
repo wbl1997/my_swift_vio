@@ -69,7 +69,7 @@ LoopClosureDetector::LoopClosureDetector(
 
   // TODO(jhuai): make these parameters accurate by learning from the covariance weighted counterpart.
   uniform_noise_sigmas_ << 0.01, 0.01, 0.01, 0.1, 0.1, 0.1;
-  // Initialize the ORB feature detector object:
+
   orb_feature_detector_ = cv::ORB::create(lcd_params_->nfeatures_,
                                           lcd_params_->scale_factor_,
                                           lcd_params_->nlevels_,
@@ -97,7 +97,6 @@ LoopClosureDetector::LoopClosureDetector(
   vocab.load(FLAGS_vocabulary_path);
   LOG(INFO) << "Loaded vocabulary with " << vocab.size() << " visual words.";
 
-  // Initialize the thirdparty wrapper:
   lcd_tp_wrapper_ = VIO::make_unique<LcdThirdPartyWrapper>(lcd_params);
 
   db_BoW_ = std::make_shared<OrbDatabase>(vocab);
@@ -220,9 +219,15 @@ bool LoopClosureDetector::addConstraintsAndOptimize(
 // TODO(marcus): only add nodes if they're x dist away from previous node
 void LoopClosureDetector::addOdometryFactors(
     const okvis::KeyframeInDatabase& keyframeInDB) {
-  auto constraintList = keyframeInDB.constraintList();
-  auto firstNeighbor = constraintList.at(0);
-  size_t dbowIdLastKf = vioIdToDbowId_.find(firstNeighbor->id_)->second;
+  const std::vector<std::shared_ptr<okvis::NeighborConstraintInDatabase>>&
+      constraintList = keyframeInDB.constraintList();
+  std::shared_ptr<const okvis::NeighborConstraintInDatabase> firstNeighbor =
+      constraintList.at(0);
+  std::unordered_map<uint64_t, size_t>::const_iterator idIter =
+      vioIdToDbowId_.find(firstNeighbor->id_);
+  LOG(INFO) << "Looking for first neighbor " << firstNeighbor->id_
+            << " not found ? " << (idIter == vioIdToDbowId_.end());
+  size_t dbowIdLastKf = idIter->second;
   CHECK_EQ(dbowIdLastKf + 1, keyframeInDB.dbowId_);
 
   gtsam::NonlinearFactorGraph nfgSequentialOdometry;
@@ -233,18 +238,19 @@ void LoopClosureDetector::addOdometryFactors(
   valueSequentialOdometry.insert(gtsam::Symbol(keyframeInDB.dbowId_),
                                  GtsamWrap::toPose3(keyframeInDB.vio_T_WB_));
 
-  gtsam::SharedNoiseModel noiseModel = createRobustNoiseModelSqrtR(firstNeighbor->squareRootInfo_);
-  nfgSequentialOdometry.add(gtsam::BetweenFactor<gtsam::Pose3>(gtsam::Symbol(dbowIdLastKf),
-                                             gtsam::Symbol(keyframeInDB.dbowId_),
-                                             GtsamWrap::toPose3(firstNeighbor->T_BBr_),
-                                             noiseModel));
+  gtsam::SharedNoiseModel noiseModel =
+      createRobustNoiseModelSqrtR(firstNeighbor->squareRootInfo_);
+  nfgSequentialOdometry.add(gtsam::BetweenFactor<gtsam::Pose3>(
+      gtsam::Symbol(dbowIdLastKf), gtsam::Symbol(keyframeInDB.dbowId_),
+      GtsamWrap::toPose3(firstNeighbor->T_BBr_), noiseModel));
   // no optimization will be performed.
   pgo_->update(nfgSequentialOdometry, valueSequentialOdometry);
 
   // non-sequential odometry constraints.
   gtsam::NonlinearFactorGraph nfg;
   gtsam::Values value;
-  for (auto iter = ++constraintList.begin(); iter != constraintList.end(); ++iter) {
+  for (std::vector<std::shared_ptr<okvis::NeighborConstraintInDatabase>>::const_iterator
+       iter = ++constraintList.begin(); iter != constraintList.end(); ++iter) {
     size_t dbowIdOldKf = vioIdToDbowId_.find((*iter)->id_)->second;
     gtsam::SharedNoiseModel noiseModel = createRobustNoiseModelSqrtR((*iter)->squareRootInfo_);
     nfg.add(gtsam::BetweenFactor<gtsam::Pose3>(
@@ -272,16 +278,40 @@ LoopClosureDetector::initializeKeyframeInDatabase(
   } else {
     size_t j = 0u;
     for (auto constraint : queryKeyframe.odometryConstraintList()) {
-      Eigen::Matrix<double, 6, 6> cov_T_BnBr;
-      constraint->computeRelativePoseCovariance(
-          queryKeyframe.T_WB_, queryKeyframe.getCovariance(), &cov_T_BnBr);
-      VIO::BetweenFactorPose3Wrap bfWrap(GtsamWrap::toPose3(constraint->core_.T_BBr_));
-      Eigen::Matrix<double, 6, 6, Eigen::RowMajor> de_dz;
-      Eigen::Matrix<double, 6, 1> autoResidual;
-      bfWrap.toMeasurmentJacobian(&de_dz, &autoResidual);
+      // Method 1 as below is practically wrong as the resulting cov for
+      // cov_T_BnBr is greater than covariance of T_WBn or T_WBr.
+//      Eigen::Matrix<double, 6, 6> cov_T_BnBr;
+//      constraint->computeRelativePoseCovariance(
+//          queryKeyframe.T_WB_, queryKeyframe.getCovariance(), &cov_T_BnBr);
+//      VIO::BetweenFactorPose3Wrap bfWrap(
+//          GtsamWrap::toPose3(constraint->core_.T_BBr_));
+//      Eigen::Matrix<double, 6, 6, Eigen::RowMajor> de_dz;
+//      Eigen::Matrix<double, 6, 1> autoResidual;
+//      bfWrap.toMeasurmentJacobian(&de_dz, &autoResidual);
 
+//      queryKeyframeInDB->setSquareRootInfoFromCovariance(
+//          j, de_dz * cov_T_BnBr * de_dz.transpose());
+
+      // Method 2 see Kimera-RPGO PoseWithCovariance
+      // cov_T_BnBr = cov_T_Br - J * cov_T_Bn * J or cov_T_Bn - J * cov_T_Br *
+      // J, but this may leads to negative diagonal entries in cov_T_BnBr.
+
+      // Method 3 use heuristic diagonal sigmas as in Westman and Kaess
+      // http://www.cs.cmu.edu/~kaess/pub/Westman18tr.pdf
+      // If non uniform weights are used for odometry and loop constraints, then
+      // these values needs to be consistent with the square root info from the
+      // PnP for loop constraint and the drift rate of the VIO estimator. These
+      // values should be obtained by learning from data.
+      Eigen::Matrix<double, 6, 1> sigmas;
+      Eigen::Vector3d deltaTranslation = constraint->core_.T_BBr_.r().cwiseAbs();
+      double maxDeltaTranslation = deltaTranslation.maxCoeff();
+
+      sigmas.head<2>().setConstant(0.005); // roll pitch
+      sigmas[2] = 0.005 + 0.002 * maxDeltaTranslation; // yaw
+      sigmas.tail<3>().setConstant(0.005);
+      sigmas.tail<3>() += 0.002 * deltaTranslation; // x, y, z
       queryKeyframeInDB->setSquareRootInfoFromCovariance(
-            j, de_dz * cov_T_BnBr * de_dz.transpose());
+                  j, sigmas.asDiagonal());
       ++j;
     }
   }
@@ -433,7 +463,9 @@ bool LoopClosureDetector::geometricVerificationCheck(
 
   // match descriptors associated with landmarks in loop keyframe to descriptors in query keyframe.
   std::vector<DMatchVec> matches;
-  descriptor_matcher_->knnMatch(loopFrame->frontendDescriptorsWithLandmarks(),
+  cv::Mat descriptorsForLoopLandmarks = loopFrame->frontendDescriptorsWithLandmarks();
+
+  descriptor_matcher_->knnMatch(descriptorsForLoopLandmarks,
                                 queryKeyframe.getDescriptors(), matches, 2u);
   double lowe_ratio = lcd_params_->lowe_ratio_;
   const size_t n_matches = matches.size();
@@ -460,7 +492,9 @@ bool LoopClosureDetector::geometricVerificationCheck(
       queryKeyframe.NFrame());
 
   size_t numCorrespondences = adapter.getNumberCorrespondences();
-  CHECK_EQ(numCorrespondences, pointIndices.size());
+  LOG(INFO) << "knnmatch 3d landmarks " << descriptorsForLoopLandmarks.rows
+            << " to 2d keypoints " << queryKeyframe.getDescriptors().rows
+            << " correspondences " << numCorrespondences;
   if (static_cast<int>(numCorrespondences) >= lcd_params_->min_correspondences_) {
     // create a RelativePoseSac problem and RANSAC
     opengv::sac::Ransac<
@@ -533,7 +567,9 @@ bool LoopClosureDetector::geometricVerificationCheck(
             sm::eigen::computeMatrixSqrt(lambda_B, choleskyFactor);
             Eigen::Matrix<double, 6, 6> sqrtInfo = choleskyFactor.transpose() *
                 lcd_params_->relative_pose_info_damper_;
-            LOG(INFO) << "relative pose sqrt info\n" << sqrtInfo;
+            LOG(INFO) << "lc relative pose sqrt info\n"
+                      << sqrtInfo << "\ninternal uniform weight? "
+                      << internal_pgo_uniform_weight_;
             if (internal_pgo_uniform_weight_) {
               sqrtInfo = uniform_noise_sigmas_.asDiagonal();
             }
