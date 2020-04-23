@@ -18,7 +18,7 @@ void PgoPublisher::csvSaveStateAsCallback(
 
 bool PgoPublisher::setCsvFile(const std::string& csvFile) {
   csvStream_ = std::ofstream(csvFile.c_str(), std::ios_base::out);
-  csvStream_ << "timestamp[sec] T_WB(x y z qx qy qz qw)\n";
+  csvStream_ << "%timestamp[sec] T_WB(x y z qx qy qz qw)\n";
   return csvStream_.good();
 }
 

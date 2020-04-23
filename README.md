@@ -85,7 +85,9 @@ git checkout 342f30d148fae84c92ff71705c9e50e0a3683bda
 mkdir build
 cd build
 
-# EIGEN_INCLUDE_DIR is needed for ubuntu 16 to preempt the incompatible system-wide Eigen.
+*EIGEN_INCLUDE_DIR is needed for ubuntu 16 to preempt the incompatible system-wide Eigen.*
+*$HOME/Documents/slam_devel is more error prone than /usr/local as it may cause
+ difficulty in debugging this program in QtCreator.*
 cmake -DCMAKE_INSTALL_PREFIX=$HOME/Documents/slam_devel -DCMAKE_BUILD_TYPE=Release \
   -DGTSAM_TANGENT_PREINTEGRATION=OFF -DGTSAM_POSE3_EXPMAP=ON -DGTSAM_ROT3_EXPMAP=ON \
   -DGTSAM_USE_SYSTEM_EIGEN=ON ..
@@ -102,6 +104,9 @@ trouble understanding the symbol "$HOME", so it is preferred to replace it with 
 ```
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$HOME/Documents/slam_devel/lib
 ```
+Even LD_LIBRARY_PATH is properly set in Run Environment in QtCreator, 
+QtCreator debugger may still fail to load libmetis.so. In that case, you may 
+need to install gtsam to /usr/local, i.e., -DCMAKE_INSTALL_PREFIX=/usr/local.
 
 ## Build the project
 

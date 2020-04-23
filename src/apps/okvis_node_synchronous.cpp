@@ -103,7 +103,7 @@ int main(int argc, char **argv) {
     }
   } else {
     if (!nh.getParam("config_filename", configFilename)) {
-      LOG(ERROR) << "Please specify filename of configuration!";
+      LOG(ERROR) << "Usage:" << argv[0] << " <config yml> <lcd config yml> [extra gflags]";
       return 1;
     }
   }
@@ -126,6 +126,14 @@ int main(int argc, char **argv) {
                     "configuration filename is provided!";
   } else {
     lcParams->parseYAML(lcdConfigFilename);
+  }
+  if (!frontend->isDescriptorBasedMatching()) {
+    lcParams->loop_closure_method_ = VIO::LoopClosureMethodType::Mock;
+    LOG(WARNING)
+        << "Loop closure module requires descriptors for keypoints to perform "
+           "matching. But the KLT frontend does not extract descriptors. "
+           "Descriptors can be extracted for KLT points in creating loop query "
+           "keyframes but this is not done yet.";
   }
   std::shared_ptr<okvis::LoopClosureMethod> loopClosureMethod =
       msckf::createLoopClosureMethod(lcParams);

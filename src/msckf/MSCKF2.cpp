@@ -1074,8 +1074,12 @@ void MSCKF2::optimize(size_t /*numIter*/, size_t /*numThreads*/, bool verbose) {
       Exception,
       covariance_.rows() - startIndexOfClonedStates(),
       (int)(kClonedStateMinimalDimen * statesMap_.size()), "Inconsistent covDim and number of states");
-  LOG(INFO) << "MSCKF receives #loop frames " << loopFrameAndMatchesList_.size()
-            << " but has not implemented relocalization yet!";
+  if (loopFrameAndMatchesList_.size() > 0) {
+    LOG(INFO) << "MSCKF receives #loop frames " << loopFrameAndMatchesList_.size()
+              << " but has not implemented relocalization yet!";
+    loopFrameAndMatchesList_.clear();
+  }
+
 
   // mark tracks of features that are not tracked in current frame
   int numTracked = 0;

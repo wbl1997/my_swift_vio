@@ -119,6 +119,9 @@ void LoopClosureDetector::saveFinalPgoResults() {
   if (FLAGS_output_dir.empty()) {
     return;
   }
+  // This is necessary because the latest added poses have not been shifted by PGO yet.
+  pgo_->forceUpdate();
+
   std::string output_csv =
       okvis::removeTrailingSlash(FLAGS_output_dir) + "/final_pgo.csv";
   std::ofstream stream(output_csv, std::ios_base::out);
@@ -126,7 +129,7 @@ void LoopClosureDetector::saveFinalPgoResults() {
     return;
   }
   const char delimiter = ' ';
-  stream << "timestamp[sec] T_WB(x y z qx qy qz qw)\n";
+  stream << "%timestamp[sec] T_WB(x y z qx qy qz qw)\n";
   gtsam::Values estimates = pgo_->calculateEstimate();
   for (auto keyframeInDB : db_frames_) {
     gtsam::Pose3 T_WB = estimates.at<gtsam::Pose3>(
@@ -164,9 +167,10 @@ bool LoopClosureDetector::addConstraintsAndOptimize(
       pfw.toMeasurementJacobian(&de_dz, &residual);
       Eigen::Matrix<double, 6, 6> cov_e = de_dz * cov_z * de_dz.transpose();
       bool tryToSimplify = true;
-      gtsam::SharedNoiseModel shared_noise_model =
+      shared_noise_model =
           gtsam::noiseModel::Gaussian::Covariance(cov_e, tryToSimplify);
     }
+    shared_noise_model->print("Prior factor noise model");
     gtsam::NonlinearFactorGraph init_nfg;
     gtsam::Values init_val;
     init_val.insert(gtsam::Symbol(queryKeyframeInDB.dbowId_),
@@ -225,8 +229,6 @@ void LoopClosureDetector::addOdometryFactors(
       constraintList.at(0);
   std::unordered_map<uint64_t, size_t>::const_iterator idIter =
       vioIdToDbowId_.find(firstNeighbor->id_);
-  LOG(INFO) << "Looking for first neighbor " << firstNeighbor->id_
-            << " not found ? " << (idIter == vioIdToDbowId_.end());
   size_t dbowIdLastKf = idIter->second;
   CHECK_EQ(dbowIdLastKf + 1, keyframeInDB.dbowId_);
 
@@ -280,17 +282,17 @@ LoopClosureDetector::initializeKeyframeInDatabase(
     for (auto constraint : queryKeyframe.odometryConstraintList()) {
       // Method 1 as below is practically wrong as the resulting cov for
       // cov_T_BnBr is greater than covariance of T_WBn or T_WBr.
-//      Eigen::Matrix<double, 6, 6> cov_T_BnBr;
-//      constraint->computeRelativePoseCovariance(
-//          queryKeyframe.T_WB_, queryKeyframe.getCovariance(), &cov_T_BnBr);
-//      VIO::BetweenFactorPose3Wrap bfWrap(
-//          GtsamWrap::toPose3(constraint->core_.T_BBr_));
-//      Eigen::Matrix<double, 6, 6, Eigen::RowMajor> de_dz;
-//      Eigen::Matrix<double, 6, 1> autoResidual;
-//      bfWrap.toMeasurmentJacobian(&de_dz, &autoResidual);
+      Eigen::Matrix<double, 6, 6> cov_T_BnBr;
+      constraint->computeRelativePoseCovariance(
+          queryKeyframe.T_WB_, queryKeyframe.getCovariance(), &cov_T_BnBr);
+      VIO::BetweenFactorPose3Wrap bfWrap(
+          GtsamWrap::toPose3(constraint->core_.T_BBr_));
+      Eigen::Matrix<double, 6, 6, Eigen::RowMajor> de_dz;
+      Eigen::Matrix<double, 6, 1> autoResidual;
+      bfWrap.toMeasurmentJacobian(&de_dz, &autoResidual);
 
-//      queryKeyframeInDB->setSquareRootInfoFromCovariance(
-//          j, de_dz * cov_T_BnBr * de_dz.transpose());
+      queryKeyframeInDB->setSquareRootInfoFromCovariance(
+          j, de_dz * cov_T_BnBr * de_dz.transpose());
 
       // Method 2 see Kimera-RPGO PoseWithCovariance
       // cov_T_BnBr = cov_T_Br - J * cov_T_Bn * J or cov_T_Bn - J * cov_T_Br *
@@ -302,16 +304,16 @@ LoopClosureDetector::initializeKeyframeInDatabase(
       // these values needs to be consistent with the square root info from the
       // PnP for loop constraint and the drift rate of the VIO estimator. These
       // values should be obtained by learning from data.
-      Eigen::Matrix<double, 6, 1> sigmas;
-      Eigen::Vector3d deltaTranslation = constraint->core_.T_BBr_.r().cwiseAbs();
-      double maxDeltaTranslation = deltaTranslation.maxCoeff();
+//      Eigen::Matrix<double, 6, 1> sigmas;
+//      Eigen::Vector3d deltaTranslation = constraint->core_.T_BBr_.r().cwiseAbs();
+//      double maxDeltaTranslation = deltaTranslation.maxCoeff();
 
-      sigmas.head<2>().setConstant(0.005); // roll pitch
-      sigmas[2] = 0.005 + 0.002 * maxDeltaTranslation; // yaw
-      sigmas.tail<3>().setConstant(0.005);
-      sigmas.tail<3>() += 0.002 * deltaTranslation; // x, y, z
-      queryKeyframeInDB->setSquareRootInfoFromCovariance(
-                  j, sigmas.asDiagonal());
+//      sigmas.head<2>().setConstant(0.005); // roll pitch
+//      sigmas[2] = 0.005 + 0.002 * maxDeltaTranslation; // yaw
+//      sigmas.tail<3>().setConstant(0.005);
+//      sigmas.tail<3>() += 0.002 * deltaTranslation; // x, y, z
+//      queryKeyframeInDB->setSquareRootInfoFromCovariance(
+//                  j, sigmas.asDiagonal());
       ++j;
     }
   }
@@ -376,13 +378,9 @@ bool LoopClosureDetector::detectLoop(
   } else {
     double nss_factor = 1.0;
     if (lcd_params_->use_nss_) {
+      // Ordinary nss score (<1 by definition) is about 0.05 when dist_local is at 10.
+      // When one bowvec is empty, the score is expected to be 0.
       nss_factor = db_BoW_->getVocabulary()->score(bow_vec, latest_bowvec_);
-      if (latest_bowvec_.size() == 0) {
-        LOG(INFO) << "When ref bowvec is empty, the score is expected to be 0 ? " << nss_factor;
-        CHECK_EQ(nss_factor, 0);
-      } else {
-        LOG(INFO) << "Normal nss score is expected to be close to 1 ? " << nss_factor;
-      }
     }
 
     if (lcd_params_->use_nss_ && nss_factor < lcd_params_->min_nss_factor_) {
@@ -445,10 +443,10 @@ bool LoopClosureDetector::detectLoop(
             << loopFrameAndMatches->dbowId_ << " and query keyframe "
             << loopFrameAndMatches->queryKeyframeId_ << " with dbow id "
             << loopFrameAndMatches->queryKeyframeDbowId_;
-  } else {
+  } /*else {
     VLOG(0) << "LoopClosureDetector: No loop closure detected. Reason: "
             << lcdStatus.asString();
-  }
+  }*/
   lcd_tp_wrapper_->setLatestQueryId(dbowId);
   return lcdStatus.isLoop();
 }
@@ -481,7 +479,7 @@ bool LoopClosureDetector::geometricVerificationCheck(
   }
 
   loopFrameAndMatches->reset();
-  int numInliers = 0;
+  size_t numInliers = 0u;
   // Absolute pose ransac with OpenGV. An alternate is opencv solvePnPRansac().
   // The camera intrinsics are carried inside nframe.
   // If the estimator estimates camera parameters, it is possible to update
@@ -534,7 +532,15 @@ bool LoopClosureDetector::geometricVerificationCheck(
           AlignedVector<Eigen::Vector3d> bearingInliers;
           adapter.getInlierPoints(ransac.inliers_, &pointInliers);
           adapter.getInlierBearings(ransac.inliers_, &bearingInliers);
-
+          std::vector<double> rayVariances;
+          // Note we are ignoring the distortion effect on variance of ray direction.
+          adapter.getInlierRayVariances(ransac.inliers_, &rayVariances);
+          std::vector<double> rayInfos(rayVariances.size());
+          int varIndex = 0;
+          for (auto variance : rayVariances) {
+            rayInfos[varIndex] = 1.0 / variance;
+            ++varIndex;
+          }
           // LM optimization of T_BlBq.
           StackedProjectionFactorDynamic stackedProjectionFactor(
               pointInliers, bearingInliers,
@@ -550,8 +556,8 @@ bool LoopClosureDetector::geometricVerificationCheck(
           solver.Solve(stackedProjectionFactor, &optimized_T_BlBq_coeffs);
           okvis::kinematics::Transformation optimized_T_BlBq;
           optimized_T_BlBq.setCoeffs(optimized_T_BlBq_coeffs);
-          LOG(INFO) << "T_BlBq: opengv:" << T_BlBq.coeffs().transpose()
-                    << "\nTiny Solver: " << optimized_T_BlBq.coeffs().transpose();
+//          LOG(INFO) << "T_BlBq: opengv:" << T_BlBq.coeffs().transpose()
+//                    << "\nTiny Solver: " << optimized_T_BlBq.coeffs().transpose();
           if (solver.summary.status !=
               msckf::ceres::TinySolver<
                   StackedProjectionFactorDynamic>::Status::HIT_MAX_ITERATIONS) {
@@ -561,15 +567,22 @@ bool LoopClosureDetector::geometricVerificationCheck(
             stackedProjectionFactor(optimized_T_BlBq_coeffs.data(), residuals.data(),
                                     jacColMajor.data());
 
-            Eigen::Matrix<double, 6, 6> lambda_B =
-                jacColMajor.transpose() * jacColMajor;
+            Eigen::Matrix<double, 6, 6> lambda_B;
+            lambda_B.setZero();
+            for (size_t obsIndex = 0u; obsIndex < numInliers; ++obsIndex) {
+              lambda_B +=
+                  (jacColMajor.block<2, 6>(obsIndex * 2, 0).transpose() *
+                   jacColMajor.block<2, 6>(obsIndex * 2, 0)) *
+                  rayInfos[obsIndex];
+            }
             Eigen::Matrix<double, 6, 6> choleskyFactor;
             sm::eigen::computeMatrixSqrt(lambda_B, choleskyFactor);
             Eigen::Matrix<double, 6, 6> sqrtInfo = choleskyFactor.transpose() *
                 lcd_params_->relative_pose_info_damper_;
-            LOG(INFO) << "lc relative pose sqrt info\n"
-                      << sqrtInfo << "\ninternal uniform weight? "
-                      << internal_pgo_uniform_weight_;
+//            LOG(INFO) << "lc relative pose sqrt info\n"
+//                      << sqrtInfo << "\nlambda\n"
+//                      << lambda_B << "\ninternal uniform weight? "
+//                      << internal_pgo_uniform_weight_;
             if (internal_pgo_uniform_weight_) {
               sqrtInfo = uniform_noise_sigmas_.asDiagonal();
             }
