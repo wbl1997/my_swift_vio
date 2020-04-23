@@ -467,8 +467,6 @@ class HybridFilter : public Estimator {
   /// ... \pi{B_{N-1}} following Li icra 2014 x_B = [^{G}p_B] ^{G}q_B ^{G}v_B
   /// b_g b_a]
 
-  std::map<uint64_t, int> mStateID2CovID_;  // maps state id to the ordered cloned states in the covariance matrix
-
   // minimum of the ids of the states that have tracked features
   uint64_t minValidStateId_;
 

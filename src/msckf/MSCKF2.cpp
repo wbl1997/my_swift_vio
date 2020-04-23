@@ -181,7 +181,7 @@ int MSCKF2::marginalizeRedundantFrames(size_t numKeyframes, size_t numImuFrames)
   for (const auto &cam_id : rm_cam_state_ids) {
     int cam_sequence =
         std::distance(statesMap_.begin(), statesMap_.find(cam_id));
-    OKVIS_ASSERT_EQ(Exception, cam_sequence, mStateID2CovID_[cam_id], "inconsistent mStateID2CovID_");
+    OKVIS_ASSERT_EQ(Exception, cam_sequence, statesMap_[cam_id].orderInCov, "Inconsistent state order in covariance");
   }
 
   // remove observations in removed frames
@@ -460,9 +460,9 @@ bool MSCKF2::measurementJacobianAIDP(
   J_x->setZero();
   const int minCamParamDim = cameraParamsMinimalDimen();
   J_x->topLeftCorner(2, minCamParamDim) = J_Xc;
-  std::map<uint64_t, int>::const_iterator poseid_iter =
-      mStateID2CovID_.find(poseId);
-  int covid = poseid_iter->second;
+  auto poseid_iter =
+      statesMap_.find(poseId);
+  int covid = poseid_iter->second.orderInCov;
 
   uint64_t anchorId = pointDataPtr->anchorIds()[0];
   if (poseId == anchorId) {
@@ -472,10 +472,10 @@ bool MSCKF2::measurementJacobianAIDP(
   } else {
     J_x->block<2, 9>(0, minCamParamDim +
                            9 * covid) = J_XBj;
-    std::map<uint64_t, int>::const_iterator anchorid_iter =
-        mStateID2CovID_.find(anchorId);
+    auto anchorid_iter =
+        statesMap_.find(anchorId);
     J_x->block<2, 9>(0, minCamParamDim +
-                           9 * anchorid_iter->second) = J_XBa;
+                           9 * anchorid_iter->second.orderInCov) = J_XBa;
   }
   return true;
 }
@@ -967,11 +967,11 @@ bool MSCKF2::featureJacobian(const MapPoint &mp, Eigen::MatrixXd &H_oi,
     for (size_t saga = 0; saga < numValidObs; ++saga) {
       size_t saga2 = saga * 2;
       H_xi.block(saga2, 0, 2, cameraParamsDimen) = vJ_Xc[saga];
-      std::map<uint64_t, int>::const_iterator poseCovIndexIter =
-          mStateID2CovID_.find(vFrameIds[saga]);
+      auto poseCovIndexIter =
+          statesMap_.find(vFrameIds[saga]);
       H_xi.block<2, kClonedStateMinimalDimen>(
           saga2, cameraParamsDimen +
-                     kClonedStateMinimalDimen * poseCovIndexIter->second) =
+                     kClonedStateMinimalDimen * poseCovIndexIter->second.orderInCov) =
           vJ_XBj[saga];
       H_fi.block<2, 3>(saga2, 0) = vJ_pfi[saga];
       ri.segment<2>(saga2) = vri[saga];

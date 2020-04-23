@@ -149,11 +149,11 @@ HybridFilter::computeCameraObservationJacobians(
               duv_td_minimal, duv_tr_minimal;
         }
       }
-      std::map<uint64_t, int>::const_iterator poseCovIndexIter =
-          mStateID2CovID_.find(poseId);
+
+      int orderInCov = stateInQuestion.orderInCov;
       J_X->block<2, kClonedStateMinimalDimen>(
           0,
-          cameraParamsDim + kClonedStateMinimalDimen * poseCovIndexIter->second)
+          cameraParamsDim + kClonedStateMinimalDimen * orderInCov)
           << duv_deltaTWS_minimal,
           duv_sb_minimal.topLeftCorner<2, 3>();
       *J_pfi = duv_deltahpW.topLeftCorner<2, 3>();
@@ -300,11 +300,10 @@ HybridFilter::computeCameraObservationJacobians(
       std::vector<uint64_t> jmaFrameIds{poseId, anchorIds[0], anchorIds[1]};
       for (int f = 0; f < 3; ++f) {
         uint64_t frameId = jmaFrameIds[f];
-        std::map<uint64_t, int>::const_iterator poseCovIndexIter =
-            mStateID2CovID_.find(frameId);
+        auto smIter = statesMap_.find(frameId);
         J_X->block<krd, kClonedStateMinimalDimen>(
             0, cameraParamsDim +
-                   kClonedStateMinimalDimen * poseCovIndexIter->second)
+                   kClonedStateMinimalDimen * smIter->second.orderInCov)
             << de_dTWB_minimal[f],
             de_dSpeedAndBias_minimal[f].template topLeftCorner<krd, 3>();
       }
@@ -452,11 +451,10 @@ HybridFilter::computeCameraObservationJacobians(
         std::vector<uint64_t> jmaFrameIds{poseId, anchorIds[0], anchorIds[1]};
         for (int f = 0; f < 3; ++f) {
           uint64_t frameId = jmaFrameIds[f];
-          std::map<uint64_t, int>::const_iterator poseCovIndexIter =
-              mStateID2CovID_.find(frameId);
+          auto smIter = statesMap_.find(frameId);
           J_X->block<krd, kClonedStateMinimalDimen>(
               0, cameraParamsDim +
-                     kClonedStateMinimalDimen * poseCovIndexIter->second)
+                     kClonedStateMinimalDimen * smIter->second.orderInCov)
               << de_dTWB_minimal[f],
               de_dSpeedAndBias_minimal[f].template topLeftCorner<krd, 3>();
         }
