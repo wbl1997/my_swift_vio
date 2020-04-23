@@ -579,8 +579,8 @@ bool LoopClosureDetector::geometricVerificationCheck(
             sm::eigen::computeMatrixSqrt(lambda_B, choleskyFactor);
             Eigen::Matrix<double, 6, 6> sqrtInfo = choleskyFactor.transpose() *
                 lcd_params_->relative_pose_info_damper_;
-//            LOG(INFO) << "lc relative pose sqrt info\n"
-//                      << sqrtInfo << "\nlambda\n"
+//            LOG(INFO) << "lc relative pose cholesky factor \n"
+//                      << choleskyFactor << "\nlambda\n"
 //                      << lambda_B << "\ninternal uniform weight? "
 //                      << internal_pgo_uniform_weight_;
             if (internal_pgo_uniform_weight_) {
