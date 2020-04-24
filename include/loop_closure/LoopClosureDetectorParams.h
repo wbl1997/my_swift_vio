@@ -50,7 +50,7 @@ class LoopClosureDetectorParams : public okvis::LoopClosureParameters {
       double ransac_threshold_stereo = 9,
       int relative_pose_opt_iterations = 15,
       double ransac_inlier_threshold_stereo = 0.3,
-      double relative_pose_info_damper = 0.9,
+      double relative_pose_info_damper = 1.0,
 
       double lowe_ratio = 0.7,
       int matcher_type = cv::DescriptorMatcher::BRUTEFORCE_HAMMING,

@@ -19,7 +19,7 @@ max_ransac_iterations_stereo: 100
 ransac_threshold_stereo: 9
 ransac_inlier_threshold_stereo: 0.3
 relative_pose_opt_iterations: 15
-relative_pose_info_damper: 0.9
+relative_pose_info_damper: 1.0
 
 nfeatures: 500
 scale_factor: 1.2

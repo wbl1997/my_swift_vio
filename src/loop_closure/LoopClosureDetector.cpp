@@ -280,8 +280,7 @@ LoopClosureDetector::initializeKeyframeInDatabase(
   } else {
     size_t j = 0u;
     for (auto constraint : queryKeyframe.odometryConstraintList()) {
-      // Method 1 as below is practically wrong as the resulting cov for
-      // cov_T_BnBr is greater than covariance of T_WBn or T_WBr.
+      // Method 1
       Eigen::Matrix<double, 6, 6> cov_T_BnBr;
       constraint->computeRelativePoseCovariance(
           queryKeyframe.T_WB_, queryKeyframe.getCovariance(), &cov_T_BnBr);
