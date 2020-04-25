@@ -27,8 +27,10 @@
 #include <msckf/PointSharedData.hpp>
 #include <msckf/RelativeMotionJacobian.hpp>
 #include <msckf/TwoViewPair.hpp>
+#include <msckf/memory.h>
 
 #include <vio/eigen_utils.h>
+
 DEFINE_bool(use_RK4, false,
             "use 4th order runge-kutta or the trapezoidal "
             "rule for integrating IMU data and computing"
@@ -105,21 +107,22 @@ void HybridFilter::addImuAugmentedStates(const okvis::Time stateTime,
     std::map<uint64_t, States>::reverse_iterator lastElementIterator =
         statesMap_.rbegin();
     lastElementIterator++;
+    const SpecificSensorStatesContainer& prevImuInfo =
+        lastElementIterator->second.sensors.at(SensorStates::Imu).at(imu_id);
     imuInfo->at(ImuSensorStates::TG).id =
-        lastElementIterator->second.sensors.at(SensorStates::Imu)
-            .at(imu_id)
-            .at(ImuSensorStates::TG)
-            .id;
+        prevImuInfo.at(ImuSensorStates::TG).id;
     imuInfo->at(ImuSensorStates::TS).id =
-        lastElementIterator->second.sensors.at(SensorStates::Imu)
-            .at(imu_id)
-            .at(ImuSensorStates::TS)
-            .id;
+        prevImuInfo.at(ImuSensorStates::TS).id;
     imuInfo->at(ImuSensorStates::TA).id =
-        lastElementIterator->second.sensors.at(SensorStates::Imu)
-            .at(imu_id)
-            .at(ImuSensorStates::TA)
-            .id;
+        prevImuInfo.at(ImuSensorStates::TA).id;
+    imuInfo->at(ImuSensorStates::SpeedAndBias).startIndexInCov =
+        prevImuInfo.at(ImuSensorStates::SpeedAndBias).startIndexInCov;
+    imuInfo->at(ImuSensorStates::TG).startIndexInCov =
+        prevImuInfo.at(ImuSensorStates::TG).startIndexInCov;
+    imuInfo->at(ImuSensorStates::TS).startIndexInCov =
+        prevImuInfo.at(ImuSensorStates::TS).startIndexInCov;
+    imuInfo->at(ImuSensorStates::TA).startIndexInCov =
+        prevImuInfo.at(ImuSensorStates::TA).startIndexInCov;
   } else {
     Eigen::Matrix<double, 27, 1> vTgTsTa = imu_rig_.getImuAugmentedEuclideanParams();
     Eigen::Matrix<double, 9, 1> TG = vTgTsTa.head<9>();
@@ -142,7 +145,103 @@ void HybridFilter::addImuAugmentedStates(const okvis::Time stateTime,
         new okvis::ceres::ShapeMatrixParamBlock(TA, id, stateTime));
     mapPtr_->addParameterBlock(taBlockPtr, ceres::Map::Trivial);
     imuInfo->at(ImuSensorStates::TA).id = id;
+    // The startIndex in covariance will be initialized along with covariance.
   }
+}
+
+void HybridFilter::usePreviousCameraParamBlocks(
+    std::map<uint64_t, States>::const_reverse_iterator prevStateRevIter,
+    size_t cameraIndex, SpecificSensorStatesContainer* cameraInfos) const {
+  // use the same block...
+  // the following will point to the last states:
+  const SpecificSensorStatesContainer& prevCameraInfo =
+      prevStateRevIter->second.sensors.at(SensorStates::Camera).at(cameraIndex);
+  cameraInfos->at(CameraSensorStates::T_SCi).id =
+      prevCameraInfo.at(CameraSensorStates::T_SCi).id;
+  cameraInfos->at(CameraSensorStates::Intrinsics).exists =
+      prevCameraInfo.at(CameraSensorStates::Intrinsics).exists;
+  cameraInfos->at(CameraSensorStates::Intrinsics).id =
+      prevCameraInfo.at(CameraSensorStates::Intrinsics).id;
+  cameraInfos->at(CameraSensorStates::Distortion).id =
+      prevCameraInfo.at(CameraSensorStates::Distortion).id;
+  cameraInfos->at(CameraSensorStates::TD).id =
+      prevCameraInfo.at(CameraSensorStates::TD).id;
+  cameraInfos->at(CameraSensorStates::TR).id =
+      prevCameraInfo.at(CameraSensorStates::TR).id;
+
+  cameraInfos->at(CameraSensorStates::T_SCi).startIndexInCov =
+      prevCameraInfo.at(CameraSensorStates::T_SCi).startIndexInCov;
+  cameraInfos->at(CameraSensorStates::Intrinsics).startIndexInCov =
+      prevCameraInfo.at(CameraSensorStates::Intrinsics).startIndexInCov;
+  cameraInfos->at(CameraSensorStates::Distortion).startIndexInCov =
+      prevCameraInfo.at(CameraSensorStates::Distortion).startIndexInCov;
+  cameraInfos->at(CameraSensorStates::TD).startIndexInCov =
+      prevCameraInfo.at(CameraSensorStates::TD).startIndexInCov;
+  cameraInfos->at(CameraSensorStates::TR).startIndexInCov =
+      prevCameraInfo.at(CameraSensorStates::TR).startIndexInCov;
+}
+
+void HybridFilter::initializeCameraParamBlocks(
+    okvis::Time stateEpoch, size_t cameraIndex, SpecificSensorStatesContainer* cameraInfos) {
+  const okvis::kinematics::Transformation T_BC =
+      camera_rig_.getCameraExtrinsic(cameraIndex);
+  uint64_t id = IdProvider::instance().newId();
+  std::shared_ptr<okvis::ceres::PoseParameterBlock> extrinsicsParameterBlockPtr(
+      new okvis::ceres::PoseParameterBlock(T_BC, id, stateEpoch));
+  mapPtr_->addParameterBlock(extrinsicsParameterBlockPtr, ceres::Map::Pose6d);
+  cameraInfos->at(CameraSensorStates::T_SCi).id = id;
+
+  Eigen::VectorXd allIntrinsics;
+  camera_rig_.getCameraGeometry(cameraIndex)->getIntrinsics(allIntrinsics);
+  id = IdProvider::instance().newId();
+  int projOptModelId = camera_rig_.getProjectionOptMode(cameraIndex);
+  const int minProjectionDim = camera_rig_.getMinimalProjectionDimen(cameraIndex);
+  if (!fixCameraIntrinsicParams_[cameraIndex]) {
+    Eigen::VectorXd optProjIntrinsics;
+    ProjectionOptGlobalToLocal(projOptModelId, allIntrinsics,
+                               &optProjIntrinsics);
+    std::shared_ptr<okvis::ceres::EuclideanParamBlock>
+        projIntrinsicParamBlockPtr(new okvis::ceres::EuclideanParamBlock(
+            optProjIntrinsics, id, stateEpoch, minProjectionDim));
+    mapPtr_->addParameterBlock(projIntrinsicParamBlockPtr,
+                               ceres::Map::Parameterization::Trivial);
+    cameraInfos->at(CameraSensorStates::Intrinsics).id = id;
+  } else {
+    Eigen::VectorXd optProjIntrinsics = allIntrinsics.head<4>();
+    std::shared_ptr<okvis::ceres::EuclideanParamBlock>
+        projIntrinsicParamBlockPtr(new okvis::ceres::EuclideanParamBlock(
+            optProjIntrinsics, id, stateEpoch, 4));
+    mapPtr_->addParameterBlock(projIntrinsicParamBlockPtr,
+                               ceres::Map::Parameterization::Trivial);
+    cameraInfos->at(CameraSensorStates::Intrinsics).id = id;
+    mapPtr_->setParameterBlockConstant(id);
+  }
+  id = IdProvider::instance().newId();
+  const int distortionDim = camera_rig_.getDistortionDimen(cameraIndex);
+  std::shared_ptr<okvis::ceres::EuclideanParamBlock> distortionParamBlockPtr(
+      new okvis::ceres::EuclideanParamBlock(allIntrinsics.tail(distortionDim),
+                                            id, stateEpoch,
+                                            distortionDim));
+  mapPtr_->addParameterBlock(distortionParamBlockPtr,
+                             ceres::Map::Parameterization::Trivial);
+  cameraInfos->at(CameraSensorStates::Distortion).id = id;
+
+  id = IdProvider::instance().newId();
+  std::shared_ptr<okvis::ceres::CameraTimeParamBlock> tdParamBlockPtr(
+      new okvis::ceres::CameraTimeParamBlock(camera_rig_.getImageDelay(cameraIndex), id,
+                                             stateEpoch));
+  mapPtr_->addParameterBlock(tdParamBlockPtr,
+                             ceres::Map::Parameterization::Trivial);
+  cameraInfos->at(CameraSensorStates::TD).id = id;
+
+  id = IdProvider::instance().newId();
+  std::shared_ptr<okvis::ceres::CameraTimeParamBlock> trParamBlockPtr(
+      new okvis::ceres::CameraTimeParamBlock(camera_rig_.getReadoutTime(cameraIndex), id,
+                                             stateEpoch));
+  mapPtr_->addParameterBlock(trParamBlockPtr,
+                             ceres::Map::Parameterization::Trivial);
+  cameraInfos->at(CameraSensorStates::TR).id = id;
+  // The startIndex in covariance will be initialized along with covariance.
 }
 
 bool HybridFilter::addStates(okvis::MultiFramePtr multiFrame,
@@ -311,8 +410,6 @@ bool HybridFilter::addStates(okvis::MultiFramePtr multiFrame,
   multiFramePtrMap_.insert(
       std::pair<uint64_t, okvis::MultiFramePtr>(states.id, multiFrame));
 
-  OKVIS_ASSERT_EQ_DBG(Exception, extrinsicsEstimationParametersVec_.size(), 1,
-                      "Only one camera is supported.");
   OKVIS_ASSERT_EQ_DBG(Exception, imuParametersVec_.size(), 1,
                       "Only one IMU is supported.");
   // initialize new sensor states
@@ -327,103 +424,12 @@ bool HybridFilter::addStates(okvis::MultiFramePtr multiFrame,
     // In MSCKF, use the same block for those parameters that are assumed
     // constant and updated in the filter
     if (statesMap_.size() > 1) {
-      // use the same block...
-      // the following will point to the last states:
-      std::map<uint64_t, States>::reverse_iterator lastElementIterator =
+      std::map<uint64_t, States>::const_reverse_iterator lastElementIterator =
           statesMap_.rbegin();
       lastElementIterator++;
-      cameraInfos.at(CameraSensorStates::T_SCi).id =
-          lastElementIterator->second.sensors.at(SensorStates::Camera)
-              .at(i)
-              .at(CameraSensorStates::T_SCi)
-              .id;
-      cameraInfos.at(CameraSensorStates::Intrinsics).exists =
-          lastElementIterator->second.sensors.at(SensorStates::Camera)
-              .at(i)
-              .at(CameraSensorStates::Intrinsics)
-              .exists;
-      cameraInfos.at(CameraSensorStates::Intrinsics).id =
-          lastElementIterator->second.sensors.at(SensorStates::Camera)
-              .at(i)
-              .at(CameraSensorStates::Intrinsics)
-              .id;
-      cameraInfos.at(CameraSensorStates::Distortion).id =
-          lastElementIterator->second.sensors.at(SensorStates::Camera)
-              .at(i)
-              .at(CameraSensorStates::Distortion)
-              .id;
-      cameraInfos.at(CameraSensorStates::TD).id =
-          lastElementIterator->second.sensors.at(SensorStates::Camera)
-              .at(i)
-              .at(CameraSensorStates::TD)
-              .id;
-      cameraInfos.at(CameraSensorStates::TR).id =
-          lastElementIterator->second.sensors.at(SensorStates::Camera)
-              .at(i)
-              .at(CameraSensorStates::TR)
-              .id;
+      usePreviousCameraParamBlocks(lastElementIterator, i, &cameraInfos);
     } else {
-      const okvis::kinematics::Transformation T_BC =
-          camera_rig_.getCameraExtrinsic(i);
-
-      uint64_t id = IdProvider::instance().newId();
-      std::shared_ptr<okvis::ceres::PoseParameterBlock>
-          extrinsicsParameterBlockPtr(new okvis::ceres::PoseParameterBlock(
-              T_BC, id, correctedStateTime));
-      mapPtr_->addParameterBlock(extrinsicsParameterBlockPtr,
-                                 ceres::Map::Pose6d);
-      cameraInfos.at(CameraSensorStates::T_SCi).id = id;
-
-      Eigen::VectorXd allIntrinsics;
-      camera_rig_.getCameraGeometry(i)->getIntrinsics(allIntrinsics);
-      id = IdProvider::instance().newId();
-      int projOptModelId = camera_rig_.getProjectionOptMode(i);
-      const int minProjectionDim = camera_rig_.getMinimalProjectionDimen(i);
-      if (!fixCameraIntrinsicParams_[i]) {
-        Eigen::VectorXd optProjIntrinsics;
-        ProjectionOptGlobalToLocal(projOptModelId, allIntrinsics,
-                                   &optProjIntrinsics);
-        std::shared_ptr<okvis::ceres::EuclideanParamBlock>
-            projIntrinsicParamBlockPtr(new okvis::ceres::EuclideanParamBlock(
-                optProjIntrinsics, id, correctedStateTime, minProjectionDim));
-        mapPtr_->addParameterBlock(projIntrinsicParamBlockPtr,
-                                   ceres::Map::Parameterization::Trivial);
-        cameraInfos.at(CameraSensorStates::Intrinsics).id = id;
-      } else {
-        Eigen::VectorXd optProjIntrinsics = allIntrinsics.head<4>();
-        std::shared_ptr<okvis::ceres::EuclideanParamBlock>
-            projIntrinsicParamBlockPtr(new okvis::ceres::EuclideanParamBlock(
-                optProjIntrinsics, id, correctedStateTime, 4));
-        mapPtr_->addParameterBlock(projIntrinsicParamBlockPtr,
-                                   ceres::Map::Parameterization::Trivial);
-        cameraInfos.at(CameraSensorStates::Intrinsics).id = id;
-        mapPtr_->setParameterBlockConstant(id);
-      }
-      id = IdProvider::instance().newId();
-      const int distortionDim = camera_rig_.getDistortionDimen(i);
-      std::shared_ptr<okvis::ceres::EuclideanParamBlock>
-          distortionParamBlockPtr(new okvis::ceres::EuclideanParamBlock(
-              allIntrinsics.tail(distortionDim), id, correctedStateTime,
-              distortionDim));
-      mapPtr_->addParameterBlock(distortionParamBlockPtr,
-                                 ceres::Map::Parameterization::Trivial);
-      cameraInfos.at(CameraSensorStates::Distortion).id = id;
-
-      id = IdProvider::instance().newId();
-      std::shared_ptr<okvis::ceres::CameraTimeParamBlock> tdParamBlockPtr(
-          new okvis::ceres::CameraTimeParamBlock(camera_rig_.getImageDelay(i),
-                                                 id, correctedStateTime));
-      mapPtr_->addParameterBlock(tdParamBlockPtr,
-                                 ceres::Map::Parameterization::Trivial);
-      cameraInfos.at(CameraSensorStates::TD).id = id;
-
-      id = IdProvider::instance().newId();
-      std::shared_ptr<okvis::ceres::CameraTimeParamBlock> trParamBlockPtr(
-          new okvis::ceres::CameraTimeParamBlock(camera_rig_.getReadoutTime(i),
-                                                 id, correctedStateTime));
-      mapPtr_->addParameterBlock(trParamBlockPtr,
-                                 ceres::Map::Parameterization::Trivial);
-      cameraInfos.at(CameraSensorStates::TR).id = id;
+      initializeCameraParamBlocks(correctedStateTime, i, &cameraInfos);
     }
     // update the info in both copies of states
     statesMap_.rbegin()
@@ -456,8 +462,7 @@ bool HybridFilter::addStates(okvis::MultiFramePtr multiFrame,
   // depending on whether or not this is the very beginning, we will construct
   // covariance
   if (statesMap_.size() == 1) {
-    const int camIdx = 0;
-    initCovariance(camIdx);
+    initCovariance();
   }
 
   addCovForClonedStates();
@@ -465,7 +470,7 @@ bool HybridFilter::addStates(okvis::MultiFramePtr multiFrame,
   return true;
 }
 
-void HybridFilter::initCovariance(int camIdx) {
+void HybridFilter::initCovariance() {
   int covDim = startIndexOfClonedStates();
   Eigen::Matrix<double, 6, 6> covPQ =
       Eigen::Matrix<double, 6, 6>::Zero();  // [\delta p_B^G, \delta \theta]
@@ -498,17 +503,27 @@ void HybridFilter::initCovariance(int camIdx) {
     covTGTSTA.block<9, 9>(18, 18) =
         Eigen::Matrix<double, 9, 9>::Identity() * std::pow(sigmaTAElement, 2);
   }
+  SpecificSensorStatesContainer& imuInfo =
+      statesMap_.rbegin()->second.sensors.at(SensorStates::Imu).at(0u);
+
   covariance_ = Eigen::MatrixXd::Zero(covDim, covDim);
+
   covariance_.topLeftCorner<6, 6>() = covPQ;
   covariance_.block<9, 9>(6, 6) = covSB;
+  imuInfo.at(ImuSensorStates::SpeedAndBias).startIndexInCov = 6u;
   covariance_.block<27, 27>(15, 15) = covTGTSTA;
+  imuInfo.at(ImuSensorStates::TG).startIndexInCov = 15u;
+  imuInfo.at(ImuSensorStates::TS).startIndexInCov = 24u;
+  imuInfo.at(ImuSensorStates::TA).startIndexInCov = 33u;
 
-  initCameraParamCovariance(camIdx);
+  for (size_t j = 0u; j < camera_rig_.numberCameras(); ++j) {
+    initCameraParamCovariance(j);
+  }
 }
 
 void HybridFilter::initCameraParamCovariance(int camIdx) {
   // camera sensor states
-  int camParamStartIndex = startIndexOfCameraParams();
+  int camParamIndex = startIndexOfCameraParams(camIdx);
   int minExtrinsicDim = camera_rig_.getMinimalExtrinsicDimen(camIdx);
   int minProjectionDim = camera_rig_.getMinimalProjectionDimen(camIdx);
   int distortionDim = camera_rig_.getDistortionDimen(camIdx);
@@ -518,7 +533,10 @@ void HybridFilter::initCameraParamCovariance(int camIdx) {
   Eigen::MatrixXd covDistortion;
   Eigen::Matrix2d covTDTR;
 
-  int camParamIndex = camParamStartIndex;
+  SpecificSensorStatesContainer& cameraInfos =
+      statesMap_.rbegin()->second.sensors.at(SensorStates::Camera).at(camIdx);
+
+  cameraInfos.at(CameraSensorStates::T_SCi).startIndexInCov = camParamIndex;
   if (!fixCameraExtrinsicParams_[camIdx]) {
     covExtrinsic =
         ExtrinsicModelInitCov(camera_rig_.getExtrinsicOptMode(camIdx),
@@ -526,11 +544,11 @@ void HybridFilter::initCameraParamCovariance(int camIdx) {
                                   .sigma_absolute_translation,
                               extrinsicsEstimationParametersVec_.at(camIdx)
                                   .sigma_absolute_orientation);
-    covariance_.block(camParamStartIndex, camParamStartIndex, minExtrinsicDim,
+    covariance_.block(camParamIndex, camParamIndex, minExtrinsicDim,
                       minExtrinsicDim) = covExtrinsic;
     camParamIndex += minExtrinsicDim;
   }
-
+  cameraInfos.at(CameraSensorStates::Intrinsics).startIndexInCov = camParamIndex;
   if (!fixCameraIntrinsicParams_[camIdx]) {
     covProjIntrinsics = ProjectionModelGetInitCov(
         camera_rig_.getProjectionOptMode(camIdx),
@@ -546,11 +564,15 @@ void HybridFilter::initCameraParamCovariance(int camIdx) {
     covariance_.block(camParamIndex, camParamIndex, minProjectionDim,
                       minProjectionDim) = covProjIntrinsics;
     camParamIndex += minProjectionDim;
+    cameraInfos.at(CameraSensorStates::Distortion).startIndexInCov = camParamIndex;
     covariance_.block(camParamIndex, camParamIndex, distortionDim,
                       distortionDim) = covDistortion;
     camParamIndex += distortionDim;
+  } else {
+    cameraInfos.at(CameraSensorStates::Distortion).startIndexInCov = camParamIndex;
   }
-
+  cameraInfos.at(CameraSensorStates::TD).startIndexInCov = camParamIndex;
+  cameraInfos.at(CameraSensorStates::TR).startIndexInCov = camParamIndex + 1;
   covTDTR = Eigen::Matrix2d::Identity();
   covTDTR(0, 0) *=
       std::pow(extrinsicsEstimationParametersVec_.at(camIdx).sigma_td, 2);
@@ -619,7 +641,8 @@ bool HybridFilter::applyMarginalizationStrategy(
                                  // reparameterized, 0 based
   std::vector<uint64_t>
       toRemoveLmIds;  // id of landmarks to be removed that are in state
-  const size_t numNavImuCamStates = startIndexOfClonedStates();
+  const size_t numNavImuCamStates = startIndexOfClonedStatesFast();
+  CHECK_EQ(numNavImuCamStates, startIndexOfClonedStates());
   // number of navigation, imu, and camera states in the covariance
   const size_t numNavImuCamPoseStates =
       numNavImuCamStates + 9 * statesMap_.size();
@@ -853,7 +876,7 @@ bool HybridFilter::applyMarginalizationStrategy(
     return true;
   }
 
-  int startIndex = startIndexOfClonedStates();
+  int startIndex = startIndexOfClonedStatesFast();
   int finishIndex = startIndex + numRemovedStates * 9;
   Eigen::MatrixXd slimCovariance(covDim - numRemovedStates * 9,
                                  covDim - numRemovedStates * 9);
@@ -875,9 +898,14 @@ void HybridFilter::updateImuRig() {
 
 void HybridFilter::updateCovarianceIndex() {
   int nCovIndex = 0;
-  // note the statesMap_ is an ordered map!
-  for (auto iter = statesMap_.begin(); iter != statesMap_.end(); ++iter) {
-    statesMap_[iter->first].orderInCov = nCovIndex;
+  for (std::map<uint64_t, States, std::less<uint64_t>,
+                Eigen::aligned_allocator<std::pair<const uint64_t, States>>>::
+           iterator iter = statesMap_.begin();
+       iter != statesMap_.end(); ++iter) {
+    iter->second.orderInCov = nCovIndex;
+    // TODO(jhuai): remove orderInCov and use startIndexInCov instead.
+    //    iter->second.global.at(GlobalStates::T_WS).startIndexInCov =
+    //    nCovIndex;
     ++nCovIndex;
   }
 }
@@ -1170,14 +1198,13 @@ bool HybridFilter::featureJacobian(
   msckf::PointLandmark pointLandmark(msckf::InverseDepthParameterization::kModelId);
   std::shared_ptr<msckf::PointSharedData> pointDataPtr(new msckf::PointSharedData());
   msckf::TriangulationStatus status = triangulateAMapPoint(
-      mp, obsInPixel, pointLandmark, vSigmai, tempCameraGeometry, T_BC0,
-      pointDataPtr.get(), nullptr, false);
+      mp, obsInPixel, pointLandmark, vSigmai, pointDataPtr.get(), nullptr, false);
   Eigen::Map<Eigen::Vector4d> v4Xhomog(pointLandmark.data(), 4);
   if (!status.triangulationOk) {
     computeHTimer.stop();
     return false;
   }
-  uint64_t anchorId = pointDataPtr->anchorIds()[0];
+  uint64_t anchorId = pointDataPtr->anchorIds()[0].frameId_;
 
   size_t numCamPoseStates = cameraParamPoseAndLandmarkMinimalDimen() - 3 * mInCovLmIds.size();
   // camera states, pose states, excluding feature states, and the velocity
@@ -1491,10 +1518,8 @@ void HybridFilter::cloneImuAugmentedStates(
 }
 
 void HybridFilter::cloneCameraParameterStates(
-    const States& stateInQuestion,
-    StatePointerAndEstimateList*
-        currentStates) const {
-  const int camIdx = 0;
+    const States& stateInQuestion, StatePointerAndEstimateList* currentStates,
+    size_t camIdx) const {
   if (!fixCameraExtrinsicParams_[camIdx]) {
     uint64_t extrinsicId = stateInQuestion.sensors.at(SensorStates::Camera)
                                .at(camIdx)
@@ -1570,7 +1595,9 @@ void HybridFilter::cloneFilterStates(
   currentStates->emplace_back(sbParamBlockPtr, sbParamBlockPtr->estimate());
 
   cloneImuAugmentedStates(stateInQuestion, currentStates);
-  cloneCameraParameterStates(stateInQuestion, currentStates);
+  for (size_t j = 0u; j < camera_rig_.numberCameras(); ++j) {
+    cloneCameraParameterStates(stateInQuestion, currentStates, j);
+  }
 
   auto finalIter = statesMap_.end();
   --finalIter; // The last one has been added early on.
@@ -1623,51 +1650,53 @@ void HybridFilter::boxminusFromInput(
   int stateBlockIndex = 5;
 
   // camera related parameters
-  const int camIdx = 0;
-  if (!fixCameraExtrinsicParams_[camIdx]) {
-    int extrinsicOptModelId = camera_rig_.getExtrinsicOptMode(camIdx);
-    int minExtrinsicDim = camera_rig_.getMinimalExtrinsicDimen(camIdx);
-    Eigen::VectorXd delta(minExtrinsicDim);
-    ExtrinsicModelBoxminus(
-        extrinsicOptModelId,
-        refStates.at(stateBlockIndex).parameterBlockPtr->parameters(),
-        refStates.at(stateBlockIndex).parameterEstimate.data(), delta.data());
-    deltaX->segment(covStateIndex, minExtrinsicDim) = delta;
-    covStateIndex += minExtrinsicDim;
+  for (size_t camIdx = 0u; camIdx < camera_rig_.numberCameras(); ++camIdx) {
+    if (!fixCameraExtrinsicParams_[camIdx]) {
+      int extrinsicOptModelId = camera_rig_.getExtrinsicOptMode(camIdx);
+      int minExtrinsicDim = camera_rig_.getMinimalExtrinsicDimen(camIdx);
+      Eigen::VectorXd delta(minExtrinsicDim);
+      ExtrinsicModelBoxminus(
+          extrinsicOptModelId,
+          refStates.at(stateBlockIndex).parameterBlockPtr->parameters(),
+          refStates.at(stateBlockIndex).parameterEstimate.data(), delta.data());
+      deltaX->segment(covStateIndex, minExtrinsicDim) = delta;
+      covStateIndex += minExtrinsicDim;
+      ++stateBlockIndex;
+    }
+
+    if (!fixCameraIntrinsicParams_[camIdx]) {
+      const int minProjectionDim =
+          camera_rig_.getMinimalProjectionDimen(camIdx);
+      Eigen::Map<const Eigen::VectorXd> cameraIntrinsics(
+          refStates.at(stateBlockIndex).parameterBlockPtr->parameters(),
+          minProjectionDim);
+      deltaX->segment(covStateIndex, minProjectionDim) =
+          refStates.at(stateBlockIndex).parameterEstimate - cameraIntrinsics;
+      covStateIndex += minProjectionDim;
+      ++stateBlockIndex;
+
+      const int distortionCoeffDim = camera_rig_.getDistortionDimen(camIdx);
+      Eigen::Map<const Eigen::VectorXd> cameraDistortion(
+          refStates.at(stateBlockIndex).parameterBlockPtr->parameters(),
+          distortionCoeffDim);
+      deltaX->segment(covStateIndex, distortionCoeffDim) =
+          refStates.at(stateBlockIndex).parameterEstimate - cameraDistortion;
+      covStateIndex += distortionCoeffDim;
+      ++stateBlockIndex;
+    }
+
+    (*deltaX)[covStateIndex] =
+        refStates.at(stateBlockIndex).parameterEstimate[0] -
+        refStates.at(stateBlockIndex).parameterBlockPtr->parameters()[0];
+    ++covStateIndex;
+    ++stateBlockIndex;
+
+    (*deltaX)[covStateIndex] =
+        refStates.at(stateBlockIndex).parameterEstimate[0] -
+        refStates.at(stateBlockIndex).parameterBlockPtr->parameters()[0];
+    ++covStateIndex;
     ++stateBlockIndex;
   }
-
-  if (!fixCameraIntrinsicParams_[camIdx]) {
-    const int minProjectionDim = camera_rig_.getMinimalProjectionDimen(camIdx);
-    Eigen::Map<const Eigen::VectorXd> cameraIntrinsics(
-        refStates.at(stateBlockIndex).parameterBlockPtr->parameters(),
-        minProjectionDim);
-    deltaX->segment(covStateIndex, minProjectionDim) =
-        refStates.at(stateBlockIndex).parameterEstimate - cameraIntrinsics;
-    covStateIndex += minProjectionDim;
-    ++stateBlockIndex;
-
-    const int distortionCoeffDim = camera_rig_.getDistortionDimen(camIdx);
-    Eigen::Map<const Eigen::VectorXd> cameraDistortion(
-        refStates.at(stateBlockIndex).parameterBlockPtr->parameters(),
-        distortionCoeffDim);
-    deltaX->segment(covStateIndex, distortionCoeffDim) =
-        refStates.at(stateBlockIndex).parameterEstimate - cameraDistortion;
-    covStateIndex += distortionCoeffDim;
-    ++stateBlockIndex;
-  }
-
-  (*deltaX)[covStateIndex] =
-      refStates.at(stateBlockIndex).parameterEstimate[0] -
-      refStates.at(stateBlockIndex).parameterBlockPtr->parameters()[0];
-  ++covStateIndex;
-  ++stateBlockIndex;
-
-  (*deltaX)[covStateIndex] =
-      refStates.at(stateBlockIndex).parameterEstimate[0] -
-      refStates.at(stateBlockIndex).parameterBlockPtr->parameters()[0];
-  ++covStateIndex;
-  ++stateBlockIndex;
 
   for (auto iter = refStates.begin() + stateBlockIndex; iter != refStates.end();
        ++iter) {
@@ -1694,7 +1723,7 @@ void HybridFilter::boxminusFromInput(
 void HybridFilter::updateStates(
     const Eigen::Matrix<double, Eigen::Dynamic, 1>& deltaX) {
   updateStatesTimer.start();
-  const size_t numNavImuCamStates = startIndexOfClonedStates();
+  const size_t numNavImuCamStates = startIndexOfClonedStatesFast();
   // number of navigation, imu, and camera states in the covariance
   const size_t numNavImuCamPoseStates =
       numNavImuCamStates + 9 * statesMap_.size();
@@ -1740,9 +1769,12 @@ void HybridFilter::updateStates(
         stateInQuestion, deltaX.segment(15, imu_rig_.getAugmentedMinimalDim(0)));
 
   // update camera sensor states
-  int camParamIndex = startIndexOfCameraParams();
+  size_t camParamIndex = startIndexOfCameraParamsFast(0u);
   const int camIdx = 0;
-
+  // It has been shown that estimating the extrinsic parameter T_ClCr performs
+  // better than estimating T_SCr. see eq(5) in A comparative analysis of
+  // tightly-coupled monocular, binocular, and stereo VINS.
+  // Therefore, we may save T_C0Ci in place of T_SCi.
   if (!fixCameraExtrinsicParams_[camIdx]) {
     uint64_t extrinsicId = stateInQuestion.sensors.at(SensorStates::Camera)
                                .at(camIdx)
@@ -1820,7 +1852,7 @@ void HybridFilter::updateStates(
 
   for (auto iter = statesMap_.begin(); iter != finalIter; ++iter, ++jack) {
     stateId = iter->first;
-    size_t qStart = startIndexOfClonedStates() + 3 + kClonedStateMinimalDimen * jack;
+    size_t qStart = startIndexOfClonedStatesFast() + 3 + kClonedStateMinimalDimen * jack;
 
     poseParamBlockPtr = std::static_pointer_cast<ceres::PoseParameterBlock>(
         mapPtr_->parameterBlockPtr(stateId));
@@ -1847,7 +1879,7 @@ void HybridFilter::updateStates(
   // update feature states, correction is  \delta[\alpha, \beta, \rho], stored
   // states are [\alpha, \beta, 1, \rho]
   int kale = 0;
-  size_t lkStart = startIndexOfClonedStates() + kClonedStateMinimalDimen * statesMap_.size();
+  size_t lkStart = startIndexOfClonedStatesFast() + kClonedStateMinimalDimen * statesMap_.size();
   size_t aStart = lkStart - 3;  // a dummy initialization
   for (auto iter = mInCovLmIds.begin(), iterEnd = mInCovLmIds.end();
        iter != iterEnd; ++iter, ++kale) {
@@ -1901,7 +1933,7 @@ void HybridFilter::optimize(size_t /*numIter*/, size_t /*numThreads*/,
 
   OKVIS_ASSERT_EQ_DBG(
       Exception, (size_t)covariance_.rows(),
-      startIndexOfClonedStates() +
+      startIndexOfClonedStatesFast() +
           kClonedStateMinimalDimen * statesMap_.size() + 3 * mInCovLmIds.size(),
       "Inconsistent covDim and number of states");
 
@@ -2116,7 +2148,7 @@ void HybridFilter::optimize(size_t /*numIter*/, size_t /*numThreads*/,
     }
     // another check the copied state should have the same covariance as its
     // source
-    const size_t numNavImuCamStates = startIndexOfClonedStates();
+    const size_t numNavImuCamStates = startIndexOfClonedStatesFast();
     const size_t numNavImuCamPoseStates =
         numNavImuCamStates + 9 * statesMap_.size();
     if ((covariance_.topLeftCorner(covDim, 9) -
@@ -2326,7 +2358,7 @@ void HybridFilter::optimize(size_t /*numIter*/, size_t /*numThreads*/,
       }
       // another check the copied state should have the same covariance as its
       // source
-      const size_t numNavImuCamStates = startIndexOfClonedStates();
+      const size_t numNavImuCamStates = startIndexOfClonedStatesFast();
       const size_t numNavImuCamPoseStates =
           numNavImuCamStates + 9 * statesMap_.size();
       if ((covariance_.topLeftCorner(covDim, 9) -
@@ -2404,7 +2436,6 @@ void HybridFilter::optimize(size_t /*numIter*/, size_t /*numThreads*/,
 // private stuff
 size_t HybridFilter::gatherMapPointObservations(
     const MapPoint& mp,
-    std::shared_ptr<const cameras::CameraBase> cameraGeometry,
     msckf::PointSharedData* pointDataPtr,
     std::vector<Eigen::Vector3d, Eigen::aligned_allocator<Eigen::Vector3d>>*
         obsDirections,
@@ -2423,8 +2454,7 @@ size_t HybridFilter::gatherMapPointObservations(
       mp.observations.rbegin();
   std::map<okvis::KeypointIdentifier, uint64_t>::const_reverse_iterator
       second_riter = ++mp.observations.rbegin();
-  const int camIdx = 0;
-  uint32_t imageHeight = camera_rig_.getCameraGeometry(camIdx)->imageHeight();
+
   switch (seqType) {
   case HEAD_TAIL:
       obsPair[observations->begin()->first] = observations->begin()->second;
@@ -2452,6 +2482,8 @@ size_t HybridFilter::gatherMapPointObservations(
                                itObs->first.keypointIndex, measurement);
     // use the latest estimates for camera intrinsic parameters
     Eigen::Vector3d backProjectionDirection;
+    std::shared_ptr<const cameras::CameraBase> cameraGeometry =
+        camera_rig_.getCameraGeometry(itObs->first.cameraIndex);
     bool validDirection = cameraGeometry->backProject(measurement, &backProjectionDirection);
     if (!validDirection) {
         orderedBadFrameIds->emplace_back(poseId, itObs->first.cameraIndex);
@@ -2470,6 +2502,7 @@ size_t HybridFilter::gatherMapPointObservations(
 
     std::shared_ptr<ceres::ParameterBlock> parameterBlockPtr;
     getGlobalStateParameterBlockPtr(poseId, GlobalStates::T_WS, parameterBlockPtr);
+    uint32_t imageHeight = cameraGeometry->imageHeight();
     double kpN = measurement[1] / imageHeight - 0.5;
     pointDataPtr->addKeypointObservation(itObs->first, parameterBlockPtr, kpN);
   }
@@ -2482,7 +2515,8 @@ bool HybridFilter::hasLowDisparity(
     const std::vector<
         okvis::kinematics::Transformation,
         Eigen::aligned_allocator<okvis::kinematics::Transformation>>& T_WSs,
-    const kinematics::Transformation& T_BC0) const {
+    const AlignedVector<okvis::kinematics::Transformation>& T_BCs,
+    const std::vector<size_t>& camIndices) const {
   Eigen::VectorXd intrinsics;
   camera_rig_.getCameraGeometry(0)->getIntrinsics(intrinsics);
   double focalLength = intrinsics[0];
@@ -2491,8 +2525,11 @@ bool HybridFilter::hasLowDisparity(
   double raySigma = fourthRoot2 * keypointAStdDev / focalLength;
   Eigen::Vector3d rayA_inA = obsDirections.front().normalized();
   Eigen::Vector3d rayB_inB = obsDirections.back().normalized();
-  Eigen::Vector3d rayB_inA = (T_WSs.front().C() * T_BC0.C()).transpose() *
-                             T_WSs.back().C() * T_BC0.C() * rayB_inB;
+  size_t frontCamIdx = camIndices.front();
+  size_t backCamIdx = camIndices.back();
+  Eigen::Vector3d rayB_inA =
+      (T_WSs.front().C() * T_BCs.at(frontCamIdx).C()).transpose() *
+      T_WSs.back().C() * T_BCs.at(backCamIdx).C() * rayB_inB;
   return okvis::triangulation::hasLowDisparity(rayA_inA, rayB_inB, rayB_inA,
                                                raySigma);
 }
@@ -2517,9 +2554,9 @@ bool HybridFilter::isPureRotation(const MapPoint& mp) const {
 
 void HybridFilter::propagatePoseAndVelocityForMapPoint(
     msckf::PointSharedData* pointDataPtr) const {
-  std::vector<std::pair<uint64_t, int>> frameIds = pointDataPtr->frameIds();
+  std::vector<std::pair<uint64_t, size_t>> frameIds = pointDataPtr->frameIds();
   int observationIndex = 0;
-  for (const std::pair<uint64_t, int>& frameAndCameraIndex : frameIds) {
+  for (const std::pair<uint64_t, size_t>& frameAndCameraIndex : frameIds) {
     uint64_t frameId = frameAndCameraIndex.first;
     auto statesIter = statesMap_.find(frameId);
     pointDataPtr->setImuInfo(observationIndex, statesIter->second.timestamp,
@@ -2555,8 +2592,6 @@ msckf::TriangulationStatus HybridFilter::triangulateAMapPoint(
         obsInPixel,
     msckf::PointLandmark& pointLandmark,
     std::vector<double>& imageNoiseStd,
-    std::shared_ptr<const cameras::CameraBase> cameraGeometry,
-    const kinematics::Transformation& T_BC0,
     msckf::PointSharedData* pointDataPtr,
     std::vector<uint64_t>* orderedCulledFrameIds,
     bool checkDisparity) const {
@@ -2568,7 +2603,7 @@ msckf::TriangulationStatus HybridFilter::triangulateAMapPoint(
       obsDirections;
   std::vector<std::pair<uint64_t, int>> badObservationIdentifiers;
   size_t numObs = gatherMapPointObservations(
-      mp, cameraGeometry, pointDataPtr, &obsDirections, &obsInPixel,
+      mp, pointDataPtr, &obsDirections, &obsInPixel,
       &imageNoiseStd, &badObservationIdentifiers);
 
   msckf::TriangulationStatus status;
@@ -2584,32 +2619,43 @@ msckf::TriangulationStatus HybridFilter::triangulateAMapPoint(
               Eigen::aligned_allocator<okvis::kinematics::Transformation>>
       T_WSs = pointDataPtr->poseAtObservationList();
 
+  std::vector<size_t> camIndices = pointDataPtr->cameraIndexList();
+  size_t numCameras = camera_rig_.numberCameras();
+  AlignedVector<okvis::kinematics::Transformation> T_BCs;
+  T_BCs.reserve(numCameras);
+  for (size_t j = 0u; j < numCameras; ++j) {
+    T_BCs.push_back(camera_rig_.getCameraExtrinsic(j));
+  }
   if (checkDisparity) {
 //    if (isPureRotation(mp)) {
 //      triangulateTimer.stop();
 //      status.raysParallel = true;
 //      return false;
 //    }
-    if (hasLowDisparity(obsDirections, T_WSs, T_BC0)) {
+    if (hasLowDisparity(obsDirections, T_WSs, T_BCs, camIndices)) {
       triangulateTimer.stop();
       status.raysParallel = true;
       return status;
     }
   }
 
-  std::vector<std::pair<uint64_t, int>> frameIds = pointDataPtr->frameIds();
-  std::vector<uint64_t> anchorIds;
-  std::vector<int> anchorSeqIds;
+  std::vector<std::pair<uint64_t, size_t>> frameIds = pointDataPtr->frameIds();
+  std::vector<okvis::AnchorFrameIdentifier> anchorIds;
+
   if (orderedCulledFrameIds) {
     msckf::eraseBadObservations(badObservationIdentifiers, orderedCulledFrameIds);
     msckf::decideAnchors(frameIds, *orderedCulledFrameIds, pointLandmark.modelId(),
-                         &anchorIds, &anchorSeqIds);
+                         &anchorIds);
   } else {
-    msckf::decideAnchors(frameIds, pointLandmark.modelId(), &anchorIds, &anchorSeqIds);
+    msckf::decideAnchors(frameIds, pointLandmark.modelId(), &anchorIds);
   }
-  pointDataPtr->setAnchors(anchorIds, anchorSeqIds);
-
-  status = pointLandmark.initialize(T_WSs, obsDirections, T_BC0, anchorSeqIds);
+  pointDataPtr->setAnchors(anchorIds);
+  std::vector<size_t> anchorSeqIds;
+  anchorSeqIds.reserve(anchorIds.size());
+  for (auto anchorId : anchorIds) {
+    anchorSeqIds.push_back(anchorId.observationIndex_);
+  }
+  status = pointLandmark.initialize(T_WSs, obsDirections, T_BCs, camIndices, anchorSeqIds);
   triangulateTimer.stop();
   return status;
 }
@@ -2642,7 +2688,7 @@ bool HybridFilter::print(std::ostream& stream) const {
   stream << " " << cameraParams.transpose().format(spaceInitFmt);
 
   // stds
-  const int stateDim = startIndexOfClonedStates();
+  const int stateDim = startIndexOfClonedStatesFast();
   Eigen::Matrix<double, Eigen::Dynamic, 1> variances =
       covariance_.topLeftCorner(stateDim, stateDim).diagonal();
   stream << " " << variances.cwiseSqrt().transpose().format(spaceInitFmt);
@@ -2743,7 +2789,7 @@ void HybridFilter::getImuAugmentedStatesEstimate(
 
 bool HybridFilter::getStateVariance(
     Eigen::Matrix<double, Eigen::Dynamic, 1>* variances) const {
-  const int dim = startIndexOfClonedStates();
+  const int dim = startIndexOfClonedStatesFast();
   *variances = covariance_.topLeftCorner(dim, dim).diagonal();
   return true;
 }
@@ -2990,7 +3036,7 @@ bool HybridFilter::featureJacobianEpipolar(
   std::shared_ptr<msckf::PointSharedData> pointDataPtr(new msckf::PointSharedData());
   std::vector<std::pair<uint64_t, int>> badObservationIdentifiers;
   size_t numFeatures = gatherMapPointObservations(
-      mp, tempCameraGeometry, pointDataPtr.get(), &obsDirections, &obsInPixels,
+      mp, pointDataPtr.get(), &obsDirections, &obsInPixels,
       &imagePointNoiseStds, &badObservationIdentifiers, seqType);
 
   // compute obsDirection Jacobians and count the valid ones, and
@@ -3119,7 +3165,7 @@ bool HybridFilter::getOdometryConstraintsForKeyframe(
   okvis::kinematics::Transformation T_WBr = queryKeyframe->T_WB_;
   auto kfCovIndexIter =
       statesMap_.find(queryKeyframe->id_);
-  int clonedStatesStart = startIndexOfClonedStates();
+  int clonedStatesStart = startIndexOfClonedStatesFast();
   int cov_T_WBr_start =
       clonedStatesStart + kClonedStateMinimalDimen * kfCovIndexIter->second.orderInCov;
   queryKeyframe->setCovariance(covariance_.block<6, 6>(cov_T_WBr_start, cov_T_WBr_start));

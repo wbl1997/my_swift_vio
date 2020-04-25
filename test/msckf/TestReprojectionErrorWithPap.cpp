@@ -357,7 +357,7 @@ uint64_t CameraObservationJacobianTest::addImuAugmentedParameterBlocks(
 
 void CameraObservationJacobianTest::propagatePoseAndVelocityForMapPoint(
     std::shared_ptr<msckf::PointSharedData> pointDataPtr) const {
-  std::vector<std::pair<uint64_t, int>> frameIds = pointDataPtr->frameIds();
+  std::vector<std::pair<uint64_t, size_t>> frameIds = pointDataPtr->frameIds();
   CHECK(frameIds[0].first == frameIds_[0] && frameIds[2].first == frameIds_[2]);
   for (int observationIndex = 0; observationIndex < 3; ++observationIndex) {
     pointDataPtr->setImuInfo(observationIndex, stateEpochs_[observationIndex],
@@ -1120,7 +1120,7 @@ void setupPoseOptProblem(bool perturbPose, bool rollingShutter,
     observationsxy1.reserve(3);
     AlignedVector<Eigen::Vector2d> imageObservations;
     imageObservations.reserve(3);
-    std::vector<int> anchorIndices{0, 1};
+    std::vector<size_t> anchorObsIndices{0, 1};
 
     bool projectOk = true;
     for (int j = 0; j < 3; ++j) {
@@ -1151,8 +1151,10 @@ void setupPoseOptProblem(bool perturbPose, bool rollingShutter,
     }
     std::shared_ptr<msckf::PointLandmark> pl(new msckf::PointLandmark(
         msckf::ParallaxAngleParameterization::kModelId));
-    msckf::TriangulationStatus status =
-        pl->initialize(true_T_WB_list, observationsxy1, T_BC, anchorIndices);
+    AlignedVector<okvis::kinematics::Transformation> T_BCs{T_BC};
+    std::vector<size_t> camIndices(true_T_WB_list.size(), 0u);
+    msckf::TriangulationStatus status = pl->initialize(
+        true_T_WB_list, observationsxy1, T_BCs, camIndices, anchorObsIndices);
     if (!status.triangulationOk) {
       continue;
     }
@@ -1180,9 +1182,8 @@ void setupPoseOptProblem(bool perturbPose, bool rollingShutter,
 
     jacTest.propagatePoseAndVelocityForMapPoint(pointDataPtr);
 
-    std::vector<uint64_t> anchorIds{frameIds[0], frameIds[1]};
-    std::vector<int> anchorSeqIds{0, 1};
-    pointDataPtr->setAnchors(anchorIds, anchorSeqIds);
+    std::vector<okvis::AnchorFrameIdentifier> anchorIds{{frameIds[0], 0, 0}, {frameIds[1], 0, 1}};
+    pointDataPtr->setAnchors(anchorIds);
 
     bool useFirstEstimate = true;
     pointDataPtr->computePoseAndVelocityForJacobians(useFirstEstimate);

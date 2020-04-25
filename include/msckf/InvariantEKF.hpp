@@ -83,7 +83,6 @@ class InvariantEKF : public HybridFilter {
    */
   bool measurementJacobianAIDP(
       const Eigen::Vector4d& ab1rho,
-      std::shared_ptr<const okvis::cameras::CameraBase> tempCameraGeometry,
       const Eigen::Vector2d& obs, int observationIndex,
       std::shared_ptr<const msckf::PointSharedData> pointDataPtr,
       Eigen::Matrix<double, 2, Eigen::Dynamic>* H_x,

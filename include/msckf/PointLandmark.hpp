@@ -39,14 +39,12 @@ struct IsObservedInFrame {
   uint64_t frameId;  ///< Multiframe ID.
 };
 
-void decideAnchors(const std::vector<std::pair<uint64_t, int>>& frameIdentifiers,
+void decideAnchors(const std::vector<std::pair<uint64_t, size_t>>& frameIdentifiers,
                    const std::vector<uint64_t>& orderedCulledFrameIds,
-                   int landmarkModelId, std::vector<uint64_t>* anchorIds,
-                   std::vector<int>* anchorSeqIds);
+                   int landmarkModelId, std::vector<okvis::AnchorFrameIdentifier>* anchorIds);
 
-void decideAnchors(const std::vector<std::pair<uint64_t, int>>& frameIdentifiers,
-                   int landmarkModelId, std::vector<uint64_t>* anchorIds,
-                   std::vector<int>* anchorSeqIds);
+void decideAnchors(const std::vector<std::pair<uint64_t, size_t>>& frameIdentifiers,
+                   int landmarkModelId, std::vector<okvis::AnchorFrameIdentifier>* anchorIds);
 
 inline int eraseBadObservations(const std::vector<std::pair<uint64_t, int>>& dudIds,
                                 std::vector<uint64_t>* candidateFrameIds) {
@@ -81,9 +79,13 @@ public:
          okvis::kinematics::Transformation,
          Eigen::aligned_allocator<okvis::kinematics::Transformation>>& T_WSs,
      const std::vector<Eigen::Vector3d,
-                       Eigen::aligned_allocator<Eigen::Vector3d>>& obsDirections,
-     const okvis::kinematics::Transformation& T_BC0,
-     const std::vector<int>& anchorSeqId);
+                       Eigen::aligned_allocator<Eigen::Vector3d>>&
+         obsDirections,
+     const std::vector<
+         okvis::kinematics::Transformation,
+         Eigen::aligned_allocator<okvis::kinematics::Transformation>>& T_BCs,
+     const std::vector<size_t>& cameraIndices,
+     const std::vector<size_t>& anchorSeqIds);
 
  double* data() {
    return parameters_.data();
@@ -101,5 +103,5 @@ private:
   int modelId_;
   std::vector<double> parameters_;
 };
-}
+} // namespace msckf
 #endif // INCLUDE_MSCKF_POINT_LANDMARK_HPP_

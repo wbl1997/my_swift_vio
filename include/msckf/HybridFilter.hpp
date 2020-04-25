@@ -26,10 +26,11 @@
 #include <okvis/timing/Timer.hpp>
 
 #include <msckf/CameraRig.hpp>
-#include <msckf/imu/ImuOdometry.h>
 #include <msckf/MotionAndStructureStats.h>
 #include <msckf/PointLandmark.hpp>
 #include <msckf/PointSharedData.hpp>
+#include <msckf/memory.h>
+#include <msckf/imu/ImuOdometry.h>
 
 /// \brief okvis Main namespace of this package.
 namespace okvis {
@@ -48,7 +49,7 @@ struct StatePointerAndEstimate {
       : parameterBlockPtr(_parameterBlockPtr),
         parameterEstimate(_parameterEstimate) {}
   std::shared_ptr<const okvis::ceres::ParameterBlock> parameterBlockPtr;
-  Eigen::VectorXd parameterEstimate;
+  Eigen::VectorXd parameterEstimate; // This records an earlier estimate.
 };
 
 typedef std::vector<StatePointerAndEstimate,
@@ -104,6 +105,7 @@ class HybridFilter : public Estimator {
 
 
   /**
+   * @obsolete the Jacobians only supports one camera.
    * @brief Applies the dropping/marginalization strategy according to the
    * RSS'13/IJRR'14 paper. The new number of frames in the window will be
    * numKeyframes+numImuFrames.
@@ -113,6 +115,13 @@ class HybridFilter : public Estimator {
       size_t numKeyframes, size_t numImuFrames,
       okvis::MapPointVector &removedLandmarks);
 
+  /**
+   * @obsolete the Jacobians only supports one camera.
+   * @brief optimize
+   * @param numIter
+   * @param numThreads
+   * @param verbose
+   */
   virtual void optimize(size_t numIter, size_t numThreads = 1,
                         bool verbose = false);
 
@@ -132,7 +141,6 @@ class HybridFilter : public Estimator {
   /**
    * @brief gatherMapPointObservations
    * @param mp
-   * @param cameraGeometry
    * @param pointDataPtr
    * @param obsDirections Each observation is in image plane z=1, (\bar{x}, \bar{y}, 1).
    * @param obsInPixel
@@ -144,7 +152,6 @@ class HybridFilter : public Estimator {
    */
   size_t gatherMapPointObservations(
       const MapPoint &mp,
-      std::shared_ptr<const cameras::CameraBase> cameraGeometry,
       msckf::PointSharedData *pointDataPtr,
       std::vector<Eigen::Vector3d, Eigen::aligned_allocator<Eigen::Vector3d>>
           *obsDirections,
@@ -167,7 +174,8 @@ class HybridFilter : public Estimator {
       const std::vector<
           okvis::kinematics::Transformation,
           Eigen::aligned_allocator<okvis::kinematics::Transformation>> &T_WSs,
-      const kinematics::Transformation &T_SC0) const;
+      const AlignedVector<okvis::kinematics::Transformation>& T_BCs,
+      const std::vector<size_t>& camIndices) const;
 
   bool isPureRotation(const MapPoint& mp) const;
 
@@ -189,8 +197,6 @@ class HybridFilter : public Estimator {
    *  or [cos\theta, sin\theta, n_x, n_y, n_z] depending on anchorSeqId.
    * @param vSigmai, the diagonal elements of the observation noise matrix, in
    *    pixels, size 2Nx1
-   * @param cameraGeometry, used for point projection
-   * @param T_SC0
    * @param pointDataPtr[in/out] shared data of the map point for computing
    * poses and velocity at observation.
    * The anchor frames will be set depending on the landmarkModelId_.
@@ -209,12 +215,12 @@ class HybridFilter : public Estimator {
           &obsInPixel,
       msckf::PointLandmark& pointLandmark,
       std::vector<double> &vSigmai,
-      std::shared_ptr<const okvis::cameras::CameraBase> cameraGeometry,
-      const okvis::kinematics::Transformation &T_SC0,
       msckf::PointSharedData* pointDataPtr,
       std::vector<uint64_t>* orderedCulledFrameIds,
       bool checkDisparity = false) const;
+
   /**
+   * @obsolete the Jacobians only supports one camera.
    * @brief slamFeatureJacobian, compute the residual and Jacobians for a SLAM feature i
    * observed in current frame
    * @param hpbid homogeneous point parameter block id of the map point
@@ -233,8 +239,8 @@ class HybridFilter : public Estimator {
                            Eigen::Matrix2d &R_i);
 
   /**
-   * @brief compute the marginalized Jacobian for a feature i's
-   track
+   * @obsolete The jacobians do not support ncameras.
+   * @brief compute the marginalized Jacobian for a feature i's track
    * assume the number of observations of the map points is at least two
    * @param mp mappoint
    * @param H_oi Jacobians of feature observations w.r.t variables related to
@@ -291,32 +297,133 @@ class HybridFilter : public Estimator {
   // will remove state parameter blocks and all of their related residuals
   okvis::Time removeState(uint64_t stateId);
 
-  void initCovariance(int camIdx = 0);
+  void initCovariance();
 
-  // currently only support one camera
-  void initCameraParamCovariance(int camIdx = 0);
+  void initCameraParamCovariance(int camIdx);
 
   void addCovForClonedStates();
 
-  // camera parameters and all cloned states including the last inserted
-  // and all landmarks.
-  // p_B^C, f_x, f_y, c_x, c_y, k_1, k_2, p_1, p_2, [k_3], t_d, t_r,
-  // \pi_{B_i}(=[p_{B_i}^G, q_{B_i}^G, v_{B_i}^G]), l_i
-  inline int cameraParamPoseAndLandmarkMinimalDimen() const {
-    return cameraParamsMinimalDimen() +
+  /**
+   * @brief minimalDimOfAllCameraParams
+   * @warning call this no earlier than first call of addStates().
+   * @return
+   */
+  inline size_t minimalDimOfAllCameraParams() const {
+    size_t totalCamDim = statesMap_.rbegin()
+                             ->second.sensors.at(SensorStates::Camera)
+                             .back()
+                             .at(CameraSensorStates::TR)
+                             .startIndexInCov +
+                         1;
+    size_t totalImuDim = statesMap_.rbegin()
+                             ->second.sensors.at(SensorStates::Imu)
+                             .back()
+                             .at(ImuSensorStates::TA)
+                             .startIndexInCov +
+                         9;
+    return totalCamDim - totalImuDim;
+  }
+
+  /**
+   * @brief cameraParamsMinimalDimFast
+   * @warning call this no earlier than first call of addStates().
+   * @param camIdx
+   * @return
+   */
+  size_t cameraParamsMinimalDimFast(size_t camIdx) const {
+    size_t totalInclusiveDim = statesMap_.rbegin()
+                                   ->second.sensors.at(SensorStates::Camera)
+                                   .at(camIdx)
+                                   .at(CameraSensorStates::TR)
+                                   .startIndexInCov +
+                               1;
+    size_t totalExclusiveDim = statesMap_.rbegin()
+                                   ->second.sensors.at(SensorStates::Camera)
+                                   .at(camIdx)
+                                   .at(CameraSensorStates::T_SCi)
+                                   .startIndexInCov;
+    return totalInclusiveDim - totalExclusiveDim;
+  }
+
+  /**
+   * @brief minimal dim of camera parameters and all cloned states including the last
+   * inserted one and all landmarks.
+   * Ex: C_p_B, f_x, f_y, c_x, c_y, k_1, k_2, p_1, p_2, [k_3], t_d, t_r,
+   * C0_p_Ci, C0_q_Ci, f_x, f_y, c_x, c_y, k_1, k_2, p_1, p_2, [k_3], t_d, t_r,
+   * \pi_{B_i}(=[p_{B_i}^G, q_{B_i}^G, v_{B_i}^G]), l_i
+   * @warning call this no earlier than first call of addStates().
+   * @return
+   */
+  inline size_t cameraParamPoseAndLandmarkMinimalDimen() const {
+    return minimalDimOfAllCameraParams() +
            kClonedStateMinimalDimen * statesMap_.size() +
            3 * mInCovLmIds.size();
   }
 
-  inline int startIndexOfClonedStates() const {
-    return okvis::ceres::ode::NavErrorStateDim + imu_rig_.getImuParamsMinimalDim(0) +
-           cameraParamsMinimalDimen();
+  inline size_t startIndexOfClonedStates() const {
+    size_t dim = okvis::ceres::ode::NavErrorStateDim + imu_rig_.getImuParamsMinimalDim(0);
+    for (size_t j = 0; j < camera_rig_.numberCameras(); ++j) {
+      dim += cameraParamsMinimalDimen(j);
+    }
+    return dim;
   }
 
-  inline int startIndexOfCameraParams() const {
-    return okvis::ceres::ode::NavErrorStateDim + imu_rig_.getImuParamsMinimalDim(0);
+  /**
+   * @brief startIndexOfClonedStatesFast
+   * @warning call this no earlier than first call of addStates().
+   * @return
+   */
+  inline size_t startIndexOfClonedStatesFast() const {
+    return statesMap_.rbegin()
+               ->second.sensors.at(SensorStates::Camera)
+               .back()
+               .at(CameraSensorStates::TR)
+               .startIndexInCov +
+           1;
   }
 
+  inline size_t startIndexOfCameraParams(size_t camIdx = 0u) const {
+    size_t dim = okvis::ceres::ode::NavErrorStateDim + imu_rig_.getImuParamsMinimalDim(0);
+    for (size_t i = 0u; i < camIdx; ++i) {
+      dim += cameraParamsMinimalDimen(i);
+    }
+    return dim;
+  }
+
+  /**
+   * @brief startIndexOfCameraParamsFast
+   * @warning call this no earlier than first call of addStates().
+   * @param camIdx
+   * @return
+   */
+  inline size_t startIndexOfCameraParamsFast(size_t camIdx) const {
+    return statesMap_.rbegin()
+        ->second.sensors.at(SensorStates::Camera)
+        .at(camIdx)
+        .at(CameraSensorStates::T_SCi)
+        .startIndexInCov;
+  }
+
+  /**
+   * @brief intraStartIndexOfCameraParams
+   * @warning call this no earlier than first call of addStates().
+   * @param camIdx
+   * @return
+   */
+  inline size_t intraStartIndexOfCameraParams(size_t camIdx) const {
+    size_t totalInclusiveDim = statesMap_.rbegin()
+                                   ->second.sensors.at(SensorStates::Camera)
+                                   .at(camIdx)
+                                   .at(CameraSensorStates::T_SCi)
+                                   .startIndexInCov;
+    size_t totalExclusiveDim = statesMap_.rbegin()
+                                   ->second.sensors.at(SensorStates::Imu)
+                                   .back()
+                                   .at(ImuSensorStates::TA)
+                                   .startIndexInCov +
+                               9;
+    return totalInclusiveDim - totalExclusiveDim;
+  }
 
   // error state: \delta p, \alpha for q, \delta v
   // state: \pi_{B_i}(=[p_{B_i}^G, q_{B_i}^G, v_{B_i}^G])
@@ -336,7 +443,8 @@ class HybridFilter : public Estimator {
 
   void cloneCameraParameterStates(
       const States &stateInQuestion,
-      StatePointerAndEstimateList *currentStates) const;
+      StatePointerAndEstimateList *currentStates,
+      size_t camIdx) const;
 
   void updateStates(const Eigen::Matrix<double, Eigen::Dynamic, 1> &deltaX);
 
@@ -359,6 +467,13 @@ class HybridFilter : public Estimator {
    * @param deltaAugmentedParams
    */
   void updateImuAugmentedStates(const States& stateInQuestion, const Eigen::VectorXd deltaAugmentedParams);
+
+  void usePreviousCameraParamBlocks(
+      std::map<uint64_t, States>::const_reverse_iterator prevStateRevIter,
+      size_t cameraIndex, SpecificSensorStatesContainer* cameraInfos) const;
+
+  void initializeCameraParamBlocks(okvis::Time stateEpoch, size_t cameraIndex,
+                                   SpecificSensorStatesContainer *cameraInfos);
 
   // epipolar measurement used by filters for computing Jacobians
   // https://en.cppreference.com/w/cpp/language/nested_types
@@ -383,7 +498,9 @@ class HybridFilter : public Estimator {
             Eigen::aligned_allocator<Eigen::Matrix<double, 3, Eigen::Dynamic>>>
             &dfj_dXcam,
         const std::vector<int> &index_vec);
+
     /**
+     @ @obsolete the Jacobians do not support ncameras.
      * @brief measurementJacobian
      *     The Jacobians for state variables except for states related to time
      *     can be computed with automatic differentiation.

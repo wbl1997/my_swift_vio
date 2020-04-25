@@ -86,8 +86,8 @@ bool TFVIO::applyMarginalizationStrategy(
     return true;
   }
 
-  int startIndex = startIndexOfClonedStates();
-  int finishIndex = startIndex + numRemovedStates * 9;
+  size_t startIndex = startIndexOfClonedStatesFast();
+  size_t finishIndex = startIndex + numRemovedStates * 9;
   CHECK_NE(finishIndex, covariance_.rows())
       << "Never remove the covariance of the lastest state";
   FilterHelper::pruneSquareMatrix(startIndex, finishIndex, &covariance_);
@@ -101,7 +101,7 @@ int TFVIO::computeStackedJacobianAndResidual(
     Eigen::MatrixXd* R_q) const {
   // compute and stack Jacobians and Residuals for landmarks observed in current
   // frame
-  const int camParamStartIndex = startIndexOfCameraParams();
+  const int camParamStartIndex = startIndexOfCameraParamsFast(0u);
   int featureVariableDimen = covariance_.rows() - camParamStartIndex;
   int dimH[2] = {0, featureVariableDimen};
   const Eigen::MatrixXd variableCov = covariance_.block(
@@ -157,13 +157,13 @@ int TFVIO::computeStackedJacobianAndResidual(
 
 void TFVIO::optimize(size_t /*numIter*/, size_t /*numThreads*/, bool verbose) {
   uint64_t currFrameId = currentFrameId();
-  OKVIS_ASSERT_EQ(Exception, covariance_.rows() - startIndexOfClonedStates(),
-                  (int)(kClonedStateMinimalDimen * statesMap_.size()),
+  OKVIS_ASSERT_EQ(Exception, covariance_.rows() - startIndexOfClonedStatesFast(),
+                  kClonedStateMinimalDimen * statesMap_.size(),
                   "Inconsistent covDim and number of states");
 
   // mark tracks of features that are not tracked in current frame
   int numTracked = 0;
-  int featureVariableDimen = cameraParamsMinimalDimen() +
+  int featureVariableDimen = cameraParamsMinimalDimFast(0u) +
                              kClonedStateMinimalDimen * statesMap_.size();
 
   for (okvis::PointMap::iterator it = landmarksMap_.begin();
@@ -235,8 +235,6 @@ void TFVIO::optimize(size_t /*numIter*/, size_t /*numThreads*/, bool verbose) {
   // state)
   {
     updateLandmarksTimer.start();
-    const int camIdx = 0;
-    const okvis::kinematics::Transformation T_SC0 = camera_rig_.getCameraExtrinsic(camIdx);
     minValidStateId_ = getMinValidStateId();
     for (auto it = landmarksMap_.begin(); it != landmarksMap_.end(); ++it) {
       if (it->second.residualizeCase == NotInState_NotTrackedNow) continue;
@@ -249,15 +247,12 @@ void TFVIO::optimize(size_t /*numIter*/, size_t /*numThreads*/, bool verbose) {
       std::vector<Eigen::Vector2d, Eigen::aligned_allocator<Eigen::Vector2d>>
           obsInPixel;
       std::vector<double> vRi;  // std noise in pixels
-      const int camIdx = 0;
-      std::shared_ptr<const okvis::cameras::CameraBase> tempCameraGeometry =
-          camera_rig_.getCameraGeometry(camIdx);
 
       msckf::PointLandmark pointLandmark(msckf::HomogeneousPointParameterization::kModelId);
       msckf::PointSharedData psd;
       msckf::TriangulationStatus status =
           triangulateAMapPoint(it->second, obsInPixel, pointLandmark, vRi,
-                               tempCameraGeometry, T_SC0, &psd, nullptr, false);
+                               &psd, nullptr, false);
       if (status.triangulationOk) {
         it->second.quality = 1.0;
         it->second.pointHomog = Eigen::Map<Eigen::Vector4d>(pointLandmark.data(), 4);

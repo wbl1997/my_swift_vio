@@ -215,7 +215,7 @@ void computeFeatureMeasJacobian(
   EXPECT_EQ(numLandmarks, 1);
   const okvis::MapPoint& mp = landmarkMap.begin()->second;
   estimator.triangulateAMapPoint(
-      mp, obsInPixel, pointLandmark, vRi, tempCameraGeometry, *T_SC_0,
+      mp, obsInPixel, pointLandmark, vRi,
       pointDataPtr.get(), nullptr, false);
   pointDataPtr->computePoseAndVelocityForJacobians(true);
   EXPECT_EQ(anchorId, pointDataPtr->anchorIds()[0]);

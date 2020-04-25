@@ -86,9 +86,9 @@ int MSCKF2::marginalizeRedundantFrames(size_t numKeyframes, size_t numImuFrames)
   findRedundantCamStates(&rm_cam_state_ids, numImuFrames);
 
   size_t nMarginalizedFeatures = 0u;
-  int featureVariableDimen = cameraParamsMinimalDimen() +
+  int featureVariableDimen = minimalDimOfAllCameraParams() +
       kClonedStateMinimalDimen * (statesMap_.size() - 1);
-  int startIndexCamParams = startIndexOfCameraParams();
+  int startIndexCamParams = startIndexOfCameraParamsFast(0u);
   const Eigen::MatrixXd featureVariableCov =
       covariance_.block(startIndexCamParams, startIndexCamParams,
                         featureVariableDimen, featureVariableDimen);
@@ -143,9 +143,6 @@ int MSCKF2::marginalizeRedundantFrames(size_t numKeyframes, size_t numImuFrames)
       continue;
     }
 
-    // TODO(jhuai): check if some observations of a map point
-    // has been used for update in order to avoid triangulation again
-    // which may harm the filter consistency
     it->second.usedForUpdate = true;
     vr_o.push_back(r_oi);
     vR_o.push_back(R_oi);
@@ -268,7 +265,7 @@ int MSCKF2::marginalizeRedundantFrames(size_t numKeyframes, size_t numImuFrames)
     int cam_sequence =
         std::distance(statesMap_.begin(), statesIter);
     int cam_state_start =
-        startIndexOfClonedStates() + kClonedStateMinimalDimen * cam_sequence;
+        startIndexOfClonedStatesFast() + kClonedStateMinimalDimen * cam_sequence;
     int cam_state_end = cam_state_start + kClonedStateMinimalDimen;
 
     FilterHelper::pruneSquareMatrix(cam_state_start, cam_state_end,
@@ -334,8 +331,9 @@ bool MSCKF2::applyMarginalizationStrategy(
     return true;
   }
 
-  int startIndex = startIndexOfClonedStates();
-  int finishIndex = startIndex + numRemovedStates * 9;
+  size_t startIndex = startIndexOfClonedStatesFast();
+  CHECK_EQ(startIndex, startIndexOfClonedStates());
+  size_t finishIndex = startIndex + numRemovedStates * 9;
   CHECK_NE(finishIndex, covariance_.rows())
       << "Never remove the covariance of the lastest state";
   FilterHelper::pruneSquareMatrix(startIndex, finishIndex, &covariance_);
@@ -344,8 +342,7 @@ bool MSCKF2::applyMarginalizationStrategy(
 }
 
 bool MSCKF2::measurementJacobianAIDP(
-    const Eigen::Vector4d& ab1rho,
-    std::shared_ptr<const okvis::cameras::CameraBase> tempCameraGeometry,
+    const Eigen::Vector4d& ab1rho,    
     const Eigen::Vector2d& obs,
     int observationIndex,
     std::shared_ptr<const msckf::PointSharedData> pointDataPtr,
@@ -364,8 +361,6 @@ bool MSCKF2::measurementJacobianAIDP(
       pointJacobian3;  // $\frac{\partial [z_u, z_v]^T}{\partial
                        // p_{f_i}^{C_j}}$
 
-  // $\frac{\partial [z_u, z_v]^T}{\partial(extrinsic, intrinsic, t_d, t_r)}$
-  Eigen::Matrix<double, 2, Eigen::Dynamic> J_Xc(2, cameraParamsMinimalDimen());
 
   Eigen::Matrix<double, 2, kClonedStateMinimalDimen>
       J_XBj;  // $\frac{\partial [z_u, z_v]^T}{delta\p_{B_j}^G, \delta\alpha
@@ -380,7 +375,14 @@ bool MSCKF2::measurementJacobianAIDP(
   Eigen::Matrix<double, 2, kClonedStateMinimalDimen> J_XBa;
 
   uint64_t poseId = pointDataPtr->frameId(observationIndex);
-  int camIdx = pointDataPtr->cameraIndex(observationIndex);
+  size_t camIdx = pointDataPtr->cameraIndex(observationIndex);
+
+  std::shared_ptr<const okvis::cameras::CameraBase> cameraGeometry =
+      camera_rig_.getCameraGeometry(camIdx);
+  const int minCamParamDim = cameraParamsMinimalDimFast(camIdx);
+  CHECK_EQ(minCamParamDim, cameraParamsMinimalDimen(camIdx));
+  // $\frac{\partial [z_u, z_v]^T}{\partial(extrinsic, intrinsic, t_d, t_r)}$
+  Eigen::Matrix<double, 2, Eigen::Dynamic> J_Xc(2, minCamParamDim);
 
   int projOptModelId = camera_rig_.getProjectionOptMode(camIdx);
   int extrinsicModelId = camera_rig_.getExtrinsicOptMode(camIdx);
@@ -396,7 +398,7 @@ bool MSCKF2::measurementJacobianAIDP(
   okvis::kinematics::Transformation T_CA = (T_WB * T_SC0).inverse() * T_GA;  // anchor frame to current camera frame
   Eigen::Vector3d pfiinC = (T_CA * ab1rho).head<3>();
 
-  cameras::CameraBase::ProjectionStatus status = tempCameraGeometry->project(
+  cameras::CameraBase::ProjectionStatus status = cameraGeometry->project(
       pfiinC, &imagePoint, &pointJacobian3, &intrinsicsJacobian);
   *residual = obs - imagePoint;
   if (status != cameras::CameraBase::ProjectionStatus::Successful) {
@@ -458,23 +460,24 @@ bool MSCKF2::measurementJacobianAIDP(
   J_XBa = pointJacobian3 * (T_WB.C() * T_SC0.C()).transpose() * factorJ_XBa;
 
   J_x->setZero();
-  const int minCamParamDim = cameraParamsMinimalDimen();
-  J_x->topLeftCorner(2, minCamParamDim) = J_Xc;
+  int camParamStartIndex = intraStartIndexOfCameraParams(camIdx);
+  J_x->block(0, camParamStartIndex, 2, minCamParamDim) = J_Xc;
+  int totalCamParamDim = minimalDimOfAllCameraParams();
   auto poseid_iter =
       statesMap_.find(poseId);
   int covid = poseid_iter->second.orderInCov;
 
-  uint64_t anchorId = pointDataPtr->anchorIds()[0];
+  uint64_t anchorId = pointDataPtr->anchorIds()[0].frameId_;
   if (poseId == anchorId) {
-    J_x->block<2, 6>(0, minCamParamDim +
+    J_x->block<2, 6>(0, totalCamParamDim +
                            9 * covid + 3) =
         (J_XBj + J_XBa).block<2, 6>(0, 3);
   } else {
-    J_x->block<2, 9>(0, minCamParamDim +
+    J_x->block<2, 9>(0, totalCamParamDim +
                            9 * covid) = J_XBj;
     auto anchorid_iter =
         statesMap_.find(anchorId);
-    J_x->block<2, 9>(0, minCamParamDim +
+    J_x->block<2, 9>(0, totalCamParamDim +
                            9 * anchorid_iter->second.orderInCov) = J_XBa;
   }
   return true;
@@ -482,7 +485,6 @@ bool MSCKF2::measurementJacobianAIDP(
 
 bool MSCKF2::measurementJacobian(
     const Eigen::Vector4d& v4Xhomog,
-    std::shared_ptr<const okvis::cameras::CameraBase> tempCameraGeometry,
     const Eigen::Vector2d& obs,
     int observationIndex,
     std::shared_ptr<const msckf::PointSharedData> pointDataPtr,
@@ -507,7 +509,9 @@ bool MSCKF2::measurementJacobian(
   Eigen::Vector2d J_td;
   Eigen::Vector2d J_tr;
 
-  int camIdx = pointDataPtr->cameraIndex(observationIndex);
+  size_t camIdx = pointDataPtr->cameraIndex(observationIndex);
+  std::shared_ptr<const okvis::cameras::CameraBase> tempCameraGeometry =
+      camera_rig_.getCameraGeometry(camIdx);
   int projOptModelId = camera_rig_.getProjectionOptMode(camIdx);
   int extrinsicModelId = camera_rig_.getExtrinsicOptMode(camIdx);
   const okvis::kinematics::Transformation T_SC0 = camera_rig_.getCameraExtrinsic(camIdx);
@@ -543,6 +547,7 @@ bool MSCKF2::measurementJacobian(
           T_WB.C().transpose() * lP_v_WBtij);
   J_tr = J_td * kpN;
 
+  J_Xc->resize(2, cameraParamsMinimalDimFast(camIdx));
   if (fixCameraExtrinsicParams_[camIdx]) {
     if (fixCameraIntrinsicParams_[camIdx]) {
       (*J_Xc) << J_td, J_tr;
@@ -579,12 +584,10 @@ bool MSCKF2::featureJacobianGeneric(
   const int camIdx = 0;
   std::shared_ptr<const okvis::cameras::CameraBase> tempCameraGeometry =
       camera_rig_.getCameraGeometry(camIdx);
-  const okvis::kinematics::Transformation T_SC0 =
-      camera_rig_.getCameraExtrinsic(camIdx);
   // dimension of variables used in computing feature Jacobians, including
   // camera intrinsics and all cloned states except the most recent one
   // in which the marginalized observations should never occur.
-  int featureVariableDimen = cameraParamsMinimalDimen() +
+  int featureVariableDimen = minimalDimOfAllCameraParams() +
                              kClonedStateMinimalDimen * (statesMap_.size() - 1);
   int residualBlockDim = okvis::cameras::CameraObservationModelResidualDim(
         cameraObservationModelId_);
@@ -597,7 +600,7 @@ bool MSCKF2::featureJacobianGeneric(
 
   std::shared_ptr<msckf::PointSharedData> pointDataPtr(new msckf::PointSharedData());
   msckf::TriangulationStatus status = triangulateAMapPoint(
-      mp, obsInPixel, pointLandmark, vRi, tempCameraGeometry, T_SC0,
+      mp, obsInPixel, pointLandmark, vRi,
       pointDataPtr.get(), orderedCulledFrameIds, useEpipolarConstraint_);
   if (!status.triangulationOk) {
     computeHTimer.stop();
@@ -717,7 +720,7 @@ msckf::MeasurementJacobianStatus MSCKF2::measurementJacobianGeneric(
     Eigen::MatrixXd* J_X, Eigen::Matrix<double, Eigen::Dynamic, 3>* J_pfi,
     Eigen::Matrix<double, Eigen::Dynamic, 2>* J_n,
     Eigen::VectorXd* residual) const {
-  int camIdx = pointDataPtr->cameraIndex(observationIndex);
+  size_t camIdx = pointDataPtr->cameraIndex(observationIndex);
   okvis::cameras::NCameraSystem::DistortionType distortionType =
       camera_rig_.getDistortionType(camIdx);
   int projOptModelId = camera_rig_.getProjectionOptMode(camIdx);
@@ -740,8 +743,6 @@ msckf::MeasurementJacobianStatus MSCKF2::measurementJacobianGeneric(
   return status;
 }
 
-// assume the rolling shutter camera reads data row by row, and rows are
-//     aligned with the width of a frame
 bool MSCKF2::featureJacobian(const MapPoint &mp, Eigen::MatrixXd &H_oi,
                         Eigen::Matrix<double, Eigen::Dynamic, 1> &r_oi,
                         Eigen::MatrixXd &R_oi,
@@ -750,14 +751,11 @@ bool MSCKF2::featureJacobian(const MapPoint &mp, Eigen::MatrixXd &H_oi,
       cameraObservationModelId_ != okvis::cameras::kReprojectionErrorId) {
     return featureJacobianGeneric(mp, H_oi, r_oi, R_oi, orderedCulledFrameIds);
   }
-  const int camIdx = 0;
-  std::shared_ptr<const okvis::cameras::CameraBase> tempCameraGeometry =
-      camera_rig_.getCameraGeometry(camIdx);
-  const okvis::kinematics::Transformation T_SC0 = camera_rig_.getCameraExtrinsic(camIdx);
+
   // dimension of variables used in computing feature Jacobians, including
   // camera intrinsics and all cloned states except the most recent one
   // in which the marginalized observations should never occur.
-  int featureVariableDimen = cameraParamsMinimalDimen() +
+  int featureVariableDimen = minimalDimOfAllCameraParams() +
       kClonedStateMinimalDimen * (statesMap_.size() - 1);
 
   // all observations for this feature point
@@ -774,7 +772,7 @@ bool MSCKF2::featureJacobian(const MapPoint &mp, Eigen::MatrixXd &H_oi,
     std::shared_ptr<msckf::PointSharedData> pointDataPtr(new msckf::PointSharedData());
 
     msckf::TriangulationStatus status = triangulateAMapPoint(
-        mp, obsInPixel, pointLandmark, vRi, tempCameraGeometry, T_SC0,
+        mp, obsInPixel, pointLandmark, vRi,
         pointDataPtr.get(), orderedCulledFrameIds, useEpipolarConstraint_);
 
     Eigen::Map<Eigen::Vector4d> v4Xhomog(pointLandmark.data(), 4);
@@ -806,8 +804,12 @@ bool MSCKF2::featureJacobian(const MapPoint &mp, Eigen::MatrixXd &H_oi,
     std::vector<Eigen::Matrix<double, 2, 1>,
                 Eigen::aligned_allocator<Eigen::Matrix<double, 2, 1>>>
         vri;  // residuals for feature i
-
     size_t numPoses = pointDataPtr->numObservations();
+
+    vJ_X.reserve(numPoses);
+    vJ_pfi.reserve(numPoses);
+    vri.reserve(numPoses);
+
     size_t numValidObs = 0;
     auto itFrameIds = pointDataPtr->begin();
     auto itRoi = vRi.begin();
@@ -817,9 +819,8 @@ bool MSCKF2::featureJacobian(const MapPoint &mp, Eigen::MatrixXd &H_oi,
       // $\frac{\partial [z_u, z_v]^T}{\partial [\alpha, \beta, \rho]}$
       Eigen::Matrix<double, 2, 3> J_pfi;
       Eigen::Vector2d residual;
-
       bool validJacobian = measurementJacobianAIDP(
-          ab1rho, tempCameraGeometry, obsInPixel[observationIndex],
+          ab1rho, obsInPixel[observationIndex],
           observationIndex, pointDataPtr, &J_x, &J_pfi, &residual);
       if (!validJacobian) {
           ++itFrameIds;
@@ -876,7 +877,7 @@ bool MSCKF2::featureJacobian(const MapPoint &mp, Eigen::MatrixXd &H_oi,
     // The landmark is expressed with Euclidean coordinates in the global frame
     std::shared_ptr<msckf::PointSharedData> pointDataPtr(new msckf::PointSharedData());
     msckf::TriangulationStatus status = triangulateAMapPoint(
-        mp, obsInPixel, pointLandmark, vRi, tempCameraGeometry, T_SC0,
+        mp, obsInPixel, pointLandmark, vRi,
         pointDataPtr.get(), orderedCulledFrameIds, useEpipolarConstraint_);
     Eigen::Map<Eigen::Vector4d> v4Xhomog(pointLandmark.data(), 4);
     if (!status.triangulationOk) {
@@ -892,7 +893,6 @@ bool MSCKF2::featureJacobian(const MapPoint &mp, Eigen::MatrixXd &H_oi,
         << "The landmark should not be observed by the latest frame in MSCKF.";
 
     // containers of the above Jacobians for all observations of a mappoint
-    const int cameraParamsDimen = cameraParamsMinimalDimen();
     std::vector<
         Eigen::Matrix<double, 2, Eigen::Dynamic>,
         Eigen::aligned_allocator<Eigen::Matrix<double, 2, Eigen::Dynamic>>>
@@ -908,7 +908,7 @@ bool MSCKF2::featureJacobian(const MapPoint &mp, Eigen::MatrixXd &H_oi,
         vri;  // residuals for feature i
 
     std::vector<uint64_t> vFrameIds;
-
+    std::vector<size_t> cameraIndices;
     size_t numPoses = pointDataPtr->numObservations();
 
     vJ_Xc.reserve(numPoses);
@@ -916,35 +916,36 @@ bool MSCKF2::featureJacobian(const MapPoint &mp, Eigen::MatrixXd &H_oi,
     vJ_pfi.reserve(numPoses);
     vri.reserve(numPoses);
     vFrameIds.reserve(numPoses);
-
+    cameraIndices.reserve(numPoses);
 
     auto itFrameIds = pointDataPtr->begin();
     auto itRoi = vRi.begin();
     // compute Jacobians for a measurement in image j of the current feature i
     for (size_t observationIndex = 0; observationIndex < numPoses; ++observationIndex) {
       // $\frac{\partial [z_u, z_v]^T}{\partial(extrinsic, intrinsic, td, tr)}$
-      Eigen::Matrix<double, 2, Eigen::Dynamic> J_Xc(2, cameraParamsMinimalDimen());
+      Eigen::Matrix<double, 2, Eigen::Dynamic> J_Xc;
       Eigen::Matrix<double, 2, kClonedStateMinimalDimen>
           J_XBj;  // $\frac{\partial [z_u, z_v]^T}{delta\p_{B_j}^G, \delta\alpha
                   // (of q_{B_j}^G), \delta v_{B_j}^G$
       Eigen::Matrix<double, 2, 3>
           J_pfi;  // $\frac{\partial [z_u, z_v]^T}{\partial p_{f_i}^G}$
       Eigen::Vector2d residual;
-
+      size_t cameraIdx = pointDataPtr->cameraIndex(observationIndex);
       bool validJacobian = measurementJacobian(
-          v4Xhomog, tempCameraGeometry, obsInPixel[observationIndex], observationIndex, pointDataPtr,
-          &J_Xc, &J_XBj, &J_pfi, &residual);
+          v4Xhomog, obsInPixel[observationIndex],
+          observationIndex, pointDataPtr, &J_Xc, &J_XBj, &J_pfi, &residual);
       if (!validJacobian) {
-          ++itFrameIds;
-          itRoi = vRi.erase(itRoi);
-          itRoi = vRi.erase(itRoi);
-          continue;
+        ++itFrameIds;
+        itRoi = vRi.erase(itRoi);
+        itRoi = vRi.erase(itRoi);
+        continue;
       }
       vJ_Xc.push_back(J_Xc);
       vJ_XBj.push_back(J_XBj);
       vJ_pfi.push_back(J_pfi);
       vri.push_back(residual);
       vFrameIds.push_back(itFrameIds->frameId);
+      cameraIndices.push_back(cameraIdx);
       ++itFrameIds;
       itRoi += 2;
     }
@@ -957,6 +958,7 @@ bool MSCKF2::featureJacobian(const MapPoint &mp, Eigen::MatrixXd &H_oi,
     // Now we stack the Jacobians and marginalize the point position related
     // dimensions. In other words, project $H_{x_i}$ onto the nullspace of
     // $H_{f^i}$
+    size_t nCamParamMinDim = minimalDimOfAllCameraParams();
     Eigen::MatrixXd H_xi =
         Eigen::MatrixXd::Zero(2 * numValidObs, featureVariableDimen);
     Eigen::MatrixXd H_fi = Eigen::MatrixXd(2 * numValidObs, 3);
@@ -964,13 +966,25 @@ bool MSCKF2::featureJacobian(const MapPoint &mp, Eigen::MatrixXd &H_oi,
         Eigen::Matrix<double, Eigen::Dynamic, 1>(2 * numValidObs, 1);
     Eigen::MatrixXd Ri =
         Eigen::MatrixXd::Identity(2 * numValidObs, 2 * numValidObs);
+    // Precompute the camera param index in the covariance matrix.
+    size_t numCameras = camera_rig_.numberCameras();
+    std::vector<size_t> minCameraParamDims(numCameras);
+    std::vector<size_t> intraCameraParamIndices(numCameras);
+    for (size_t camIdx = 0u; camIdx < numCameras; ++camIdx) {
+      size_t camParamIntraIndex = intraStartIndexOfCameraParams(camIdx);
+      size_t camMinDim = cameraParamsMinimalDimFast(camIdx);
+      minCameraParamDims[camIdx] = camMinDim;
+      intraCameraParamIndices[camIdx] = camParamIntraIndex;
+    }
+
     for (size_t saga = 0; saga < numValidObs; ++saga) {
       size_t saga2 = saga * 2;
-      H_xi.block(saga2, 0, 2, cameraParamsDimen) = vJ_Xc[saga];
-      auto poseCovIndexIter =
-          statesMap_.find(vFrameIds[saga]);
+      size_t camParamIntraIndex = intraCameraParamIndices[cameraIndices[saga]];
+      size_t camMinDim = minCameraParamDims[cameraIndices[saga]];
+      H_xi.block(saga2, camParamIntraIndex, 2, camMinDim) = vJ_Xc[saga];
+      auto poseCovIndexIter = statesMap_.find(vFrameIds[saga]);
       H_xi.block<2, kClonedStateMinimalDimen>(
-          saga2, cameraParamsDimen +
+          saga2, nCamParamMinDim +
                      kClonedStateMinimalDimen * poseCovIndexIter->second.orderInCov) =
           vJ_XBj[saga];
       H_fi.block<2, 3>(saga2, 0) = vJ_pfi[saga];
@@ -1010,10 +1024,10 @@ int MSCKF2::computeStackedJacobianAndResidual(
   // compute and stack Jacobians and Residuals for landmarks observed no more
   size_t nMarginalizedFeatures = 0;
   int culledPoints[2] = {0};
-  int featureVariableDimen = cameraParamsMinimalDimen() +
+  int featureVariableDimen = minimalDimOfAllCameraParams() +
       kClonedStateMinimalDimen * (statesMap_.size() - 1);
   int dimH_o[2] = {0, featureVariableDimen};
-  const int camParamStartIndex = startIndexOfCameraParams();
+  const int camParamStartIndex = startIndexOfCameraParamsFast(0u);
   const Eigen::MatrixXd variableCov =
       covariance_.block(camParamStartIndex, camParamStartIndex, dimH_o[1], dimH_o[1]);
   // containers of Jacobians of measurements
@@ -1072,8 +1086,8 @@ void MSCKF2::optimize(size_t /*numIter*/, size_t /*numThreads*/, bool verbose) {
   uint64_t currFrameId = currentFrameId();
   OKVIS_ASSERT_EQ(
       Exception,
-      covariance_.rows() - startIndexOfClonedStates(),
-      (int)(kClonedStateMinimalDimen * statesMap_.size()), "Inconsistent covDim and number of states");
+      covariance_.rows() - startIndexOfClonedStatesFast(),
+      kClonedStateMinimalDimen * statesMap_.size(), "Inconsistent covDim and number of states");
   if (loopFrameAndMatchesList_.size() > 0) {
     LOG(INFO) << "MSCKF receives #loop frames " << loopFrameAndMatchesList_.size()
               << " but has not implemented relocalization yet!";
@@ -1083,7 +1097,7 @@ void MSCKF2::optimize(size_t /*numIter*/, size_t /*numThreads*/, bool verbose) {
 
   // mark tracks of features that are not tracked in current frame
   int numTracked = 0;
-  int featureVariableDimen = cameraParamsMinimalDimen() +
+  int featureVariableDimen = minimalDimOfAllCameraParams() +
       kClonedStateMinimalDimen * (statesMap_.size() - 1);
 
   for (okvis::PointMap::iterator it = landmarksMap_.begin(); it != landmarksMap_.end(); ++it) {
@@ -1195,14 +1209,12 @@ void MSCKF2::optimize(size_t /*numIter*/, size_t /*numThreads*/, bool verbose) {
           obsInPixel;
       std::vector<uint64_t> frameIds;
       std::vector<double> vRi;  // std noise in pixels
-      const int camIdx = 0;
-      std::shared_ptr<const okvis::cameras::CameraBase> tempCameraGeometry =
-          camera_rig_.getCameraGeometry(camIdx);
+
       msckf::PointLandmark pointLandmark(msckf::HomogeneousPointParameterization::kModelId);
       msckf::PointSharedData psd;
       msckf::TriangulationStatus status =
           triangulateAMapPoint(it->second, obsInPixel, pointLandmark, vRi,
-                               tempCameraGeometry, T_SC0, &psd, nullptr, false);
+                               &psd, nullptr, false);
       Eigen::Map<Eigen::Vector4d> v4Xhomog(pointLandmark.data(), 4);
       if (status.triangulationOk) {
         it->second.quality = 1.0;

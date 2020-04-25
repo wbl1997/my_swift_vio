@@ -26,7 +26,7 @@ cameras:
         focal_length: [457.587426604, 456.13442556],
         principal_point: [379.99944652, 255.238185386],
         projection_opt_mode: FXY_CXY,
-        extrinsic_opt_mode: P_CB,
+        extrinsic_opt_mode: P_BC_Q_BC,
         image_delay: 0.0,
         image_readout_time: 0.00}
 

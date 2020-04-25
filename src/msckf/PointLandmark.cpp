@@ -15,52 +15,50 @@ namespace msckf {
  * @param anchorIds
  * @param anchorSeqIds id of anchors relative to mappoint observations
  */
-void decideAnchors(const std::vector<std::pair<uint64_t, int>>& frameIds,
+void decideAnchors(const std::vector<std::pair<uint64_t, size_t>>& frameIds,
                    const std::vector<uint64_t>& orderedCulledFrameIds,
-                   int landmarkModelId, std::vector<uint64_t>* anchorIds,
-                   std::vector<int>* anchorSeqIds) {
+                   int landmarkModelId, std::vector<okvis::AnchorFrameIdentifier>* anchorIds) {
+  std::vector<uint64_t> anchorFrameIds;
+  anchorFrameIds.reserve(2);
   uint64_t anchorId;
   switch (landmarkModelId) {
     case msckf::ParallaxAngleParameterization::kModelId:
       // greedily choose the head and tail observation
       anchorId = orderedCulledFrameIds.front();
-      anchorIds->push_back(anchorId);
+      anchorFrameIds.push_back(anchorId);
       [[fallthrough]];
     case msckf::InverseDepthParameterization::kModelId:
       anchorId = orderedCulledFrameIds.back();
-      anchorIds->push_back(anchorId);
+      anchorFrameIds.push_back(anchorId);
       break;
     case msckf::HomogeneousPointParameterization::kModelId:
     default:
       break;
   }
-  for (auto aid : *anchorIds) {
-    std::vector<std::pair<uint64_t, int>>::const_iterator anchorIter =
+  anchorIds->reserve(anchorFrameIds.size());
+  for (auto aid : anchorFrameIds) {
+    std::vector<std::pair<uint64_t, size_t>>::const_iterator anchorIter =
         std::find_if(frameIds.begin(), frameIds.end(),
-                     [aid](const std::pair<uint64_t, int>& s) {
+                     [aid](const std::pair<uint64_t, size_t>& s) {
                        return s.first == aid;
                      });
-    int anchorSeqId = std::distance(frameIds.begin(), anchorIter);
-    anchorSeqIds->push_back(anchorSeqId);
+    size_t anchorSeqId = std::distance(frameIds.begin(), anchorIter);
+    anchorIds->emplace_back(anchorIter->first, anchorIter->second, anchorSeqId);
   }
 }
 
-void decideAnchors(const std::vector<std::pair<uint64_t, int>>& frameIds,
-                   int landmarkModelId, std::vector<uint64_t>* anchorIds,
-                   std::vector<int>* anchorSeqIds) {
-  uint64_t anchorId;
+void decideAnchors(const std::vector<std::pair<uint64_t, size_t>>& frameIds,
+                   int landmarkModelId, std::vector<okvis::AnchorFrameIdentifier>* anchorIds) {
   switch (landmarkModelId) {
     case msckf::ParallaxAngleParameterization::kModelId:
       // TODO(jhuai): is there an efficient way to find the ray pair of max
       // angle? For now, we greedily choose the head and tail observation.
-      anchorId = frameIds.front().first;
-      anchorIds->push_back(anchorId);
-      anchorSeqIds->push_back(0);
+      anchorIds->emplace_back(frameIds.front().first, frameIds.front().second,
+                              0u);
       [[fallthrough]];
     case msckf::InverseDepthParameterization::kModelId:
-      anchorId = frameIds.back().first;
-      anchorIds->push_back(anchorId);
-      anchorSeqIds->push_back(frameIds.size() - 1);
+      anchorIds->emplace_back(frameIds.back().first, frameIds.back().second,
+                              frameIds.size() - 1);
       break;
     case msckf::HomogeneousPointParameterization::kModelId:
     default:
@@ -77,8 +75,11 @@ TriangulationStatus PointLandmark::initialize(
         Eigen::aligned_allocator<okvis::kinematics::Transformation>>& T_WSs,
     const std::vector<Eigen::Vector3d,
                       Eigen::aligned_allocator<Eigen::Vector3d>>& obsDirections,
-    const okvis::kinematics::Transformation& T_BC0,
-    const std::vector<int>& anchorSeqIds) {
+    const std::vector<
+        okvis::kinematics::Transformation,
+        Eigen::aligned_allocator<okvis::kinematics::Transformation>>& T_BCs,
+    const std::vector<size_t>& cameraIndices,
+    const std::vector<size_t>& anchorSeqIds) {
   std::vector<okvis::kinematics::Transformation,
               Eigen::aligned_allocator<okvis::kinematics::Transformation>>
       cam_states(obsDirections.size());
@@ -93,10 +94,11 @@ TriangulationStatus PointLandmark::initialize(
   switch (anchorSeqIds.size()) {
     case 1: { // AIDP
       // Ca will play the role of W
+      size_t anchorCamIdx = cameraIndices[anchorSeqIds[0]];
       okvis::kinematics::Transformation T_CaW =
-          (T_WSs.at(anchorSeqIds[0]) * T_BC0).inverse();
+          (T_WSs.at(anchorSeqIds[0]) * T_BCs[anchorCamIdx]).inverse();
       for (auto T_WS : T_WSs) {
-        okvis::kinematics::Transformation T_WCi = T_WS * T_BC0;
+        okvis::kinematics::Transformation T_WCi = T_WS * T_BCs[cameraIndices[joel]];
         cam_states[joel] = T_CaW * T_WCi;
         ++joel;
       }
@@ -104,7 +106,7 @@ TriangulationStatus PointLandmark::initialize(
     }
     case 2: {
       for (auto iter = T_WSs.begin(); iter != T_WSs.end(); ++iter, ++joel) {
-        cam_states[joel] = *iter * T_BC0;
+        cam_states[joel] = *iter * T_BCs[cameraIndices[joel]];
       }
       LWF::ParallaxAnglePoint pap;
       TriangulationStatus status;
@@ -121,7 +123,7 @@ TriangulationStatus PointLandmark::initialize(
     case 0:
     default:
       for (auto iter = T_WSs.begin(); iter != T_WSs.end(); ++iter, ++joel) {
-        cam_states[joel] = *iter * T_BC0;
+        cam_states[joel] = *iter * T_BCs[cameraIndices[joel]];
       }
       break;
   }

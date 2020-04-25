@@ -264,13 +264,13 @@ HybridFilter::computeCameraObservationJacobians(
                                     de_dSpeedAndBias_minimal[2].data()};
       bool evaluateOk = observationError->EvaluateWithMinimalJacobians(
           parameters, residual->data(), jacobians, jacobiansMinimal);
-      std::vector<uint64_t> anchorIds = pointDataPtr->anchorIds();
+      const std::vector<okvis::AnchorFrameIdentifier>& anchorIds = pointDataPtr->anchorIds();
       if (evaluateOk) {
         status = msckf::MeasurementJacobianStatus::Successful;
       } else {
-        if (anchorIds[0] == poseId) {
+        if (anchorIds[0].frameId_ == poseId) {
           status = msckf::MeasurementJacobianStatus::MainAnchorProjectionFailed;
-        } else if (anchorIds[1] == poseId) {
+        } else if (anchorIds[1].frameId_ == poseId) {
           status =
               msckf::MeasurementJacobianStatus::AssociateAnchorProjectionFailed;
         }
@@ -297,7 +297,7 @@ HybridFilter::computeCameraObservationJacobians(
         }
       }
 
-      std::vector<uint64_t> jmaFrameIds{poseId, anchorIds[0], anchorIds[1]};
+      std::vector<uint64_t> jmaFrameIds{poseId, anchorIds[0].frameId_, anchorIds[1].frameId_};
       for (int f = 0; f < 3; ++f) {
         uint64_t frameId = jmaFrameIds[f];
         auto smIter = statesMap_.find(frameId);
@@ -415,13 +415,13 @@ HybridFilter::computeCameraObservationJacobians(
                                       de_dSpeedAndBias_minimal[2].data()};
         bool evaluateOk = observationError->EvaluateWithMinimalJacobians(
             parameters, residual->data(), jacobians, jacobiansMinimal);
-        std::vector<uint64_t> anchorIds = pointDataPtr->anchorIds();
+        const std::vector<okvis::AnchorFrameIdentifier>& anchorIds = pointDataPtr->anchorIds();
         if (evaluateOk) {
           status = msckf::MeasurementJacobianStatus::Successful;
         } else {
-          if (anchorIds[0] == poseId) {
+          if (anchorIds[0].frameId_ == poseId) {
             status = msckf::MeasurementJacobianStatus::MainAnchorProjectionFailed;
-          } else if (anchorIds[1] == poseId) {
+          } else if (anchorIds[1].frameId_ == poseId) {
             status =
                 msckf::MeasurementJacobianStatus::AssociateAnchorProjectionFailed;
           }
@@ -448,7 +448,7 @@ HybridFilter::computeCameraObservationJacobians(
           }
         }
 
-        std::vector<uint64_t> jmaFrameIds{poseId, anchorIds[0], anchorIds[1]};
+        std::vector<uint64_t> jmaFrameIds{poseId, anchorIds[0].frameId_, anchorIds[1].frameId_};
         for (int f = 0; f < 3; ++f) {
           uint64_t frameId = jmaFrameIds[f];
           auto smIter = statesMap_.find(frameId);
