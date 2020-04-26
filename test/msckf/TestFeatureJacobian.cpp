@@ -282,6 +282,12 @@ void testPointLandmarkJacobian(std::string projOptModelName,
     estimator->print(debugStream);
     debugStream << std::endl;
 
+    // TODO(jhuai): Check loop query keyframe message for msckf has proper
+    // covariance matrices.
+    // estimator->getLoopQueryKeyframeMessage();
+    // check number of landmarks, landmark positions are in camera frame,
+    // the constraint list, poses, etc.
+
     Eigen::Vector3d v_WS_true = vioSystemBuilder.sinusoidalTrajectory()
                                     ->computeGlobalLinearVelocity(*iter);
 

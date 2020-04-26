@@ -338,7 +338,7 @@ bool InvariantEKF::applyMarginalizationStrategy(
 bool InvariantEKF::measurementJacobianAIDP(
     const Eigen::Vector4d& ab1rho,
     const Eigen::Vector2d& obs,
-    int observationIndex,
+    size_t observationIndex,
     std::shared_ptr<const msckf::PointSharedData> pointDataPtr,
     Eigen::Matrix<double, 2, Eigen::Dynamic>* J_x,
     Eigen::Matrix<double, 2, 3>* J_pfi, Eigen::Vector2d* residual) const {

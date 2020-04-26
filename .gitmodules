@@ -6,5 +6,5 @@
 	url = https://github.com/stevenlovegrove/Sophus.git
 [submodule "Kimera-RPGO"]
 	path = Kimera-RPGO
-	url = https://github.com/MIT-SPARK/Kimera-RPGO.git
+	url = https://github.com/JzHuai0108/Kimera-RPGO.git
 	branch = master

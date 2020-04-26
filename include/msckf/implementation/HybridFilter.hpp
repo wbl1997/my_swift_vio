@@ -63,9 +63,9 @@ HybridFilter::computeCameraObservationJacobians(
       mapPtr_->parameterBlockPtr(distortionId);
 
   std::shared_ptr<const okvis::ceres::ParameterBlock> tdParamBlockPtr =
-      pointDataPtr->cameraTimeDelayParameterBlockPtr();
+      pointDataPtr->cameraTimeDelayParameterBlockPtr(camIdx);
   std::shared_ptr<const okvis::ceres::ParameterBlock> trParamBlockPtr =
-      pointDataPtr->frameReadoutTimeParameterBlockPtr();
+      pointDataPtr->frameReadoutTimeParameterBlockPtr(camIdx);
   std::shared_ptr<const CameraGeometry> argCameraGeometry =
       std::static_pointer_cast<const CameraGeometry>(baseCameraGeometry);
 

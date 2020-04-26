@@ -5,6 +5,7 @@
 #include <msckf/PointLandmarkModels.hpp>
 
 #include <okvis/IdProvider.hpp>
+#include <okvis/MultiFrame.hpp>
 #include <okvis/cameras/PinholeCamera.hpp>
 #include <okvis/cameras/FovDistortion.hpp>
 #include <okvis/cameras/RadialTangentialDistortion.hpp>
@@ -13,12 +14,13 @@ std::shared_ptr<okvis::MultiFrame> createMultiFrame(
     okvis::Time timestamp,
     std::shared_ptr<okvis::cameras::NCameraSystem> cameraSystem) {
   // assemble a multi-frame
-  std::shared_ptr<okvis::MultiFrame> mf(new okvis::MultiFrame);
+  std::shared_ptr<okvis::MultiFrame> mf(new okvis::MultiFrame());
   mf->setId(okvis::IdProvider::instance().newId());
   mf->setTimestamp(timestamp);
   mf->resetCameraSystemAndFrames(*cameraSystem);
   return mf;
 }
+
 double angular_rate = 0.3;  // rad/sec
 const double radius = 1.5;
 okvis::ImuMeasurementDeque createImuMeasurements(okvis::Time t0) {
@@ -42,9 +44,7 @@ okvis::ImuMeasurementDeque createImuMeasurements(okvis::Time t0) {
 
 void computeFeatureMeasJacobian(
     okvis::cameras::NCameraSystem::DistortionType distortionId,
-    const Eigen::Vector2d& expectedObservation,
-    const Eigen::Matrix<double, 2, 3>& expectedJpoint,
-    const Eigen::MatrixXd& expectedJstates) {
+    const Eigen::Vector2d& expectedObservation) {
   double imageDelay = 0.0;
   double trNoisy = 0.033;
   std::shared_ptr<okvis::ceres::Map> mapPtr(new okvis::ceres::Map);
@@ -199,8 +199,6 @@ void computeFeatureMeasJacobian(
   Eigen::Matrix<double, 2, 3> J_pfi;
   Eigen::Vector2d residual;
 
-  uint64_t anchorId = estimator.frameIdByAge(1);
-
   okvis::kinematics::Transformation T_WBa(Eigen::Vector3d(0, 0, 1),
                                           Eigen::Quaterniond(1, 0, 0, 0));
   msckf::PointLandmark pointLandmark(msckf::InverseDepthParameterization::kModelId);
@@ -212,76 +210,54 @@ void computeFeatureMeasJacobian(
   std::vector<double> vRi; // std noise in pixels
   okvis::PointMap landmarkMap;
   size_t numLandmarks = estimator.getLandmarks(landmarkMap);
-  EXPECT_EQ(numLandmarks, 1);
+  EXPECT_EQ(numLandmarks, 1u);
   const okvis::MapPoint& mp = landmarkMap.begin()->second;
   estimator.triangulateAMapPoint(
       mp, obsInPixel, pointLandmark, vRi,
       pointDataPtr.get(), nullptr, false);
   pointDataPtr->computePoseAndVelocityForJacobians(true);
-  EXPECT_EQ(anchorId, pointDataPtr->anchorIds()[0]);
-  int observationIndex = 0;
+
+  uint64_t anchorId = estimator.frameIdByAge(1);
+  EXPECT_EQ(anchorId, pointDataPtr->anchorIds()[0].frameId_);
+  size_t observationIndex = 0u;
   bool result = estimator.measurementJacobianAIDP(
-      ab1rho, tempCameraGeometry, expectedObservation, observationIndex,
+      ab1rho, expectedObservation, observationIndex,
       pointDataPtr, &J_x, &J_pfi, &residual);
-  Eigen::IOFormat spaceInitFmt(Eigen::FullPrecision, Eigen::DontAlignCols,
-                               ",", " ", "", "", "", "");
-  std::cout << "J_x\n" << J_x.rows() << " " << J_x.cols() << "\n" << J_x.format(spaceInitFmt) << std::endl;
-  EXPECT_LT((J_x - expectedJstates).lpNorm<Eigen::Infinity>(), 1e-6);
-  EXPECT_LT((J_pfi - expectedJpoint).lpNorm<Eigen::Infinity>(), 1e-6);
-  EXPECT_LT(residual.lpNorm<Eigen::Infinity>(), 1e-4);
+
+  Eigen::Matrix<double, 2, Eigen::Dynamic> J_x_legacy(2, featureVariableDimen);
+  // $\frac{\partial [z_u, z_v]^T}{\partial [\alpha, \beta, \rho]}$
+  Eigen::Matrix<double, 2, 3> J_pfi_legacy;
+  Eigen::Vector2d residual_legacy;
+  bool result_legacy = estimator.measurementJacobianAIDPMono(
+              ab1rho, expectedObservation, observationIndex,
+              pointDataPtr, &J_x_legacy, &J_pfi_legacy, &residual_legacy);
+  EXPECT_EQ(result, result_legacy);
   EXPECT_TRUE(result);
+  Eigen::IOFormat commaInitFmt(Eigen::StreamPrecision, 0, ", ", "\n", "", "", "", "");
+  size_t tdIndex = estimator.intraStartIndexOfCameraParams(
+      0u, okvis::Estimator::CameraSensorStates::TD);
+  Eigen::MatrixXd J_x_diff = J_x - J_x_legacy;
+  EXPECT_LT(J_x_diff.leftCols(tdIndex).lpNorm<Eigen::Infinity>(), 1e-6);
+  EXPECT_LT(J_x_diff.rightCols(J_x.cols() - tdIndex - 2).lpNorm<Eigen::Infinity>(), 0.02)
+          << "J_x\n" << J_x.format(commaInitFmt)
+          << "\nJ_x_legacy\n" << J_x_legacy.format(commaInitFmt);
+  // We do not check Jacobians relative to time as the new AIDP implementation
+  // considers the effect of time error on anchor frame.
+  EXPECT_LT((J_pfi - J_pfi_legacy).lpNorm<Eigen::Infinity>(), 1e-6);
+  EXPECT_LT((residual - residual_legacy).lpNorm<Eigen::Infinity>(), 1e-4);
 }
 
-TEST(MSCKF2, MeasurementJacobian) {
+TEST(MSCKF2, MeasurementJacobianAIDP) {
+  // TODO(jhuai): This test is fragile because of these hard coded numbers.
+  // Rewrite the test with an independent method for computing Jacobians.
   Eigen::Vector2d expectedObservation(360.4815, 238.0);
-  Eigen::Matrix<double, 2, 3> expectedJpoint;
-  expectedJpoint << 350.258, 9.93345e-11, -525.386, 1.02593e-10, 360.084, -360.084;
-  Eigen::MatrixXd expectedJstates(2, 40);
-  expectedJstates << -0.000216805851973353, -1.98955441749053e-16,
-      0.00433440512740632, -0.0500529547647059, 0, 1, 0, -0.0438561999225605,
-      -0.000109817857626036, 9.93354729270363e-10, 2.62924628013702,
-      102.975852337977, -0.429066051408235, -105.077360523391,
-      -5.25377046353618, 2.98001502045618e-11, 5.95977831679945e-10,
-      -9.92806083732939e-09, 351.139998429583, 0.0144480319946058,
-      0.000722388184965761, -4.09749085297704e-15, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-      105.077360523391, 5.25377046353618, -2.98001502045618e-11,
-      5.25377046343684, -105.077360523351, -343.252841126589, 0, 0,
-      0, -1.26430388652045e-13, -1.16516105242636e-25, 5.37359365296899e-15, 0,
-      -2.83657371915451e-11, 0, 1, -2.55640588735688e-11, -6.40135301890805e-14,
-      0.901455867475549, 1.0217362929638e-09, 0.000148532458908287,
-      -6.18885245451193e-07, -3.07780126661939e-11, -3.0649816240008e-09,
-      108.02526136408, 360.090888561366, 18.0042100894899, 6.13425546685075e-10,
-      4.23194596358899e-15, 4.21431908318486e-13, -0.0148533654122997, 0, 0, 0,
-      0, 0, 0, 0, 0, 0, 3.07780126661939e-11, 3.0649816240008e-09,
-      -108.02526136408, -360.084204543869, 144.033681818743,
-      3.98404878978042e-09, 0, 0, 0;
   computeFeatureMeasJacobian(
       okvis::cameras::NCameraSystem::DistortionType::RadialTangential,
-      expectedObservation, expectedJpoint, expectedJstates);
+      expectedObservation);
   try {
     expectedObservation = Eigen::Vector2d(359.214, 238.0);
-    expectedJpoint << 374.828, -3.30823e-10, -562.241,
-                      -3.39825e-10, 386.137, -386.137;
-    expectedJstates.resize(2, 37);
-    expectedJstates << -0.00023201451463455, -2.12911920186466e-16,
-        0.0046384582921142, -0.053674389058464, 0, 1, 0, -3.07170483111539,
-        110.199481157046, -0.459164504821023, -112.44840754534,
-        -5.62231597073543, -9.92471170912074e-11, 2.00651122793431e-10,
-        -1.06463583243582e-08, 375.77203550036, 0.0154615435890767,
-        0.000773062823660151, 1.36463793529239e-14, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        112.44840754534, 5.62231597073543, 9.92471170912074e-11,
-        5.62231597106625, -112.448407545472, -367.33160385682, 0, 0,
-        0, -1.35299440712587e-13, -1.2469076402355e-25, 1.9564742098705e-16, 0,
-        -3.04180566583197e-11, 0, 1, -1.79051635307018e-09,
-        0.000159278955759189, -6.63662315663286e-07, 1.01947450414553e-10,
-        -3.27999186221071e-09, 115.841111356055, 386.144205470152,
-        19.3068517448449, 2.06834163514887e-10, -1.40176724845506e-14,
-        4.5099560106211e-13, -0.0159280369703463, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        -1.01947450414553e-10, 3.27999186221071e-09, -115.841111356055,
-        -386.137037850238, 154.454815141509, 4.71314731766279e-09, 0, 0, 0;
     computeFeatureMeasJacobian(
-        okvis::cameras::NCameraSystem::DistortionType::FOV, expectedObservation,
-        expectedJpoint, expectedJstates);
+        okvis::cameras::NCameraSystem::DistortionType::FOV, expectedObservation);
   } catch (...) {
     std::cout << "Error occurred!\n";
   }

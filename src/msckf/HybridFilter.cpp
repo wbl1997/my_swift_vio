@@ -182,12 +182,25 @@ void HybridFilter::usePreviousCameraParamBlocks(
 }
 
 void HybridFilter::initializeCameraParamBlocks(
-    okvis::Time stateEpoch, size_t cameraIndex, SpecificSensorStatesContainer* cameraInfos) {
+    okvis::Time stateEpoch, size_t cameraIndex,
+    SpecificSensorStatesContainer* cameraInfos) {
   const okvis::kinematics::Transformation T_BC =
       camera_rig_.getCameraExtrinsic(cameraIndex);
+  const okvis::kinematics::Transformation T_BC0 =
+      camera_rig_.getCameraExtrinsic(kMainCameraIndex);
   uint64_t id = IdProvider::instance().newId();
-  std::shared_ptr<okvis::ceres::PoseParameterBlock> extrinsicsParameterBlockPtr(
-      new okvis::ceres::PoseParameterBlock(T_BC, id, stateEpoch));
+  std::shared_ptr<okvis::ceres::PoseParameterBlock> extrinsicsParameterBlockPtr;
+  switch (camera_rig_.getExtrinsicOptMode(cameraIndex)) {
+    case Extrinsic_p_CB::kModelId:
+    case Extrinsic_p_BC_q_BC::kModelId:
+      extrinsicsParameterBlockPtr.reset(
+          new okvis::ceres::PoseParameterBlock(T_BC, id, stateEpoch));
+      break;
+    case Extrinsic_p_C0C_q_C0C::kModelId:
+      extrinsicsParameterBlockPtr.reset(new okvis::ceres::PoseParameterBlock(
+          T_BC0.inverse() * T_BC, id, stateEpoch));
+      break;
+  }
   mapPtr_->addParameterBlock(extrinsicsParameterBlockPtr, ceres::Map::Pose6d);
   cameraInfos->at(CameraSensorStates::T_SCi).id = id;
 
@@ -195,7 +208,8 @@ void HybridFilter::initializeCameraParamBlocks(
   camera_rig_.getCameraGeometry(cameraIndex)->getIntrinsics(allIntrinsics);
   id = IdProvider::instance().newId();
   int projOptModelId = camera_rig_.getProjectionOptMode(cameraIndex);
-  const int minProjectionDim = camera_rig_.getMinimalProjectionDimen(cameraIndex);
+  const int minProjectionDim =
+      camera_rig_.getMinimalProjectionDimen(cameraIndex);
   if (!fixCameraIntrinsicParams_[cameraIndex]) {
     Eigen::VectorXd optProjIntrinsics;
     ProjectionOptGlobalToLocal(projOptModelId, allIntrinsics,
@@ -911,34 +925,50 @@ void HybridFilter::updateCovarianceIndex() {
 }
 
 void HybridFilter::updateSensorRigs() {
-  const int camIdx = 0;
+  size_t numCameras = camera_rig_.numberCameras();
   const uint64_t currFrameId = currentFrameId();
   okvis::kinematics::Transformation T_BC0;
-  getCameraSensorStates(currFrameId, camIdx, T_BC0);
-  camera_rig_.setCameraExtrinsic(camIdx, T_BC0);
+  getCameraSensorStates(currFrameId, kMainCameraIndex, T_BC0);
 
-  Eigen::Matrix<double, Eigen::Dynamic, 1> projectionIntrinsic;
-  getSensorStateEstimateAs<ceres::EuclideanParamBlock>(
-      currFrameId, camIdx, SensorStates::Camera, CameraSensorStates::Intrinsics,
-      projectionIntrinsic);
+  for (size_t camIdx = 0u; camIdx < numCameras; ++camIdx) {
+    int extrinsicModelId = camera_rig_.getExtrinsicOptMode(camIdx);
+    okvis::kinematics::Transformation T_XCi;
+    switch (extrinsicModelId) {
+      case Extrinsic_p_CB::kModelId:
+      case Extrinsic_p_BC_q_BC::kModelId:
+        getCameraSensorStates(currFrameId, camIdx, T_XCi);
+        camera_rig_.setCameraExtrinsic(camIdx, T_XCi);
+        break;
+      case Extrinsic_p_C0C_q_C0C::kModelId:
+        getCameraSensorStates(currFrameId, camIdx, T_XCi);
+        camera_rig_.setCameraExtrinsic(camIdx, T_BC0 * T_XCi);
+        break;
+    }
 
-  Eigen::Matrix<double, Eigen::Dynamic, 1> distortionCoeffs;
-  getSensorStateEstimateAs<ceres::EuclideanParamBlock>(
-      currFrameId, camIdx, SensorStates::Camera, CameraSensorStates::Distortion,
-      distortionCoeffs);
-  camera_rig_.setCameraIntrinsics(camIdx, projectionIntrinsic, distortionCoeffs);
+    Eigen::Matrix<double, Eigen::Dynamic, 1> projectionIntrinsic;
+    getSensorStateEstimateAs<ceres::EuclideanParamBlock>(
+        currFrameId, camIdx, SensorStates::Camera,
+        CameraSensorStates::Intrinsics, projectionIntrinsic);
 
-  double tdEstimate;
-  getSensorStateEstimateAs<ceres::CameraTimeParamBlock>(
-      currFrameId, camIdx, SensorStates::Camera, CameraSensorStates::TD,
-      tdEstimate);
-  camera_rig_.setImageDelay(camIdx, tdEstimate);
+    Eigen::Matrix<double, Eigen::Dynamic, 1> distortionCoeffs;
+    getSensorStateEstimateAs<ceres::EuclideanParamBlock>(
+        currFrameId, camIdx, SensorStates::Camera,
+        CameraSensorStates::Distortion, distortionCoeffs);
+    camera_rig_.setCameraIntrinsics(camIdx, projectionIntrinsic,
+                                    distortionCoeffs);
 
-  double trEstimate;
-  getSensorStateEstimateAs<ceres::CameraTimeParamBlock>(
-      currFrameId, camIdx, SensorStates::Camera, CameraSensorStates::TR,
-      trEstimate);
-  camera_rig_.setReadoutTime(camIdx, trEstimate);
+    double tdEstimate;
+    getSensorStateEstimateAs<ceres::CameraTimeParamBlock>(
+        currFrameId, camIdx, SensorStates::Camera, CameraSensorStates::TD,
+        tdEstimate);
+    camera_rig_.setImageDelay(camIdx, tdEstimate);
+
+    double trEstimate;
+    getSensorStateEstimateAs<ceres::CameraTimeParamBlock>(
+        currFrameId, camIdx, SensorStates::Camera, CameraSensorStates::TR,
+        trEstimate);
+    camera_rig_.setReadoutTime(camIdx, trEstimate);
+  } // every camera.
 
   updateImuRig();
 }
@@ -1451,7 +1481,8 @@ bool HybridFilter::featureJacobian(
   return true;
 }
 
-void HybridFilter::updateImuAugmentedStates(const States& stateInQuestion, const Eigen::VectorXd deltaAugmentedParams) {
+void HybridFilter::updateImuAugmentedStates(
+    const States& stateInQuestion, const Eigen::VectorXd deltaAugmentedParams) {
   const int imuIdx = 0;
   uint64_t TGId = stateInQuestion.sensors.at(SensorStates::Imu)
                       .at(imuIdx)
@@ -1515,6 +1546,88 @@ void HybridFilter::cloneImuAugmentedStates(
       std::static_pointer_cast<const ceres::ShapeMatrixParamBlock>(
           mapPtr_->parameterBlockPtr(TAId));
   currentStates->emplace_back(taParamBlockPtr, taParamBlockPtr->estimate());
+}
+
+void HybridFilter::updateCameraSensorStates(const States& stateInQuestion,
+                                            const Eigen::VectorXd& deltaX) {
+  size_t camParamIndex = startIndexOfCameraParamsFast(0u);
+  const int numCameras = camera_rig_.numberCameras();
+  for (int camIdx = 0; camIdx < numCameras; ++camIdx) {
+    // It has been shown that estimating the extrinsic parameter T_ClCr performs
+    // better than estimating T_SCr. see eq(5) in A comparative analysis of
+    // tightly-coupled monocular, binocular, and stereo VINS.
+    // Therefore, we may save T_C0Ci in place of T_SCi.
+    if (!fixCameraExtrinsicParams_[camIdx]) {
+      uint64_t extrinsicId = stateInQuestion.sensors.at(SensorStates::Camera)
+                                 .at(camIdx)
+                                 .at(CameraSensorStates::T_SCi)
+                                 .id;
+      std::shared_ptr<ceres::PoseParameterBlock> extrinsicParamBlockPtr =
+          std::static_pointer_cast<ceres::PoseParameterBlock>(
+              mapPtr_->parameterBlockPtr(extrinsicId));
+
+      kinematics::Transformation T_XC = extrinsicParamBlockPtr->estimate();
+      Eigen::Vector3d t_XC;
+      Eigen::Quaterniond q_XC;
+      int extrinsicOptModelId = camera_rig_.getExtrinsicOptMode(camIdx);
+      int minExtrinsicDim = camera_rig_.getMinimalExtrinsicDimen(camIdx);
+      ExtrinsicModelUpdateState(extrinsicOptModelId, T_XC.r(), T_XC.q(),
+                                deltaX.segment(camParamIndex, minExtrinsicDim),
+                                &t_XC, &q_XC);
+      extrinsicParamBlockPtr->setEstimate(
+          kinematics::Transformation(t_XC, q_XC));
+      camParamIndex += minExtrinsicDim;
+    }
+
+    if (!fixCameraIntrinsicParams_[camIdx]) {
+      const int minProjectionDim =
+          camera_rig_.getMinimalProjectionDimen(camIdx);
+      uint64_t intrinsicId = stateInQuestion.sensors.at(SensorStates::Camera)
+                                 .at(camIdx)
+                                 .at(CameraSensorStates::Intrinsics)
+                                 .id;
+      std::shared_ptr<ceres::EuclideanParamBlock> intrinsicParamBlockPtr =
+          std::static_pointer_cast<ceres::EuclideanParamBlock>(
+              mapPtr_->parameterBlockPtr(intrinsicId));
+      Eigen::VectorXd cameraIntrinsics =
+          intrinsicParamBlockPtr->estimate() +
+          deltaX.segment(camParamIndex, minProjectionDim);
+      intrinsicParamBlockPtr->setEstimate(cameraIntrinsics);
+      camParamIndex += minProjectionDim;
+
+      const int nDistortionCoeffDim = camera_rig_.getDistortionDimen(camIdx);
+      uint64_t distortionId = stateInQuestion.sensors.at(SensorStates::Camera)
+                                  .at(camIdx)
+                                  .at(CameraSensorStates::Distortion)
+                                  .id;
+      std::shared_ptr<ceres::EuclideanParamBlock> distortionParamBlockPtr =
+          std::static_pointer_cast<ceres::EuclideanParamBlock>(
+              mapPtr_->parameterBlockPtr(distortionId));
+      Eigen::VectorXd cameraDistortion =
+          distortionParamBlockPtr->estimate() +
+          deltaX.segment(camParamIndex, nDistortionCoeffDim);
+      distortionParamBlockPtr->setEstimate(cameraDistortion);
+      camParamIndex += nDistortionCoeffDim;
+    }
+
+    uint64_t tdId = stateInQuestion.sensors.at(SensorStates::Camera)
+                        .at(camIdx)
+                        .at(CameraSensorStates::TD)
+                        .id;
+    std::shared_ptr<ceres::ParameterBlock> tdParamBlockPtr =
+        mapPtr_->parameterBlockPtr(tdId);
+    tdParamBlockPtr->parameters()[0] += deltaX(camParamIndex);
+    camParamIndex += 1;
+
+    uint64_t trId = stateInQuestion.sensors.at(SensorStates::Camera)
+                        .at(camIdx)
+                        .at(CameraSensorStates::TR)
+                        .id;
+    std::shared_ptr<ceres::ParameterBlock> trParamBlockPtr =
+        mapPtr_->parameterBlockPtr(trId);
+    trParamBlockPtr->parameters()[0] += deltaX[camParamIndex];
+    camParamIndex += 1;
+  }
 }
 
 void HybridFilter::cloneCameraParameterStates(
@@ -1766,83 +1879,9 @@ void HybridFilter::updateStates(
   sbParamBlockPtr->setEstimate(sb + deltaX.segment<9>(6));
 
   updateImuAugmentedStates(
-        stateInQuestion, deltaX.segment(15, imu_rig_.getAugmentedMinimalDim(0)));
+      stateInQuestion, deltaX.segment(15, imu_rig_.getAugmentedMinimalDim(0)));
 
-  // update camera sensor states
-  size_t camParamIndex = startIndexOfCameraParamsFast(0u);
-  const int camIdx = 0;
-  // It has been shown that estimating the extrinsic parameter T_ClCr performs
-  // better than estimating T_SCr. see eq(5) in A comparative analysis of
-  // tightly-coupled monocular, binocular, and stereo VINS.
-  // Therefore, we may save T_C0Ci in place of T_SCi.
-  if (!fixCameraExtrinsicParams_[camIdx]) {
-    uint64_t extrinsicId = stateInQuestion.sensors.at(SensorStates::Camera)
-                               .at(camIdx)
-                               .at(CameraSensorStates::T_SCi)
-                               .id;
-    std::shared_ptr<ceres::PoseParameterBlock> extrinsicParamBlockPtr =
-        std::static_pointer_cast<ceres::PoseParameterBlock>(
-            mapPtr_->parameterBlockPtr(extrinsicId));
-
-    kinematics::Transformation T_BC0 = extrinsicParamBlockPtr->estimate();
-    Eigen::Vector3d t_BC;
-    Eigen::Quaterniond q_BC;
-    int extrinsicOptModelId = camera_rig_.getExtrinsicOptMode(camIdx);
-    int minExtrinsicDim = camera_rig_.getMinimalExtrinsicDimen(camIdx);
-    ExtrinsicModelUpdateState(extrinsicOptModelId, T_BC0.r(), T_BC0.q(),
-                              deltaX.segment(camParamIndex, minExtrinsicDim),
-                              &t_BC, &q_BC);
-    extrinsicParamBlockPtr->setEstimate(kinematics::Transformation(t_BC, q_BC));
-    camParamIndex += minExtrinsicDim;
-  }
-
-  if (!fixCameraIntrinsicParams_[camIdx]) {
-    const int minProjectionDim = camera_rig_.getMinimalProjectionDimen(camIdx);
-    uint64_t intrinsicId = stateInQuestion.sensors.at(SensorStates::Camera)
-                               .at(camIdx)
-                               .at(CameraSensorStates::Intrinsics)
-                               .id;
-    std::shared_ptr<ceres::EuclideanParamBlock> intrinsicParamBlockPtr =
-        std::static_pointer_cast<ceres::EuclideanParamBlock>(
-            mapPtr_->parameterBlockPtr(intrinsicId));
-    Eigen::VectorXd cameraIntrinsics =
-        intrinsicParamBlockPtr->estimate() +
-        deltaX.segment(camParamIndex, minProjectionDim);
-    intrinsicParamBlockPtr->setEstimate(cameraIntrinsics);
-    camParamIndex += minProjectionDim;
-
-    const int nDistortionCoeffDim = camera_rig_.getDistortionDimen(camIdx);
-    uint64_t distortionId = stateInQuestion.sensors.at(SensorStates::Camera)
-                                .at(camIdx)
-                                .at(CameraSensorStates::Distortion)
-                                .id;
-    std::shared_ptr<ceres::EuclideanParamBlock> distortionParamBlockPtr =
-        std::static_pointer_cast<ceres::EuclideanParamBlock>(
-            mapPtr_->parameterBlockPtr(distortionId));
-    Eigen::VectorXd cameraDistortion =
-        distortionParamBlockPtr->estimate() +
-        deltaX.segment(camParamIndex, nDistortionCoeffDim);
-    distortionParamBlockPtr->setEstimate(cameraDistortion);
-    camParamIndex += nDistortionCoeffDim;
-  }
-
-  uint64_t tdId = stateInQuestion.sensors.at(SensorStates::Camera)
-                      .at(camIdx)
-                      .at(CameraSensorStates::TD)
-                      .id;
-  std::shared_ptr<ceres::ParameterBlock> tdParamBlockPtr =
-          mapPtr_->parameterBlockPtr(tdId);
-  tdParamBlockPtr->parameters()[0] += deltaX(camParamIndex);
-  camParamIndex += 1;
-
-  uint64_t trId = stateInQuestion.sensors.at(SensorStates::Camera)
-                      .at(camIdx)
-                      .at(CameraSensorStates::TR)
-                      .id;
-  std::shared_ptr<ceres::ParameterBlock> trParamBlockPtr =
-          mapPtr_->parameterBlockPtr(trId);
-  trParamBlockPtr->parameters()[0] += deltaX[camParamIndex];
-  camParamIndex += 1;
+  updateCameraSensorStates(stateInQuestion, deltaX);
 
   // Update cloned states except for the last one, the current state,
   // which is already updated early on.
@@ -2575,9 +2614,13 @@ void HybridFilter::propagatePoseAndVelocityForMapPoint(
   }
 
   std::vector<std::shared_ptr<const okvis::ceres::ParameterBlock>>
-      cameraTimeParameterPtrs = getCameraTimeParameterPtrs();
-  pointDataPtr->setCameraTimeParameterPtrs(cameraTimeParameterPtrs[0],
-                                           cameraTimeParameterPtrs[1]);
+      cameraDelayParameterPtrs;
+  std::vector<std::shared_ptr<const okvis::ceres::ParameterBlock>>
+      cameraReadoutTimeParameterPtrs;
+  getCameraTimeParameterPtrs(&cameraDelayParameterPtrs,
+                             &cameraReadoutTimeParameterPtrs);
+  pointDataPtr->setCameraTimeParameterPtrs(cameraDelayParameterPtrs,
+                                           cameraReadoutTimeParameterPtrs);
 
   std::vector<std::shared_ptr<const okvis::ceres::ParameterBlock>>
       imuAugmentedParameterPtrs = getImuAugmentedParameterPtrs();
@@ -2730,28 +2773,32 @@ void HybridFilter::getCameraCalibrationEstimate(
   cameraParams->tail<2>() = Eigen::Vector2d(tdEstimate, trEstimate);
 }
 
-std::vector<std::shared_ptr<const okvis::ceres::ParameterBlock>>
-HybridFilter::getCameraTimeParameterPtrs() const {
-  std::vector<std::shared_ptr<const okvis::ceres::ParameterBlock>>
-      cameraTimeParameterPtrs;
-  cameraTimeParameterPtrs.reserve(2);
+void HybridFilter::getCameraTimeParameterPtrs(
+    std::vector<std::shared_ptr<const okvis::ceres::ParameterBlock>>
+        *cameraDelayParameterPtrs,
+    std::vector<std::shared_ptr<const okvis::ceres::ParameterBlock>>
+        *cameraReadoutTimeParameterPtrs) const {
+  size_t numCameras = camera_rig_.numberCameras();
+  cameraDelayParameterPtrs->reserve(numCameras);
+  cameraReadoutTimeParameterPtrs->reserve(numCameras);
+
   const States& oneState = statesMap_.rbegin()->second;
-  const int camIdx = 0;
-  uint64_t tdId = oneState.sensors.at(SensorStates::Camera)
-                      .at(camIdx)
-                      .at(CameraSensorStates::TD)
-                      .id;
-  std::shared_ptr<ceres::ParameterBlock> tdParamBlockPtr =
-      mapPtr_->parameterBlockPtr(tdId);
-  uint64_t trId = oneState.sensors.at(SensorStates::Camera)
-                      .at(camIdx)
-                      .at(CameraSensorStates::TR)
-                      .id;
-  std::shared_ptr<ceres::ParameterBlock> trParamBlockPtr =
-      mapPtr_->parameterBlockPtr(trId);
-  cameraTimeParameterPtrs.push_back(tdParamBlockPtr);
-  cameraTimeParameterPtrs.push_back(trParamBlockPtr);
-  return cameraTimeParameterPtrs;
+  for (size_t camIdx = 0u; camIdx < numCameras; ++camIdx) {
+    uint64_t tdId = oneState.sensors.at(SensorStates::Camera)
+                        .at(camIdx)
+                        .at(CameraSensorStates::TD)
+                        .id;
+    std::shared_ptr<ceres::ParameterBlock> tdParamBlockPtr =
+        mapPtr_->parameterBlockPtr(tdId);
+    uint64_t trId = oneState.sensors.at(SensorStates::Camera)
+                        .at(camIdx)
+                        .at(CameraSensorStates::TR)
+                        .id;
+    std::shared_ptr<ceres::ParameterBlock> trParamBlockPtr =
+        mapPtr_->parameterBlockPtr(trId);
+    cameraDelayParameterPtrs->push_back(tdParamBlockPtr);
+    cameraReadoutTimeParameterPtrs->push_back(trParamBlockPtr);
+  }
 }
 
 std::vector<std::shared_ptr<const okvis::ceres::ParameterBlock>>

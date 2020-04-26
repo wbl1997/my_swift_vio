@@ -65,11 +65,30 @@ class MSCKF2 : public HybridFilter {
 
   virtual void optimize(size_t numIter, size_t numThreads = 1,
                         bool verbose = false) final;
+
+  /**
+   * @brief compute the Jacobians of T_BC relative to extrinsic parameters.
+   * Perturbation in T_BC is defined by kinematics::oplus.
+   * Perturbation in extrinsic parameters are defined by extrinsic models.
+   * @param T_BCi Transform from i camera frame to body frame.
+   * @param T_BC0 Transform from main camera frame to body frame.
+   * @param cameraExtrinsicModelId
+   * @param mainCameraExtrinsicModelId
+   * @param[out] dT_BCi_dExtrinsics list of Jacobians for T_BC.
+   * @param[in, out] involvedCameraIndices observation camera index, and main camera index if T_C0Ci extrinsic model is used.
+   * @pre involvedCameraIndices has exactly one camera index for i camera frame.
+   */
+  void computeExtrinsicJacobians(
+      const okvis::kinematics::Transformation& T_BCi,
+      const okvis::kinematics::Transformation& T_BC0,
+      int cameraExtrinsicModelId, int mainCameraExtrinsicModelId,
+      AlignedVector<Eigen::MatrixXd>* dT_BCi_dExtrinsics,
+      std::vector<size_t>* involvedCameraIndices) const;
+
   /**
    * @brief measurementJacobianAIDP
    * @warning Both poseId and anchorId are older than the latest frame Id.
-   * @param ab1rho
-   * @param tempCameraGeometry
+   * @param ab1rho \f $[a, b, 1]^T = \rho p_{C{t(i, a)}} \f$
    * @param obs
    * @param observationIndex index of the observation inside the point's shared data.
    * @param pointDataPtr shared data of the point.
@@ -83,7 +102,14 @@ class MSCKF2 : public HybridFilter {
    */
   bool measurementJacobianAIDP(
       const Eigen::Vector4d& ab1rho,
-      const Eigen::Vector2d& obs, int observationIndex,
+      const Eigen::Vector2d& obs, size_t observationIndex,
+      std::shared_ptr<const msckf::PointSharedData> pointDataPtr,
+      Eigen::Matrix<double, 2, Eigen::Dynamic>* H_x,
+      Eigen::Matrix<double, 2, 3>* J_pfi, Eigen::Vector2d* residual) const;
+
+  bool measurementJacobianAIDPMono(
+      const Eigen::Vector4d& ab1rho,
+      const Eigen::Vector2d& obs, size_t observationIndex,
       std::shared_ptr<const msckf::PointSharedData> pointDataPtr,
       Eigen::Matrix<double, 2, Eigen::Dynamic>* H_x,
       Eigen::Matrix<double, 2, 3>* J_pfi, Eigen::Vector2d* residual) const;

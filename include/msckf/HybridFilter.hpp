@@ -276,8 +276,11 @@ class HybridFilter : public Estimator {
 
   virtual void printTrackLengthHistogram(std::ostream &stream) const final;
 
-  std::vector<std::shared_ptr<const okvis::ceres::ParameterBlock>>
-      getCameraTimeParameterPtrs() const;
+  void getCameraTimeParameterPtrs(
+      std::vector<std::shared_ptr<const okvis::ceres::ParameterBlock>>
+          *cameraDelayParameterPtrs,
+      std::vector<std::shared_ptr<const okvis::ceres::ParameterBlock>>
+          *cameraReadoutTimeParameterPtrs) const;
 
   std::vector<std::shared_ptr<const okvis::ceres::ParameterBlock>>
       getImuAugmentedParameterPtrs() const;
@@ -410,11 +413,13 @@ class HybridFilter : public Estimator {
    * @param camIdx
    * @return
    */
-  inline size_t intraStartIndexOfCameraParams(size_t camIdx) const {
+  inline size_t intraStartIndexOfCameraParams(
+      size_t camIdx,
+      CameraSensorStates camParamBlockName = CameraSensorStates::T_SCi) const {
     size_t totalInclusiveDim = statesMap_.rbegin()
                                    ->second.sensors.at(SensorStates::Camera)
                                    .at(camIdx)
-                                   .at(CameraSensorStates::T_SCi)
+                                   .at(camParamBlockName)
                                    .startIndexInCov;
     size_t totalExclusiveDim = statesMap_.rbegin()
                                    ->second.sensors.at(SensorStates::Imu)
@@ -466,7 +471,11 @@ class HybridFilter : public Estimator {
    * @param stateInQuestion
    * @param deltaAugmentedParams
    */
-  void updateImuAugmentedStates(const States& stateInQuestion, const Eigen::VectorXd deltaAugmentedParams);
+  void updateImuAugmentedStates(const States& stateInQuestion,
+                                const Eigen::VectorXd deltaAugmentedParams);
+
+  void updateCameraSensorStates(const States& stateInQuestion,
+                                const Eigen::VectorXd& deltaX);
 
   void usePreviousCameraParamBlocks(
       std::map<uint64_t, States>::const_reverse_iterator prevStateRevIter,
@@ -603,6 +612,8 @@ class HybridFilter : public Estimator {
   // Li, icra14 optimization based ...
   static const size_t maxTrackLength_ = 12;
   // i.e., max cloned states in the cov matrix
+
+  const size_t kMainCameraIndex = 0u;
 
   std::vector<size_t>
       mTrackLengthAccumulator;  // histogram of the track lengths, start from

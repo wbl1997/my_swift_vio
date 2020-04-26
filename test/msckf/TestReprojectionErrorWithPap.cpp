@@ -369,8 +369,8 @@ void CameraObservationJacobianTest::propagatePoseAndVelocityForMapPoint(
     pointDataPtr->setVelocityParameterBlockPtr(observationIndex,
                                                parameterBlockPtr);
   }
-  pointDataPtr->setCameraTimeParameterPtrs(cameraParameterBlocks_[3],
-                                           cameraParameterBlocks_[2]);
+  pointDataPtr->setCameraTimeParameterPtrs({cameraParameterBlocks_[3]},
+                                           {cameraParameterBlocks_[2]});
 
   pointDataPtr->setImuAugmentedParameterPtrs(imuAugmentedBlocks_,
                                              &imuParameters_);
