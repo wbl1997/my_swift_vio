@@ -664,7 +664,6 @@ void LoopClosureDetector::initializePGO() {
   gtsam::Values init_val;
   init_val.insert(gtsam::Symbol(0), gtsam::Pose3());
 
-  CHECK(pgo_);
   pgo_->update(init_nfg, init_val);
 }
 

@@ -656,7 +656,6 @@ bool HybridFilter::applyMarginalizationStrategy(
   std::vector<uint64_t>
       toRemoveLmIds;  // id of landmarks to be removed that are in state
   const size_t numNavImuCamStates = startIndexOfClonedStatesFast();
-  CHECK_EQ(numNavImuCamStates, startIndexOfClonedStates());
   // number of navigation, imu, and camera states in the covariance
   const size_t numNavImuCamPoseStates =
       numNavImuCamStates + 9 * statesMap_.size();

@@ -333,7 +333,6 @@ bool MSCKF2::applyMarginalizationStrategy(
   }
 
   size_t startIndex = startIndexOfClonedStatesFast();
-  CHECK_EQ(startIndex, startIndexOfClonedStates());
   size_t finishIndex = startIndex + numRemovedStates * 9;
   CHECK_NE(finishIndex, covariance_.rows())
       << "Never remove the covariance of the lastest state";
