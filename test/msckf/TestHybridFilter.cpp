@@ -416,12 +416,9 @@ void testHybridFilterSinusoid(const std::string& outputPath,
       debugStream.open(outputFile, std::ofstream::out);
       std::string headerLine;
       okvis::StreamHelper::composeHeaderLine(
-            vioSystemBuilder.imuModelType(),
-            projOptModelName,
-            extrinsicModelName,
-            vioSystemBuilder.distortionType(),
-            okvis::FULL_STATE_WITH_ALL_CALIBRATION,
-            &headerLine);
+          vioSystemBuilder.imuModelType(), {extrinsicModelName},
+          {projOptModelName}, {vioSystemBuilder.distortionType()},
+          okvis::FULL_STATE_WITH_ALL_CALIBRATION, &headerLine);
       debugStream << headerLine << std::endl;
     }
 
@@ -625,10 +622,9 @@ void testHybridFilterSinusoid(const std::string& outputPath,
   rmseStream.open(rmseFile, std::ofstream::out);
   std::string headerLine;
   okvis::StreamHelper::composeHeaderLine(
-        "BG_BA_TG_TS_TA", projOptModelName,
-        extrinsicModelName, "RadialTangentialDistortion",
-        okvis::FULL_STATE_WITH_ALL_CALIBRATION,
-        &headerLine, false);
+      "BG_BA_TG_TS_TA", {extrinsicModelName}, {projOptModelName},
+      {"RadialTangentialDistortion"}, okvis::FULL_STATE_WITH_ALL_CALIBRATION,
+      &headerLine, false);
   rmseStream << headerLine << std::endl;
   for (auto it = rmseSum.begin(); it != rmseSum.end(); ++it)
     rmseStream << it->first << " " << it->second.transpose() << std::endl;

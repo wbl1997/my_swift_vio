@@ -147,8 +147,6 @@ def find_all_bags_with_gt(euroc_dir, uzh_fpv_dir):
                                        "forget to extract gt from bag files, e.g.,"
                                        " with extract_uzh_fpv_gt.py}".format(gt_file))
 
-    print(Fore.RED + "We use only one mission from each dataset for debugging purpose")
-
     bag_list = uzh_fpv_bags
     bag_list.extend(euroc_bags)
     gt_list = uzh_fpv_gt_list

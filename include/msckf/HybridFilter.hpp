@@ -286,7 +286,7 @@ class HybridFilter : public Estimator {
       getImuAugmentedParameterPtrs() const;
 
   virtual void getCameraCalibrationEstimate(
-      int cameraIndex, Eigen::Matrix<double, Eigen::Dynamic, 1>* cameraParams) const final;
+      Eigen::Matrix<double, Eigen::Dynamic, 1>* cameraParams) const final;
 
   virtual void getImuAugmentedStatesEstimate(
       Eigen::Matrix<double, Eigen::Dynamic, 1>* extraParams) const final;

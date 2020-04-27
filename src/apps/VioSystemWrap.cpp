@@ -9,7 +9,7 @@ void VioSystemWrap::registerCallbacks(
     okvis::ThreadedKFVio* vioSystem, okvis::Publisher* publisher,
     okvis::PgoPublisher* pgoPublisher) {
   std::string path = okvis::removeTrailingSlash(output_dir);
-  int camIdx = 0;
+
   vioSystem->setFullStateCallback(
       std::bind(&okvis::Publisher::publishFullStateAsCallback, publisher,
                 std::placeholders::_1, std::placeholders::_2,
@@ -20,11 +20,22 @@ void VioSystemWrap::registerCallbacks(
 
   std::string stateFilename = path + "/msckf_estimates.csv";
   std::string headerLine;
+  size_t numCameras = parameters.nCameraSystem.numCameras();
+  std::vector<std::string> extrinsicParamRepList(numCameras);
+  std::vector<std::string> projectionParamRepList(numCameras);
+  std::vector<std::string> distortionParamRepList(numCameras);
+  for (size_t camIdx = 0; camIdx < numCameras; ++camIdx) {
+    extrinsicParamRepList[camIdx] =
+        parameters.nCameraSystem.extrinsicOptRep(camIdx);
+    projectionParamRepList[camIdx] = parameters.nCameraSystem.projOptRep(camIdx);
+    distortionParamRepList[camIdx] =
+        parameters.nCameraSystem.cameraGeometry(camIdx)->distortionType();
+  }
+
   okvis::StreamHelper::composeHeaderLine(
-      parameters.imu.model_type, parameters.nCameraSystem.projOptRep(camIdx),
-      parameters.nCameraSystem.extrinsicOptRep(camIdx),
-      parameters.nCameraSystem.cameraGeometry(camIdx)->distortionType(),
-      okvis::FULL_STATE_WITH_ALL_CALIBRATION, &headerLine);
+      parameters.imu.model_type, extrinsicParamRepList, projectionParamRepList,
+      distortionParamRepList, okvis::FULL_STATE_WITH_ALL_CALIBRATION,
+      &headerLine);
   publisher->setCsvFile(stateFilename, headerLine);
   if (FLAGS_dump_output_option == 2) {
     // save estimates of evolving states, and camera extrinsics

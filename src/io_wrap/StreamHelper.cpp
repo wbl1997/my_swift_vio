@@ -10,20 +10,28 @@ DEFINE_string(datafile_separator, ",",
 namespace okvis {
 
 void StreamHelper::composeHeaderLine(const std::string &imu_model,
-                                     const std::string &cam0_proj_opt_rep,
-                                     const std::string &cam0_extrinsic_opt_rep,
-                                     const std::string &cam0_distortion_rep,
+                                     const std::vector<std::string> &cam_extrinsic_opt_rep,
+                                     const std::vector<std::string> &cam_proj_opt_rep,
+                                     const std::vector<std::string> &cam_distortion_rep,
                                      DUMP_RESULT_OPTION result_option,
                                      std::string *header_line, bool include_frameid) {
-  composeHeaderLine(imu_model, ProjectionOptNameToId(cam0_proj_opt_rep),
-                    ExtrinsicModelNameToId(cam0_extrinsic_opt_rep),
-                    cam0_distortion_rep, result_option, header_line, include_frameid);
+  size_t numCameras = cam_extrinsic_opt_rep.size();
+  std::vector<int> cam_extrinsic_opt_mode(numCameras);
+  std::vector<int> cam_proj_opt_mode(numCameras);
+  for (size_t j = 0; j < numCameras; ++j) {
+    cam_extrinsic_opt_mode[j] =
+        ExtrinsicModelNameToId(cam_extrinsic_opt_rep[j]);
+    cam_proj_opt_mode[j] = ProjectionOptNameToId(cam_proj_opt_rep[j]);
+  }
+  composeHeaderLine(imu_model, cam_extrinsic_opt_mode, cam_proj_opt_mode,
+                    cam_distortion_rep, result_option, header_line,
+                    include_frameid);
 }
 
-void StreamHelper::composeHeaderLine(const std::string &imu_model,
-                                     const int &cam0_proj_opt_mode,
-                                     const int &cam0_extrinsic_opt_mode,
-                                     const std::string &cam0_distortion_rep,
+void StreamHelper::composeHeaderLine(const std::string& imu_model,
+                                     const std::vector<int>& cam_extrinsic_opt_mode,
+                                     const std::vector<int>& cam_proj_opt_mode,
+                                     const std::vector<std::string>& cam_distortion_rep,
                                      DUMP_RESULT_OPTION result_option,
                                      std::string *header_line,
                                      bool include_frameid) {
@@ -40,33 +48,42 @@ void StreamHelper::composeHeaderLine(const std::string &imu_model,
   std::string imu_param_format;
   ImuModelToFormatString(ImuModelNameToId(imu_model), FLAGS_datafile_separator,
                          &imu_param_format);
-  std::string cam_proj_intrinsic_format;
-  ProjectionOptToParamsInfo(cam0_proj_opt_mode, FLAGS_datafile_separator,
-                            &cam_proj_intrinsic_format);
-  std::string cam_extrinsic_format;
-  ExtrinsicModelToParamsInfo(cam0_extrinsic_opt_mode, FLAGS_datafile_separator,
-                             &cam_extrinsic_format);
-  std::string cam_distortion_format;
-  okvis::cameras::DistortionNameToParamsInfo(
-      cam0_distortion_rep, FLAGS_datafile_separator, &cam_distortion_format);
-
   if (result_option == FULL_STATE_WITH_ALL_CALIBRATION) {
     stream << FLAGS_datafile_separator << imu_param_format;
-    stream << FLAGS_datafile_separator << cam_extrinsic_format;
-    stream << (cam_extrinsic_format.empty() ? "" : FLAGS_datafile_separator)
-           << cam_proj_intrinsic_format;
-    stream << (cam_proj_intrinsic_format.empty() ? "" : FLAGS_datafile_separator)
-           << cam_distortion_format;
-    stream << FLAGS_datafile_separator << "td[s]" << FLAGS_datafile_separator
-           << "tr[s]";
   } else if (result_option == FULL_STATE_WITH_EXTRINSICS) {
     stream << FLAGS_datafile_separator << imu_param_format;
-    stream << FLAGS_datafile_separator << cam_extrinsic_format;
   } else {
     std::string imu_param_format;
     ImuModelToFormatString(ImuModelNameToId("BG_BA"), FLAGS_datafile_separator,
                            &imu_param_format);
     stream << FLAGS_datafile_separator << imu_param_format;
+  }
+
+  size_t numCameras = cam_extrinsic_opt_mode.size();
+  for (size_t j = 0u; j < numCameras; ++j) {
+      std::string cam_extrinsic_format;
+      ExtrinsicModelToParamsInfo(cam_extrinsic_opt_mode[j],
+                                 FLAGS_datafile_separator, &cam_extrinsic_format);
+      stream << (cam_extrinsic_format.empty() ? "" : FLAGS_datafile_separator)
+             << cam_extrinsic_format;
+  }
+
+  for (size_t j = 0u; j < numCameras; ++j) {
+    std::string cam_proj_intrinsic_format;
+    ProjectionOptToParamsInfo(cam_proj_opt_mode[j], FLAGS_datafile_separator,
+                              &cam_proj_intrinsic_format);
+    std::string cam_distortion_format;
+    okvis::cameras::DistortionNameToParamsInfo(cam_distortion_rep[j],
+                                               FLAGS_datafile_separator,
+                                               &cam_distortion_format);
+    if (result_option == FULL_STATE_WITH_ALL_CALIBRATION) {
+      stream << (cam_proj_intrinsic_format.empty() ? ""
+                                                   : FLAGS_datafile_separator)
+             << cam_proj_intrinsic_format;
+      stream << FLAGS_datafile_separator << cam_distortion_format;
+      stream << FLAGS_datafile_separator << "td[s]" << FLAGS_datafile_separator
+             << "tr[s]";
+    }
   }
   *header_line = stream.str();
 }

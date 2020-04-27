@@ -168,9 +168,9 @@ void testPointLandmarkJacobian(std::string projOptModelName,
     std::string headerLine;
     okvis::StreamHelper::composeHeaderLine(
           vioSystemBuilder.imuModelType(),
-          projOptModelName,
-          extrinsicModelName,
-          vioSystemBuilder.distortionType(),
+          {extrinsicModelName},
+          {projOptModelName},
+          {vioSystemBuilder.distortionType()},
           okvis::FULL_STATE_WITH_ALL_CALIBRATION,
           &headerLine);
     debugStream << headerLine << std::endl;

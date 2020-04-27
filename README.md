@@ -164,7 +164,16 @@ TODO(jhuai): the progress percentage in building msckf jumps back and forth with
 This effect is not observed with OKVIS_ROS.
 An comparison of the CMakeLists.txt between msckf and okvis_ros does not reveal suspicious differences.
 
-### 3. DO_TIMING
+### 3. CATKIN_ENABLE_TESTING
+BUILD_TESTS=ON tells the program to build tests which depends on gmock and gtest. 
+If the program is built outside a catkin environment, then we will download and build gmock and gtest.
+Otherwise, if the program is built by catkin, the ros stack provides gmock and gtest. 
+Additional build of gmock and gtest will cause the error 
+"add_library cannot create imported target "gmock" because another target with the same name already exists."
+To tell if we are in catkin, CATKIN_ENABLE_TESTING=ON can be used. 
+But since this the default value in catkin, we do not need to specify it.
+
+### 4. DO_TIMING
 Add this cmake flag to enable timing statistics.
 
 ## Build and run tests
@@ -189,6 +198,14 @@ rosrun msckf msckf_test --gtest_filter="*Eigen*"
 cd msckf_ws/build/msckf/Kimera-RPGO
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$HOME/Documents/slam_devel/lib
 make check
+```
+
+* To run integration tests,
+You will need to download [rpg_trajectory_evaluation](https://github.com/uzh-rpg/rpg_trajectory_evaluation.git) which is the evaluation engine.
+Also you will need to download the EuRoC dataset and optionally the UZH-FPV dataset.
+```
+msckf/evaluation/smoke_test.py tests the program with one data session from EuRoC dataset.
+msckf/evaluation/main_evaluation.py tests the program with multiple data session from EuRoC and UZH-FPV dataset.
 ```
 
 ## Debug the project with QtCreator

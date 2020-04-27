@@ -2711,22 +2711,24 @@ bool HybridFilter::print(std::ostream& stream) const {
   getImuAugmentedStatesEstimate(&extraParams);
   stream << " " << extraParams.transpose().format(spaceInitFmt);
 
-  // camera sensor states
-  const int camIdx = 0;
-  uint64_t extrinsicId = stateInQuestion.sensors.at(SensorStates::Camera)
-                             .at(camIdx)
-                             .at(CameraSensorStates::T_SCi)
-                             .id;
-  std::shared_ptr<ceres::PoseParameterBlock> extrinsicParamBlockPtr =
-      std::static_pointer_cast<ceres::PoseParameterBlock>(
-          mapPtr_->parameterBlockPtr(extrinsicId));
-  kinematics::Transformation T_BC0 = extrinsicParamBlockPtr->estimate();
-  std::string extrinsicValues;
-  ExtrinsicModelToParamsValueString(camera_rig_.getExtrinsicOptMode(camIdx),
-                                    T_BC0, " ", &extrinsicValues);
-  stream << " " << extrinsicValues;
+  // camera extrinsic parameters.
+  size_t numCameras = camera_rig_.numberCameras();
+  for (int camIdx = 0; camIdx < (int)numCameras; ++camIdx) {
+    uint64_t extrinsicId = stateInQuestion.sensors.at(SensorStates::Camera)
+                               .at(camIdx)
+                               .at(CameraSensorStates::T_SCi)
+                               .id;
+    std::shared_ptr<ceres::PoseParameterBlock> extrinsicParamBlockPtr =
+        std::static_pointer_cast<ceres::PoseParameterBlock>(
+            mapPtr_->parameterBlockPtr(extrinsicId));
+    kinematics::Transformation T_XC = extrinsicParamBlockPtr->estimate();
+    std::string extrinsicValues;
+    ExtrinsicModelToParamsValueString(camera_rig_.getExtrinsicOptMode(camIdx),
+                                      T_XC, " ", &extrinsicValues);
+    stream << " " << extrinsicValues;
+  }
   Eigen::VectorXd cameraParams;
-  getCameraCalibrationEstimate(camIdx, &cameraParams);
+  getCameraCalibrationEstimate(&cameraParams);
   stream << " " << cameraParams.transpose().format(spaceInitFmt);
 
   // stds
@@ -2747,29 +2749,34 @@ void HybridFilter::printTrackLengthHistogram(std::ostream& stream) const {
 }
 
 void HybridFilter::getCameraCalibrationEstimate(
-    int camIdx,
     Eigen::Matrix<double, Eigen::Dynamic, 1>* cameraParams) const {
   const uint64_t poseId = statesMap_.rbegin()->first;
-  Eigen::VectorXd intrinsic;
+  size_t numCameras = camera_rig_.numberCameras();
 
-  getSensorStateEstimateAs<ceres::EuclideanParamBlock>(
-      poseId, camIdx, SensorStates::Camera, CameraSensorStates::Intrinsics,
-      intrinsic);
-
-  Eigen::VectorXd distortionCoeffs;
-  getSensorStateEstimateAs<ceres::EuclideanParamBlock>(
-      poseId, camIdx, SensorStates::Camera, CameraSensorStates::Distortion,
-      distortionCoeffs);
-  cameraParams->resize(intrinsic.size() + distortionCoeffs.size() + 2, 1);
-  cameraParams->head(intrinsic.size()) = intrinsic;
-  cameraParams->segment(intrinsic.size(), distortionCoeffs.size()) =
-          distortionCoeffs;
-  double tdEstimate(0), trEstimate(0);
-  getSensorStateEstimateAs<ceres::CameraTimeParamBlock>(
-      poseId, camIdx, SensorStates::Camera, CameraSensorStates::TD, tdEstimate);
-  getSensorStateEstimateAs<ceres::CameraTimeParamBlock>(
-      poseId, camIdx, SensorStates::Camera, CameraSensorStates::TR, trEstimate);
-  cameraParams->tail<2>() = Eigen::Vector2d(tdEstimate, trEstimate);
+  for (int camIdx = 0; camIdx < (int)numCameras; ++camIdx) {
+    Eigen::VectorXd intrinsic;
+    getSensorStateEstimateAs<ceres::EuclideanParamBlock>(
+        poseId, camIdx, SensorStates::Camera, CameraSensorStates::Intrinsics,
+        intrinsic);
+    Eigen::VectorXd distortionCoeffs;
+    getSensorStateEstimateAs<ceres::EuclideanParamBlock>(
+        poseId, camIdx, SensorStates::Camera, CameraSensorStates::Distortion,
+        distortionCoeffs);
+    int oldSize = cameraParams->size();
+    cameraParams->conservativeResize(
+        oldSize + intrinsic.size() + distortionCoeffs.size() + 2, 1);
+    cameraParams->segment(oldSize, intrinsic.size()) = intrinsic;
+    cameraParams->segment(oldSize + intrinsic.size(), distortionCoeffs.size()) =
+        distortionCoeffs;
+    double tdEstimate(0), trEstimate(0);
+    getSensorStateEstimateAs<ceres::CameraTimeParamBlock>(
+        poseId, camIdx, SensorStates::Camera, CameraSensorStates::TD,
+        tdEstimate);
+    getSensorStateEstimateAs<ceres::CameraTimeParamBlock>(
+        poseId, camIdx, SensorStates::Camera, CameraSensorStates::TR,
+        trEstimate);
+    cameraParams->tail<2>() = Eigen::Vector2d(tdEstimate, trEstimate);
+  }
 }
 
 void HybridFilter::getCameraTimeParameterPtrs(
@@ -3207,7 +3214,7 @@ bool HybridFilter::getOdometryConstraintsForKeyframe(
   std::vector<std::shared_ptr<NeighborConstraintMessage>>&
       odometryConstraintList = queryKeyframe->odometryConstraintListMutable();
   odometryConstraintList.reserve(
-      maxOdometryConstraintForAKeyframe_);
+      poseGraphParameters_.maxOdometryConstraintForAKeyframe);
   okvis::kinematics::Transformation T_WBr = queryKeyframe->T_WB_;
   auto kfCovIndexIter =
       statesMap_.find(queryKeyframe->id_);
@@ -3217,7 +3224,7 @@ bool HybridFilter::getOdometryConstraintsForKeyframe(
   queryKeyframe->setCovariance(covariance_.block<6, 6>(cov_T_WBr_start, cov_T_WBr_start));
   auto riter = statesMap_.rbegin();
   for (++riter;  // skip the last frame which in this case should be a keyframe.
-       riter != statesMap_.rend() && j < maxOdometryConstraintForAKeyframe_;
+       riter != statesMap_.rend() && j < poseGraphParameters_.maxOdometryConstraintForAKeyframe;
        ++riter) {
     if (riter->second.isKeyframe) {
       okvis::kinematics::Transformation T_WBn;

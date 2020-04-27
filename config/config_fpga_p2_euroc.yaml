@@ -79,6 +79,9 @@ optimization:
     landmarkModelId: 1
     initializeWithoutEnoughParallax: true
 
+pose_graph:
+    maxOdometryConstraintForAKeyframe: 2
+
 # ceres optimization options
 ceres_options:
     minIterations: 3   # minimum number of iterations always performed
