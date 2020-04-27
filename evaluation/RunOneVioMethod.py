@@ -16,7 +16,7 @@ class RunOneVioMethod(object):
     def __init__(self, catkin_ws, vio_config_template,
                  algo_code_flags,
                  num_trials, bag_list, gt_list,
-                 vio_output_dir_list, extra_library_path=''):
+                 vio_output_dir_list, extra_library_path='', lcd_config_template=''):
         """
         :param catkin_ws: workspace containing executables
         :param vio_config_template: the template config yaml for running this algorithm.
@@ -32,6 +32,7 @@ class RunOneVioMethod(object):
 
         self.catkin_ws = catkin_ws
         self.vio_config_template = vio_config_template
+        self.lcd_config_template = lcd_config_template
         self.algo_code_flags = algo_code_flags
         self.num_keyframes = algo_code_flags["numKeyframes"]
         self.num_imuframes = algo_code_flags["numImuFrames"]
@@ -41,6 +42,7 @@ class RunOneVioMethod(object):
         self.output_dir_list = vio_output_dir_list
         self.algo_dir = os.path.dirname(vio_output_dir_list[0].rstrip('/'))
         self.custom_vio_config_list = []
+        self.custom_lcd_config_list = []
         self.eval_cfg_template = os.path.join(
             os.path.dirname(os.path.abspath(__file__)), "config/eval_cfg.yaml")
         self.extra_lib_path = extra_library_path
@@ -87,22 +89,35 @@ class RunOneVioMethod(object):
             vio_yaml_list.append(vio_yaml_mission)
         self.custom_vio_config_list = vio_yaml_list
 
-    def create_sync_command(self, custom_vio_config, vio_trial_output_dir, bag_fullname):
+    def create_lcd_config_yaml(self):
+        """for each data mission, create a lcd config yaml"""
+        lcd_yaml_list = []
+        for bag_index, bag_fullname in enumerate(self.bag_list):
+            output_dir_mission = self.output_dir_list[bag_index]
+            lcd_yaml_mission = os.path.join(output_dir_mission, os.path.basename(self.lcd_config_template))
+            shutil.copy2(self.lcd_config_template, lcd_yaml_mission)
+            lcd_yaml_list.append(lcd_yaml_mission)
+        self.custom_lcd_config_list = lcd_yaml_list
+
+    def create_sync_command(self, custom_vio_config, custom_lcd_config,
+                            vio_trial_output_dir, bag_fullname):
         data_type = OkvisConfigComposer.dataset_code(bag_fullname)
         arg_topics = r'--camera_topics="{},{}" --imu_topic={}'.format(
             ROS_TOPICS[data_type][0], ROS_TOPICS[data_type][1], ROS_TOPICS[data_type][2])
 
         export_lib_cmd = "export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:{};". \
             format(self.extra_lib_path)
-        cmd = "{} {} --output_dir={} --skip_first_seconds=0" \
+        cmd = "{} {} {} --output_dir={} --skip_first_seconds=0" \
               " --max_inc_tol=10.0 --dump_output_option=3" \
               " --bagname={} {} {}".format(
-            self.get_sync_exe(), custom_vio_config, vio_trial_output_dir,
+            self.get_sync_exe(), custom_vio_config, custom_lcd_config,
+            vio_trial_output_dir,
             bag_fullname, arg_topics,
             self.algo_code_flags["extra_gflags"])
         return export_lib_cmd + cmd
 
-    def create_async_command(self, custom_vio_config, vio_trial_output_dir, bag_fullname):
+    def create_async_command(self, custom_vio_config,
+                             vio_trial_output_dir, bag_fullname):
         launch_file = "okvis_node_rosbag.launch"
         setup_bash_file = os.path.join(self.catkin_ws, "devel/setup.bash")
         arg_val_str = utility_functions.get_arg_value_from_gflags(
@@ -131,6 +146,7 @@ class RunOneVioMethod(object):
         :return:
         '''
         self.create_vio_config_yaml()
+        self.create_lcd_config_yaml()
 
         mock = 'async' in algo_name
         roscore_manager = RoscoreManager.RosCoreManager(mock)
@@ -144,6 +160,7 @@ class RunOneVioMethod(object):
             eval_config_file = os.path.join(output_dir_mission, 'eval_cfg.yaml')
             shutil.copy2(self.eval_cfg_template, eval_config_file)
             custom_vio_config = self.custom_vio_config_list[bag_index]
+            custom_lcd_config = self.custom_lcd_config_list[bag_index]
             for trial_index in range(self.num_trials):
                 if self.num_trials == 1:
                     index_str = ''
@@ -167,7 +184,8 @@ class RunOneVioMethod(object):
                         stream.write('{}\n'.format(cmd))
                     cmd = "chmod +x {wrap};{wrap}".format(wrap=src_wrap)
                 else:
-                    cmd = self.create_sync_command(custom_vio_config, output_dir_trial, bag_fullname)
+                    cmd = self.create_sync_command(custom_vio_config, custom_lcd_config,
+                                                   output_dir_trial, bag_fullname)
 
                 user_msg = 'Running vio method with cmd\n{}\n'.format(cmd)
                 print(user_msg)

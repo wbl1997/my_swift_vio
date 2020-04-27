@@ -75,6 +75,14 @@ def parse_args():
         help='Export extra library path to LD_LIBRARY_PATH'
              ' so that locally installed libs can be loaded',
         default="$HOME/Documents/slam_devel/lib")
+
+    lcd_config_default = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                      '../config/LcdParams.yaml')
+    parser.add_argument('--lcd_config_yaml', type=str,
+                        help="path to loop closure detector template config yaml. Its content "
+                             "will NOT be modified in running the program.",
+                        default=lcd_config_default)
+
     args = parser.parse_args()
     check_common_args(args)
     return args

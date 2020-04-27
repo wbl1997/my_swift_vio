@@ -32,7 +32,13 @@ BAGNAME_DATANAME_LABEL = {
     'indoor_forward_10_snapdragon_with_gt': ('in_fwd_10', 'if10'),
     'outdoor_forward_1_snapdragon_with_gt': ('out_fwd_1', 'of1'),
     'outdoor_forward_3_snapdragon_with_gt': ('out_fwd_3', 'of3'),
-    'outdoor_forward_5_snapdragon_with_gt': ('out_fwd_5', 'of5')
+    'outdoor_forward_5_snapdragon_with_gt': ('out_fwd_5', 'of5'),
+    'indoor_forward_11_snapdragon': ('in_fwd_11', 'if11'),
+    'indoor_forward_12_snapdragon': ('in_fwd_12', 'if12'),
+    'indoor_45_3_snapdragon': ('in_45_3', 'i3'),
+    'indoor_45_16_snapdragon': ('in_45_16', 'i16'),
+    'outdoor_forward_9_snapdragon': ('out_fwd_9', 'of9'),
+    'outdoor_forward_10_snapdragon': ('out_fwd_10', 'of10'),
 }
 
 
