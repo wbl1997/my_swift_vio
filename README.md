@@ -255,8 +255,12 @@ The default target "all" may not emcompass building some test targets.
 ## Example running cases
 
 ### Parameter description
+The parameters are divided into two groups, those that depend on operating system and file system, 
+and those that are intrinsic to the program.
+Parameters belonging to the first group are typically passed through command line gflags.
+Parameters of the second group are typically configured through yaml.
 
-Parameters through command line
+**List of parameters through command line**
 |  Command line arguments | Description | Default |
 |---|---|---|
 |  load_input_option |  0 subscribe to rostopics, 1 load video and IMU csv |  1 |
@@ -267,8 +271,7 @@ Parameters through command line
 | head_tail | Use the fixed head and receding tail observations or the entire feature track to compose two-view constraints in TF_VIO | false |
 | image_noise_cov_multiplier | Scale up the image observation noise cov for TF_VIO. 9 is recommended for the two-view constraint scheme based on an entire feature track, 25 is recommended for the two-view head_tail constraint scheme | 9 |
 
-Parameters through config yaml
-
+**Parameters through config yaml**
 Remark: set sigma_{param} to zero to disable estimating "param" in filtering methods.
 
 | Configuration parameters | Description | Default |
