@@ -163,9 +163,8 @@ if __name__ == '__main__':
     for index, gt in enumerate(gt_list):
         print('{}: {}'.format(bag_list[index], gt))
 
-    algo_name_code_flags_dict = {'OKVIS': AlgoConfig.create_algo_config(['OKVIS', '', 5, 3]),
-                                 'OKVIS_nframe': AlgoConfig.create_algo_config(['OKVIS', '', 5, 3, 0]),
-                                 'MSCKF_i': AlgoConfig.create_algo_config(['MSCKF', '--use_IEKF=true', 10, 3]),
+    algo_name_code_flags_dict = {'OKVIS_nframe': AlgoConfig.create_algo_config(['OKVIS', '', 5, 3, 0]),
+                                 'MSCKF_nframe': AlgoConfig.create_algo_config(['MSCKF', '', 10, 3, 0]),
                                  'MSCKF': AlgoConfig.create_algo_config(['MSCKF', '', 10, 3])}
 
     algo_name_list = list(algo_name_code_flags_dict.keys())
