@@ -674,11 +674,18 @@ bool MSCKF2::measurementJacobianAIDP(
     dpoint_dX.emplace_back(dpoint_dT_WBt * dT_WBt_dv_WB);
   }
 
-  // Accumulate jacobian components to Jacobian relative to states.
+  // According to Li 2013 IJRR high precision, eq 41 and 55, among all Jacobian
+  // components, only the Jacobian ddpoint_dX, i.e.,
+  // \f$\frac{\partial \rho p^{C(t_{i,j})}}{\partial \delta X}\f$, need to use
+  // first estimates. The Jacobians relative to the intrinsic parameters, and
+  // relative to \f$\rho p^{C(t_{i,j})}\f$ do not need to use first estimates.
+
+  // Accumulate Jacobians relative to nav states.
   J_x->setZero();
   size_t iterIndex = 0u;
   for (auto& startAndLen : startIndexToMinDim) {
-    J_x->block(0, startAndLen.first, 2, startAndLen.second) += dz_drhoxpCtj * dpoint_dX[iterIndex].topRows<3>();
+    J_x->block(0, startAndLen.first, 2, startAndLen.second) +=
+        dz_drhoxpCtj * dpoint_dX[iterIndex].topRows<3>();
     ++iterIndex;
   }
   // Jacobian relative to camera parameters.
@@ -688,14 +695,17 @@ bool MSCKF2::measurementJacobianAIDP(
     size_t startIndex = intraStartIndexOfCameraParams(camIdx, CameraSensorStates::Intrinsics);
     J_x->block(0, startIndex, 2, intrinsicsJacobian.cols()) = intrinsicsJacobian;
   }
-  // Jacobian relative to landmakr parameters.
+  // Jacobian relative to landmark parameters.
   Eigen::Matrix<double, 4, 3> dhomo_dabrho;
   dhomo_dabrho.setZero();
   dhomo_dabrho(0, 0) = 1;
   dhomo_dabrho(1, 1) = 1;
   dhomo_dabrho(3, 2) = 1;
-  (*J_pfi) = dz_drhoxpCtj * mtpj.dp_dpoint().topRows<3>() * dhomo_dabrho;
-//  (*J_pfi) = dz_drhoxpCtj * T_CtjCta.T().topRows<3>() * dhomo_dabrho; // TODO(jhuai): do we use this or not?
+  // According to Li 2013 IJRR high precision, eq 41 and 55, J_pfi does not need
+  // to use first estimates. As a result, expression 2 should be used.
+  // And tests show that (1) often cause divergence for mono MSCKF.
+  //  (*J_pfi) = dz_drhoxpCtj * mtpj.dp_dpoint().topRows<3>() * dhomo_dabrho; //  (1)
+  (*J_pfi) = dz_drhoxpCtj * T_CtjCta.T().topRows<3>() * dhomo_dabrho; // (2)
   return true;
 }
 
