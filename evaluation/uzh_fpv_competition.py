@@ -16,10 +16,11 @@ init(autoreset=True)
 
 def find_test_bags(uzh_fpv_dir):
     session_list = {
-        'indoor_forward_11_snapdragon.bag',
-        'indoor_forward_12_snapdragon.bag',
+
         'indoor_45_3_snapdragon.bag',
         'indoor_45_16_snapdragon.bag',
+        'indoor_forward_11_snapdragon.bag',
+        'indoor_forward_12_snapdragon.bag',
         'outdoor_forward_9_snapdragon.bag',
         'outdoor_forward_10_snapdragon.bag',
     }
@@ -67,7 +68,8 @@ if __name__ == '__main__':
             code_flags,
             args.num_trials, bag_list, None,
             results_dir_manager.get_all_result_dirs(name),
-            args.extra_lib_path, args.lcd_config_yaml)
+            args.extra_lib_path, args.lcd_config_yaml,
+            args.voc_file)
         rc = runner.run_method(name, args.pose_conversion_script)
         if rc != 0:
             returncode = rc

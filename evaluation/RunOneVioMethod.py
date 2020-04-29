@@ -16,7 +16,9 @@ class RunOneVioMethod(object):
     def __init__(self, catkin_ws, vio_config_template,
                  algo_code_flags,
                  num_trials, bag_list, gt_list,
-                 vio_output_dir_list, extra_library_path='', lcd_config_template=''):
+                 vio_output_dir_list, extra_library_path='',
+                 lcd_config_template='',
+                 voc_file = ''):
         """
         :param catkin_ws: workspace containing executables
         :param vio_config_template: the template config yaml for running this algorithm.
@@ -33,6 +35,7 @@ class RunOneVioMethod(object):
         self.catkin_ws = catkin_ws
         self.vio_config_template = vio_config_template
         self.lcd_config_template = lcd_config_template
+        self.voc_file = voc_file
         self.algo_code_flags = algo_code_flags
         self.num_keyframes = algo_code_flags["numKeyframes"]
         self.num_imuframes = algo_code_flags["numImuFrames"]
@@ -109,10 +112,10 @@ class RunOneVioMethod(object):
             format(self.extra_lib_path)
         cmd = "{} {} {} --output_dir={} --skip_first_seconds=0" \
               " --max_inc_tol=10.0 --dump_output_option=3" \
-              " --bagname={} {} {}".format(
+              " --bagname={} --vocabulary_path={} {} {}".format(
             self.get_sync_exe(), custom_vio_config, custom_lcd_config,
             vio_trial_output_dir,
-            bag_fullname, arg_topics,
+            bag_fullname, self.voc_file, arg_topics,
             self.algo_code_flags["extra_gflags"])
         return export_lib_cmd + cmd
 

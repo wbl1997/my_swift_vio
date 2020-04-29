@@ -83,6 +83,13 @@ def parse_args():
                              "will NOT be modified in running the program.",
                         default=lcd_config_default)
 
+    voc_file_default = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                    '../vocabulary/ORBvoc.yml')
+
+    parser.add_argument('--voc_file', type=str,
+                        help="vocabulary full filename.",
+                        default=voc_file_default)
+
     args = parser.parse_args()
     check_common_args(args)
     return args
