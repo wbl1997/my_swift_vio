@@ -92,7 +92,7 @@ int main(int argc, char **argv) {
 
   const std::string nodeName = "okvis_node_synchronous";
   ros::init(argc, argv, nodeName);
-  ros::NodeHandle nh(nodeName);
+  ros::NodeHandle nh("okvis_node"); // use okvis_node because it is the prefix for topics shown in rviz.
 
   std::string configFilename;
   std::string lcdConfigFilename;
