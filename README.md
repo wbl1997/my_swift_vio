@@ -128,6 +128,8 @@ catkin config --cmake-args -DUSE_ROS=ON -DBUILD_TESTS=ON \
 catkin build vio_common msckf -DUSE_ROS=ON -DBUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Release -j$USE_PROC
 # -DCMAKE_PREFIX_PATH=/opt/ros/$ROS_VERSION
 # -DDO_TIMING
+# -DUSE_SANITIZER=Address
+
 ```
 ### 1. Why is EIGEN_INCLUDE_DIR passed as a build argument?
 Setting EIGEN_INCLUDE_DIR is necessary for Ubuntu 16.04 because
@@ -218,7 +220,7 @@ Build the project with instructions in Section Build the project.
 You may need to clean build and devel dirs under the workspace with
 
 ```
-caktin clean -y
+catkin clean -y
 ```
 
 ### 2. Open msckf with QtCreator

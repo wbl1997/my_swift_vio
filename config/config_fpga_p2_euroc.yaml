@@ -26,7 +26,7 @@ cameras:
         focal_length: [457.587426604, 456.13442556],
         principal_point: [379.99944652, 255.238185386],
         projection_opt_mode: FXY_CXY,
-        extrinsic_opt_mode: P_BC_Q_BC,
+        extrinsic_opt_mode: P_C0C_Q_C0C,
         image_delay: 0.0,
         image_readout_time: 0.00}
 
@@ -73,7 +73,7 @@ numKeyframes: 5 # number of keyframes in optimisation window
 numImuFrames: 3 # number of frames linked by most recent nonlinear IMU error terms
 optimization:
     triangulationMaxDepth: 1000.0
-    algorithm: "OKVIS"
+    algorithm: "MSCKF"
     useEpipolarConstraint: false
     cameraObservationModelId: 0
     landmarkModelId: 1

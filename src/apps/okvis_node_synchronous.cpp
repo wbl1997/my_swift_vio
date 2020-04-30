@@ -212,25 +212,29 @@ int main(int argc, char **argv) {
     // check if at the end
     if (view_imu_iterator == view_imu.end()) {
       std::cout << std::endl
-                << "Finished. Press any key to exit." << std::endl
+                << "Finished IMU data. Press any key to exit." << std::endl
                 << std::flush;
       char k = 0;
       while (k == 0 && ros::ok()) {
         k = cv::waitKey(1);
         ros::spinOnce();
       }
+      std::cout << "Returning from okvis_node_sync IMU branch!";
       return 0;
     }
     for (size_t i = 0; i < numCameras; ++i) {
       if (view_cam_iterators[i] == view_cams_ptr[i]->end()) {
         std::cout << std::endl
-                  << "Finished. Press any key to exit." << std::endl
+                  << "Finished images. Press any key to exit." << std::endl
                   << std::flush;
         char k = 0;
         while (k == 0 && ros::ok()) {
           k = cv::waitKey(1);
           ros::spinOnce();
         }
+        // TODO(jhuai): There is a erratic segmentation fault at the end of execution.
+        // It happens before destructors for ThreadedKFVio or any Estimator are called.
+        std::cout << "Returning from okvis_node_sync image branch!";
         return 0;
       }
     }
