@@ -161,7 +161,8 @@ class MSCKF2 : public HybridFilter {
 
   virtual void setKeyframeRedundancyThresholds(double dist, double angle,
                                                double trackingRate,
-                                               size_t minTrackLength) final;
+                                               size_t minTrackLength,
+                                               size_t numImuFrames) final;
 
  private:
   int computeStackedJacobianAndResidual(

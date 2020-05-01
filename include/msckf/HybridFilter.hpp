@@ -295,7 +295,8 @@ class HybridFilter : public Estimator {
 
   virtual void setKeyframeRedundancyThresholds(double dist, double angle,
                                                double trackingRate,
-                                               size_t minTrackLength);
+                                               size_t minTrackLength,
+                                               size_t numImuFrames);
 
   // will remove state parameter blocks and all of their related residuals
   okvis::Time removeState(uint64_t stateId);
@@ -626,6 +627,7 @@ class HybridFilter : public Estimator {
   double trackingRateThreshold_;
   double updateVecNormTermination_;
   int maxNumIteration_;
+  size_t numImuFrames_;
 };
 }  // namespace okvis
 #include <msckf/implementation/HybridFilter.hpp>

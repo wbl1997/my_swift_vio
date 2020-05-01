@@ -509,14 +509,16 @@ void testHybridFilterSinusoid(const std::string& outputPath,
         size_t numThreads = 2u;
         estimator->optimize(maxIterations, numThreads, false);
         okvis::Optimization sharedOptConfig;
+        size_t numKeyFrames = 5u;
+        size_t numImuFrames = 3u;
         estimator->setKeyframeRedundancyThresholds(
             sharedOptConfig.translationThreshold,
             sharedOptConfig.rotationThreshold,
             sharedOptConfig.trackingRateThreshold,
-            sharedOptConfig.minTrackLength);
+            sharedOptConfig.minTrackLength,
+            numImuFrames);
         okvis::MapPointVector removedLandmarks;
-        size_t numKeyFrames = 5u;
-        size_t numImuFrames = 5u;
+
         if (isFilteringMethod(estimatorAlgorithm)) {
           numKeyFrames = 10u;
         }

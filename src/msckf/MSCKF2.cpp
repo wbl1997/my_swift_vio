@@ -630,7 +630,7 @@ bool MSCKF2::measurementJacobianAIDP(
       AlignedVector<Eigen::MatrixXd> dT_BC_dExtrinsics;
       computeExtrinsicJacobians(T_BC_list[ja], T_BC0, extrinsicModelIdList[ja],
                                mainExtrinsicModelId, &dT_BC_dExtrinsics,
-                               &involvedCameraIndices);
+                               &involvedCameraIndices, kMainCameraIndex);
       size_t camParamIdx = 0u;
       for (auto idx : involvedCameraIndices) {
         size_t extrinsicStartIndex = intraStartIndexOfCameraParams(idx);
@@ -1238,9 +1238,10 @@ bool MSCKF2::featureJacobian(const MapPoint &mp, Eigen::MatrixXd &H_oi,
 
 void MSCKF2::setKeyframeRedundancyThresholds(double dist, double angle,
                                              double trackingRate,
-                                             size_t minTrackLength) {
+                                             size_t minTrackLength,
+                                             size_t numImuFrames) {
   HybridFilter::setKeyframeRedundancyThresholds(dist, angle, trackingRate,
-                                                minTrackLength);
+                                                minTrackLength, numImuFrames);
   minCulledFrames_ = 4u - camera_rig_.numberCameras();
 }
 

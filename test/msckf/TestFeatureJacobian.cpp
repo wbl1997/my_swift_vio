@@ -269,14 +269,14 @@ void testPointLandmarkJacobian(std::string projOptModelName,
     size_t numThreads = 2u;
     estimator->optimize(maxIterations, numThreads, false);
     okvis::Optimization sharedOptConfig;
+    size_t numKeyFrames = 5u;
+    size_t numImuFrames = 3u;
     estimator->setKeyframeRedundancyThresholds(
         sharedOptConfig.translationThreshold,
         sharedOptConfig.rotationThreshold,
         sharedOptConfig.trackingRateThreshold,
-        sharedOptConfig.minTrackLength);
+        sharedOptConfig.minTrackLength, numImuFrames);
     okvis::MapPointVector removedLandmarks;
-    size_t numKeyFrames = 5u;
-    size_t numImuFrames = 20u;
 
     estimator->applyMarginalizationStrategy(numKeyFrames, numImuFrames, removedLandmarks);
     estimator->print(debugStream);

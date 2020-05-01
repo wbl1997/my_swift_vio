@@ -71,7 +71,8 @@ HybridFilter::HybridFilter(std::shared_ptr<okvis::ceres::Map> mapPtr)
       updateLandmarksTimer("3.1.5 updateLandmarks", true),
       mTrackLengthAccumulator(100, 0),
       updateVecNormTermination_(1e-4),
-      maxNumIteration_(6) {
+      maxNumIteration_(6),
+      numImuFrames_(3u) {
   setLandmarkModel(msckf::InverseDepthParameterization::kModelId);
 }
 
@@ -87,7 +88,8 @@ HybridFilter::HybridFilter()
       updateLandmarksTimer("3.1.5 updateLandmarks", true),
       mTrackLengthAccumulator(100, 0),
       updateVecNormTermination_(1e-4),
-      maxNumIteration_(6) {
+      maxNumIteration_(6),
+      numImuFrames_(3u) {
   setLandmarkModel(msckf::InverseDepthParameterization::kModelId);
 }
 
@@ -1767,7 +1769,7 @@ void HybridFilter::boxminusFromInput(
       int extrinsicOptModelId = camera_rig_.getExtrinsicOptMode(camIdx);
       int minExtrinsicDim = camera_rig_.getMinimalExtrinsicDimen(camIdx);
       Eigen::VectorXd delta(minExtrinsicDim);
-      ExtrinsicModelBoxminus(
+      ExtrinsicModelOminus(
           extrinsicOptModelId,
           refStates.at(stateBlockIndex).parameterBlockPtr->parameters(),
           refStates.at(stateBlockIndex).parameterEstimate.data(), delta.data());
@@ -2849,11 +2851,13 @@ bool HybridFilter::getStateVariance(
 
 void HybridFilter::setKeyframeRedundancyThresholds(double dist, double angle,
                                                    double trackingRate,
-                                                   size_t minTrackLength) {
+                                                   size_t minTrackLength,
+                                                   size_t numImuFrames) {
   translationThreshold_ = dist;
   rotationThreshold_ = angle;
   trackingRateThreshold_ = trackingRate;
   minTrackLength_ = minTrackLength;
+  numImuFrames_ = numImuFrames;
 }
 
 okvis::Time HybridFilter::removeState(uint64_t stateId) {
@@ -3204,8 +3208,18 @@ uint64_t HybridFilter::getMinValidStateId() const {
   }
   // We keep at least one keyframe which is required for visualization.
   uint64_t lastKeyframeId = currentKeyframeId();
-  min_state_id = min_state_id < lastKeyframeId ? min_state_id : lastKeyframeId;
-  return min_state_id;
+  // Also keep at least numImuFrames frames.
+  uint64_t keepFrameId;
+  size_t i = 0u;
+  for (std::map<uint64_t, States>::const_reverse_iterator rit = statesMap_.rbegin();
+       rit != statesMap_.rend(); ++rit) {
+    keepFrameId = rit->first;
+    if (i == numImuFrames_) {
+      break;
+    }
+    ++i;
+  }
+  return std::min(min_state_id, std::min(lastKeyframeId, keepFrameId));
 }
 
 bool HybridFilter::getOdometryConstraintsForKeyframe(
