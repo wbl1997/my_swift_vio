@@ -483,57 +483,6 @@ bool MSCKF2::measurementJacobianAIDPMono(
   return true;
 }
 
-void MSCKF2::computeExtrinsicJacobians(
-    const okvis::kinematics::Transformation& T_BCi,
-    const okvis::kinematics::Transformation& T_BC0,
-    int cameraExtrinsicModelId,
-    int mainCameraExtrinsicModelId,
-    AlignedVector<Eigen::MatrixXd>* dT_BCi_dExtrinsics,
-    std::vector<size_t>* involvedCameraIndices) const {
-  dT_BCi_dExtrinsics->reserve(2);
-  switch (cameraExtrinsicModelId) {
-    case Extrinsic_p_CB::kModelId: {
-      Eigen::Matrix<double, 6, Extrinsic_p_CB::kNumParams> dT_BC_dExtrinsic;
-      Extrinsic_p_CB::dT_BC_dExtrinsic(T_BCi.C(), &dT_BC_dExtrinsic);
-      dT_BCi_dExtrinsics->push_back(dT_BC_dExtrinsic);
-    } break;
-    case Extrinsic_p_BC_q_BC::kModelId: {
-      Eigen::Matrix<double, 6, Extrinsic_p_BC_q_BC::kNumParams>
-          dT_BC_dExtrinsic;
-      Extrinsic_p_BC_q_BC::dT_BC_dExtrinsic(&dT_BC_dExtrinsic);
-      dT_BCi_dExtrinsics->push_back(dT_BC_dExtrinsic);
-    } break;
-    case Extrinsic_p_C0C_q_C0C::kModelId: {
-      involvedCameraIndices->push_back(kMainCameraIndex);
-      Eigen::Matrix<double, 6, Extrinsic_p_C0C_q_C0C::kNumParams> dT_BC_dT_C0Ci;
-      Eigen::Matrix<double, 6, Extrinsic_p_C0C_q_C0C::kNumParams> dT_BC_dT_BC0;
-      Extrinsic_p_C0C_q_C0C::dT_BC_dExtrinsic(T_BCi, T_BC0, &dT_BC_dT_C0Ci,
-                                              &dT_BC_dT_BC0);
-      dT_BCi_dExtrinsics->push_back(dT_BC_dT_C0Ci);
-
-      switch (mainCameraExtrinsicModelId) {
-        case Extrinsic_p_CB::kModelId: {
-          Eigen::Matrix<double, 6, Extrinsic_p_CB::kNumParams>
-              dT_BC0_dExtrinsic;
-          Extrinsic_p_CB::dT_BC_dExtrinsic(T_BC0.C(), &dT_BC0_dExtrinsic);
-          dT_BCi_dExtrinsics->push_back(dT_BC_dT_BC0 * dT_BC0_dExtrinsic);
-        } break;
-        case Extrinsic_p_BC_q_BC::kModelId: {
-          Eigen::Matrix<double, 6, Extrinsic_p_BC_q_BC::kNumParams>
-              dT_BC0_dExtrinsic;
-          Extrinsic_p_BC_q_BC::dT_BC_dExtrinsic(&dT_BC0_dExtrinsic);
-          dT_BCi_dExtrinsics->push_back(dT_BC_dT_BC0 * dT_BC0_dExtrinsic);
-        } break;
-        default:
-          throw std::runtime_error(
-              "Unknown extrinsic model type for main camera!");
-      }
-    } break;
-    default:
-      throw std::runtime_error("Unknown extrinsic model type for a camera!");
-  }
-}
-
 bool MSCKF2::measurementJacobianAIDP(
     const Eigen::Vector4d& ab1rho,    
     const Eigen::Vector2d& obs,
@@ -1463,4 +1412,57 @@ void MSCKF2::optimize(size_t /*numIter*/, size_t /*numThreads*/, bool verbose) {
     LOG(INFO) << mapPtr_->summary.FullReport();
   }
 }
+
+void computeExtrinsicJacobians(
+    const okvis::kinematics::Transformation& T_BCi,
+    const okvis::kinematics::Transformation& T_BC0,
+    int cameraExtrinsicModelId,
+    int mainCameraExtrinsicModelId,
+    AlignedVector<Eigen::MatrixXd>* dT_BCi_dExtrinsics,
+    std::vector<size_t>* involvedCameraIndices,
+    size_t mainCameraIndex) {
+  dT_BCi_dExtrinsics->reserve(2);
+  switch (cameraExtrinsicModelId) {
+    case Extrinsic_p_CB::kModelId: {
+      Eigen::Matrix<double, 6, Extrinsic_p_CB::kNumParams> dT_BC_dExtrinsic;
+      Extrinsic_p_CB::dT_BC_dExtrinsic(T_BCi.C(), &dT_BC_dExtrinsic);
+      dT_BCi_dExtrinsics->push_back(dT_BC_dExtrinsic);
+    } break;
+    case Extrinsic_p_BC_q_BC::kModelId: {
+      Eigen::Matrix<double, 6, Extrinsic_p_BC_q_BC::kNumParams>
+          dT_BC_dExtrinsic;
+      Extrinsic_p_BC_q_BC::dT_BC_dExtrinsic(&dT_BC_dExtrinsic);
+      dT_BCi_dExtrinsics->push_back(dT_BC_dExtrinsic);
+    } break;
+    case Extrinsic_p_C0C_q_C0C::kModelId: {
+      involvedCameraIndices->push_back(mainCameraIndex);
+      Eigen::Matrix<double, 6, Extrinsic_p_C0C_q_C0C::kNumParams> dT_BC_dT_C0Ci;
+      Eigen::Matrix<double, 6, Extrinsic_p_C0C_q_C0C::kNumParams> dT_BC_dT_BC0;
+      Extrinsic_p_C0C_q_C0C::dT_BC_dExtrinsic(T_BCi, T_BC0, &dT_BC_dT_C0Ci,
+                                              &dT_BC_dT_BC0);
+      dT_BCi_dExtrinsics->push_back(dT_BC_dT_C0Ci);
+
+      switch (mainCameraExtrinsicModelId) {
+        case Extrinsic_p_CB::kModelId: {
+          Eigen::Matrix<double, 6, Extrinsic_p_CB::kNumParams>
+              dT_BC0_dExtrinsic;
+          Extrinsic_p_CB::dT_BC_dExtrinsic(T_BC0.C(), &dT_BC0_dExtrinsic);
+          dT_BCi_dExtrinsics->push_back(dT_BC_dT_BC0 * dT_BC0_dExtrinsic);
+        } break;
+        case Extrinsic_p_BC_q_BC::kModelId: {
+          Eigen::Matrix<double, 6, Extrinsic_p_BC_q_BC::kNumParams>
+              dT_BC0_dExtrinsic;
+          Extrinsic_p_BC_q_BC::dT_BC_dExtrinsic(&dT_BC0_dExtrinsic);
+          dT_BCi_dExtrinsics->push_back(dT_BC_dT_BC0 * dT_BC0_dExtrinsic);
+        } break;
+        default:
+          throw std::runtime_error(
+              "Unknown extrinsic model type for main camera!");
+      }
+    } break;
+    default:
+      throw std::runtime_error("Unknown extrinsic model type for a camera!");
+  }
+}
+
 }  // namespace okvis

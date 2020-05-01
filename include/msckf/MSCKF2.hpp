@@ -66,24 +66,6 @@ class MSCKF2 : public HybridFilter {
   virtual void optimize(size_t numIter, size_t numThreads = 1,
                         bool verbose = false) final;
 
-  /**
-   * @brief compute the Jacobians of T_BC relative to extrinsic parameters.
-   * Perturbation in T_BC is defined by kinematics::oplus.
-   * Perturbation in extrinsic parameters are defined by extrinsic models.
-   * @param T_BCi Transform from i camera frame to body frame.
-   * @param T_BC0 Transform from main camera frame to body frame.
-   * @param cameraExtrinsicModelId
-   * @param mainCameraExtrinsicModelId
-   * @param[out] dT_BCi_dExtrinsics list of Jacobians for T_BC.
-   * @param[in, out] involvedCameraIndices observation camera index, and main camera index if T_C0Ci extrinsic model is used.
-   * @pre involvedCameraIndices has exactly one camera index for i camera frame.
-   */
-  void computeExtrinsicJacobians(
-      const okvis::kinematics::Transformation& T_BCi,
-      const okvis::kinematics::Transformation& T_BC0,
-      int cameraExtrinsicModelId, int mainCameraExtrinsicModelId,
-      AlignedVector<Eigen::MatrixXd>* dT_BCi_dExtrinsics,
-      std::vector<size_t>* involvedCameraIndices) const;
 
   /**
    * @brief measurementJacobianAIDP
@@ -107,6 +89,18 @@ class MSCKF2 : public HybridFilter {
       Eigen::Matrix<double, 2, Eigen::Dynamic>* H_x,
       Eigen::Matrix<double, 2, 3>* J_pfi, Eigen::Vector2d* residual) const;
 
+  /**
+   * @brief measurementJacobianAIDPMono
+   * @warning legacy method to check measurementJacobianAIDP in monocular case
+   * @param ab1rho
+   * @param obs
+   * @param observationIndex
+   * @param pointDataPtr
+   * @param H_x
+   * @param J_pfi
+   * @param residual
+   * @return
+   */
   bool measurementJacobianAIDPMono(
       const Eigen::Vector4d& ab1rho,
       const Eigen::Vector2d& obs, size_t observationIndex,
@@ -188,6 +182,26 @@ class MSCKF2 : public HybridFilter {
   // see Sun 2017 Robust stereo appendix D
   size_t minCulledFrames_;
 };
+
+/**
+ * @brief compute the Jacobians of T_BC relative to extrinsic parameters.
+ * Perturbation in T_BC is defined by kinematics::oplus.
+ * Perturbation in extrinsic parameters are defined by extrinsic models.
+ * @param T_BCi Transform from i camera frame to body frame.
+ * @param T_BC0 Transform from main camera frame to body frame.
+ * @param cameraExtrinsicModelId
+ * @param mainCameraExtrinsicModelId
+ * @param[out] dT_BCi_dExtrinsics list of Jacobians for T_BC.
+ * @param[in, out] involvedCameraIndices observation camera index, and main camera index if T_C0Ci extrinsic model is used.
+ * @pre involvedCameraIndices has exactly one camera index for i camera frame.
+ */
+void computeExtrinsicJacobians(
+    const okvis::kinematics::Transformation& T_BCi,
+    const okvis::kinematics::Transformation& T_BC0,
+    int cameraExtrinsicModelId, int mainCameraExtrinsicModelId,
+    AlignedVector<Eigen::MatrixXd>* dT_BCi_dExtrinsics,
+    std::vector<size_t>* involvedCameraIndices,
+    size_t mainCameraIndex);
 
 }  // namespace okvis
 
