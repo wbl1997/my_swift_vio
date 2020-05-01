@@ -170,10 +170,15 @@ int InvariantEKF::marginalizeRedundantFrames(size_t maxClonedStates) {
   }
 
   // sanity check
-  for (const auto &cam_id : rm_cam_state_ids) {
+  for (const auto& cam_id : rm_cam_state_ids) {
     int cam_sequence =
         std::distance(statesMap_.begin(), statesMap_.find(cam_id));
-    OKVIS_ASSERT_EQ(Exception, cam_sequence, statesMap_[cam_id].orderInCov, "Inconsistent state order in covariance");
+    OKVIS_ASSERT_EQ(
+        Exception,
+        cam_sequence * kClonedStateMinimalDimen +
+            startIndexOfClonedStatesFast(),
+        statesMap_[cam_id].global.at(GlobalStates::T_WS).startIndexInCov,
+        "Inconsistent state order in covariance");
   }
 
   // remove observations in removed frames
@@ -454,20 +459,20 @@ bool InvariantEKF::measurementJacobianAIDP(
   J_x->topLeftCorner(2, minCamParamDim) = J_Xc;
   auto poseid_iter =
       statesMap_.find(poseId);
-  int covid = poseid_iter->second.orderInCov;
+  size_t startIndexCameraParams = startIndexOfCameraParamsFast(kMainCameraIndex);
+  int covid =
+      poseid_iter->second.global.at(GlobalStates::T_WS).startIndexInCov -
+      startIndexCameraParams;
 
   uint64_t anchorId = pointDataPtr->anchorIds()[0].frameId_;
   if (poseId == anchorId) {
-    J_x->block<2, 6>(0, minCamParamDim +
-                           9 * covid + 3) =
-        (J_XBj + J_XBa).block<2, 6>(0, 3);
+    J_x->block<2, 6>(0, covid + 3) = (J_XBj + J_XBa).block<2, 6>(0, 3);
   } else {
-    J_x->block<2, 9>(0, minCamParamDim +
-                           9 * covid) = J_XBj;
-    auto anchorid_iter =
-        statesMap_.find(anchorId);
-    J_x->block<2, 9>(0, minCamParamDim +
-                           9 * anchorid_iter->second.orderInCov) = J_XBa;
+    J_x->block<2, 9>(0, covid) = J_XBj;
+    auto anchorid_iter = statesMap_.find(anchorId);
+    J_x->block<2, 9>(
+        0, anchorid_iter->second.global.at(GlobalStates::T_WS).startIndexInCov -
+               startIndexCameraParams) = J_XBa;
   }
   return true;
 }
@@ -954,14 +959,14 @@ bool InvariantEKF::featureJacobian(const MapPoint &mp, Eigen::MatrixXd &H_oi,
         Eigen::Matrix<double, Eigen::Dynamic, 1>(2 * numValidObs, 1);
     Eigen::MatrixXd Ri =
         Eigen::MatrixXd::Identity(2 * numValidObs, 2 * numValidObs);
+    size_t startIndexCameraParams = startIndexOfCameraParams(kMainCameraIndex);
     for (size_t saga = 0; saga < numValidObs; ++saga) {
       size_t saga2 = saga * 2;
       H_xi.block(saga2, 0, 2, cameraParamsDimen) = vJ_Xc[saga];
       auto poseCovIndexIter =
           statesMap_.find(vFrameIds[saga]);
       H_xi.block<2, kClonedStateMinimalDimen>(
-          saga2, cameraParamsDimen +
-                     kClonedStateMinimalDimen * poseCovIndexIter->second.orderInCov) =
+          saga2, poseCovIndexIter->second.global.at(GlobalStates::T_WS).startIndexInCov - startIndexCameraParams) =
           vJ_XBj[saga];
       H_fi.block<2, 3>(saga2, 0) = vJ_pfi[saga];
       ri.segment<2>(saga2) = vri[saga];

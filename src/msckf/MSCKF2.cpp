@@ -179,7 +179,11 @@ int MSCKF2::marginalizeRedundantFrames(size_t numKeyframes, size_t numImuFrames)
   for (const auto &cam_id : rm_cam_state_ids) {
     int cam_sequence =
         std::distance(statesMap_.begin(), statesMap_.find(cam_id));
-    OKVIS_ASSERT_EQ(Exception, cam_sequence, statesMap_[cam_id].orderInCov, "Inconsistent state order in covariance");
+    OKVIS_ASSERT_EQ(Exception,
+                    cam_sequence * kClonedStateMinimalDimen +
+                        startIndexOfClonedStatesFast(),
+                    statesMap_[cam_id].global.at(GlobalStates::T_WS).startIndexInCov,
+                    "Inconsistent state order in covariance");
   }
 
   // remove observations in removed frames
@@ -471,15 +475,17 @@ bool MSCKF2::measurementJacobianAIDPMono(
   J_x->setZero();
   int camParamStartIndex = intraStartIndexOfCameraParams(camIdx);
   J_x->block(0, camParamStartIndex, 2, minCamParamDim) = J_Xc;
-  int totalCamParamDim = minimalDimOfAllCameraParams();
+
+  size_t startIndexCameraParams = startIndexOfCameraParams(kMainCameraIndex);
   auto poseid_iter = statesMap_.find(poseId);
-  int covid = poseid_iter->second.orderInCov;
+  int covid = poseid_iter->second.global.at(GlobalStates::T_WS).startIndexInCov;
 
   uint64_t anchorId = pointDataPtr->anchorIds()[0].frameId_;
-  J_x->block<2, 9>(0, totalCamParamDim + 9 * covid) = J_XBj;
+  J_x->block<2, 9>(0, covid - startIndexCameraParams) = J_XBj;
   auto anchorid_iter = statesMap_.find(anchorId);
   J_x->block<2, 9>(
-      0, totalCamParamDim + 9 * anchorid_iter->second.orderInCov) += J_XBa;
+      0, anchorid_iter->second.global.at(GlobalStates::T_WS).startIndexInCov -
+             startIndexCameraParams) += J_XBa;
   return true;
 }
 
@@ -552,7 +558,7 @@ bool MSCKF2::measurementJacobianAIDP(
   std::vector<std::pair<size_t, size_t>> startIndexToMinDim;
   AlignedVector<Eigen::MatrixXd> dpoint_dX; // drhoxpCtj_dParameters
 
-  size_t totalCamParamDim = minimalDimOfAllCameraParams();
+  size_t startIndexCameraParams = startIndexOfCameraParams(kMainCameraIndex);
   std::vector<size_t> camIndices{camIdx, anchorCamIdx};
   std::vector<size_t> mtpjExtrinsicIndices{0u, 3u};
   AlignedVector<okvis::kinematics::Transformation> T_BC_list{T_BCj, T_BCa};
@@ -614,8 +620,8 @@ bool MSCKF2::measurementJacobianAIDP(
     dpoint_dX.emplace_back(dpoint_dT_WBt * dT_WBt_dt * dt_dtdtr.transpose());
     // Jacobians relative to nav states
     auto stateIter = statesMap_.find(frameIndices[ja]);
-    int orderInCov = stateIter->second.orderInCov;
-    size_t navStateIndex = totalCamParamDim + orderInCov * kClonedStateMinimalDimen;
+    int orderInCov = stateIter->second.global.at(GlobalStates::T_WS).startIndexInCov;
+    size_t navStateIndex = orderInCov - startIndexCameraParams;
     startIndexToMinDim.emplace_back(navStateIndex, 6u);
     dpoint_dX.emplace_back(dpoint_dT_WBt);
 
@@ -1133,7 +1139,7 @@ bool MSCKF2::featureJacobian(const MapPoint &mp, Eigen::MatrixXd &H_oi,
     // Now we stack the Jacobians and marginalize the point position related
     // dimensions. In other words, project $H_{x_i}$ onto the nullspace of
     // $H_{f^i}$
-    size_t nCamParamMinDim = minimalDimOfAllCameraParams();
+    size_t startIndexCameraParams = startIndexOfCameraParams(kMainCameraIndex);
     Eigen::MatrixXd H_xi =
         Eigen::MatrixXd::Zero(2 * numValidObs, featureVariableDimen);
     Eigen::MatrixXd H_fi = Eigen::MatrixXd(2 * numValidObs, 3);
@@ -1159,9 +1165,9 @@ bool MSCKF2::featureJacobian(const MapPoint &mp, Eigen::MatrixXd &H_oi,
       H_xi.block(saga2, camParamIntraIndex, 2, camMinDim) = vJ_Xc[saga];
       auto poseCovIndexIter = statesMap_.find(vFrameIds[saga]);
       H_xi.block<2, kClonedStateMinimalDimen>(
-          saga2, nCamParamMinDim +
-                     kClonedStateMinimalDimen * poseCovIndexIter->second.orderInCov) =
-          vJ_XBj[saga];
+          saga2, poseCovIndexIter->second.global.at(GlobalStates::T_WS)
+                         .startIndexInCov -
+                     startIndexCameraParams) = vJ_XBj[saga];
       H_fi.block<2, 3>(saga2, 0) = vJ_pfi[saga];
       ri.segment<2>(saga2) = vri[saga];
       Ri(saga2, saga2) *= (vRi[saga2] * vRi[saga2]);

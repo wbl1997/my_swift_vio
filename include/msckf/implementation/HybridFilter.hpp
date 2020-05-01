@@ -129,7 +129,7 @@ HybridFilter::computeCameraObservationJacobians(
       if (evaluateOk) {
         status = msckf::MeasurementJacobianStatus::Successful;
       }
-      int cameraParamsDim = cameraParamsMinimalDimen();
+      int cameraParamsDim = cameraParamsMinimalDimen(camIdx);
       J_X->setZero();
       if (fixCameraExtrinsicParams_[camIdx]) {
         if (fixCameraIntrinsicParams_[camIdx]) {
@@ -150,10 +150,11 @@ HybridFilter::computeCameraObservationJacobians(
         }
       }
 
-      int orderInCov = stateInQuestion.orderInCov;
+      size_t orderInCov = stateInQuestion.global.at(GlobalStates::T_WS).startIndexInCov;
+      size_t cameraParamStartIndex = startIndexOfCameraParamsFast(kMainCameraIndex);
       J_X->block<2, kClonedStateMinimalDimen>(
           0,
-          cameraParamsDim + kClonedStateMinimalDimen * orderInCov)
+          orderInCov - cameraParamStartIndex)
           << duv_deltaTWS_minimal,
           duv_sb_minimal.topLeftCorner<2, 3>();
       *J_pfi = duv_deltahpW.topLeftCorner<2, 3>();
@@ -275,7 +276,7 @@ HybridFilter::computeCameraObservationJacobians(
               msckf::MeasurementJacobianStatus::AssociateAnchorProjectionFailed;
         }
       }
-      int cameraParamsDim = cameraParamsMinimalDimen();
+      int cameraParamsDim = cameraParamsMinimalDimen(camIdx);
       J_X->setZero();
       if (fixCameraExtrinsicParams_[camIdx]) {
         if (fixCameraIntrinsicParams_[camIdx]) {
@@ -297,13 +298,14 @@ HybridFilter::computeCameraObservationJacobians(
         }
       }
 
+      size_t cameraParamStartIndex = startIndexOfCameraParamsFast(kMainCameraIndex);
       std::vector<uint64_t> jmaFrameIds{poseId, anchorIds[0].frameId_, anchorIds[1].frameId_};
       for (int f = 0; f < 3; ++f) {
         uint64_t frameId = jmaFrameIds[f];
         auto smIter = statesMap_.find(frameId);
+        size_t orderInCov = smIter->second.global.at(GlobalStates::T_WS).startIndexInCov;
         J_X->block<krd, kClonedStateMinimalDimen>(
-            0, cameraParamsDim +
-                   kClonedStateMinimalDimen * smIter->second.orderInCov)
+            0, orderInCov - cameraParamStartIndex)
             << de_dTWB_minimal[f],
             de_dSpeedAndBias_minimal[f].template topLeftCorner<krd, 3>();
       }
@@ -448,13 +450,14 @@ HybridFilter::computeCameraObservationJacobians(
           }
         }
 
+        size_t cameraParamStartIndex = startIndexOfCameraParamsFast(kMainCameraIndex);
         std::vector<uint64_t> jmaFrameIds{poseId, anchorIds[0].frameId_, anchorIds[1].frameId_};
         for (int f = 0; f < 3; ++f) {
           uint64_t frameId = jmaFrameIds[f];
           auto smIter = statesMap_.find(frameId);
+          size_t orderInCov = smIter->second.global.at(GlobalStates::T_WS).startIndexInCov;
           J_X->block<krd, kClonedStateMinimalDimen>(
-              0, cameraParamsDim +
-                     kClonedStateMinimalDimen * smIter->second.orderInCov)
+              0, orderInCov - cameraParamStartIndex)
               << de_dTWB_minimal[f],
               de_dSpeedAndBias_minimal[f].template topLeftCorner<krd, 3>();
         }

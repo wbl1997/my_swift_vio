@@ -482,7 +482,6 @@ bool HybridFilter::addStates(okvis::MultiFramePtr multiFrame,
   }
 
   addCovForClonedStates();
-  updateCovarianceIndex();
   return true;
 }
 
@@ -600,6 +599,8 @@ void HybridFilter::initCameraParamCovariance(int camIdx) {
 void HybridFilter::addCovForClonedStates() {
   // augment states in the propagated covariance matrix
   int oldCovDim = covariance_.rows();
+  statesMap_.rbegin()->second.global.at(GlobalStates::T_WS).startIndexInCov =
+      oldCovDim;
   size_t covDimAugmented = oldCovDim + 9;  //$\delta p,\delta \alpha,\delta v$
   Eigen::MatrixXd covarianceAugmented(covDimAugmented, covDimAugmented);
 
@@ -724,10 +725,12 @@ bool HybridFilter::applyMarginalizationStrategy(
                                    T_GC.r(), abrhoj, &jacobian);
 
           reparamJacobian.setZero();
-          size_t startRowC =
-              numNavImuCamStates + 9 * statesMap_[currFrameId].orderInCov;
-          size_t startRowA = numNavImuCamStates +
-                             9 * statesMap_[pit->second.anchorStateId].orderInCov;
+          size_t startRowC = statesMap_[currFrameId]
+                                 .global.at(GlobalStates::T_WS)
+                                 .startIndexInCov;
+          size_t startRowA = statesMap_[pit->second.anchorStateId]
+                                 .global.at(GlobalStates::T_WS)
+                                 .startIndexInCov;
 
           reparamJacobian.block<3, 3>(0, startRowA) =
               jacobian.block<3, 3>(0, 3);
@@ -912,16 +915,13 @@ void HybridFilter::updateImuRig() {
 }
 
 void HybridFilter::updateCovarianceIndex() {
-  int nCovIndex = 0;
+  size_t nCovIndex = startIndexOfClonedStatesFast();
   for (std::map<uint64_t, States, std::less<uint64_t>,
                 Eigen::aligned_allocator<std::pair<const uint64_t, States>>>::
            iterator iter = statesMap_.begin();
        iter != statesMap_.end(); ++iter) {
-    iter->second.orderInCov = nCovIndex;
-    // TODO(jhuai): remove orderInCov and use startIndexInCov instead.
-    //    iter->second.global.at(GlobalStates::T_WS).startIndexInCov =
-    //    nCovIndex;
-    ++nCovIndex;
+    iter->second.global.at(GlobalStates::T_WS).startIndexInCov = nCovIndex;
+    nCovIndex += kClonedStateMinimalDimen;
   }
 }
 
@@ -1183,16 +1183,15 @@ bool HybridFilter::slamFeatureJacobian(
   H_x.setZero();
   H_f.resize(2, 3 * mInCovLmIds.size());
   H_f.setZero();
-  const int minCamParamDim = cameraParamsMinimalDimen();
-
+  const int minCamParamDim = cameraParamsMinimalDimen(camIdx);
   H_x.topLeftCorner(2, minCamParamDim) = J_Xc;
-
+  size_t cameraParamStartIndex = startIndexOfCameraParamsFast(kMainCameraIndex);
   H_x.block<2, 9>(
-      0,
-      minCamParamDim + 9 * statesMap_[currFrameId].orderInCov) = J_XBj;
+      0, statesMap_[currFrameId].global.at(GlobalStates::T_WS).startIndexInCov -
+             cameraParamStartIndex) = J_XBj;
   H_x.block<2, 9>(
-      0,
-      minCamParamDim + 9 * statesMap_[anchorId].orderInCov) = J_XBa;
+      0, statesMap_[anchorId].global.at(GlobalStates::T_WS).startIndexInCov -
+             cameraParamStartIndex) = J_XBa;
 
   std::deque<uint64_t>::iterator idPos =
       std::find(mInCovLmIds.begin(), mInCovLmIds.end(), hpbid);
@@ -1319,6 +1318,8 @@ bool HybridFilter::featureJacobian(
   size_t numValidObs = 0;
   auto itFrameIds = pointDataPtr->begin();
   auto itRoi = vSigmai.begin();
+
+  size_t cameraParamStartIndex = startIndexOfCameraParamsFast(kMainCameraIndex);
   // compute Jacobians for a measurement in image j of the current feature i
   for (size_t observationIndex = 0; observationIndex < numPoses; ++observationIndex) {
     double kpN = pointDataPtr->normalizedRow(observationIndex);
@@ -1409,20 +1410,20 @@ bool HybridFilter::featureJacobian(
     H_x.topLeftCorner(2, minCamParamDim) = J_Xc;
     uint64_t poseId = itFrameIds->frameId;
     if (poseId == anchorId) {
-      auto poseid_iter =
-          statesMap_.find(poseId);
-      H_x.block<2, 6>(0, minCamParamDim +
-                             9 * poseid_iter->second.orderInCov + 3) =
-          (J_XBj + J_XBa).block<2, 6>(0, 3);
+      auto poseid_iter = statesMap_.find(poseId);
+      H_x.block<2, 6>(
+          0, poseid_iter->second.global.at(GlobalStates::T_WS).startIndexInCov +
+                 3 - cameraParamStartIndex) = (J_XBj + J_XBa).block<2, 6>(0, 3);
     } else {
-      auto poseid_iter =
-          statesMap_.find(poseId);
-      H_x.block<2, 9>(0, minCamParamDim +
-                             9 * poseid_iter->second.orderInCov) = J_XBj;
-      auto anchorid_iter =
-          statesMap_.find(anchorId);
-      H_x.block<2, 9>(0, minCamParamDim +
-                             9 * anchorid_iter->second.orderInCov) = J_XBa;
+      auto poseid_iter = statesMap_.find(poseId);
+      H_x.block<2, 9>(
+          0, poseid_iter->second.global.at(GlobalStates::T_WS).startIndexInCov -
+                 cameraParamStartIndex) = J_XBj;
+      auto anchorid_iter = statesMap_.find(anchorId);
+      H_x.block<2, 9>(
+          0,
+          anchorid_iter->second.global.at(GlobalStates::T_WS).startIndexInCov -
+              cameraParamStartIndex) = J_XBa;
     }
 
     vJ_X.push_back(H_x);
@@ -3057,13 +3058,15 @@ bool HybridFilter::EpipolarMeasurement::measurementJacobian(
   startIndex += 1;
   (*H_xjk)(startIndex) = de_dtr;
 
-  const int minCamParamDim = filter_.cameraParamsMinimalDimen();
+  size_t cameraParamStartIndex =
+      filter_.startIndexOfCameraParamsFast(filter_.kMainCameraIndex);
   for (int j = 0; j < 2; ++j) {
     uint64_t poseId = pointDataPtr->frameId(observationIndexPair[j]);
     auto poseid_iter =
         filter_.statesMap_.find(poseId);
-    int covid = poseid_iter->second.orderInCov;
-    int startIndex = minCamParamDim + 9 * covid;
+    int startIndex =
+        poseid_iter->second.global.at(GlobalStates::T_WS).startIndexInCov -
+        cameraParamStartIndex;
     H_xjk->block<1, 3>(0, startIndex) = de_dp_GBtj[j];
     H_xjk->block<1, 3>(0, startIndex + 3) = de_dtheta_GBtj[j];
     H_xjk->block<1, 3>(0, startIndex + 6) = de_dv_GBtj[j];
@@ -3230,11 +3233,8 @@ bool HybridFilter::getOdometryConstraintsForKeyframe(
   odometryConstraintList.reserve(
       poseGraphParameters_.maxOdometryConstraintForAKeyframe);
   okvis::kinematics::Transformation T_WBr = queryKeyframe->T_WB_;
-  auto kfCovIndexIter =
-      statesMap_.find(queryKeyframe->id_);
-  int clonedStatesStart = startIndexOfClonedStatesFast();
-  int cov_T_WBr_start =
-      clonedStatesStart + kClonedStateMinimalDimen * kfCovIndexIter->second.orderInCov;
+  auto kfCovIndexIter = statesMap_.find(queryKeyframe->id_);
+  int cov_T_WBr_start = kfCovIndexIter->second.global.at(GlobalStates::T_WS).startIndexInCov;
   queryKeyframe->setCovariance(covariance_.block<6, 6>(cov_T_WBr_start, cov_T_WBr_start));
   auto riter = statesMap_.rbegin();
   for (++riter;  // skip the last frame which in this case should be a keyframe.
@@ -3249,10 +3249,10 @@ bool HybridFilter::getOdometryConstraintsForKeyframe(
               riter->first, riter->second.timestamp, T_BnBr, T_WBn));
       odometryConstraint->core_.squareRootInfo_.setIdentity();
 
-      auto poseCovIndexIter =
-          statesMap_.find(riter->first);
-      int cov_T_WBn_start = clonedStatesStart +
-          kClonedStateMinimalDimen * poseCovIndexIter->second.orderInCov;
+      auto poseCovIndexIter = statesMap_.find(riter->first);
+      int cov_T_WBn_start =
+          poseCovIndexIter->second.global.at(GlobalStates::T_WS)
+              .startIndexInCov;
 
       odometryConstraint->cov_T_WB_ = covariance_.block<6, 6>(
             cov_T_WBn_start, cov_T_WBn_start);
