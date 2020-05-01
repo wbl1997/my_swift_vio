@@ -81,6 +81,54 @@ DEFINE_string(camera_topics, "/cam0/image_raw,/cam1/image_raw",
 
 DEFINE_string(imu_topic, "/imu0", "Imu topic inside the bag");
 
+class RosbagIteratorChecker {
+ public:
+  RosbagIteratorChecker(
+      rosbag::View& view_imu,
+      const std::vector<std::shared_ptr<rosbag::View> >& view_cams_ptr)
+      : view_imu_(view_imu), view_cams_ptr_(view_cams_ptr), numCameras_(view_cams_ptr.size()) {}
+
+  bool atImuEnd(rosbag::View::iterator view_imu_iterator) const {
+    if (view_imu_iterator == view_imu_.end()) {
+      std::cout << std::endl
+                << "Finished IMU data. Press any key to exit." << std::endl
+                << std::flush;
+      char k = 0;
+      while (k == 0 && ros::ok()) {
+        k = cv::waitKey(1);
+        ros::spinOnce();
+      }
+      std::cout << "Returning from okvis_node_sync IMU branch!";
+      return true;
+    } else {
+      return false;
+    }
+  }
+
+  bool atImageEnd(const std::vector<rosbag::View::iterator>& view_cam_iterators) const {
+    for (size_t i = 0; i < numCameras_; ++i) {
+      if (view_cam_iterators[i] == view_cams_ptr_[i]->end()) {
+        std::cout << std::endl
+                  << "Finished images. Press any key to exit." << std::endl
+                  << std::flush;
+        char k = 0;
+        while (k == 0 && ros::ok()) {
+          k = cv::waitKey(1);
+          ros::spinOnce();
+        }
+        std::cout << "Returning from okvis_node_sync image branch!";
+        return true;
+      }
+    }
+    return false;
+  }
+
+ private:
+  rosbag::View& view_imu_;
+  std::vector<std::shared_ptr<rosbag::View> > view_cams_ptr_;
+  size_t numCameras_;
+};
+
 // this is just a workbench. most of the stuff here will go into the Frontend
 // class.
 int main(int argc, char **argv) {
@@ -205,50 +253,25 @@ int main(int argc, char **argv) {
 
   int counter = 0;
   okvis::Time start(0.0);
+  RosbagIteratorChecker endGuard(view_imu, view_cams_ptr);
   while (ros::ok()) {
     ros::spinOnce();
     okvis_estimator.display();
 
     // check if at the end
-    if (view_imu_iterator == view_imu.end()) {
-      std::cout << std::endl
-                << "Finished IMU data. Press any key to exit." << std::endl
-                << std::flush;
-      char k = 0;
-      while (k == 0 && ros::ok()) {
-        k = cv::waitKey(1);
-        ros::spinOnce();
-      }
-      std::cout << "Returning from okvis_node_sync IMU branch!";
+    if (endGuard.atImuEnd(view_imu_iterator)) {
       return 0;
     }
-    for (size_t i = 0; i < numCameras; ++i) {
-      if (view_cam_iterators[i] == view_cams_ptr[i]->end()) {
-        std::cout << std::endl
-                  << "Finished images. Press any key to exit." << std::endl
-                  << std::flush;
-        char k = 0;
-        while (k == 0 && ros::ok()) {
-          k = cv::waitKey(1);
-          ros::spinOnce();
-        }
-        // TODO(jhuai): There is a erratic segmentation fault at the end of execution.
-        // It happens before destructors for ThreadedKFVio or any Estimator are called.
-        std::cout << "Returning from okvis_node_sync image branch!";
-        return 0;
-      }
+    if (endGuard.atImageEnd(view_cam_iterators)) {
+      return 0;
     }
 
     // add images
     okvis::Time t;
-    okvis::Time lastImuMsgTime;
     for (size_t i = 0; i < numCameras; ++i) {
       sensor_msgs::ImageConstPtr msg1 =
           view_cam_iterators[i]->instantiate<sensor_msgs::Image>();
       cv::Mat filtered = okvis::convertImageMsgToMat(msg1);
-//      cv::Mat filtered(msg1->height, msg1->width, CV_8UC1,
-//                       const_cast<uint8_t*>(&msg1->data[0]), msg1->step);
-//      memcpy(filtered.data, &msg1->data[0], msg1->height * msg1->width);
       t = okvis::Time(msg1->header.stamp.sec, msg1->header.stamp.nsec);
       if (start == okvis::Time(0.0)) {
         start = t;
@@ -266,11 +289,7 @@ int main(int argc, char **argv) {
                             msg->linear_acceleration.z);
 
         t_imu = okvis::Time(msg->header.stamp.sec, msg->header.stamp.nsec);
-        if (lastImuMsgTime >= t_imu) {
-          continue;
-        } else {
-          lastImuMsgTime = t_imu;
-        }
+
         // add the IMU measurement for (blocking) processing
         if (t_imu - start > deltaT)
           okvis_estimator.addImuMeasurement(t_imu, acc, gyr);
@@ -280,7 +299,10 @@ int main(int argc, char **argv) {
 
       // add the image to the frontend for (blocking) processing
       if (t - start > deltaT) okvis_estimator.addImage(t, i, filtered);
-
+      // The imu messages may end for the next image message in the NFrame.
+      if (endGuard.atImuEnd(view_imu_iterator)) {
+        return 0;
+      }
       view_cam_iterators[i]++;
     }
     ++counter;
