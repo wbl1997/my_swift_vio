@@ -90,15 +90,13 @@ class RosbagIteratorChecker {
 
   bool atImuEnd(rosbag::View::iterator view_imu_iterator) const {
     if (view_imu_iterator == view_imu_.end()) {
-      std::cout << std::endl
-                << "Finished IMU data. Press any key to exit." << std::endl
-                << std::flush;
+      LOG(INFO) << "Finished IMU data. Press any key to exit.";
       char k = 0;
       while (k == 0 && ros::ok()) {
         k = cv::waitKey(1);
         ros::spinOnce();
       }
-      std::cout << "Returning from okvis_node_sync IMU branch!";
+      LOG(INFO) << "Returning from okvis_node_sync IMU branch!";
       return true;
     } else {
       return false;
@@ -108,15 +106,13 @@ class RosbagIteratorChecker {
   bool atImageEnd(const std::vector<rosbag::View::iterator>& view_cam_iterators) const {
     for (size_t i = 0; i < numCameras_; ++i) {
       if (view_cam_iterators[i] == view_cams_ptr_[i]->end()) {
-        std::cout << std::endl
-                  << "Finished images. Press any key to exit." << std::endl
-                  << std::flush;
+        LOG(INFO) << "Finished images. Press any key to exit.";
         char k = 0;
         while (k == 0 && ros::ok()) {
           k = cv::waitKey(1);
           ros::spinOnce();
         }
-        std::cout << "Returning from okvis_node_sync image branch!";
+        LOG(INFO) << "Returning from okvis_node_sync image branch!";
         return true;
       }
     }
@@ -309,13 +305,12 @@ int main(int argc, char **argv) {
 
     // display progress
     if (counter % 20 == 0) {
-      std::cout << "\rProgress: "
+      LOG(INFO) << "\rProgress: "
                 << int(double(counter) / double(view_cams_ptr.back()->size()) *
                        100)
                 << "%  ";
     }
   }
 
-  std::cout << std::endl;
   return 0;
 }
