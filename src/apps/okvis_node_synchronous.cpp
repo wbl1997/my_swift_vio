@@ -305,7 +305,7 @@ int main(int argc, char **argv) {
 
     // display progress
     if (counter % 20 == 0) {
-      LOG(INFO) << "\rProgress: "
+      LOG(INFO) << "Progress: "
                 << int(double(counter) / double(view_cams_ptr.back()->size()) *
                        100)
                 << "%  ";

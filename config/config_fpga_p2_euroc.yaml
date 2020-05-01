@@ -47,7 +47,7 @@ camera_params:
 
 imu_params:
     a_max: 176.0 # acceleration saturation [m/s^2]
-    g_max: 7.8 # gyro saturation [rad/s]
+    g_max: 31.4 # gyro saturation [rad/s]
     sigma_g_c: 12.0e-4 # gyro noise density [rad/s/sqrt(Hz)]
     sigma_a_c: 8.0e-3 # accelerometer noise density [m/s^2/sqrt(Hz)]
     sigma_bg: 0.03 # gyro bias prior [rad/s]
