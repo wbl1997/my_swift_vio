@@ -84,6 +84,9 @@ public:
      const std::vector<
          okvis::kinematics::Transformation,
          Eigen::aligned_allocator<okvis::kinematics::Transformation>>& T_BCs,
+     const std::vector<
+         okvis::kinematics::Transformation,
+         Eigen::aligned_allocator<okvis::kinematics::Transformation>>& T_WCa_list,
      const std::vector<size_t>& cameraIndices,
      const std::vector<size_t>& anchorSeqIds);
 

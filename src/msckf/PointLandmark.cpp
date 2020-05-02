@@ -78,6 +78,9 @@ TriangulationStatus PointLandmark::initialize(
     const std::vector<
         okvis::kinematics::Transformation,
         Eigen::aligned_allocator<okvis::kinematics::Transformation>>& T_BCs,
+    const std::vector<
+        okvis::kinematics::Transformation,
+        Eigen::aligned_allocator<okvis::kinematics::Transformation>>& T_WCa_list,
     const std::vector<size_t>& cameraIndices,
     const std::vector<size_t>& anchorSeqIds) {
   std::vector<okvis::kinematics::Transformation,
@@ -94,9 +97,7 @@ TriangulationStatus PointLandmark::initialize(
   switch (anchorSeqIds.size()) {
     case 1: { // AIDP
       // Ca will play the role of W
-      size_t anchorCamIdx = cameraIndices[anchorSeqIds[0]];
-      okvis::kinematics::Transformation T_CaW =
-          (T_WSs.at(anchorSeqIds[0]) * T_BCs[anchorCamIdx]).inverse();
+      okvis::kinematics::Transformation T_CaW = T_WCa_list[0].inverse();
       for (auto T_WS : T_WSs) {
         okvis::kinematics::Transformation T_WCi = T_WS * T_BCs[cameraIndices[joel]];
         cam_states[joel] = T_CaW * T_WCi;
@@ -104,7 +105,7 @@ TriangulationStatus PointLandmark::initialize(
       }
       break;
     }
-    case 2: {
+    case 2: { // PAP
       for (auto iter = T_WSs.begin(); iter != T_WSs.end(); ++iter, ++joel) {
         cam_states[joel] = *iter * T_BCs[cameraIndices[joel]];
       }
@@ -120,7 +121,7 @@ TriangulationStatus PointLandmark::initialize(
       status.raysParallel = false;
       return status;
     }
-    case 0:
+    case 0: // HPP
     default:
       for (auto iter = T_WSs.begin(); iter != T_WSs.end(); ++iter, ++joel) {
         cam_states[joel] = *iter * T_BCs[cameraIndices[joel]];

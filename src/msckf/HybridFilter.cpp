@@ -1263,7 +1263,7 @@ bool HybridFilter::featureJacobian(
   // f_i is the feature in consideration
 
   // transform from the body frame at the anchor frame epoch to the world frame
-  okvis::kinematics::Transformation T_WBa = pointDataPtr->T_WBa_list()[0];
+  okvis::kinematics::Transformation T_WBa = pointDataPtr->T_WB_mainAnchorStateEpoch();
   okvis::kinematics::Transformation T_GA = T_WBa * T_BC0;  // anchor frame to global frame
   ab1rho = T_GA.inverse() * v4Xhomog;
   if (ab1rho[2] < 0) {
@@ -2703,10 +2703,34 @@ msckf::TriangulationStatus HybridFilter::triangulateAMapPoint(
   pointDataPtr->setAnchors(anchorIds);
   std::vector<size_t> anchorSeqIds;
   anchorSeqIds.reserve(anchorIds.size());
+
   for (auto anchorId : anchorIds) {
-    anchorSeqIds.push_back(anchorId.observationIndex_);
+    size_t anchorObsIndex = anchorId.observationIndex_;
+    anchorSeqIds.push_back(anchorObsIndex);
   }
-  status = pointLandmark.initialize(T_WSs, obsDirections, T_BCs, camIndices, anchorSeqIds);
+
+  std::vector<
+      okvis::kinematics::Transformation,
+      Eigen::aligned_allocator<okvis::kinematics::Transformation>> T_WCa_list;
+  T_WCa_list.reserve(anchorIds.size());
+  if (pointLandmarkOptions_.anchorAtObservationTime) {
+    // anchor body frame's pose is propagated to feature observation time with IMU readings.
+    for (auto anchorId : anchorIds) {
+      size_t anchorObsIndex = anchorId.observationIndex_;
+      T_WCa_list.push_back(T_WSs.at(anchorObsIndex) *
+                           T_BCs[camIndices[anchorObsIndex]]);
+    }
+  } else {
+    // anchor body frame is at the state epoch, so its pose does not depend on td and tr any more.
+    for (auto anchorId : anchorIds) {
+      size_t anchorObsIndex = anchorId.observationIndex_;
+      okvis::kinematics::Transformation T_WB =
+          pointDataPtr->poseParameterBlockPtr(anchorObsIndex)->estimate();
+      T_WCa_list.push_back(T_WB * T_BCs[camIndices[anchorObsIndex]]);
+    }
+  }
+  status = pointLandmark.initialize(T_WSs, obsDirections, T_BCs, T_WCa_list,
+                                    camIndices, anchorSeqIds);
   triangulateTimer.stop();
   return status;
 }

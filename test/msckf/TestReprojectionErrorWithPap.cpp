@@ -1153,8 +1153,11 @@ void setupPoseOptProblem(bool perturbPose, bool rollingShutter,
         msckf::ParallaxAngleParameterization::kModelId));
     AlignedVector<okvis::kinematics::Transformation> T_BCs{T_BC};
     std::vector<size_t> camIndices(true_T_WB_list.size(), 0u);
+    AlignedVector<okvis::kinematics::Transformation> T_WCa_list{
+      true_T_WB_list[anchorObsIndices[0]] * T_BC};
     msckf::TriangulationStatus status = pl->initialize(
-        true_T_WB_list, observationsxy1, T_BCs, camIndices, anchorObsIndices);
+        true_T_WB_list, observationsxy1, T_BCs, T_WCa_list,
+        camIndices, anchorObsIndices);
     if (!status.triangulationOk) {
       continue;
     }

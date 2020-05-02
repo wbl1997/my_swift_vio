@@ -388,7 +388,7 @@ bool InvariantEKF::measurementJacobian(
 
   kinematics::Transformation T_WB = pointDataPtr->T_WBtij(observationIndex);
   Eigen::Vector3d omega_Btij = pointDataPtr->omega_Btij(observationIndex);
-  okvis::kinematics::Transformation T_WBa = pointDataPtr->T_WBa_list()[0];
+  okvis::kinematics::Transformation T_WBa = pointDataPtr->T_WB_mainAnchorStateEpoch();
   okvis::kinematics::Transformation T_GA = T_WBa * T_SC0;  // anchor frame to global frame
   okvis::kinematics::Transformation T_CA = (T_WB * T_SC0).inverse() * T_GA;  // anchor frame to current camera frame
   Eigen::Vector3d pfiinC = (T_CA * ab1rho).head<3>();

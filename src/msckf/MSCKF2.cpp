@@ -400,7 +400,12 @@ bool MSCKF2::measurementJacobianAIDPMono(
 
   kinematics::Transformation T_WBtj = pointDataPtr->T_WBtij(observationIndex);
 
-  okvis::kinematics::Transformation T_WBta = pointDataPtr->T_WBa_list()[0];
+  okvis::kinematics::Transformation T_WBta;
+  if (pointLandmarkOptions_.anchorAtObservationTime) {
+    T_WBta = pointDataPtr->T_WB_mainAnchor();
+  } else {
+    T_WBta = pointDataPtr->T_WB_mainAnchorStateEpoch();
+  }
 
   okvis::kinematics::Transformation T_WCta = T_WBta * T_BCa;  // anchor frame to global frame
   okvis::kinematics::Transformation T_CtjCta = (T_WBtj * T_BCj).inverse() * T_WCta;  // anchor frame to current camera frame
@@ -549,13 +554,21 @@ bool MSCKF2::measurementJacobian(
     const okvis::kinematics::Transformation T_BCa =
         camera_rig_.getCameraExtrinsic(anchorCamIdx);
 
-    okvis::kinematics::Transformation T_WBta = pointDataPtr->T_WBa_list()[0];
+    okvis::kinematics::Transformation T_WBta;
+    size_t anchorObservationIndex = pointDataPtr->anchorIds()[0].observationIndex_;
+    kinematics::Transformation lP_T_WBta;
+    if (pointLandmarkOptions_.anchorAtObservationTime) {
+      T_WBta = pointDataPtr->T_WB_mainAnchor();
+      lP_T_WBta = pointDataPtr->T_WB_mainAnchorForJacobian();
+    } else {
+      T_WBta = pointDataPtr->T_WB_mainAnchorStateEpoch();
+      lP_T_WBta = pointDataPtr->T_WB_mainAnchorStateEpochForJacobian();
+    }
     okvis::kinematics::Transformation T_WCta = T_WBta * T_BCa;
     T_CtjX = (T_WBtj * T_BCj).inverse() * T_WCta;
 
-    size_t anchorObservationIndex = pointDataPtr->anchorIds()[0].observationIndex_;
-    kinematics::Transformation lP_T_WBta = pointDataPtr->T_WBtij_ForJacobian(anchorObservationIndex);
     transformList.push_back(lP_T_WBta);
+
     exponentList.push_back(1);
     transformList.push_back(T_BCa);
     exponentList.push_back(1);
@@ -602,9 +615,9 @@ bool MSCKF2::measurementJacobian(
   okvis::MultipleTransformPointJacobian mtpj(transformList, exponentList, homogeneousPoint);
   std::vector<std::pair<size_t, size_t>> startIndexToMinDim;
   AlignedVector<Eigen::MatrixXd> dpoint_dX; // drhoxpCtj_dParameters
-
+  // compute drhoxpCtj_dParameters
   size_t startIndexCameraParams = startIndexOfCameraParams(kMainCameraIndex);
-  for (size_t ja = 0; ja < camIndices.size(); ++ja) { // observing camera and anchor camera.
+  for (size_t ja = 0; ja < camIndices.size(); ++ja) { // observing camera and/or anchor camera.
     // Extrinsic Jacobians.
     int mainExtrinsicModelId =
         camera_rig_.getExtrinsicOptMode(kMainCameraIndex);
@@ -628,37 +641,45 @@ bool MSCKF2::measurementJacobian(
       }
     }
 
-    // Jacobians relative to time parameters
-    Eigen::Matrix<double, 4, 6> dpoint_dT_WBt = mtpj.dp_dT(mtpjPoseIndices[ja]);
-    Eigen::Vector3d lP_v_WBt =
-        pointDataPtr->v_WBtij_ForJacobian(observationIndices[ja]);
-    Eigen::Matrix<double, 6, 1> dT_WBt_dt;
-    dT_WBt_dt.head<3>() =
-        msckf::SimpleImuPropagationJacobian::dp_dt(lP_v_WBt);
-    Eigen::Vector3d omega_Btij = pointDataPtr->omega_Btij(observationIndices[ja]);
-    dT_WBt_dt.tail<3>() = msckf::SimpleImuPropagationJacobian::dtheta_dt(
-        omega_Btij, lP_T_WBt_list[ja].q());
-    Eigen::Vector2d dt_dtdtr(1, 1);
-    dt_dtdtr[1] = pointDataPtr->normalizedRow(observationIndices[ja]);
-    Eigen::Matrix<double, 6, 3> dT_WBt_dv_WB;
-    double featureDelay = pointDataPtr->normalizedFeatureTime(observationIndices[ja]);
-    dT_WBt_dv_WB.topRows<3>() =
-        msckf::SimpleImuPropagationJacobian::dp_dv_WB(featureDelay);
-    dT_WBt_dv_WB.bottomRows<3>().setZero();
-
-    size_t cameraDelayIntraIndex =
-        intraStartIndexOfCameraParams(camIndices[ja], CameraSensorStates::TD);
-    startIndexToMinDim.emplace_back(cameraDelayIntraIndex, 2u);
-    dpoint_dX.emplace_back(dpoint_dT_WBt * dT_WBt_dt * dt_dtdtr.transpose());
     // Jacobians relative to nav states
+    Eigen::Matrix<double, 4, 6> dpoint_dT_WBt = mtpj.dp_dT(mtpjPoseIndices[ja]);
     auto stateIter = statesMap_.find(frameIndices[ja]);
     int orderInCov = stateIter->second.global.at(GlobalStates::T_WS).startIndexInCov;
     size_t navStateIndex = orderInCov - startIndexCameraParams;
     startIndexToMinDim.emplace_back(navStateIndex, 6u);
     dpoint_dX.emplace_back(dpoint_dT_WBt);
+    // Jacobians relative to time parameters and velocity.
+    if (ja == 1u && !pointLandmarkOptions_.anchorAtObservationTime) {
+      // Because the anchor frame is at state epoch, then its pose to
+      // time and velocity are zero.
+    } else {
+      Eigen::Vector3d lP_v_WBt =
+          pointDataPtr->v_WBtij_ForJacobian(observationIndices[ja]);
+      Eigen::Matrix<double, 6, 1> dT_WBt_dt;
+      dT_WBt_dt.head<3>() =
+          msckf::SimpleImuPropagationJacobian::dp_dt(lP_v_WBt);
+      Eigen::Vector3d omega_Btij =
+          pointDataPtr->omega_Btij(observationIndices[ja]);
+      dT_WBt_dt.tail<3>() = msckf::SimpleImuPropagationJacobian::dtheta_dt(
+          omega_Btij, lP_T_WBt_list[ja].q());
+      Eigen::Vector2d dt_dtdtr(1, 1);
+      dt_dtdtr[1] = pointDataPtr->normalizedRow(observationIndices[ja]);
 
-    startIndexToMinDim.emplace_back(navStateIndex + 6u, 3u);
-    dpoint_dX.emplace_back(dpoint_dT_WBt * dT_WBt_dv_WB);
+      size_t cameraDelayIntraIndex =
+          intraStartIndexOfCameraParams(camIndices[ja], CameraSensorStates::TD);
+      startIndexToMinDim.emplace_back(cameraDelayIntraIndex, 2u);
+      dpoint_dX.emplace_back(dpoint_dT_WBt * dT_WBt_dt * dt_dtdtr.transpose());
+
+      Eigen::Matrix<double, 6, 3> dT_WBt_dv_WB;
+      double featureDelay =
+          pointDataPtr->normalizedFeatureTime(observationIndices[ja]);
+      dT_WBt_dv_WB.topRows<3>() =
+          msckf::SimpleImuPropagationJacobian::dp_dv_WB(featureDelay);
+      dT_WBt_dv_WB.bottomRows<3>().setZero();
+
+      startIndexToMinDim.emplace_back(navStateIndex + 6u, 3u);
+      dpoint_dX.emplace_back(dpoint_dT_WBt * dT_WBt_dv_WB);
+    }
   }
 
   // According to Li 2013 IJRR high precision, eq 41 and 55, among all Jacobian
