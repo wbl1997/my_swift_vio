@@ -340,7 +340,7 @@ bool InvariantEKF::applyMarginalizationStrategy(
   return true;
 }
 
-bool InvariantEKF::measurementJacobianAIDP(
+bool InvariantEKF::measurementJacobian(
     const Eigen::Vector4d& ab1rho,
     const Eigen::Vector2d& obs,
     size_t observationIndex,
@@ -589,7 +589,7 @@ bool InvariantEKF::featureJacobianGeneric(
       obsInPixel;
   std::vector<double> vRi;         // std noise in pixels, 2Nx1
   computeHTimer.start();
-  msckf::PointLandmark pointLandmark(landmarkModelId_);
+  msckf::PointLandmark pointLandmark(pointLandmarkOptions_.landmarkModelId);
 
   std::shared_ptr<msckf::PointSharedData> pointDataPtr(new msckf::PointSharedData());
   msckf::TriangulationStatus status = triangulateAMapPoint(
@@ -742,7 +742,7 @@ bool InvariantEKF::featureJacobian(const MapPoint &mp, Eigen::MatrixXd &H_oi,
                         Eigen::Matrix<double, Eigen::Dynamic, 1> &r_oi,
                         Eigen::MatrixXd &R_oi,
                         std::vector<uint64_t>* orderedCulledFrameIds) const {
-  if (landmarkModelId_ == msckf::ParallaxAngleParameterization::kModelId ||
+  if (pointLandmarkOptions_.landmarkModelId == msckf::ParallaxAngleParameterization::kModelId ||
       cameraObservationModelId_ != okvis::cameras::kReprojectionErrorId) {
     return featureJacobianGeneric(mp, H_oi, r_oi, R_oi, orderedCulledFrameIds);
   }
@@ -760,12 +760,12 @@ bool InvariantEKF::featureJacobian(const MapPoint &mp, Eigen::MatrixXd &H_oi,
       obsInPixel;
   std::vector<double> vRi; // std noise in pixels
   computeHTimer.start();
-  if (landmarkModelId_ == msckf::InverseDepthParameterization::kModelId) {
+  if (pointLandmarkOptions_.landmarkModelId == msckf::InverseDepthParameterization::kModelId) {
     // The landmark is expressed with AIDP in the anchor frame    
     // if the feature is lost in current frame, the anchor frame is chosen
     // as the last frame observing the point.
 
-    msckf::PointLandmark pointLandmark(landmarkModelId_);
+    msckf::PointLandmark pointLandmark(pointLandmarkOptions_.landmarkModelId);
     std::shared_ptr<msckf::PointSharedData> pointDataPtr(new msckf::PointSharedData());
 
     msckf::TriangulationStatus status = triangulateAMapPoint(
@@ -813,7 +813,7 @@ bool InvariantEKF::featureJacobian(const MapPoint &mp, Eigen::MatrixXd &H_oi,
       Eigen::Matrix<double, 2, 3> J_pfi;
       Eigen::Vector2d residual;
 
-      bool validJacobian = measurementJacobianAIDP(
+      bool validJacobian = measurementJacobian(
           ab1rho, obsInPixel[observationIndex],
           observationIndex, pointDataPtr, &J_x, &J_pfi, &residual);
       if (!validJacobian) {
@@ -867,7 +867,7 @@ bool InvariantEKF::featureJacobian(const MapPoint &mp, Eigen::MatrixXd &H_oi,
     computeHTimer.stop();
     return true;
   } else {
-    msckf::PointLandmark pointLandmark(landmarkModelId_);
+    msckf::PointLandmark pointLandmark(pointLandmarkOptions_.landmarkModelId);
     // The landmark is expressed with Euclidean coordinates in the global frame
     std::shared_ptr<msckf::PointSharedData> pointDataPtr(new msckf::PointSharedData());
     msckf::TriangulationStatus status = triangulateAMapPoint(

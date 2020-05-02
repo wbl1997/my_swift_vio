@@ -66,11 +66,14 @@ class MSCKF2 : public HybridFilter {
   virtual void optimize(size_t numIter, size_t numThreads = 1,
                         bool verbose = false) final;
 
-
   /**
-   * @brief measurementJacobianAIDP
-   * @warning Both poseId and anchorId are older than the latest frame Id.
-   * @param ab1rho \f $[a, b, 1]^T = \rho p_{C{t(i, a)}} \f$
+   * @brief measurementJacobian
+   * @warning Both poseId and anchorId should be older than the latest frame Id.
+   * @param homogeneousPoint, if landmarkModel is AIDP,
+   * \f$[\alpha, \beta, 1, \rho] = [X, Y, Z, 1]^C_a / Z^C_a\f$,
+   * if landmarkModel is HPP, \f$[X,Y,Z,1]^W\f$.
+   * \f $[\alpha, \beta, 1]^T = \rho p_{C{t(i, a)}} \f$ or
+   * \f $[\alpha, \beta, 1]^T = \rho p_{C{t(a)}} \f$
    * @param obs
    * @param observationIndex index of the observation inside the point's shared data.
    * @param pointDataPtr shared data of the point.
@@ -82,8 +85,8 @@ class MSCKF2 : public HybridFilter {
    * @param residual
    * @return
    */
-  bool measurementJacobianAIDP(
-      const Eigen::Vector4d& ab1rho,
+  bool measurementJacobian(
+      const Eigen::Vector4d& homogeneousPoint,
       const Eigen::Vector2d& obs, size_t observationIndex,
       std::shared_ptr<const msckf::PointSharedData> pointDataPtr,
       Eigen::Matrix<double, 2, Eigen::Dynamic>* H_x,
@@ -91,7 +94,8 @@ class MSCKF2 : public HybridFilter {
 
   /**
    * @brief measurementJacobianAIDPMono
-   * @warning legacy method to check measurementJacobianAIDP in monocular case
+   * @warning legacy method to check measurementJacobian in monocular case
+   * with anchored inverse depth parameterization.
    * @param ab1rho
    * @param obs
    * @param observationIndex
@@ -108,7 +112,20 @@ class MSCKF2 : public HybridFilter {
       Eigen::Matrix<double, 2, Eigen::Dynamic>* H_x,
       Eigen::Matrix<double, 2, 3>* J_pfi, Eigen::Vector2d* residual) const;
 
-  bool measurementJacobian(
+  /**
+   * @brief measurementJacobianHPPMono legacy method to check measurementJacobian
+   * in monocular homogeneous parameterization case.
+   * @param v4Xhomog
+   * @param obs
+   * @param observationIndex
+   * @param pointData
+   * @param J_Xc
+   * @param J_XBj
+   * @param J_pfi
+   * @param residual
+   * @return
+   */
+  bool measurementJacobianHPPMono(
       const Eigen::Vector4d& v4Xhomog,
       const Eigen::Vector2d& obs, int observationIndex,
       std::shared_ptr<const msckf::PointSharedData> pointData,

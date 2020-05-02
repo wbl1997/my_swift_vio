@@ -66,7 +66,7 @@ class InvariantEKF : public HybridFilter {
   virtual void optimize(size_t numIter, size_t numThreads = 1,
                         bool verbose = false) final;
   /**
-   * @brief measurementJacobianAIDP
+   * @brief measurementJacobian
    * @warning Both poseId and anchorId are older than the latest frame Id.
    * @param ab1rho
    * @param tempCameraGeometry
@@ -81,7 +81,7 @@ class InvariantEKF : public HybridFilter {
    * @param residual
    * @return
    */
-  bool measurementJacobianAIDP(
+  bool measurementJacobian(
       const Eigen::Vector4d& ab1rho,
       const Eigen::Vector2d& obs, size_t observationIndex,
       std::shared_ptr<const msckf::PointSharedData> pointDataPtr,

@@ -198,7 +198,9 @@ void VioTestSystemBuilder::createVioSystem(
   }
   estimator->setUseEpipolarConstraint(testSetting.useEpipolarConstraint);
   estimator->setCameraObservationModel(testSetting.cameraObservationModelId);
-  estimator->setLandmarkModel(testSetting.landmarkModelId);
+  okvis::PointLandmarkOptions plOptions;
+  plOptions.landmarkModelId = testSetting.landmarkModelId;
+  estimator->setPointLandmarkOptions(plOptions);
 
   int insideLandmarkModelId = estimator->landmarkModelId();
   int insideCameraObservationModelId = estimator->cameraObservationModelId();

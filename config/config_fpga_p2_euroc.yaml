@@ -76,8 +76,11 @@ optimization:
     algorithm: "MSCKF"
     useEpipolarConstraint: false
     cameraObservationModelId: 0
-    landmarkModelId: 1
     initializeWithoutEnoughParallax: true
+
+point_landmark:
+    landmarkModelId: 1
+    anchorAtObservationTime: 0
 
 pose_graph:
     maxOdometryConstraintForAKeyframe: 2

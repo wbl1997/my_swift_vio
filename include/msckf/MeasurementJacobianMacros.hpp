@@ -7,7 +7,7 @@
 #define PROJECTION_INTRINSIC_MODEL_CHAIN_CASE(                                \
     ImuModel, ExtrinsicModel, CameraGeometry, ProjectionIntrinsicModel)       \
   case ProjectionIntrinsicModel::kModelId:                                    \
-    switch (landmarkModelId_) {                                               \
+    switch (pointLandmarkOptions_.landmarkModelId) {                                               \
       case msckf::HomogeneousPointParameterization::kModelId:                 \
         status = computeCameraObservationJacobians<                           \
             CameraGeometry, ProjectionIntrinsicModel, ExtrinsicModel,         \
