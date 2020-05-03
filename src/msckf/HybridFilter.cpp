@@ -72,7 +72,8 @@ HybridFilter::HybridFilter(std::shared_ptr<okvis::ceres::Map> mapPtr)
       mTrackLengthAccumulator(100, 0),
       updateVecNormTermination_(1e-4),
       maxNumIteration_(6),
-      numImuFrames_(3u) {
+      numImuFrames_(3u),
+      numKeyframes_(5u) {
   // reset the default to AIDP.
   PointLandmarkOptions plOptions;
   plOptions.landmarkModelId = msckf::InverseDepthParameterization::kModelId;
@@ -92,7 +93,8 @@ HybridFilter::HybridFilter()
       mTrackLengthAccumulator(100, 0),
       updateVecNormTermination_(1e-4),
       maxNumIteration_(6),
-      numImuFrames_(3u) {
+      numImuFrames_(3u),
+      numKeyframes_(5u) {
   // reset the default to AIDP.
   PointLandmarkOptions plOptions;
   plOptions.landmarkModelId = msckf::InverseDepthParameterization::kModelId;
@@ -2883,11 +2885,13 @@ bool HybridFilter::getStateVariance(
 void HybridFilter::setKeyframeRedundancyThresholds(double dist, double angle,
                                                    double trackingRate,
                                                    size_t minTrackLength,
+                                                   size_t numKeyframes,
                                                    size_t numImuFrames) {
   translationThreshold_ = dist;
   rotationThreshold_ = angle;
   trackingRateThreshold_ = trackingRate;
   minTrackLength_ = minTrackLength;
+  numKeyframes_ = numKeyframes;
   numImuFrames_ = numImuFrames;
 }
 
@@ -3244,13 +3248,14 @@ uint64_t HybridFilter::getMinValidStateId() const {
   // Also keep at least numImuFrames frames.
   uint64_t keepFrameId;
   size_t i = 0u;
+  size_t numFrameToKeep = numImuFrames_ + numKeyframes_;
   for (std::map<uint64_t, States>::const_reverse_iterator rit = statesMap_.rbegin();
        rit != statesMap_.rend(); ++rit) {
     keepFrameId = rit->first;
-    if (i == numImuFrames_) {
+    ++i;
+    if (i == numFrameToKeep) {
       break;
     }
-    ++i;
   }
   return std::min(min_state_id, std::min(lastKeyframeId, keepFrameId));
 }

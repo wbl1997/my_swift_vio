@@ -275,7 +275,9 @@ void testPointLandmarkJacobian(std::string projOptModelName,
         sharedOptConfig.translationThreshold,
         sharedOptConfig.rotationThreshold,
         sharedOptConfig.trackingRateThreshold,
-        sharedOptConfig.minTrackLength, numImuFrames);
+        sharedOptConfig.minTrackLength,
+        numKeyFrames,
+        numImuFrames);
     okvis::MapPointVector removedLandmarks;
 
     estimator->applyMarginalizationStrategy(numKeyFrames, numImuFrames, removedLandmarks);

@@ -1102,9 +1102,10 @@ bool MSCKF2::featureJacobian(const MapPoint &mp, Eigen::MatrixXd &H_oi,
 void MSCKF2::setKeyframeRedundancyThresholds(double dist, double angle,
                                              double trackingRate,
                                              size_t minTrackLength,
+                                             size_t numKeyframes,
                                              size_t numImuFrames) {
-  HybridFilter::setKeyframeRedundancyThresholds(dist, angle, trackingRate,
-                                                minTrackLength, numImuFrames);
+  HybridFilter::setKeyframeRedundancyThresholds(
+      dist, angle, trackingRate, minTrackLength, numKeyframes, numImuFrames);
   minCulledFrames_ = 4u - camera_rig_.numberCameras();
 }
 

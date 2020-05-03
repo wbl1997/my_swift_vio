@@ -516,6 +516,7 @@ void testHybridFilterSinusoid(const std::string& outputPath,
             sharedOptConfig.rotationThreshold,
             sharedOptConfig.trackingRateThreshold,
             sharedOptConfig.minTrackLength,
+            numKeyFrames,
             numImuFrames);
         okvis::MapPointVector removedLandmarks;
 
