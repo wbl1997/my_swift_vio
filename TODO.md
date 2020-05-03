@@ -118,7 +118,7 @@ are exposed to user by documentation
 Use a underlying trajectory parameterization to serve poses, and underlying variable parameterization to serve values, sort of like Kalibr
 Create factors with Jacobians that can be used for either filtering or optimization
 
-35. A mysterious issue
+35. Solved: A mysterious issue
 I0911 23:19:01.549983   955 HybridFrontend.cpp:128] Initialized!
 QObject::~QObject: Timers cannot be stopped from another thread
 terminate called after throwing an instance of 'boost::exception_detail::clone_impl<boost::exception_detail::error_info_injector<boost::lock_error> >'
@@ -129,8 +129,6 @@ The root cause for this issue has nothing to do with the report. It is caused by
 36. In testHybridFilter, of DeadreckoningO some runs have zigzag ripples in the pose profile, 
 some runs have results close to the pose profile of DeadreckoningM. 
 Preliminary tests find that this issue with DeadreckoningO is not caused by applyMarginalizationStrategy.
-
-38. develop compatibility with multiple IMU models
 
 39. develop iSAM with monocular, and multiple camera e.g., binocular, or stereo frontend, refer to Kimera stereo VIO implementation, 
 my previous vin-csfm repo that depends on gtsam, and cpi closed_form preintegration by Eckenhoff, and 
@@ -149,12 +147,13 @@ examples [here](https://github.com/ganlumomo/VisualInertialOdometry)
 
 44. The timing entries for waitForOptimization and waitForMatching are often unusually large.
 
-45. Put covariance index in the state to ease state management. see OpenVINS.
+45. Solved: Put covariance index in the state to ease state management. see OpenVINS.
 
-46. Extend MSCKF to work with multi camera observations.
+46. Solved: Extend MSCKF to work with multi camera observations.
 Also consider the extrinsic and intrinsic parameters for the extra cameras.
 
-47. Refactor IMU error model in propagation() to support at least 3 types of IMU models.
+47. Refactor IMU error model in propagation() to support at least 3 types of IMU models, i.e.,
+develop compatibility with multiple IMU models
 Examine OdoErrorStateDim, ShapeMatrixParamBlock etc.
 
 48. Simulation for the rolling shutter effect.
@@ -170,4 +169,10 @@ A better approach is to separate adding observations to feature tracks and addin
 Also to investigate the NEES consistency, we can test exact first estimate Jacobian which means to use first estimates in
 computing Jacobians for variables of fixed linearization points.
 Refer to Basalt and GTSAM for alternate margialization strategies.
+
+52. ThreadedKFVio mock test failed in MockVioBackendInterface even with the github okvis master branch.
+
+53. The deadreckoning in okvis and that in MSCKF give different results, see testHybridFilter DeadreckoningM and DeadreckoningO.
+
+
 
