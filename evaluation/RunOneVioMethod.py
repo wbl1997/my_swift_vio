@@ -3,6 +3,7 @@ import shutil
 
 import dir_utility_functions
 import utility_functions
+import AlgoConfig
 import OkvisConfigComposer
 import RoscoreManager
 
@@ -37,8 +38,6 @@ class RunOneVioMethod(object):
         self.lcd_config_template = lcd_config_template
         self.voc_file = voc_file
         self.algo_code_flags = algo_code_flags
-        self.num_keyframes = algo_code_flags["numKeyframes"]
-        self.num_imuframes = algo_code_flags["numImuFrames"]
         self.num_trials = num_trials
         self.bag_list = bag_list
         self.gt_list = gt_list
@@ -71,24 +70,9 @@ class RunOneVioMethod(object):
             config_composer.create_config_for_mission()
 
             # apply algorithm parameters
-            algo_code = self.algo_code_flags["algo_code"]
-            sed_algo = r'sed -i "/algorithm/c\    algorithm: {}" {};'.\
-                format(algo_code, vio_yaml_mission)
-            sed_kf = r'sed -i "/numImuFrames:/c\numImuFrames: {}" {};'.\
-                format(self.num_imuframes, vio_yaml_mission)
-            sed_imuframes = r'sed -i "/numKeyframes:/c\numKeyframes: {}" {};'.\
-                format(self.num_keyframes, vio_yaml_mission)
-            sed_imuframes = r'sed -i "/monocular_input:/c\monocular_input: {}" {};'. \
-                format(self.algo_code_flags["monocular_input"], vio_yaml_mission)
-            sed_display = r'sed -i "/displayImages:/c\displayImages: false" {};'.\
-                format(vio_yaml_mission)
+            AlgoConfig.apply_config_to_yaml(
+                self.algo_code_flags, vio_yaml_mission, output_dir_mission)
 
-            sed_cmd = sed_algo + sed_kf + sed_imuframes + sed_display
-            out_stream = open(os.path.join(output_dir_mission, "sed_out.log"), 'w')
-            err_stream = open(os.path.join(output_dir_mission, "sed_err.log"), 'w')
-            utility_functions.subprocess_cmd(sed_cmd, out_stream, err_stream)
-            out_stream.close()
-            err_stream.close()
             vio_yaml_list.append(vio_yaml_mission)
         self.custom_vio_config_list = vio_yaml_list
 
@@ -108,8 +92,13 @@ class RunOneVioMethod(object):
         arg_topics = r'--camera_topics="{},{}" --imu_topic={}'.format(
             ROS_TOPICS[data_type][0], ROS_TOPICS[data_type][1], ROS_TOPICS[data_type][2])
 
-        export_lib_cmd = "export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:{};". \
-            format(self.extra_lib_path)
+        export_lib_cmd = ""
+        if self.extra_lib_path:
+            export_lib_cmd = "export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:{};".format(self.extra_lib_path)
+        verbose_leak_sanitizer = True
+        if verbose_leak_sanitizer:
+            export_lib_cmd += "export ASAN_OPTIONS=fast_unwind_on_malloc=0;"
+
         cmd = "{} {} {} --output_dir={} --skip_first_seconds=0" \
               " --max_inc_tol=10.0 --dump_output_option=3" \
               " --bagname={} --vocabulary_path={} {} {}".format(

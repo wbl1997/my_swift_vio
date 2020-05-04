@@ -17,6 +17,7 @@ import sys
 import dir_utility_functions
 import parse_args
 import rpg_eval_tool_wrap
+import utility_functions
 
 import AlgoConfig
 import ResultsDirManager
@@ -37,17 +38,92 @@ if __name__ == '__main__':
     for index, gt in enumerate(gt_list):
         print('{}: {}'.format(bag_list[index], gt))
 
-    # rpg eval tool supports evaluating 6 algorithms at the same time, see len(PALLETE)
-    algo_name_code_flags_dict = {
-        'OKVIS': AlgoConfig.create_algo_config(['OKVIS', '', 5, 3]),
-        'OKVIS_nframe': AlgoConfig.create_algo_config(['OKVIS', '', 5, 3, 0]),
-        'MSCKF_i': AlgoConfig.create_algo_config(['MSCKF', '--use_IEKF=true', 10, 3]),
-        'MSCKF': AlgoConfig.create_algo_config(['MSCKF', '', 10, 3]),
-        # 'MSCKF_brisk_b2b': AlgoConfig.create_algo_config(['MSCKF', '--feature_tracking_method=2', 10, 3]),
-        'MSCKF_klt': AlgoConfig.create_algo_config(['MSCKF', '--feature_tracking_method=1', 10, 3]),
-        'MSCKF_async': AlgoConfig.create_algo_config(['MSCKF', '', 10, 3])}
+    # python3.7 will remember insertion order of items, see
+    # https://stackoverflow.com/questions/39980323/are-dictionaries-ordered-in-python-3-6
+    algoname_to_options = {
+        # We disable online extrinsic calibration for OKVIS by zeroing
+        # sigma_absolute_translation and sigma_absolute_orientation.
+        'OKVIS': {"algo_code": "OKVIS",
+                  "extra_gflags": "",
+                  "numKeyframes": 5,
+                  "numImuFrames": 3,
+                  "monocular_input": 1,
+                  "landmarkModelId": 0,
+                  "anchorAtObservationTime": 0,
+                  "extrinsic_opt_mode_main_camera": "p_BC_q_BC",
+                  "extrinsic_opt_mode_other_camera": "p_BC_q_BC",
+                  "sigma_absolute_translation": "0.0",
+                  "sigma_absolute_orientation": "0.0"},
+        'MSCKF_n_aidp': {"algo_code": "MSCKF",
+                         "extra_gflags": "",
+                         "numKeyframes": 10,
+                         "numImuFrames": 5,
+                         "monocular_input": 0,
+                         "landmarkModelId": 1,
+                         "anchorAtObservationTime": 0,
+                         "extrinsic_opt_mode_main_camera": "p_CB",
+                         "extrinsic_opt_mode_other_camera": "p_C0C_q_C0C"},
+        'MSCKF_n_hpp': {"algo_code": "MSCKF",
+                        "extra_gflags": "",
+                        "numKeyframes": 10,
+                        "numImuFrames": 5,
+                        "monocular_input": 0,
+                        "landmarkModelId": 0,
+                        "anchorAtObservationTime": 0,
+                        "extrinsic_opt_mode_main_camera": "p_CB",
+                        "extrinsic_opt_mode_other_camera": "p_C0C_q_C0C"},
+        # Jacobian relative to time come from observation frame and anchor frame.
+        'MSCKF_n_aidp2': {"algo_code": "MSCKF",
+                          "extra_gflags": "",
+                          "numKeyframes": 10,
+                          "numImuFrames": 5,
+                          "monocular_input": 0,
+                          "landmarkModelId": 1,
+                          "anchorAtObservationTime": 1,
+                          "extrinsic_opt_mode_main_camera": "p_CB",
+                          "extrinsic_opt_mode_other_camera": "p_C0C_q_C0C"},
+        'MSCKF_n_aidp_T_BC': {"algo_code": "MSCKF",
+                              "extra_gflags": "",
+                              "numKeyframes": 10,
+                              "numImuFrames": 5,
+                              "monocular_input": 0,
+                              "landmarkModelId": 1,
+                              "anchorAtObservationTime": 0,
+                              "extrinsic_opt_mode_main_camera": "p_CB",
+                              "extrinsic_opt_mode_other_camera": "p_BC_q_BC"},
+        'MSCKF_aidp': {"algo_code": "MSCKF",
+                       "extra_gflags": "",
+                       "numKeyframes": 10,
+                       "numImuFrames": 5,
+                       "monocular_input": 1,
+                       "landmarkModelId": 1,
+                       "anchorAtObservationTime": 0,
+                       "extrinsic_opt_mode_main_camera": "p_CB",
+                       "extrinsic_opt_mode_other_camera": "p_C0C_q_C0C"},
+        'OKVIS_nframe': {"algo_code": "OKVIS",
+                         "extra_gflags": "",
+                         "numKeyframes": 5,
+                         "numImuFrames": 3,
+                         "monocular_input": 0,
+                         "landmarkModelId": 0,
+                         "anchorAtObservationTime": 0,
+                         "extrinsic_opt_mode_main_camera": "p_BC_q_BC",
+                         "extrinsic_opt_mode_other_camera": "p_BC_q_BC",
+                         "sigma_absolute_translation": "0.0",
+                         "sigma_absolute_orientation": "0.0"},
+    }
 
-    algo_name_list = list(algo_name_code_flags_dict.keys())
+    # 'MSCKF_i': AlgoConfig.create_algo_config(['MSCKF', '--use_IEKF=true', 10, 3]),
+    # 'MSCKF_brisk_b2b': AlgoConfig.create_algo_config(['MSCKF', '--feature_tracking_method=2', 10, 3]),
+    # 'MSCKF_klt': AlgoConfig.create_algo_config(['MSCKF', '--feature_tracking_method=1', 10, 3]),
+    # 'MSCKF_async': AlgoConfig.create_algo_config(['MSCKF', '', 10, 3])}
+
+    # rpg eval tool supports evaluating 6 algorithms at the same time, see len(PALLETE)
+    MAX_ALGORITHMS_TO_EVALUATE = 6
+    algoname_to_options = utility_functions.resize_dict(algoname_to_options,
+                                                        MAX_ALGORITHMS_TO_EVALUATE)
+
+    algo_name_list = list(algoname_to_options.keys())
 
     results_dir = os.path.join(args.output_dir, "msckf_smoke")
     eval_output_dir = os.path.join(args.output_dir, "msckf_smoke_eval")
@@ -58,7 +134,7 @@ if __name__ == '__main__':
     results_dir_manager.create_eval_config_yaml()
     results_dir_manager.create_eval_output_dir(eval_output_dir)
     returncode = 0
-    for name, code_flags in algo_name_code_flags_dict.items():
+    for name, code_flags in algoname_to_options.items():
         runner = RunOneVioMethod.RunOneVioMethod(
             args.catkin_ws, args.vio_config_yaml,
             code_flags,
