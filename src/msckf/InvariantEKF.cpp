@@ -771,8 +771,6 @@ bool InvariantEKF::featureJacobian(const MapPoint &mp, Eigen::MatrixXd &H_oi,
     msckf::TriangulationStatus status = triangulateAMapPoint(
         mp, obsInPixel, pointLandmark, vRi,
         pointDataPtr.get(), orderedCulledFrameIds, useEpipolarConstraint_);
-
-    Eigen::Map<Eigen::Vector4d> v4Xhomog(pointLandmark.data(), 4);
     if (!status.triangulationOk) {
       computeHTimer.stop();
       return false;
@@ -784,7 +782,7 @@ bool InvariantEKF::featureJacobian(const MapPoint &mp, Eigen::MatrixXd &H_oi,
     pointDataPtr->computeSharedJacobians(cameraObservationModelId_);
     CHECK_NE(statesMap_.rbegin()->first, pointDataPtr->lastFrameId())
         << "The landmark should not be observed by the latest frame in MSCKF.";
-
+    Eigen::Map<Eigen::Vector4d> v4Xhomog(pointLandmark.data(), 4);
     Eigen::Vector4d ab1rho = v4Xhomog;
     CHECK_GT(ab1rho[2], 0) << "Negative depth in anchor frame";
     ab1rho /= ab1rho[2];  //[\alpha = X/Z, \beta= Y/Z, 1, \rho=1/Z] in the
@@ -873,7 +871,6 @@ bool InvariantEKF::featureJacobian(const MapPoint &mp, Eigen::MatrixXd &H_oi,
     msckf::TriangulationStatus status = triangulateAMapPoint(
         mp, obsInPixel, pointLandmark, vRi,
         pointDataPtr.get(), orderedCulledFrameIds, useEpipolarConstraint_);
-    Eigen::Map<Eigen::Vector4d> v4Xhomog(pointLandmark.data(), 4);
     if (!status.triangulationOk) {
       computeHTimer.stop();
       return false;
@@ -912,7 +909,7 @@ bool InvariantEKF::featureJacobian(const MapPoint &mp, Eigen::MatrixXd &H_oi,
     vri.reserve(numPoses);
     vFrameIds.reserve(numPoses);
 
-
+    Eigen::Map<Eigen::Vector4d> v4Xhomog(pointLandmark.data(), 4);
     auto itFrameIds = pointDataPtr->begin();
     auto itRoi = vRi.begin();
     // compute Jacobians for a measurement in image j of the current feature i
@@ -1182,8 +1179,8 @@ void InvariantEKF::optimize(size_t /*numIter*/, size_t /*numThreads*/, bool verb
       msckf::TriangulationStatus status =
           triangulateAMapPoint(it->second, obsInPixel, pointLandmark, vRi,
                                &psd, nullptr, false);
-      Eigen::Map<Eigen::Vector4d> v4Xhomog(pointLandmark.data(), 4);
       if (status.triangulationOk) {
+        Eigen::Map<Eigen::Vector4d> v4Xhomog(pointLandmark.data(), 4);
         it->second.quality = 1.0;
         it->second.pointHomog = v4Xhomog;
         if (!status.raysParallel && !status.flipped) {

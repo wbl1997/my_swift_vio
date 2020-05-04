@@ -1237,14 +1237,13 @@ bool HybridFilter::featureJacobian(
   std::shared_ptr<msckf::PointSharedData> pointDataPtr(new msckf::PointSharedData());
   msckf::TriangulationStatus status = triangulateAMapPoint(
       mp, obsInPixel, pointLandmark, vSigmai, pointDataPtr.get(), nullptr, false);
-  Eigen::Map<Eigen::Vector4d> v4Xhomog(pointLandmark.data(), 4);
   if (!status.triangulationOk) {
     computeHTimer.stop();
     return false;
   }
   uint64_t anchorId = pointDataPtr->anchorIds()[0].frameId_;
-
-  size_t numCamPoseStates = cameraParamPoseAndLandmarkMinimalDimen() - 3 * mInCovLmIds.size();
+  size_t numCamPoseStates =
+      cameraParamPoseAndLandmarkMinimalDimen() - 3 * mInCovLmIds.size();
   // camera states, pose states, excluding feature states, and the velocity
   // dimension for the anchor state
   if (pH_fi == NULL) {
@@ -1267,6 +1266,7 @@ bool HybridFilter::featureJacobian(
   // transform from the body frame at the anchor frame epoch to the world frame
   okvis::kinematics::Transformation T_WBa = pointDataPtr->T_WB_mainAnchorStateEpoch();
   okvis::kinematics::Transformation T_GA = T_WBa * T_BC0;  // anchor frame to global frame
+  Eigen::Map<Eigen::Vector4d> v4Xhomog(pointLandmark.data(), 4);
   ab1rho = T_GA.inverse() * v4Xhomog;
   if (ab1rho[2] < 0) {
     std::cout << "negative depth in ab1rho " << ab1rho.transpose() << std::endl;

@@ -998,8 +998,6 @@ bool MSCKF2::featureJacobian(const MapPoint &mp, Eigen::MatrixXd &H_oi,
   msckf::TriangulationStatus status = triangulateAMapPoint(
       mp, obsInPixel, pointLandmark, vRi,
       pointDataPtr.get(), orderedCulledFrameIds, useEpipolarConstraint_);
-
-  Eigen::Vector4d homogeneousPoint = Eigen::Map<Eigen::Vector4d>(pointLandmark.data(), 4);
   if (!status.triangulationOk) {
     computeHTimer.stop();
     return false;
@@ -1019,7 +1017,10 @@ bool MSCKF2::featureJacobian(const MapPoint &mp, Eigen::MatrixXd &H_oi,
   vJ_pfi.reserve(numPoses);
   vri.reserve(numPoses);
 
-  if (pointLandmarkOptions_.landmarkModelId == msckf::InverseDepthParameterization::kModelId) {
+  Eigen::Vector4d homogeneousPoint =
+      Eigen::Map<Eigen::Vector4d>(pointLandmark.data(), 4);
+  if (pointLandmarkOptions_.landmarkModelId ==
+      msckf::InverseDepthParameterization::kModelId) {
     // The landmark is parameterized with inverse depth in an anchor frame. If
     // the feature is not observed in current frame, the anchor frame is chosen
     // as the last frame observing the point. In case of rolling shutter,
@@ -1306,9 +1307,9 @@ void MSCKF2::optimize(size_t /*numIter*/, size_t /*numThreads*/, bool verbose) {
       msckf::TriangulationStatus status =
           triangulateAMapPoint(it->second, obsInPixel, pointLandmark, vRi,
                                &psd, nullptr, false);
-      Eigen::Map<Eigen::Vector4d> v4Xhomog(pointLandmark.data(), 4);
       if (status.triangulationOk) {
         it->second.quality = 1.0;
+        Eigen::Map<Eigen::Vector4d> v4Xhomog(pointLandmark.data(), 4);
         it->second.pointHomog = v4Xhomog;
         if (!status.raysParallel && !status.flipped) {
           Eigen::Vector4d hpA = T_CcW * v4Xhomog;
