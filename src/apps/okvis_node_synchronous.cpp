@@ -157,6 +157,13 @@ int main(int argc, char **argv) {
   vio_parameters_reader.getParameters(parameters);
   okvis::setInputParameters(&parameters.input);
 
+  // Caution: Objects including shared_ptrs are destroyed in reverse order of construction,
+  // and an object shared by shared_ptr will be destroyed when no shared_ptr shares its ownership.
+  // Publisher is created before ThreadedKFVio as it depends on publisher in publisherLoop().
+  okvis::Publisher publisher(nh);
+  publisher.setParameters(parameters);
+  okvis::PgoPublisher pgoPublisher;
+
   std::shared_ptr<okvis::Estimator> estimator =
       msckf::createBackend(parameters.optimization.algorithm);
   std::shared_ptr<okvis::Frontend> frontend = msckf::createFrontend(
@@ -183,10 +190,6 @@ int main(int argc, char **argv) {
       msckf::createLoopClosureMethod(lcParams);
   okvis::ThreadedKFVio okvis_estimator(parameters, estimator, frontend,
                                        loopClosureMethod);
-
-  okvis::Publisher publisher(nh);
-  publisher.setParameters(parameters);
-  okvis::PgoPublisher pgoPublisher;
   okvis::VioSystemWrap::registerCallbacks(
       FLAGS_output_dir, parameters, &okvis_estimator, &publisher,
       &pgoPublisher);

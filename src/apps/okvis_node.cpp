@@ -61,6 +61,10 @@ int main(int argc, char **argv) {
   vio_parameters_reader.getParameters(parameters);
   okvis::setInputParameters(&parameters.input);
 
+  okvis::Publisher publisher(nh);
+  publisher.setParameters(parameters);
+  okvis::PgoPublisher pgoPublisher;
+
   std::shared_ptr<okvis::Estimator> estimator =
       msckf::createBackend(parameters.optimization.algorithm);
   std::shared_ptr<okvis::Frontend> frontend = msckf::createFrontend(
@@ -88,9 +92,7 @@ int main(int argc, char **argv) {
   okvis::ThreadedKFVio okvis_estimator(parameters, estimator, frontend,
                                        loopClosureMethod);
 
-  okvis::Publisher publisher(nh);
-  publisher.setParameters(parameters);
-  okvis::PgoPublisher pgoPublisher;
+
   okvis::VioSystemWrap::registerCallbacks(
       FLAGS_output_dir, parameters, &okvis_estimator, &publisher,
       &pgoPublisher);
