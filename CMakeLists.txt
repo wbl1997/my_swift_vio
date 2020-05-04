@@ -309,6 +309,8 @@ list(APPEND TEST_SRC_FILES
 
     test/opencv/TestOpenCVDistortion.cpp
 
+    test/ros/TestRosbag.cpp
+
     test/std/TestBinaryOperators.cpp
     test/std/TestCallMemberFunctionAtConstruction.cpp
     test/std/TestDequeIterator.cpp
