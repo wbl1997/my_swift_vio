@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 import subprocess
 
 def subprocess_cmd(command, out_stream=subprocess.STDOUT, err_stream=subprocess.STDOUT):
@@ -64,3 +65,23 @@ def get_arg_value_from_gflags(cmd_gflags, key_str):
             return cmd_gflags[val_start_index:]
         else:
             return cmd_gflags[val_start_index:next_arg_index]
+
+def resize_dict(d, maxsize):
+    """
+    :pre This function assumes that dict d is ordered in the insertion order which requires python >3.6.
+    :param d:
+    :param maxsize:
+    :return:
+    """
+    length = len(d)
+    if length <= maxsize:
+        return d
+    num_duds = length - maxsize
+    num_removed = 0
+    r = dict(d)
+    for key in reversed(list(r.keys())):
+        del r[key]
+        num_removed += 1
+        if num_removed == num_duds:
+            break
+    return r
