@@ -129,16 +129,17 @@ void LoopClosureDetector::saveFinalPgoResults() {
     return;
   }
   const char delimiter = ' ';
-  stream << "%timestamp[sec] T_WB(x y z qx qy qz qw)\n";
+  stream << "# timestamp tx ty tz qx qy qz qw\n";
   gtsam::Values estimates = pgo_->calculateEstimate();
   for (auto keyframeInDB : db_frames_) {
-    gtsam::Pose3 T_WB = estimates.at<gtsam::Pose3>(
-          gtsam::Symbol(keyframeInDB->dbowId_));
+    gtsam::Pose3 T_WB =
+        estimates.at<gtsam::Pose3>(gtsam::Symbol(keyframeInDB->dbowId_));
     const Eigen::Vector3d& r = T_WB.translation();
     Eigen::Quaterniond q = T_WB.rotation().toQuaternion();
-    stream << keyframeInDB->stamp_ << delimiter << r[0] << delimiter << r[1]
-           << delimiter << r[2] << delimiter << q.x() << delimiter << q.y()
-           << delimiter << q.z() << delimiter << q.w() << "\n";
+    stream << keyframeInDB->stamp_ << delimiter << std::setprecision(8) << r[0]
+           << delimiter << r[1] << delimiter << r[2] << delimiter << q.x()
+           << delimiter << q.y() << delimiter << q.z() << delimiter << q.w()
+           << "\n";
   }
   stream.close();
   LOG(INFO) << "Saved final PGO results to " << output_csv;

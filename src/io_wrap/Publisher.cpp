@@ -638,9 +638,7 @@ void Publisher::csvSaveFullStateAsCallback(
       //LOG(INFO)<<"file: good.";
       Eigen::Vector3d p_WS_W = T_WS.r();
       Eigen::Quaterniond q_WS = T_WS.q();
-      std::stringstream time;
-      time << t.sec << std::setw(9) << std::setfill('0') << t.nsec;
-      *csvFile_ << time.str() << FLAGS_datafile_separator << frameIdInSource
+      *csvFile_ << t << FLAGS_datafile_separator << frameIdInSource
                 << FLAGS_datafile_separator << std::scientific
                 << std::setprecision(8) << p_WS_W[0] << FLAGS_datafile_separator
                 << p_WS_W[1] << FLAGS_datafile_separator << p_WS_W[2]
@@ -677,9 +675,7 @@ void Publisher::csvSaveFullStateWithExtrinsicsAsCallback(
     if (csvFile_->good()) {
       Eigen::Vector3d p_WS_W = T_WS.r();
       Eigen::Quaterniond q_WS = T_WS.q();
-      std::stringstream time;
-      time << t.sec << std::setw(9) << std::setfill('0') << t.nsec;
-      *csvFile_ << time.str() << FLAGS_datafile_separator << frameIdInSource
+      *csvFile_ << t << FLAGS_datafile_separator << frameIdInSource
                 << FLAGS_datafile_separator << std::setprecision(6) << p_WS_W[0]
                 << FLAGS_datafile_separator << p_WS_W[1]
                 << FLAGS_datafile_separator << p_WS_W[2]
@@ -734,9 +730,7 @@ void Publisher::csvSaveFullStateWithAllCalibrationAsCallback(
     if (csvFile_->good()) {
       Eigen::Vector3d p_WS_W = T_WS.r();
       Eigen::Quaterniond q_WS = T_WS.q();
-      std::stringstream time;
-      time << t.sec << std::setw(9) << std::setfill('0') << t.nsec;
-      *csvFile_ << time.str() << FLAGS_datafile_separator << frameIdInSource
+      *csvFile_ << t << FLAGS_datafile_separator << frameIdInSource
                 << FLAGS_datafile_separator << std::setprecision(6) << p_WS_W[0]
                 << FLAGS_datafile_separator << p_WS_W[1]
                 << FLAGS_datafile_separator << p_WS_W[2]

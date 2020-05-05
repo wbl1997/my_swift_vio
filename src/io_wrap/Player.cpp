@@ -67,7 +67,7 @@ void Player::Run() {
     okvis::Time t(frameTime);
     t -= okvis::Duration(vioParameters_.sensors_information.imageDelay);
     if (frameCounter % progressReportInterval == 0) {
-      LOG(INFO) << "read in frame at " << std::setprecision(12) << t.toSec()
+      LOG(INFO) << "read in frame at " << t
                 << " id " << mFG->getCurrentId();
     }
     vioInterface_->addImage(t, 0, filtered, NULL, mFG->getCurrentId());
@@ -128,8 +128,7 @@ void Player::RunBlocking() {
     okvis::Time t(frameTime);
     t -= okvis::Duration(vioParameters_.sensors_information.imageDelay);
     if (frameCounter % progressReportInterval == 0) {
-      LOG(INFO) << "read in frame at " << std::setprecision(12) << t.toSec()
-                << " id " << mFG->getCurrentId();
+      LOG(INFO) << "read in frame at " << t << " id " << mFG->getCurrentId();
     }
     vioInterface_->addImage(t, 0, filtered, NULL, mFG->getCurrentId());
 

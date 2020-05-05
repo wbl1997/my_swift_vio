@@ -1,3 +1,4 @@
+#include <iomanip>
 #include "io_wrap/PgoPublisher.hpp"
 
 namespace okvis {
@@ -9,7 +10,7 @@ void PgoPublisher::csvSaveStateAsCallback(
     const okvis::Time& t, const okvis::kinematics::Transformation& T_WB) {
   const char delimiter = ' ';
   const Eigen::Matrix<double, 7, 1>& T_WB_coeffs = T_WB.coeffs();
-  csvStream_ << t;
+  csvStream_ << t << std::setprecision(8);
   for (int j = 0; j < T_WB_coeffs.size(); ++j) {
     csvStream_ << delimiter << T_WB_coeffs[j];
   }
@@ -18,7 +19,7 @@ void PgoPublisher::csvSaveStateAsCallback(
 
 bool PgoPublisher::setCsvFile(const std::string& csvFile) {
   csvStream_ = std::ofstream(csvFile.c_str(), std::ios_base::out);
-  csvStream_ << "%timestamp[sec] T_WB(x y z qx qy qz qw)\n";
+  csvStream_ << "# timestamp tx ty tz qx qy qz qw\n";
   return csvStream_.good();
 }
 
