@@ -1,4 +1,5 @@
 import os
+import textwrap
 
 import utility_functions
 from colorama import init, Fore
@@ -23,7 +24,7 @@ def run_rpg_evaluation(rpg_eval_dir, eval_config_yaml, num_trials,
     user_msg = 'cmd to rpg eval tool\n{}\n'.format(cmd)
     out_stream = open(os.path.join(eval_output_dir, "out.log"), 'w')
     err_stream = open(os.path.join(eval_output_dir, "err.log"), 'w')
-    print(user_msg)
+    print(textwrap.fill(user_msg, 120))
     out_stream.write(user_msg)
     rc , err = utility_functions.subprocess_cmd(cmd, out_stream, err_stream)
     out_stream.close()

@@ -1,4 +1,5 @@
 import os
+import textwrap
 
 import dir_utility_functions
 import utility_functions
@@ -39,7 +40,8 @@ def run_evo(results_dir, eval_output_dir):
         err_stream = open(os.path.join(eval_mission_output_dir, "err.log"), 'a')
 
         cmd = "evo_ape tum {} {} -va --save_results {} --no_warnings".format(gt_file, est_file, eval_zip)
-        print("Running evo cmd {}\n".format(cmd))
+        user_msg = "Running evo cmd {}\n".format(cmd)
+        print(textwrap.fill(user_msg, 120))
         out_stream.write("{}\n".format(cmd))
         utility_functions.subprocess_cmd(cmd, out_stream, err_stream)
         out_stream.close()
@@ -53,7 +55,7 @@ def run_evo(results_dir, eval_output_dir):
     user_msg = 'cmd to rpg eval tool\n{}\n'.format(cmd)
     out_stream = open(os.path.join(eval_output_dir, "out.log"), 'w')
     err_stream = open(os.path.join(eval_output_dir, "err.log"), 'w')
-    print(user_msg)
+    print(textwrap.fill(user_msg, 120))
     out_stream.write(user_msg)
     rc , err = utility_functions.subprocess_cmd(cmd, out_stream, err_stream)
     out_stream.close()

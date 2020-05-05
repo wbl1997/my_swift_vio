@@ -47,25 +47,109 @@ if __name__ == '__main__':
     for index, bagpath in enumerate(bag_list):
         print('{}: {}'.format(index, bag_list[index]))
 
-    algo_name_code_flags_dict = {'OKVIS_nframe': AlgoConfig.create_algo_config(['OKVIS', '', 5, 3, 0]),
-                                 'MSCKF': AlgoConfig.create_algo_config(['MSCKF', '', 10, 3]),
-                                 'MSCKF_nframe': AlgoConfig.create_algo_config(['MSCKF', '', 10, 3, 0])}
+    algoname_to_options = {
+        # We disable online extrinsic calibration for OKVIS by zeroing
+        # sigma_absolute_translation and sigma_absolute_orientation.
+        # 'OKVIS': {"algo_code": "OKVIS",
+        #           "extra_gflags": "",
+        #           "numKeyframes": 5,
+        #           "numImuFrames": 3,
+        #           "monocular_input": 1,
+        #           "landmarkModelId": 0,
+        #           "anchorAtObservationTime": 0,
+        #           "extrinsic_opt_mode_main_camera": "p_BC_q_BC",
+        #           "extrinsic_opt_mode_other_camera": "p_BC_q_BC",
+        #           "sigma_absolute_translation": "0.0",
+        #           "sigma_absolute_orientation": "0.0"},
+        'MSCKF_n_aidp': {"algo_code": "MSCKF",
+                         "extra_gflags": "",
+                         "numKeyframes": 10,
+                         "numImuFrames": 5,
+                         "monocular_input": 0,
+                         "landmarkModelId": 1,
+                         "anchorAtObservationTime": 0,
+                         "extrinsic_opt_mode_main_camera": "p_CB",
+                         "extrinsic_opt_mode_other_camera": "p_C0C_q_C0C",
+                         "sigma_absolute_translation": "0.02",
+                         "sigma_absolute_orientation": "0.01"
+                         },
+        'MSCKF_n_hpp': {"algo_code": "MSCKF",
+                        "extra_gflags": "",
+                        "numKeyframes": 10,
+                        "numImuFrames": 5,
+                        "monocular_input": 0,
+                        "landmarkModelId": 0,
+                        "anchorAtObservationTime": 0,
+                        "extrinsic_opt_mode_main_camera": "p_CB",
+                        "extrinsic_opt_mode_other_camera": "p_C0C_q_C0C",
+                        "sigma_absolute_translation": "0.02",
+                        "sigma_absolute_orientation": "0.01"
+                        },
+        # Jacobian relative to time come from observation frame and anchor frame.
+        'MSCKF_n_aidp2': {"algo_code": "MSCKF",
+                          "extra_gflags": "",
+                          "numKeyframes": 10,
+                          "numImuFrames": 5,
+                          "monocular_input": 0,
+                          "landmarkModelId": 1,
+                          "anchorAtObservationTime": 1,
+                          "extrinsic_opt_mode_main_camera": "p_CB",
+                          "extrinsic_opt_mode_other_camera": "p_C0C_q_C0C",
+                          "sigma_absolute_translation": "0.02",
+                          "sigma_absolute_orientation": "0.01"
+                          },
+        'MSCKF_n_aidp_T_BC': {"algo_code": "MSCKF",
+                              "extra_gflags": "",
+                              "numKeyframes": 10,
+                              "numImuFrames": 5,
+                              "monocular_input": 0,
+                              "landmarkModelId": 1,
+                              "anchorAtObservationTime": 0,
+                              "extrinsic_opt_mode_main_camera": "p_CB",
+                              "extrinsic_opt_mode_other_camera": "p_BC_q_BC",
+                              "sigma_absolute_translation": "0.02",
+                              "sigma_absolute_orientation": "0.01"
+                              },
+        'MSCKF_aidp': {"algo_code": "MSCKF",
+                       "extra_gflags": "",
+                       "numKeyframes": 10,
+                       "numImuFrames": 5,
+                       "monocular_input": 1,
+                       "landmarkModelId": 1,
+                       "anchorAtObservationTime": 0,
+                       "extrinsic_opt_mode_main_camera": "p_CB",
+                       "extrinsic_opt_mode_other_camera": "p_C0C_q_C0C",
+                       "sigma_absolute_translation": "0.02",
+                       "sigma_absolute_orientation": "0.01"
+                       },
+        'OKVIS_nframe': {"algo_code": "OKVIS",
+                         "extra_gflags": "",
+                         "numKeyframes": 5,
+                         "numImuFrames": 3,
+                         "monocular_input": 0,
+                         "landmarkModelId": 0,
+                         "anchorAtObservationTime": 0,
+                         "extrinsic_opt_mode_main_camera": "p_BC_q_BC",
+                         "extrinsic_opt_mode_other_camera": "p_BC_q_BC",
+                         "sigma_absolute_translation": "0.0",
+                         "sigma_absolute_orientation": "0.0"},
+    }
 
-    algo_name_list = list(algo_name_code_flags_dict.keys())
+    algo_name_list = list(algoname_to_options.keys())
 
-    results_dir = os.path.join(args.output_dir, "okvis")
-    eval_output_dir = os.path.join(args.output_dir, "okvis_eval")
+    results_dir = os.path.join(args.output_dir, "vio")
+    eval_output_dir = os.path.join(args.output_dir, "vio_eval")
 
-    results_dir_manager = ResultsDirManager.ResultsDirManager(results_dir, bag_list, algo_name_list)
+    results_dir_manager = ResultsDirManager.ResultsDirManager(
+        results_dir, bag_list, algo_name_list)
     results_dir_manager.create_results_dir()
     results_dir_manager.create_eval_config_yaml()
     results_dir_manager.create_eval_output_dir(eval_output_dir)
-
     returncode = 0
-    for name, code_flags in algo_name_code_flags_dict.items():
+    for name, options in algoname_to_options.items():
         runner = RunOneVioMethod.RunOneVioMethod(
             args.catkin_ws, args.vio_config_yaml,
-            code_flags,
+            options,
             args.num_trials, bag_list, None,
             results_dir_manager.get_all_result_dirs(name),
             args.extra_lib_path, args.lcd_config_yaml,
@@ -74,12 +158,8 @@ if __name__ == '__main__':
         if rc != 0:
             returncode = rc
 
-    rc, streamdata = rpg_eval_tool_wrap.run_rpg_evaluation(
-        args.rpg_eval_tool_dir, results_dir_manager.get_eval_config_yaml(),
-        args.num_trials, results_dir, eval_output_dir)
-    if rc != 0:
-        print(Fore.RED + "Error code {} in run_rpg_evaluation: {}".format(rc, streamdata))
-        sys.exit(1)
-
-    print('Successfully finished processing uzh fpv competition dataset!')
-    sys.exit(0)
+    if returncode != 0:
+        print(Fore.RED + "Error code {} in run_uzh_fpv_competition: {}".format(returncode))
+    else:
+        print('Successfully finished processing uzh fpv competition dataset!')
+    sys.exit(returncode)

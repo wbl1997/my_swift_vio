@@ -43,17 +43,17 @@ if __name__ == '__main__':
     algoname_to_options = {
         # We disable online extrinsic calibration for OKVIS by zeroing
         # sigma_absolute_translation and sigma_absolute_orientation.
-        'OKVIS': {"algo_code": "OKVIS",
-                  "extra_gflags": "",
-                  "numKeyframes": 5,
-                  "numImuFrames": 3,
-                  "monocular_input": 1,
-                  "landmarkModelId": 0,
-                  "anchorAtObservationTime": 0,
-                  "extrinsic_opt_mode_main_camera": "p_BC_q_BC",
-                  "extrinsic_opt_mode_other_camera": "p_BC_q_BC",
-                  "sigma_absolute_translation": "0.0",
-                  "sigma_absolute_orientation": "0.0"},
+        # 'OKVIS': {"algo_code": "OKVIS",
+        #           "extra_gflags": "",
+        #           "numKeyframes": 5,
+        #           "numImuFrames": 3,
+        #           "monocular_input": 1,
+        #           "landmarkModelId": 0,
+        #           "anchorAtObservationTime": 0,
+        #           "extrinsic_opt_mode_main_camera": "p_BC_q_BC",
+        #           "extrinsic_opt_mode_other_camera": "p_BC_q_BC",
+        #           "sigma_absolute_translation": "0.0",
+        #           "sigma_absolute_orientation": "0.0"},
         'MSCKF_n_aidp': {"algo_code": "MSCKF",
                          "extra_gflags": "",
                          "numKeyframes": 10,
@@ -125,8 +125,8 @@ if __name__ == '__main__':
 
     algo_name_list = list(algoname_to_options.keys())
 
-    results_dir = os.path.join(args.output_dir, "msckf_smoke")
-    eval_output_dir = os.path.join(args.output_dir, "msckf_smoke_eval")
+    results_dir = os.path.join(args.output_dir, "vio_smoke")
+    eval_output_dir = os.path.join(args.output_dir, "vio_smoke_eval")
 
     results_dir_manager = ResultsDirManager.ResultsDirManager(
         results_dir, bag_list, algo_name_list)
@@ -134,10 +134,10 @@ if __name__ == '__main__':
     results_dir_manager.create_eval_config_yaml()
     results_dir_manager.create_eval_output_dir(eval_output_dir)
     returncode = 0
-    for name, code_flags in algoname_to_options.items():
+    for name, options in algoname_to_options.items():
         runner = RunOneVioMethod.RunOneVioMethod(
             args.catkin_ws, args.vio_config_yaml,
-            code_flags,
+            options,
             args.num_trials, bag_list, gt_list,
             results_dir_manager.get_all_result_dirs(name),
             args.extra_lib_path, args.lcd_config_yaml,

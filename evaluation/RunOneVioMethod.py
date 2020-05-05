@@ -1,5 +1,6 @@
 import os
 import shutil
+import textwrap
 
 import dir_utility_functions
 import utility_functions
@@ -180,11 +181,12 @@ class RunOneVioMethod(object):
                                                    output_dir_trial, bag_fullname)
 
                 user_msg = 'Running vio method with cmd\n{}\n'.format(cmd)
-                print(user_msg)
+                print(textwrap.fill(user_msg, 120))
                 out_stream.write(user_msg)
                 rc, msg = utility_functions.subprocess_cmd(cmd, out_stream, err_stream)
                 if rc != 0:
-                    print('Error code {} with cmd:\n{}\nand error msg:{}\n'.format(rc, cmd, msg))
+                    err_msg = 'Error code {} with cmd:\n{}\nand error msg:{}\n'.format(rc, cmd, msg)
+                    print(textwrap.fill(err_msg, 120))
                     return_code = rc
                 vio_estimate_csv = os.path.join(output_dir_trial, 'msckf_estimates.csv')
                 converted_vio_file = os.path.join(
@@ -192,7 +194,7 @@ class RunOneVioMethod(object):
                 cmd = "python3 {} {} --outfile={} --output_delimiter=' '". \
                     format(pose_conversion_script, vio_estimate_csv, converted_vio_file)
                 user_msg = 'Converting pose file with cmd\n{}\n'.format(cmd)
-                print(user_msg)
+                print(textwrap.fill(user_msg, 120))
                 out_stream.write(user_msg)
                 utility_functions.subprocess_cmd(cmd, out_stream, err_stream)
                 out_stream.close()
