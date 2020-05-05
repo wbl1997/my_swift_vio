@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-
+"""
+Extract gt from uzh_fpv dataset rosbags and save to txt files using
+bag_to_pose.py from rpg evaluation tool.
+"""
 import os
 import sys
 

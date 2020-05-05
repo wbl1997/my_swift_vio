@@ -156,7 +156,8 @@ Also consider the extrinsic and intrinsic parameters for the extra cameras.
 develop compatibility with multiple IMU models
 Examine OdoErrorStateDim, ShapeMatrixParamBlock etc.
 
-48. Simulation for the rolling shutter effect.
+48. Simulation for the rolling shutter effect. 
+Refer to Kerl rolling shutter RGBD and Lovegrove spline fusion.
 
 49. Write a global bundle adjustment module with existing factors. Remember removing outliers during optimization steps, see Maplab.
 

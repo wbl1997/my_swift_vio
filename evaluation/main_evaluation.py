@@ -11,70 +11,146 @@ The folder structure layout for EUROC data:
 ├── machine_hall
 │   ├── MH_01_easy
 │   │   ├── data.csv
-│   │   ├── mav0
+│   │   ├── data.txt
 │   │   ├── MH_01_easy.bag
 │   │   └── MH_01_easy.zip
 │   ├── MH_02_easy
 │   │   ├── data.csv
+│   │   ├── data.txt
 │   │   ├── MH_02_easy.bag
 │   │   └── MH_02_easy.zip
 │   ├── MH_03_medium
 │   │   ├── data.csv
+│   │   ├── data.txt
 │   │   ├── MH_03_medium.bag
 │   │   └── MH_03_medium.zip
 │   ├── MH_04_difficult
 │   │   ├── data.csv
+│   │   ├── data.txt
 │   │   ├── MH_04_difficult.bag
 │   │   └── MH_04_difficult.zip
 │   └── MH_05_difficult
 │       ├── data.csv
+│       ├── data.txt
 │       ├── MH_05_difficult.bag
 │       └── MH_05_difficult.zip
 ├── vicon_room1
 │   ├── V1_01_easy
 │   │   ├── data.csv
+│   │   ├── data.txt
 │   │   ├── V1_01_easy.bag
 │   │   └── V1_01_easy.zip
 │   ├── V1_02_medium
 │   │   ├── data.csv
+│   │   ├── data.txt
 │   │   ├── V1_02_medium.bag
 │   │   └── V1_02_medium.zip
 │   └── V1_03_difficult
 │       ├── data.csv
+│       ├── data.txt
 │       ├── V1_03_difficult.bag
 │       └── V1_03_difficult.zip
 └── vicon_room2
     ├── V2_01_easy
     │   ├── data.csv
+    │   ├── data.txt
     │   ├── V2_01_easy.bag
     │   └── V2_01_easy.zip
     ├── V2_02_medium
     │   ├── data.csv
+    │   ├── data.txt
     │   ├── V2_02_medium.bag
     │   └── V2_02_medium.zip
     └── V2_03_difficult
         ├── data.csv
+        ├── data.txt
         ├── V2_03_difficult.bag
         └── V2_03_difficult.zip
 
+
 In each subfolder for each mission, data.csv is extracted from folder
 state_groundtruth_estimate0 insider the zip file.
+And data.txt is converted in format from data.csv by convert_euroc_gt_csv.py.
 
 The folder structure layout for UZH-FPV dataset:
 .
-├── indoor_45_11_davis.bag
-├── indoor_45_11_snapdragon.bag
-├── indoor_45_12_davis_with_gt.bag
 ├── indoor_45_12_snapdragon_with_gt.bag
+├── indoor_45_12_snapdragon_with_gt.txt
 ├── indoor_45_13_davis_with_gt.bag
 ├── indoor_45_13_snapdragon_with_gt.bag
+├── indoor_45_13_snapdragon_with_gt.txt
 ├── indoor_45_14_davis_with_gt.bag
 ├── indoor_45_14_snapdragon_with_gt.bag
+├── indoor_45_14_snapdragon_with_gt.txt
 ├── indoor_45_16_davis.bag
-|
-|
+├── indoor_45_16_snapdragon.bag
+├── indoor_45_1_davis.bag
+├── indoor_45_1_snapdragon.bag
+├── indoor_45_2_davis_with_gt.bag
+├── indoor_45_2_snapdragon_with_gt.bag
+├── indoor_45_2_snapdragon_with_gt.txt
+├── indoor_45_3_davis.bag
+├── indoor_45_3_snapdragon.bag
+├── indoor_45_4_davis_with_gt.bag
+├── indoor_45_4_snapdragon_with_gt.bag
+├── indoor_45_4_snapdragon_with_gt.txt
+├── indoor_45_9_davis_with_gt.bag
+├── indoor_45_9_snapdragon_with_gt.bag
+├── indoor_45_9_snapdragon_with_gt.txt
+├── indoor_forward_10_davis_with_gt.bag
+├── indoor_forward_10_snapdragon_with_gt.bag
+├── indoor_forward_10_snapdragon_with_gt.txt
+├── indoor_forward_11_davis.bag
+├── indoor_forward_11_snapdragon.bag
+├── indoor_forward_12_davis.bag
+├── indoor_forward_12_snapdragon.bag
+├── indoor_forward_3_davis_with_gt.bag
+├── indoor_forward_3_davis_with_gt.zip
+├── indoor_forward_3_snapdragon_with_gt.bag
+├── indoor_forward_3_snapdragon_with_gt.txt
+├── indoor_forward_5_davis_with_gt.bag
+├── indoor_forward_5_snapdragon_with_gt.bag
+├── indoor_forward_5_snapdragon_with_gt.txt
+├── indoor_forward_6_davis_with_gt.bag
+├── indoor_forward_6_snapdragon_with_gt.bag
+├── indoor_forward_6_snapdragon_with_gt.txt
+├── indoor_forward_6_snapdragon_with_gt.zip
+├── indoor_forward_7_davis_with_gt.bag
+├── indoor_forward_7_snapdragon_with_gt.bag
+├── indoor_forward_7_snapdragon_with_gt.txt
+├── indoor_forward_8_davis.bag
+├── indoor_forward_8_snapdragon.bag
+├── indoor_forward_8_snapdragon.orig.bag
+├── indoor_forward_9_davis_with_gt.bag
+├── indoor_forward_9_snapdragon_with_gt.bag
+├── indoor_forward_9_snapdragon_with_gt.txt
+├── outdoor_45_1_davis_with_gt.bag
+├── outdoor_45_1_snapdragon_with_gt.bag
+├── outdoor_45_1_snapdragon_with_gt.txt
+├── outdoor_45_2_davis.bag
+├── outdoor_45_2_snapdragon.bag
+├── outdoor_forward_10_davis.bag
+├── outdoor_forward_10_snapdragon.bag
+├── outdoor_forward_1_davis_with_gt.bag
+├── outdoor_forward_1_snapdragon_with_gt.bag
+├── outdoor_forward_1_snapdragon_with_gt.txt
+├── outdoor_forward_2_davis.bag
+├── outdoor_forward_2_snapdragon.bag
+├── outdoor_forward_3_davis_with_gt.bag
+├── outdoor_forward_3_snapdragon_with_gt.bag
+├── outdoor_forward_3_snapdragon_with_gt.txt
+├── outdoor_forward_5_davis_with_gt.bag
+├── outdoor_forward_5_snapdragon_with_gt.bag
+├── outdoor_forward_5_snapdragon_with_gt.txt
+├── outdoor_forward_6_davis.bag
+├── outdoor_forward_6_snapdragon.bag
+├── outdoor_forward_9_davis.bag
+├── outdoor_forward_9_snapdragon.bag
 |
 
+The bags are downloaded from uzh fpv dataset webpage and the corresponding txt
+ files are extracted from the rosbags with ground truth using
+ extract_uzh_fpv_gt.py which wraps bag_to_pose.py of the rpg evaluation tool.
 
 Metrics
 
