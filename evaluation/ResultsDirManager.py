@@ -57,14 +57,14 @@ class ResultsDirManager(object):
 
     def create_eval_output_dir(self, eval_output_dir):
         if os.path.isdir(eval_output_dir):
-            dir_utility_functions.emptyfolder(eval_output_dir)
+            dir_utility_functions.empty_dir(eval_output_dir)
         else:
             dir_utility_functions.mkdir_p(eval_output_dir)
 
     def create_results_dir(self):
         """create and clean necessary dirs and the config yaml for running evaluation"""
         if os.path.isdir(self.results_dir):
-            dir_utility_functions.emptyfolder(self.results_dir)
+            dir_utility_functions.empty_dir(self.results_dir)
         else:
             dir_utility_functions.mkdir_p(self.results_dir)
 

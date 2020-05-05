@@ -43,7 +43,7 @@ def get_converted_euroc_gt_files(euroc_bag_list):
         gt_list.append(os.path.join(os.path.dirname(bag), 'data.txt'))
     return gt_list
 
-def emptyfolder(folder):
+def empty_dir(folder):
     for the_file in os.listdir(folder):
         file_path = os.path.join(folder, the_file)
         try:
@@ -62,6 +62,11 @@ def mkdir_p(dirname):
             raise
         pass
 
+def make_or_empty_dir(dirname):
+    if os.path.isdir(dirname):
+        empty_dir(dirname)
+    else:
+        mkdir_p(dirname)
 
 def find_rpg_est_gt_pairs(results_dir):
     """
@@ -94,4 +99,24 @@ def get_rpg_est_file_suffix(est_file):
     else:
         return est_file[index]
 
+def get_number_suffix(string_number):
+    end_index = -1
+    start_index = -1
+    index = len(string_number)
+    while index > 0:
+        c = string_number[index - 1]
+        if c.isdigit():
+            if end_index == -1:
+                end_index = index
+            start_index = index - 1
+        else:
+            if end_index == -1:
+                pass
+            else:
+                break
+        index = index - 1  # decrement index
+    if end_index == -1:
+        return None, ""
+    segment = string_number[start_index:end_index]
+    return int(segment), segment
 
