@@ -6,6 +6,25 @@ from ruamel.yaml import YAML
 
 import dir_utility_functions
 
+
+def create_empty_traj_estimate_txt(filename):
+    with open(filename, "w") as stream:
+        stream.write("# timestamp tx ty tz qx qy qz qw\n")
+
+
+def find_original_config_yaml(original_result_dir):
+    filename_list = os.listdir(original_result_dir)
+    yaml_count = 0
+    eval_config_yaml = ""
+    for filename in filename_list:
+        if filename.endswith(".yaml"):
+            eval_config_yaml = os.path.join(original_result_dir, filename)
+            yaml_count += 1
+    if yaml_count > 1:
+        warnings.warn("Multiple candidate config yaml found under {}".format(original_result_dir))
+    return eval_config_yaml
+
+
 class GroupPgoResults(object):
     """Group pgo results for one method into 3 groups (original algo,
     online pgo, final pgo) which are as if produced by 3 vio methods,
@@ -16,7 +35,7 @@ class GroupPgoResults(object):
         self.results_dir = results_dir
         self.eval_output_dir = eval_output_dir
         self.algo_name = algo_name
-        self.original_eval_config_yaml = self.find_original_config_yaml(original_results_dir)
+        self.original_eval_config_yaml = find_original_config_yaml(original_results_dir)
         dir_utility_functions.make_or_empty_dir(results_dir)
 
         self.platform = platform
@@ -27,19 +46,6 @@ class GroupPgoResults(object):
         self.eval_config = None
         self.eval_config_yaml = os.path.join(results_dir,  os.path.basename(self.original_eval_config_yaml))
         self.create_config_yaml(self.original_eval_config_yaml, algo_name, self.eval_config_yaml)
-
-
-    def find_original_config_yaml(self, original_result_dir):
-        filename_list = os.listdir(original_result_dir)
-        yaml_count = 0
-        eval_config_yaml = ""
-        for filename in filename_list:
-            if filename.endswith(".yaml"):
-                eval_config_yaml = os.path.join(original_result_dir, filename)
-                yaml_count += 1
-        if yaml_count > 1:
-            warnings.warn("Multiple candidate config yaml found under {}".format(original_result_dir))
-        return eval_config_yaml
 
     def create_config_yaml(self, original_yaml, algo_name, new_config_yaml):
         yaml = YAML()
@@ -75,10 +81,6 @@ class GroupPgoResults(object):
         self.eval_config = config
         with open(new_config_yaml, "w") as stream:
             yaml.dump(config, stream)
-
-    def create_empty_traj_estimate_txt(self, filename):
-        with open(filename, "w") as stream:
-            stream.write("# timestamp tx ty tz qx qy qz qw\n")
 
     def copy_subdirs_for_pgo(self):
         """
@@ -128,20 +130,20 @@ class GroupPgoResults(object):
                         pgo_src_file = os.path.join(trial_dir, "final_pgo.csv")
                         pgo_dst_file = os.path.join(session_dir,
                                                     "stamped_traj_estimate{}.txt".format(suffix_numbers[index]))
-                        if os.path.isfile(pgo_src_file)
+                        if os.path.isfile(pgo_src_file):
                             shutil.copy2(pgo_src_file, pgo_dst_file)
                         else:
-                            self.create_empty_traj_estimate_txt(pgo_dst_file)
+                            create_empty_traj_estimate_txt(pgo_dst_file)
 
                 elif algo_name.endswith("pgo"):
                     for index, trial_dir in enumerate(trial_dir_list):
                         pgo_src_file = os.path.join(trial_dir, "online_pgo.csv")
                         pgo_dst_file = os.path.join(session_dir,
                                                     "stamped_traj_estimate{}.txt".format(suffix_numbers[index]))
-                        if os.path.isfile(pgo_src_file)
+                        if os.path.isfile(pgo_src_file):
                             shutil.copy2(pgo_src_file, pgo_dst_file)
                         else:
-                            self.create_empty_traj_estimate_txt(pgo_dst_file)
+                            create_empty_traj_estimate_txt(pgo_dst_file)
 
     def get_eval_config_yaml(self):
         return self.eval_config_yaml
