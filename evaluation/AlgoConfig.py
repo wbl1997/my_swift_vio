@@ -29,7 +29,24 @@ def default_algo_config():
     return d
 
 
-def apply_config_to_yaml(config_dict, vio_yaml, output_dir):
+def sed_line_with_parameter(config_dict, param_name, padding, config_yaml):
+    """
+
+    :param config_dict:
+    :param param_name:
+    :param padding:
+    :param config_yaml:
+    :return:
+    """
+    if param_name in config_dict.keys():
+        return r'sed -i "/{}/c\{}{}: {}" {};'.format(
+            param_name, padding, param_name,
+            config_dict[param_name], config_yaml)
+    else:
+        return ""
+
+
+def apply_config_to_yaml(config_dict, vio_yaml, debug_output_dir):
     algo_code = config_dict["algo_code"]
     sed_algo = r'sed -i "/algorithm/c\    algorithm: {}" {};'. \
         format(algo_code, vio_yaml)
@@ -42,14 +59,11 @@ def apply_config_to_yaml(config_dict, vio_yaml, output_dir):
     sed_display = r'sed -i "/displayImages:/c\displayImages: false" {};'. \
         format(vio_yaml)
     sed_cmd = sed_algo + sed_keyframes + sed_imuframes + sed_nframe + sed_display
-    if "landmarkModelId" in config_dict.keys():
-        sed_lmkModel = r'sed -i "/landmarkModelId/c\    landmarkModelId: {}" {};'. \
-            format(config_dict["landmarkModelId"], vio_yaml)
-        sed_cmd += sed_lmkModel
-    if "anchorAtObservationTime" in config_dict.keys():
-        sed_anchorTime = r'sed -i "/anchorAtObservationTime/c\    anchorAtObservationTime: {}" {};'. \
-            format(config_dict["anchorAtObservationTime"], vio_yaml)
-        sed_cmd += sed_anchorTime
+
+    padding = " " * 4
+    sed_cmd += sed_line_with_parameter(config_dict, "landmarkModelId", padding, vio_yaml)
+    sed_cmd += sed_line_with_parameter(config_dict, "anchorAtObservationTime", padding, vio_yaml)
+
     # the fields for extrinsic_opt_mode will become scrabbled in the generated vio config file,
     # so we look for the string combination of extrinsic_opt_mode + default value.
     if "extrinsic_opt_mode_main_camera" in config_dict.keys():
@@ -64,18 +78,27 @@ def apply_config_to_yaml(config_dict, vio_yaml, output_dir):
             config_dict["extrinsic_opt_mode_other_camera"], vio_yaml)
         sed_cmd += sed_extrinsicOptMode
 
-    if "sigma_absolute_translation" in config_dict.keys():
-        sed_absTranslation = r'sed -i "/sigma_absolute_translation/c\    sigma_absolute_translation: {}" {};'.format(
-            config_dict["sigma_absolute_translation"], vio_yaml)
-        sed_cmd += sed_absTranslation
+    sed_cmd += sed_line_with_parameter(config_dict, "sigma_absolute_translation", padding, vio_yaml)
+    sed_cmd += sed_line_with_parameter(config_dict, "sigma_absolute_orientation", padding, vio_yaml)
+    sed_cmd += sed_line_with_parameter(config_dict, "sigma_tr", padding, vio_yaml)
+    sed_cmd += sed_line_with_parameter(config_dict, "sigma_td", padding, vio_yaml)
+    sed_cmd += sed_line_with_parameter(config_dict, "sigma_focal_length", padding, vio_yaml)
+    sed_cmd += sed_line_with_parameter(config_dict, "sigma_principal_point", padding, vio_yaml)
+    sed_cmd += sed_line_with_parameter(config_dict, "sigma_distortion", padding, vio_yaml)
 
-    if "sigma_absolute_orientation" in config_dict.keys():
-        sed_absOrientation = r'sed -i "/sigma_absolute_orientation/c\    sigma_absolute_orientation: {}" {};'.format(
-            config_dict["sigma_absolute_orientation"], vio_yaml)
-        sed_cmd += sed_absOrientation
+    sed_cmd += sed_line_with_parameter(config_dict, "sigma_TGElement", padding, vio_yaml)
+    sed_cmd += sed_line_with_parameter(config_dict, "sigma_TSElement", padding, vio_yaml)
+    sed_cmd += sed_line_with_parameter(config_dict, "sigma_TAElement", padding, vio_yaml)
 
-    out_stream = open(os.path.join(output_dir, "sed_out.log"), 'w')
-    err_stream = open(os.path.join(output_dir, "sed_err.log"), 'w')
+    sed_cmd += sed_line_with_parameter(config_dict, "sigma_g_c", padding, vio_yaml)
+    sed_cmd += sed_line_with_parameter(config_dict, "sigma_a_c", padding, vio_yaml)
+    sed_cmd += sed_line_with_parameter(config_dict, "sigma_gw_c", padding, vio_yaml)
+    sed_cmd += sed_line_with_parameter(config_dict, "sigma_aw_c", padding, vio_yaml)
+
+    sed_cmd += sed_line_with_parameter(config_dict, "maxOdometryConstraintForAKeyframe", padding, vio_yaml)
+
+    out_stream = open(os.path.join(debug_output_dir, "sed_out.log"), 'w')
+    err_stream = open(os.path.join(debug_output_dir, "sed_err.log"), 'w')
     utility_functions.subprocess_cmd(sed_cmd, out_stream, err_stream)
     out_stream.close()
     err_stream.close()
