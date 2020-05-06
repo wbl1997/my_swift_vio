@@ -76,6 +76,10 @@ class GroupPgoResults(object):
         with open(new_config_yaml, "w") as stream:
             yaml.dump(config, stream)
 
+    def create_empty_traj_estimate_txt(self, filename):
+        with open(filename, "w") as stream:
+            stream.write("# timestamp tx ty tz qx qy qz qw\n")
+
     def copy_subdirs_for_pgo(self):
         """
         copy original traj_estimate, online_pgo and final_pgo of each trial of
@@ -121,14 +125,23 @@ class GroupPgoResults(object):
 
                 elif algo_name.endswith("gpgo"):
                     for index, trial_dir in enumerate(trial_dir_list):
-                        shutil.copy2(os.path.join(trial_dir, "final_pgo.csv"),
-                                     os.path.join(session_dir,
-                                                  "stamped_traj_estimate{}.txt".format(suffix_numbers[index])))
+                        pgo_src_file = os.path.join(trial_dir, "final_pgo.csv")
+                        pgo_dst_file = os.path.join(session_dir,
+                                                    "stamped_traj_estimate{}.txt".format(suffix_numbers[index]))
+                        if os.path.isfile(pgo_src_file)
+                            shutil.copy2(pgo_src_file, pgo_dst_file)
+                        else:
+                            self.create_empty_traj_estimate_txt(pgo_dst_file)
+
                 elif algo_name.endswith("pgo"):
                     for index, trial_dir in enumerate(trial_dir_list):
-                        shutil.copy2(os.path.join(trial_dir, "online_pgo.csv"),
-                                     os.path.join(session_dir,
-                                                  "stamped_traj_estimate{}.txt".format(suffix_numbers[index])))
+                        pgo_src_file = os.path.join(trial_dir, "online_pgo.csv")
+                        pgo_dst_file = os.path.join(session_dir,
+                                                    "stamped_traj_estimate{}.txt".format(suffix_numbers[index]))
+                        if os.path.isfile(pgo_src_file)
+                            shutil.copy2(pgo_src_file, pgo_dst_file)
+                        else:
+                            self.create_empty_traj_estimate_txt(pgo_dst_file)
 
     def get_eval_config_yaml(self):
         return self.eval_config_yaml
