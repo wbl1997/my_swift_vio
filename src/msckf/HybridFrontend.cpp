@@ -8,16 +8,12 @@
 #include <string>
 #include <vector>
 
-#include <brisk/brisk.h>
-
 #include <msckf/FeatureTriangulation.hpp>
 #include <msckf/FrameMatchingStats.hpp>
 #include <msckf/FrameTranslationOnlySacProblem.hpp>
 
-#include <opencv2/imgproc/imgproc.hpp>
-
+#include <okvis/StereoMatchingAlgorithm.hpp>
 #include <okvis/VioKeyframeWindowMatchingAlgorithm.hpp>
-#include <okvis/IdProvider.hpp>
 #include <okvis/ceres/ImuError.hpp>
 
 // cameras and distortions
@@ -276,45 +272,7 @@ bool HybridFrontend::dataAssociationAndInitialization(
     *asKeyframe = true;  // first frame needs to be keyframe
 
   // do stereo match to get new landmarks
-  TimerSwitchable matchStereoTimer("2.4.3 matchStereo");
-  switch (distortionType) {
-    case okvis::cameras::NCameraSystem::RadialTangential: {
-      matchStereo<
-          VioKeyframeWindowMatchingAlgorithm<
-              okvis::cameras::PinholeCamera<
-                  okvis::cameras::RadialTangentialDistortion> > >(estimator,
-                                                                  framesInOut);
-      break;
-    }
-    case okvis::cameras::NCameraSystem::Equidistant: {
-      matchStereo<
-          VioKeyframeWindowMatchingAlgorithm<
-              okvis::cameras::PinholeCamera<
-                  okvis::cameras::EquidistantDistortion> > >(estimator,
-                                                             framesInOut);
-      break;
-    }
-    case okvis::cameras::NCameraSystem::RadialTangential8: {
-      matchStereo<
-          VioKeyframeWindowMatchingAlgorithm<
-              okvis::cameras::PinholeCamera<
-                  okvis::cameras::RadialTangentialDistortion8> > >(estimator,
-                                                                   framesInOut);
-      break;
-    }
-    case okvis::cameras::NCameraSystem::FOV: {
-      matchStereo<
-          VioKeyframeWindowMatchingAlgorithm<
-              okvis::cameras::PinholeCamera<
-                  okvis::cameras::FovDistortion> > >(estimator,
-                                                     framesInOut);
-      break;
-    }
-    default:
-      OKVIS_THROW(Exception, "Unsupported distortion type.")
-      break;
-  }
-  matchStereoTimer.stop();
+  matchStereoSwitch(distortionType, estimator, framesInOut);
 
   return true;
 }
