@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import subprocess
 
-def subprocess_cmd(command, out_stream=subprocess.STDOUT, err_stream=subprocess.STDOUT):
+def subprocess_cmd(command, out_stream=None, err_stream=None):
     """
     Run command in a subprocess shell and wait until completion by default.
     This is a reference implementation for debugging.
