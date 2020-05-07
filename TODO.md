@@ -50,8 +50,8 @@ tests, I believe it is caused by wrong data associations.
 
 20. In frontend hybridFilter match3d2d, the homogeneous point coordinates are used and are in anchor frame,
 but in the frontend matching algorithm the homogeneous coordinates in the global frame is required,
-see also doSetup() in vioframematchingalgorithm. the pointHomog and anchorStateId of a mappoint and
-the homogeneous point parameter block has two folds meanings.
+see also doSetup() in viokeyframewindowmatchingalgorithm. the pointHomog and anchorStateId of a mappoint and
+the homogeneous point parameter block has two fold meanings.
 For MSCKF2, pointHomog and parameter block stores position in the global frame, but for HybridFilter,
 they stores position in the anchor camera frame. So need to double check their usage, although
 positions are only relevant in frontend matching.
@@ -174,6 +174,31 @@ Refer to Basalt and GTSAM for alternate margialization strategies.
 52. ThreadedKFVio mock test failed in MockVioBackendInterface even with the github okvis master branch.
 
 53. The deadreckoning in okvis and that in MSCKF give different results, see testHybridFilter DeadreckoningM and DeadreckoningO.
+
+54. Vector access over the boundary when running command:
+/media/jhuai/Seagate/jhuai/temp/msckf_ws_rel/devel/lib/msckf/okvis_node_synchronous
+/home/jhuai/Desktop/temp/msckf_rel/vio/laptop/MSCKF_aidp/laptop_MSCKF_aidp_MH_01/config_fpga_p2_euroc.yaml
+/home/jhuai/Desktop/temp/msckf_rel/vio/laptop/MSCKF_aidp/laptop_MSCKF_aidp_MH_01/LcdParams.yaml
+--output_dir=/home/jhuai/Desktop/temp/msckf_rel/vio/laptop/MSCKF_aidp/laptop_MSCKF_aidp_MH_01/MSCKF4
+--skip_first_seconds=0 --max_inc_tol=10.0 --dump_output_option=3
+--bagname=/media/jhuai/OldWin8OS/jhuai/data/euroc/ijrr_euroc_mav_dataset/machine_hall/MH_01_easy/MH_01_easy.bag
+--vocabulary_path=/media/jhuai/docker/msckf_ws/src/msckf/evaluation/../vocabulary/ORBvoc.yml
+--camera_topics="/cam0/image_raw,/cam1/image_raw" --imu_topic=/imu0 
+
+The below are the logs:
+I0506 00:09:33.438650 13717 LoopClosureDetector.cpp:520] P3P inliers 11 out of 16 ransac iteration 23 max iterations 100
+I0506 00:09:33.438757 13717 LoopClosureDetector.cpp:441] LoopClosureDetector: LOOP CLOSURE detected between loop keyframe 5326 with dbow id 21 and query keyframe 73619 with dbow id 131
+I0506 00:09:33.446796 13715 MSCKF2.cpp:1184] MSCKF receives #loop frames 1 but has not implemented relocalization yet!
+I0506 00:09:33.473873 13695 okvis_node_synchronous.cpp:311] Progress: 25%  
+I0506 00:09:33.513044 13717 LoopClosureDetector.cpp:493] knnmatch 3d landmarks 31 to 2d keypoints 149 correspondences 16
+I0506 00:09:33.513265 13717 LoopClosureDetector.cpp:520] P3P inliers 13 out of 16 ransac iteration 9 max iterations 100
+I0506 00:09:33.513334 13717 LoopClosureDetector.cpp:441] LoopClosureDetector: LOOP CLOSURE detected between loop keyframe 6967 with dbow id 24 and query keyframe 74336 with dbow id 132
+I0506 00:09:33.521447 13715 MSCKF2.cpp:1184] MSCKF receives #loop frames 1 but has not implemented relocalization yet!
+I0506 00:09:33.704480 13717 LoopClosureDetector.cpp:493] knnmatch 3d landmarks 32 to 2d keypoints 159 correspondences 10
+terminate called after throwing an instance of 'std::out_of_range'
+  what():  vector::_M_range_check: __n (which is 5) >= this->size() (which is 5)
+Aborted (core dumped)
+
 
 
 
