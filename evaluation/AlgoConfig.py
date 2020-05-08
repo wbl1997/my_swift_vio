@@ -102,3 +102,17 @@ def apply_config_to_yaml(config_dict, vio_yaml, debug_output_dir):
     utility_functions.subprocess_cmd(sed_cmd, out_stream, err_stream)
     out_stream.close()
     err_stream.close()
+
+
+def apply_config_to_lcd_yaml(config_dict, lcd_yaml, debug_output_dir):
+    sed_cmd = ""
+    if "loop_closure_method" in config_dict.keys():
+        sed_algo = r'sed -i "/loop_closure_method/c\loop_closure_method: {}" {};'. \
+            format(config_dict["loop_closure_method"], lcd_yaml)
+        sed_cmd = sed_algo
+
+    out_stream = open(os.path.join(debug_output_dir, "sed_out.log"), 'w')
+    err_stream = open(os.path.join(debug_output_dir, "sed_err.log"), 'w')
+    utility_functions.subprocess_cmd(sed_cmd, out_stream, err_stream)
+    out_stream.close()
+    err_stream.close()

@@ -84,6 +84,8 @@ class RunOneVioMethod(object):
             output_dir_mission = self.output_dir_list[bag_index]
             lcd_yaml_mission = os.path.join(output_dir_mission, os.path.basename(self.lcd_config_template))
             shutil.copy2(self.lcd_config_template, lcd_yaml_mission)
+            AlgoConfig.apply_config_to_lcd_yaml(
+                self.algo_code_flags, lcd_yaml_mission, output_dir_mission)
             lcd_yaml_list.append(lcd_yaml_mission)
         self.custom_lcd_config_list = lcd_yaml_list
 
