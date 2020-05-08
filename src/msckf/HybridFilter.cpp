@@ -320,7 +320,7 @@ bool HybridFilter::addStates(okvis::MultiFramePtr multiFrame,
 
     uint64_t td_id = statesMap_.rbegin()
                          ->second.sensors.at(SensorStates::Camera)
-                         .at(0)
+                         .at(kMainCameraIndex)
                          .at(CameraSensorStates::TD)
                          .id;  // one camera assumption
     tdEstimate =
@@ -2529,6 +2529,7 @@ size_t HybridFilter::gatherMapPointObservations(
     okvis::MultiFramePtr multiFramePtr = multiFrameIter->second;
     multiFramePtr->getKeypoint(itObs->first.cameraIndex,
                                itObs->first.keypointIndex, measurement);
+    okvis::Time imageTimestamp = multiFramePtr->timestamp(itObs->first.cameraIndex);
     // use the latest estimates for camera intrinsic parameters
     Eigen::Vector3d backProjectionDirection;
     std::shared_ptr<const cameras::CameraBase> cameraGeometry =
@@ -2553,7 +2554,8 @@ size_t HybridFilter::gatherMapPointObservations(
     getGlobalStateParameterBlockPtr(poseId, GlobalStates::T_WS, parameterBlockPtr);
     uint32_t imageHeight = cameraGeometry->imageHeight();
     double kpN = measurement[1] / imageHeight - 0.5;
-    pointDataPtr->addKeypointObservation(itObs->first, parameterBlockPtr, kpN);
+    pointDataPtr->addKeypointObservation(
+          itObs->first, parameterBlockPtr, kpN, imageTimestamp);
   }
   return pointDataPtr->numObservations();
 }
@@ -2609,7 +2611,6 @@ void HybridFilter::propagatePoseAndVelocityForMapPoint(
     uint64_t frameId = frameAndCameraIndex.first;
     auto statesIter = statesMap_.find(frameId);
     pointDataPtr->setImuInfo(observationIndex, statesIter->second.timestamp,
-                             statesIter->second.tdAtCreation,
                              statesIter->second.imuReadingWindow,
                              statesIter->second.linearizationPoint);
 

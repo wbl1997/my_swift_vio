@@ -144,6 +144,10 @@ class CameraObservationJacobianTest {
 
   void solveAndCheck();
 
+  inline okvis::Time getImageTimestamp(int observationIndex, int /*cameraIdx*/) const {
+    return stateEpochs_[observationIndex] - okvis::Duration(tdAtCreationList_[observationIndex]);
+  }
+
   CameraObservationOptions coo_;
 
  private:
@@ -361,7 +365,6 @@ void CameraObservationJacobianTest::propagatePoseAndVelocityForMapPoint(
   CHECK(frameIds[0].first == frameIds_[0] && frameIds[2].first == frameIds_[2]);
   for (int observationIndex = 0; observationIndex < 3; ++observationIndex) {
     pointDataPtr->setImuInfo(observationIndex, stateEpochs_[observationIndex],
-                             tdAtCreationList_[observationIndex],
                              imuWindowList_[observationIndex],
                              positionAndVelocityLp_[observationIndex]);
     std::shared_ptr<const okvis::ceres::SpeedAndBiasParameterBlock>
@@ -1180,7 +1183,8 @@ void setupPoseOptProblem(bool perturbPose, bool rollingShutter,
       double kpN = pointObservationList[i][j][1] / imageHeight - 0.5;
       okvis::KeypointIdentifier kpi(frameIds[j], 0, i);
       std::shared_ptr<const okvis::ceres::ParameterBlock> T_WBj_ptr(poseBlocks[j]);
-      pointDataPtr->addKeypointObservation(kpi, T_WBj_ptr, kpN);
+      okvis::Time imageStamp = jacTest.getImageTimestamp(j, 0);
+      pointDataPtr->addKeypointObservation(kpi, T_WBj_ptr, kpN, imageStamp);
     }
 
     jacTest.propagatePoseAndVelocityForMapPoint(pointDataPtr);
