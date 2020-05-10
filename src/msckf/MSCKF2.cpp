@@ -1026,12 +1026,22 @@ bool MSCKF2::featureJacobian(const MapPoint &mp, Eigen::MatrixXd &H_oi,
     // as the last frame observing the point. In case of rolling shutter,
     // the anchor frame is further corrected by propagating the nav state to the
     // feature observation epoch with IMU readings.
-    CHECK_GT(homogeneousPoint[2], 1e-6) << "Negative depth in anchor camera frame";
+    if (homogeneousPoint[2] < 1e-6) {
+      LOG(WARNING) << "Negative depth in anchor camera frame point: "
+                   << homogeneousPoint.transpose();
+      computeHTimer.stop();
+      return false;
+    }
     //[\alpha = X/Z, \beta= Y/Z, 1, \rho=1/Z] in anchor camera frame.
     homogeneousPoint /= homogeneousPoint[2];
   } else {
     // The landmark is parameterized by Euclidean coordinates in world frame.
-    CHECK_GT(homogeneousPoint[3], 1e-6) << "Point at infinity in world frame";
+    if (homogeneousPoint[3] < 1e-6) {
+      LOG(WARNING) << "Point at infinity in world frame: "
+                   << homogeneousPoint.transpose();
+      computeHTimer.stop();
+      return false;
+    }
     homogeneousPoint /= homogeneousPoint[3];  //[X, Y, Z, 1] in world frame.
   }
   // containers of the above Jacobians for all observations of a mappoint

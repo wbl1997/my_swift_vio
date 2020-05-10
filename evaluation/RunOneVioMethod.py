@@ -103,7 +103,7 @@ class RunOneVioMethod(object):
             export_lib_cmd += "export ASAN_OPTIONS=fast_unwind_on_malloc=0;"
 
         cmd = "{} {} {} --output_dir={} --skip_first_seconds=0" \
-              " --max_inc_tol=10.0 --dump_output_option=3" \
+              " --max_inc_tol=30.0 --dump_output_option=3" \
               " --bagname={} --vocabulary_path={} {} {}".format(
             self.get_sync_exe(), custom_vio_config, custom_lcd_config,
             vio_trial_output_dir,
@@ -135,7 +135,7 @@ class RunOneVioMethod(object):
             bag_fullname)
         return src_cmd + export_lib_cmd + launch_cmd
 
-    def run_method(self, algo_name, pose_conversion_script):
+    def run_method(self, algo_name, pose_conversion_script, log_vio=True):
         '''
         run a method
         :return:
@@ -185,7 +185,10 @@ class RunOneVioMethod(object):
                 user_msg = 'Running vio method with cmd\n{}\n'.format(cmd)
                 print(textwrap.fill(user_msg, 120))
                 out_stream.write(user_msg)
-                rc, msg = utility_functions.subprocess_cmd(cmd, out_stream, err_stream)
+                if log_vio:
+                    rc, msg = utility_functions.subprocess_cmd(cmd, out_stream, err_stream)
+                else:
+                    rc, msg = utility_functions.subprocess_cmd(cmd)
                 if rc != 0:
                     err_msg = 'Error code {} with cmd:\n{}\nand error msg:{}\n'.format(rc, cmd, msg)
                     print(textwrap.fill(err_msg, 120))

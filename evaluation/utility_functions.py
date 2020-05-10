@@ -1,13 +1,18 @@
 #!/usr/bin/env python3
 import subprocess
 
-def subprocess_cmd(command, out_stream=None, err_stream=None):
+
+def subprocess_cmd(command, out_stream=None, err_stream=None, timeout=10 * 60):
     """
     Run command in a subprocess shell and wait until completion by default.
     This is a reference implementation for debugging.
     """
     try:
-        rc = subprocess.call(command, stdout=out_stream, stderr=err_stream, shell=True, close_fds=True)
+        # According to the bottom reply in
+        # https://thraxil.org/users/anders/posts/2008/03/13/Subprocess-Hanging-PIPE-is-your-enemy/
+        # we should set stdout stderr to None in order to avoid external program choke.
+        rc = subprocess.call(command, stdout=out_stream, stderr=err_stream,
+                             shell=True, close_fds=True, timeout=timeout)
     except Exception as err:
         print("Unexpected error:{}".format(err))
         return 1, "Unexpected error"
