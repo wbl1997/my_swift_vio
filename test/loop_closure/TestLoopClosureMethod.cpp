@@ -155,7 +155,7 @@ class LCDFixture :public ::testing::Test {
           ->backProject(keypoint_j, &bearing_j);
 
       double dist2 = okvis::TwoViewGeometry::computeErrorEssentialMat(
-          T_CjCi, bearing_i, bearing_j, focal_length);
+          T_CjCi, bearing_i, bearing_j, focal_length, focal_length);
       if (dist2 >= threshold2) {
         status[k] = false;
       }

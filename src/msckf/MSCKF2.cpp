@@ -116,7 +116,7 @@ int MSCKF2::marginalizeRedundantFrames(size_t numKeyframes, size_t numImuFrames)
     auto obsSearchStart = obsMap.begin();
     for (auto camStateId : rm_cam_state_ids) {
       auto obsIter = std::find_if(obsSearchStart, obsMap.end(),
-                                  msckf::IsObservedInFrame(camStateId));
+                                  okvis::IsObservedInNFrame(camStateId));
       if (obsIter != obsMap.end()) {
         involved_cam_state_ids.emplace_back(camStateId);
         obsSearchStart = obsIter;
@@ -200,8 +200,8 @@ int MSCKF2::marginalizeRedundantFrames(size_t numKeyframes, size_t numImuFrames)
       }
       while (obsIter != mapPoint.observations.end() &&
              obsIter->first.frameId == camStateId) {
-        // in case there are dud observations for the
-        // landmark in the same frame
+        // loop in case there are dud observations for the
+        // landmark in the same frame.
         const KeypointIdentifier& kpi = obsIter->first;
         auto mfp = multiFramePtrMap_.find(kpi.frameId);
         mfp->second->setLandmarkId(kpi.cameraIndex, kpi.keypointIndex, 0);
@@ -253,7 +253,7 @@ int MSCKF2::marginalizeRedundantFrames(size_t numKeyframes, size_t numImuFrames)
 //    for (uint64_t camStateId : rm_cam_state_ids) {
 //      auto obsIter = std::find_if(mapPoint.observations.begin(),
 //                                  mapPoint.observations.end(),
-//                                  msckf::IsObservedInFrame(camStateId));
+//                                  okvis::IsObservedInNFrame(camStateId));
 //      if (obsIter != mapPoint.observations.end()) {
 //        LOG(INFO) << "persist lmk " << mapPoint.id << " frm " << camStateId
 //                  << " " << obsIter->first.cameraIndex << " "

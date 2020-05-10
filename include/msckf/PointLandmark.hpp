@@ -28,17 +28,6 @@ enum class MeasurementJacobianStatus {
   AssociateAnchorProjectionFailed = 3,
 };
 
-struct IsObservedInFrame {
-  IsObservedInFrame(uint64_t x) : frameId(x) {}
-  bool operator()(
-      const std::pair<okvis::KeypointIdentifier, uint64_t> &v) const {
-    return v.first.frameId == frameId;
-  }
-
- private:
-  uint64_t frameId;  ///< Multiframe ID.
-};
-
 void decideAnchors(const std::vector<std::pair<uint64_t, size_t>>& frameIdentifiers,
                    const std::vector<uint64_t>& orderedCulledFrameIds,
                    int landmarkModelId, std::vector<okvis::AnchorFrameIdentifier>* anchorIds);

@@ -107,7 +107,7 @@ int InvariantEKF::marginalizeRedundantFrames(size_t maxClonedStates) {
     auto obsSearchStart = obsMap.begin();
     for (auto camStateId : rm_cam_state_ids) {
       auto obsIter = std::find_if(obsSearchStart, obsMap.end(),
-                                  msckf::IsObservedInFrame(camStateId));
+                                  okvis::IsObservedInNFrame(camStateId));
       if (obsIter != obsMap.end()) {
         involved_cam_state_ids.emplace_back(camStateId);
         obsSearchStart = obsIter;
@@ -248,7 +248,7 @@ int InvariantEKF::marginalizeRedundantFrames(size_t maxClonedStates) {
 //    for (uint64_t camStateId : rm_cam_state_ids) {
 //      auto obsIter = std::find_if(mapPoint.observations.begin(),
 //                                  mapPoint.observations.end(),
-//                                  msckf::IsObservedInFrame(camStateId));
+//                                  okvis::IsObservedInNFrame(camStateId));
 //      if (obsIter != mapPoint.observations.end()) {
 //        LOG(INFO) << "persist lmk " << mapPoint.id << " frm " << camStateId
 //                  << " " << obsIter->first.cameraIndex << " "

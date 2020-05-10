@@ -120,7 +120,9 @@ void LoopClosureDetector::saveFinalPgoResults() {
     return;
   }
   // This is necessary because the latest added poses have not been shifted by PGO yet.
-  pgo_->forceUpdate();
+  if (pgo_->size()) {
+    pgo_->forceUpdate();
+  }
 
   std::string output_csv =
       okvis::removeTrailingSlash(FLAGS_output_dir) + "/final_pgo.csv";

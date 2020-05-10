@@ -247,7 +247,7 @@ void testPointLandmarkJacobian(std::string projOptModelName,
         uint64_t latestFrameId = estimator->currentFrameId();
         const okvis::MapPoint& mapPoint = mpIter->second;
         auto obsIter = std::find_if(mapPoint.observations.begin(), mapPoint.observations.end(),
-                                    msckf::IsObservedInFrame(latestFrameId));
+                                    okvis::IsObservedInNFrame(latestFrameId));
         if (obsIter != mapPoint.observations.end()) {
           continue; // only examine observations of landmarks disappeared in current frame.
         }

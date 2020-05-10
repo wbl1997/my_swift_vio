@@ -193,7 +193,6 @@ LIST(APPEND SOURCEFILES
     src/msckf/SimulationFrontend.cpp
     src/msckf/SlidingWindowSmoother.cpp
     src/msckf/TFVIO.cpp
-    src/msckf/TwoViewGeometry.cpp
     src/msckf/TwoViewPair.cpp
     src/msckf/VioEvaluationCallback.cpp
     src/msckf/VioTestSystemBuilder.cpp
@@ -295,6 +294,7 @@ list(APPEND TEST_SRC_FILES
     test/msckf/TestImuOdometry.cpp
     test/msckf/TestImuSimulator.cpp
     test/msckf/TestMatrixSqrt.cpp
+    test/msckf/TestMergeTwoLandmarks.cpp
     test/msckf/TestOkvisTriangulateFast.cpp
     test/msckf/TestPointLandmark.cpp
     test/msckf/TestPointObsJacobian.cpp
