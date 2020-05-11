@@ -50,89 +50,39 @@ if __name__ == '__main__':
     algoname_to_options = {
         # We disable online extrinsic calibration for OKVIS by zeroing
         # sigma_absolute_translation and sigma_absolute_orientation.
-        # 'OKVIS': {"algo_code": "OKVIS",
-        #           "extra_gflags": "",
-        #           "numKeyframes": 5,
-        #           "numImuFrames": 3,
-        #           "monocular_input": 1,
-        #           "landmarkModelId": 0,
-        #           "anchorAtObservationTime": 0,
-        #           "extrinsic_opt_mode_main_camera": "p_BC_q_BC",
-        #           "extrinsic_opt_mode_other_camera": "p_BC_q_BC",
-        #           "sigma_absolute_translation": "0.0",
-        #           "sigma_absolute_orientation": "0.0"},
-        'MSCKF_n_aidp': {"algo_code": "MSCKF",
-                         "extra_gflags": "",
-                         "numKeyframes": 10,
-                         "numImuFrames": 5,
-                         "monocular_input": 0,
-                         "landmarkModelId": 1,
-                         "anchorAtObservationTime": 0,
-                         "extrinsic_opt_mode_main_camera": "p_CB",
-                         "extrinsic_opt_mode_other_camera": "p_C0C_q_C0C",
-                         "sigma_absolute_translation": "0.02",
-                         "sigma_absolute_orientation": "0.01"
-                         },
-        'MSCKF_n_hpp': {"algo_code": "MSCKF",
-                        "extra_gflags": "",
-                        "numKeyframes": 10,
-                        "numImuFrames": 5,
-                        "monocular_input": 0,
-                        "landmarkModelId": 0,
-                        "anchorAtObservationTime": 0,
-                        "extrinsic_opt_mode_main_camera": "p_CB",
-                        "extrinsic_opt_mode_other_camera": "p_C0C_q_C0C",
-                        "sigma_absolute_translation": "0.02",
-                        "sigma_absolute_orientation": "0.01"
-                        },
-        # Jacobian relative to time come from observation frame and anchor frame.
-        'MSCKF_n_aidp2': {"algo_code": "MSCKF",
-                          "extra_gflags": "",
-                          "numKeyframes": 10,
-                          "numImuFrames": 5,
-                          "monocular_input": 0,
-                          "landmarkModelId": 1,
-                          "anchorAtObservationTime": 1,
-                          "extrinsic_opt_mode_main_camera": "p_CB",
-                          "extrinsic_opt_mode_other_camera": "p_C0C_q_C0C",
-                          "sigma_absolute_translation": "0.02",
-                          "sigma_absolute_orientation": "0.01"
-                          },
-        'MSCKF_n_aidp_T_BC': {"algo_code": "MSCKF",
-                              "extra_gflags": "",
-                              "numKeyframes": 10,
-                              "numImuFrames": 5,
-                              "monocular_input": 0,
-                              "landmarkModelId": 1,
-                              "anchorAtObservationTime": 0,
-                              "extrinsic_opt_mode_main_camera": "p_CB",
-                              "extrinsic_opt_mode_other_camera": "p_BC_q_BC",
-                              "sigma_absolute_translation": "0.02",
-                              "sigma_absolute_orientation": "0.01"
-                              },
-        'MSCKF_aidp': {"algo_code": "MSCKF",
-                       "extra_gflags": "",
-                       "numKeyframes": 10,
-                       "numImuFrames": 5,
-                       "monocular_input": 1,
-                       "landmarkModelId": 1,
-                       "anchorAtObservationTime": 0,
-                       "extrinsic_opt_mode_main_camera": "p_CB",
-                       "extrinsic_opt_mode_other_camera": "p_C0C_q_C0C",
-                       "sigma_absolute_translation": "0.02",
-                       "sigma_absolute_orientation": "0.01"
-                       },
-        'OKVIS_nframe': {"algo_code": "OKVIS",
-                         "extra_gflags": "",
-                         "numKeyframes": 5,
-                         "numImuFrames": 3,
-                         "monocular_input": 0,
-                         "landmarkModelId": 0,
-                         "anchorAtObservationTime": 0,
-                         "extrinsic_opt_mode_main_camera": "p_BC_q_BC",
-                         "extrinsic_opt_mode_other_camera": "p_BC_q_BC",
-                         "sigma_absolute_translation": "0.0",
-                         "sigma_absolute_orientation": "0.0"},
+        # 'OKVIS_nframe': {"algo_code": "OKVIS",
+        #                  "extra_gflags": "",
+        #                  "numKeyframes": 5,
+        #                  "numImuFrames": 3,
+        #                  "monocular_input": 0,
+        #                  "landmarkModelId": 0,
+        #                  "anchorAtObservationTime": 0,
+        #                  "extrinsic_opt_mode_main_camera": "p_BC_q_BC",
+        #                  "extrinsic_opt_mode_other_camera": "p_BC_q_BC",
+        #                  "sigma_absolute_translation": "0.0",
+        #                  "sigma_absolute_orientation": "0.0"},
+        'MSCKF_n_part_fix': {"algo_code": "MSCKF",
+                             "extra_gflags": "",
+                             "numKeyframes": 5,
+                             "numImuFrames": 5,
+                             "monocular_input": 0,
+                             "landmarkModelId": 1,
+                             "anchorAtObservationTime": 0,
+                             "extrinsic_opt_mode_main_camera": "P_CB",
+                             "extrinsic_opt_mode_other_camera": "P_BC_Q_BC",
+                             "sigma_absolute_translation": 0.02,
+                             "sigma_absolute_orientation": 0.01,
+                             "sigma_tr": 0.0,
+                             "sigma_focal_length": 0.0,
+                             "sigma_principal_point": 0.0,
+                             "sigma_distortion": "[0.00, 0.0, 0.0, 0.0]",
+                             "maxOdometryConstraintForAKeyframe": 2,
+                             "sigma_g_c": 0.05,
+                             "g_max": 31.4,  # 0.9 x 2000 DPS
+                             "a_max": 176.0,  # 1.1 x 16g
+                             "g: 9": 9.807,  # zurich https://units.fandom.com/wiki/Gravity_of_Earth
+                             "loop_closure_method": 0
+                             },
     }
 
     algo_name_list = list(algoname_to_options.keys())
@@ -159,7 +109,7 @@ if __name__ == '__main__':
             returncode = rc
 
     if returncode != 0:
-        print(Fore.RED + "Error code {} in run_uzh_fpv_competition: {}".format(returncode))
+        print(Fore.RED + "Error code {} in run_uzh_fpv_competition".format(returncode))
     else:
         print('Successfully finished processing uzh fpv competition dataset!')
     sys.exit(returncode)

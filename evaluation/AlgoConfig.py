@@ -95,6 +95,17 @@ def apply_config_to_yaml(config_dict, vio_yaml, debug_output_dir):
     sed_cmd += sed_line_with_parameter(config_dict, "sigma_gw_c", padding, vio_yaml)
     sed_cmd += sed_line_with_parameter(config_dict, "sigma_aw_c", padding, vio_yaml)
 
+    sed_cmd += sed_line_with_parameter(config_dict, "g_max", padding, vio_yaml)
+    sed_cmd += sed_line_with_parameter(config_dict, "a_max", padding, vio_yaml)
+
+    sed_gravity = ""
+    param_name = "g: 9"
+    if param_name in config_dict.keys():
+        sed_gravity = r'sed -i "/{}/c\{}{}: {}" {};'.format(
+            param_name, padding, "g",
+            config_dict[param_name], vio_yaml)
+    sed_cmd += sed_gravity
+
     sed_cmd += sed_line_with_parameter(config_dict, "maxOdometryConstraintForAKeyframe", padding, vio_yaml)
 
     out_stream = open(os.path.join(debug_output_dir, "sed_out.log"), 'w')
