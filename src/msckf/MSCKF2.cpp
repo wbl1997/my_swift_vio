@@ -707,8 +707,8 @@ bool MSCKF2::measurementJacobian(
   // According to Li 2013 IJRR high precision, eq 41 and 55, J_pfi does not need
   // to use first estimates. As a result, expression 2 should be used.
   // And tests show that (1) often cause divergence for mono MSCKF.
-  //  (*J_pfi) = dz_drhoxpCtj * mtpj.dp_dpoint().topRows<3>() * dhomo_dparams; //  (1)
-  (*J_pfi) = dz_drhoxpCtj * T_CtjX.T().topRows<3>() * dhomo_dparams; // (2)
+  (*J_pfi) = dz_drhoxpCtj * mtpj.dp_dpoint().topRows<3>() * dhomo_dparams; //  (1)
+  // (*J_pfi) = dz_drhoxpCtj * T_CtjX.T().topRows<3>() * dhomo_dparams; // (2)
   return true;
 }
 
