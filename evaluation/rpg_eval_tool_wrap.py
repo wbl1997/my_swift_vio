@@ -26,7 +26,7 @@ def run_rpg_evaluation(rpg_eval_dir, eval_config_yaml, num_trials,
     err_stream = open(os.path.join(eval_output_dir, "err.log"), 'w')
     print(textwrap.fill(user_msg, 120))
     out_stream.write(user_msg)
-    rc , err = utility_functions.subprocess_cmd(cmd, out_stream, err_stream)
+    rc , err = utility_functions.subprocess_cmd(cmd, out_stream, err_stream, 7200)
     out_stream.close()
     err_stream.close()
     return rc, err
