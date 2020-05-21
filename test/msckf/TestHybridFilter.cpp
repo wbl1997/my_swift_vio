@@ -38,6 +38,14 @@ DEFINE_int32(num_runs, 5, "How many times to run one simulation?");
 
 DECLARE_bool(use_mahalanobis);
 
+DEFINE_double(
+    simul_camera_time_offset_sec, 0.0,
+    "image raw timestamp + camera time offset = image time in imu clock");
+
+DEFINE_double(
+    simul_frame_readout_time_sec, 0.0,
+    "readout time for one frame in secs");
+
 typedef boost::iterator_range<std::vector<std::pair<double, double>>::iterator>
     HistogramType;
 
@@ -397,8 +405,8 @@ void testHybridFilterSinusoid(const std::string& outputPath,
     std::string trackStatFile = pathEstimatorTrajectory + "_trackstat_" + ss.str() + ".txt";
 
     simul::VioTestSystemBuilder vioSystemBuilder;
-    double timeOffset = 0.0;
-    double readoutTime = 0.0;
+    double timeOffset = FLAGS_simul_camera_time_offset_sec;
+    double readoutTime = FLAGS_simul_frame_readout_time_sec;
     int cameraModelId = 0;
     int trajectoryId = imu::trajectoryLabelToId.find(trajLabel)->second;
     vioSystemBuilder.createVioSystem(testSetting, trajectoryId,
@@ -458,7 +466,7 @@ void testHybridFilterSinusoid(const std::string& outputPath,
         uint64_t id = okvis::IdProvider::instance().newId();
         mf->setId(id);
 
-        mf->setTimestamp(*iter);
+        mf->setTimestamp(*iter - okvis::Duration(timeOffset));
         // The reference cameraSystem will be used for triangulating landmarks in
         // the frontend which provides observations to the estimator.
         mf->resetCameraSystemAndFrames(*cameraSystem0);
@@ -501,7 +509,8 @@ void testHybridFilterSinusoid(const std::string& outputPath,
         trackedFeatures = 0;
         if (testSetting.useImageObservs) {
           trackedFeatures = frontend->dataAssociationAndInitialization(
-              *estimator, T_WS, cameraSystem0, mf, &asKeyframe);
+              *estimator, vioSystemBuilder.sinusoidalTrajectory(), *iter,
+              cameraSystem0, mf, &asKeyframe);
           estimator->setKeyframe(mf->id(), asKeyframe);
         }
         frameFeatureTally(trackedFeatures);

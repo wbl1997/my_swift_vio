@@ -193,7 +193,7 @@ void testPointLandmarkJacobian(std::string projOptModelName,
     uint64_t id = okvis::IdProvider::instance().newId();
     mf->setId(id);
 
-    mf->setTimestamp(*iter);
+    mf->setTimestamp(*iter - okvis::Duration(timeOffset));
     // The reference cameraSystem will be used for triangulating landmarks in
     // the frontend which provides observations to the estimator.
     mf->resetCameraSystemAndFrames(*cameraSystem0);
@@ -227,7 +227,8 @@ void testPointLandmarkJacobian(std::string projOptModelName,
     trackedFeatures = 0;
     if (testSetting.useImageObservs) {
       trackedFeatures = frontend->dataAssociationAndInitialization(
-          *estimator, T_WS, cameraSystem0, mf, &asKeyframe);
+          *estimator, vioSystemBuilder.sinusoidalTrajectory(), *iter,
+          cameraSystem0, mf, &asKeyframe);
       estimator->setKeyframe(mf->id(), asKeyframe);
     }
 

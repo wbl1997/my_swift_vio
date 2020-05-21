@@ -189,6 +189,7 @@ LIST(APPEND SOURCEFILES
     src/msckf/MotionAndStructureStats.cpp
     src/msckf/MSCKF2.cpp
     src/msckf/PointLandmark.cpp
+    src/msckf/PointLandmarkSimulationRS.cpp
     src/msckf/PreconditionedEkfUpdater.cpp
     src/msckf/SimulationFrontend.cpp
     src/msckf/SlidingWindowSmoother.cpp
@@ -297,6 +298,7 @@ list(APPEND TEST_SRC_FILES
     test/msckf/TestMergeTwoLandmarks.cpp
     test/msckf/TestOkvisTriangulateFast.cpp
     test/msckf/TestPointLandmark.cpp
+    test/msckf/TestPointLandmarkSimulationRS.cpp
     test/msckf/TestPointObsJacobian.cpp
     test/msckf/TestQuaternionFromSmallAngle.cpp
     test/msckf/TestRelativeMotionJacobian.cpp

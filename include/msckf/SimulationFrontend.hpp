@@ -3,6 +3,9 @@
 #define INCLUDE_OKVIS_SIMULATION_FRONTEND_HPP_
 
 #include <mutex>
+
+#include <msckf/ImuSimulator.h>
+
 #include <okvis/DenseMatcher.hpp>
 #include <okvis/assert_macros.hpp>
 #include <okvis/timing/Timer.hpp>
@@ -53,7 +56,9 @@ class SimulationFrontend {
    * @return True if successful.
    */
   int dataAssociationAndInitialization(
-      okvis::Estimator& estimator, okvis::kinematics::Transformation& T_WS_ref,
+      okvis::Estimator& estimator,
+      std::shared_ptr<const imu::CircularSinusoidalTrajectory> simulatedTrajectory,
+      okvis::Time trueCentralRowEpoch,
       std::shared_ptr<const okvis::cameras::NCameraSystem> cameraSystemRef,
       std::shared_ptr<okvis::MultiFrame> framesInOut, bool* asKeyframe);
 

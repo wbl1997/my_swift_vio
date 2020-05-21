@@ -73,7 +73,7 @@ void InterpolateIMUData(
   Omega02np1[0] = SE3Type::log(bm12np1[0].inverse() * bm12np1[1]);
   Omega02np1[1] = SE3Type::log(q02n[0].inverse() * q02n[1]);  //\Omega_-1
 
-  for (int i = 3; i < lineNum + 1; ++i) {
+  for (size_t i = 3u; i < lineNum + 1; ++i) {
     bm12np1[i] = q02n[i - 1];
     Omega02np1[i - 1] = SE3Type::log(bm12np1[i - 1].inverse() * bm12np1[i]);
   }

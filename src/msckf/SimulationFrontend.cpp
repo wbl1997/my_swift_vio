@@ -18,7 +18,7 @@
 #include <okvis/cameras/RadialTangentialDistortion.hpp>
 #include <okvis/cameras/RadialTangentialDistortion8.hpp>
 
-#include <msckf/PointLandmarkSimulation.hpp>
+#include <msckf/PointLandmarkSimulationRS.hpp>
 #include <msckf/implementation/HybridFrontend.hpp>
 
 /// \brief okvis Main namespace of this package.
@@ -183,7 +183,9 @@ SimulationFrontend::SimulationFrontend(
 }
 
 int SimulationFrontend::dataAssociationAndInitialization(
-    okvis::Estimator& estimator, okvis::kinematics::Transformation& T_WS_ref,
+    okvis::Estimator& estimator,
+    std::shared_ptr<const imu::CircularSinusoidalTrajectory> simulatedTrajectory,
+    okvis::Time trueCentralRowEpoch,
     std::shared_ptr<const okvis::cameras::NCameraSystem> cameraSystemRef,
     std::shared_ptr<okvis::MultiFrame> framesInOut, bool* asKeyframe) {
   // find distortion type
@@ -196,12 +198,15 @@ int SimulationFrontend::dataAssociationAndInitialization(
   }
   int requiredMatches = 5;
 
+  okvis::kinematics::Transformation T_WS_ref =
+      simulatedTrajectory->computeGlobalPose(trueCentralRowEpoch);
+
   std::vector<std::vector<size_t>> frameLandmarkIndices;
   std::vector<std::vector<int>> keypointIndices;
-      PointLandmarkSimulation::projectLandmarksToNFrame(
-          homogeneousPoints_, T_WS_ref, cameraSystemRef, framesInOut,
-          &frameLandmarkIndices, &keypointIndices,
-          addImageNoise_ ? &imageNoiseMag_ : nullptr);
+  PointLandmarkSimulationRS::projectLandmarksToNFrame(
+      homogeneousPoints_, simulatedTrajectory, trueCentralRowEpoch,
+      cameraSystemRef, framesInOut, &frameLandmarkIndices, &keypointIndices,
+      addImageNoise_ ? &imageNoiseMag_ : nullptr);
 
   int trackedFeatures = 0;
   if (estimator.numFrames() > 1) {
