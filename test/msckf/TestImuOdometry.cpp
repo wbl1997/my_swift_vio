@@ -20,12 +20,6 @@ static void check_q_near(const Eigen::Quaterniond& q_WS0,
       std::fabs(q_WS0.y() - q_WS1.y()) < tol && std::fabs(q_WS0.z() - q_WS1.z()) < tol);
 }
 
-static void check_sb_near(const Eigen::Matrix<double, 9, 1>& sb0,
-                          const Eigen::Matrix<double, 9, 1>& sb1,
-                          const double tol) {
-  EXPECT_LT(((sb1 - sb0).norm()), tol);
-}
-
 static void check_v_near(const Eigen::Matrix<double, 9, 1>& sb0,
                          const Eigen::Matrix<double, 9, 1>& sb1,
                          const double tol) {
@@ -67,6 +61,8 @@ struct CovPropConfig {
         sigma_aw_c(2e-3),
         dt(0.1),
         bNominalTgTsTa(nominalTgTsTa) {
+    srand((unsigned int)time(0));
+
     imuParams.g_max = 7.8;
     imuParams.a_max = 176;
     imuParams.sigma_g_c = sigma_g_c;
@@ -180,24 +176,38 @@ static void print_p_q_sb(const Eigen::Vector3d& p_WS_W,
 }
 
 // compare RungeKutta and Euler forward and backward integration
-TEST(IMUOdometry, BackwardIntegration) {
-  srand((unsigned int)time(0));
+class BackwardIntegrationTest : public ::testing::Test {
+public:
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
-  CovPropConfig cpc(true, false);
+  BackwardIntegrationTest() :
+      cpc(true, false),
+      p_WS_W(cpc.get_p_WS_W0()),
+      q_WS(cpc.get_q_WS0()),
+      sb(cpc.get_sb0()),
+      T_WB(cpc.get_p_WS_W0(), cpc.get_q_WS0()),
+      imuParams(cpc.get_imu_params()) {
+    std::cout << "States before forward integration:" << std::endl;
+    print_p_q_sb(p_WS_W, q_WS, sb);
+  }
 
-  Eigen::Vector3d p_WS_W = cpc.get_p_WS_W0();
-  Eigen::Quaterniond q_WS = cpc.get_q_WS0();
-  okvis::SpeedAndBiases sb = cpc.get_sb0();
-  okvis::kinematics::Transformation T_WB(cpc.get_p_WS_W0(), cpc.get_q_WS0());
+  void SetUp() override {};
 
-  std::cout << "States before forward-backward RK integration:" << std::endl;
-  print_p_q_sb(p_WS_W, q_WS, sb);
+  CovPropConfig cpc;
+  Eigen::Vector3d p_WS_W;
+  Eigen::Quaterniond q_WS;
+  okvis::SpeedAndBiases sb;
+  okvis::kinematics::Transformation T_WB;
+  okvis::ImuParameters imuParams;
+private:
+};
+
+TEST_F(BackwardIntegrationTest, BackwardRK) {
   okvis::IMUOdometry::propagation_RungeKutta(
       cpc.get_imu_measurements(), cpc.get_imu_params(), T_WB, sb,
       cpc.get_vTgTsTa(), cpc.get_meas_begin_time(), cpc.get_meas_end_time());
-
   okvis::IMUOdometry::propagationBackward_RungeKutta(
-      cpc.get_imu_measurements(), cpc.get_imu_params(), T_WB, sb,
+      cpc.get_imu_measurements(), imuParams, T_WB, sb,
       cpc.get_vTgTsTa(), cpc.get_meas_end_time(), cpc.get_meas_begin_time());
   p_WS_W = T_WB.r();
   q_WS = T_WB.q();
@@ -208,13 +218,14 @@ TEST(IMUOdometry, BackwardIntegration) {
   std::cout << "States after forward-backward RK integration:" << std::endl;
   print_p_q_sb(p_WS_W, q_WS, sb);
 
-  // DETAILED INTEGRATION
-  p_WS_W = cpc.get_p_WS_W0();
-  q_WS = cpc.get_q_WS0();
-  sb = cpc.get_sb0();
-  std::cout << "States before forward RK integration:" << std::endl;
-  print_p_q_sb(p_WS_W, q_WS, sb);
+  // Runge Kutta return to the starting position ?
+  cpc.check_q_near(q_WS1, 1e-8);
+  cpc.check_v_near(sb1, 2e-2);
+  cpc.check_p_near(p_WS_W1, 1.5);
+}
 
+TEST_F(BackwardIntegrationTest, StepwiseBackwardRK) {
+  // DETAILED INTEGRATION
   okvis::ImuMeasurementDeque imuMeasurements = cpc.get_imu_measurements();
   auto iterLast = imuMeasurements.begin();
   for (auto iter = imuMeasurements.begin(); iter != imuMeasurements.end();
@@ -253,12 +264,12 @@ TEST(IMUOdometry, BackwardIntegration) {
   Eigen::Quaterniond q_WS2 = q_WS;
   okvis::SpeedAndBiases sb2 = sb;
 
-  // NUMERICAL_INTEGRATION EULER
-  std::cout << "States before forward Euler integration:" << std::endl;
-  print_p_q_sb(cpc.get_p_WS_W0(), cpc.get_q_WS0(), cpc.get_sb0());
+  cpc.check_q_near(q_WS2, 1e-8);
+  cpc.check_v_near(sb2, 2e-2);
+  cpc.check_p_near(p_WS_W2, 1.5);
+}
 
-  sb = cpc.get_sb0();
-  T_WB = okvis::kinematics::Transformation(cpc.get_p_WS_W0(), cpc.get_q_WS0());
+TEST_F(BackwardIntegrationTest, BackwardEuler) {
   Eigen::Vector3d tempV_WS = sb.head<3>();
   IMUErrorModel<double> iem(sb.tail<6>(), cpc.get_vTgTsTa());
   okvis::IMUOdometry::propagation(cpc.get_imu_measurements(), cpc.get_imu_params(),
@@ -270,7 +281,7 @@ TEST(IMUOdometry, BackwardIntegration) {
   print_p_q_sb(T_WB.r(), T_WB.q(), sb);
 
   okvis::IMUOdometry::propagationBackward(
-      cpc.get_imu_measurements(), cpc.get_imu_params(), T_WB, tempV_WS, iem,
+      cpc.get_imu_measurements(), imuParams, T_WB, tempV_WS, iem,
       cpc.get_meas_end_time(), cpc.get_meas_begin_time());
   p_WS_W = T_WB.r();
   q_WS = T_WB.q();
@@ -281,16 +292,6 @@ TEST(IMUOdometry, BackwardIntegration) {
   Eigen::Vector3d p_WS_W3 = p_WS_W;
   Eigen::Quaterniond q_WS3 = q_WS;
   okvis::SpeedAndBiases sb3 = sb;
-
-  // two methods results the same?
-  check_q_near(q_WS1, q_WS2, 1e-8);
-  check_p_near(p_WS_W1, p_WS_W2, 1e-8);
-  check_sb_near(sb1, sb2, 1e-8);
-
-  // Runge Kutta return to the starting position ?
-  cpc.check_q_near(q_WS1, 1e-8);
-  cpc.check_v_near(sb1, 2e-2);
-  cpc.check_p_near(p_WS_W1, 1.5);
 
   // Euler return to the starting position ?
   cpc.check_q_near(q_WS3, 1e-6);
