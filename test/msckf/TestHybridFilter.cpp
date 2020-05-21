@@ -465,11 +465,13 @@ void testHybridFilterSinusoid(const std::string& outputPath,
         std::shared_ptr<okvis::MultiFrame> mf(new okvis::MultiFrame);
         uint64_t id = okvis::IdProvider::instance().newId();
         mf->setId(id);
-
-        mf->setTimestamp(*iter - okvis::Duration(timeOffset));
+        okvis::Time frameStamp = *iter - okvis::Duration(timeOffset);
+        mf->setTimestamp(frameStamp);
         // The reference cameraSystem will be used for triangulating landmarks in
         // the frontend which provides observations to the estimator.
         mf->resetCameraSystemAndFrames(*cameraSystem0);
+
+        mf->setTimestamp(0u, frameStamp);
 
         // reference ID will be and stay the first frame added.
         multiFrameIds.push_back(id);

@@ -38,7 +38,9 @@ class CameraMeasurementJacobianTest {
     std::shared_ptr<okvis::MultiFrame> mf(new okvis::MultiFrame());
     mf->setId(okvis::IdProvider::instance().newId());
     mf->setTimestamp(timestamp);
+
     mf->resetCameraSystemAndFrames(*cameraSystem);
+    mf->setTimestamp(0u, timestamp);
     return mf;
   }
 
@@ -352,7 +354,10 @@ void CameraMeasurementJacobianTest::computeAndCheckJacobians() const {
     int numCameraIntrinsics = J_Xc.cols();
     J_x_diff.leftCols(numCameraIntrinsics) -= J_Xc;
     J_x_diff.block<2, 9>(0, numCameraIntrinsics) -= J_XBj;
-    EXPECT_LT(J_x_diff.lpNorm<Eigen::Infinity>(), 1e-6) << "J_x_diff\n" << J_x_diff;
+    EXPECT_LT(J_x_diff.lpNorm<Eigen::Infinity>(), 1e-6)
+        << "numCameraIntrinsics " << numCameraIntrinsics << " J_x_diff\n"
+        << J_x_diff.format(commaInitFmt) << "\nlegacy J_Xc\n"
+        << J_Xc.format(commaInitFmt) << "\nlegacy J_XBj\n" << J_XBj.format(commaInitFmt);
     EXPECT_LT((J_pfi - J_pfi_legacy).lpNorm<Eigen::Infinity>(), 1e-6);
     EXPECT_LT((residual - residual_legacy).lpNorm<Eigen::Infinity>(), 1e-6);
   }

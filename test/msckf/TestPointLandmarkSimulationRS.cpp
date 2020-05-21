@@ -18,7 +18,8 @@ class PointLandmarkSimulationRSTest : public ::testing::Test {
     // create multiframe
     uint64_t id = 1000u;
     mf->setId(id);
-    mf->setTimestamp(centralRowEpoch - okvis::Duration(td));
+    okvis::Time frameStamp = centralRowEpoch - okvis::Duration(td);
+    mf->setTimestamp(frameStamp);
   }
 
   void checkProjection(bool withDistortion, bool centerRow, double eps) {
@@ -35,6 +36,7 @@ class PointLandmarkSimulationRSTest : public ::testing::Test {
       csc.createNominalCameraSystem(&cameraGeometry0, &trueCameraSystem);
     }
     mf->resetCameraSystemAndFrames(*trueCameraSystem);
+    mf->setTimestamp(0u, mf->timestamp());
 
     size_t totalLandmarks = 5u;
     AlignedVector<Eigen::Vector4d> homogeneousPoints;
