@@ -113,7 +113,8 @@ class MSCKF2 : public HybridFilter {
       Eigen::Matrix<double, 2, 3>* J_pfi, Eigen::Vector2d* residual) const;
 
   /**
-   * @brief measurementJacobianHPPMono legacy method to check measurementJacobian
+   * @brief measurementJacobianHPPMono
+   * @warning legacy method to check measurementJacobian
    * in monocular homogeneous parameterization case.
    * @param v4Xhomog
    * @param obs
@@ -133,6 +134,22 @@ class MSCKF2 : public HybridFilter {
       Eigen::Matrix<double, 2, 9>* J_XBj, Eigen::Matrix<double, 2, 3>* J_pfi,
       Eigen::Vector2d* residual) const;
 
+  /**
+   * @brief Generic measurement Jacobian to handle different camera measurement
+   * factors, e.g., reprojection error, chordal distance, etc.
+   * @warning only supports one camera.
+   * @param pointLandmark
+   * @param tempCameraGeometry
+   * @param obs
+   * @param obsCovariance
+   * @param observationIndex
+   * @param pointDataPtr
+   * @param J_X
+   * @param J_pfi
+   * @param J_n
+   * @param residual
+   * @return
+   */
   msckf::MeasurementJacobianStatus measurementJacobianGeneric(
       const msckf::PointLandmark& pointLandmark,
       std::shared_ptr<const okvis::cameras::CameraBase> tempCameraGeometry,

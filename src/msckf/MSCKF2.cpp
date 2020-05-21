@@ -528,8 +528,12 @@ bool MSCKF2::measurementJacobian(
   // transformations from left to right.
   transformList.push_back(T_BCj);
   exponentList.push_back(-1);
-  kinematics::Transformation lP_T_WBtj = pointDataPtr->T_WBtij_ForJacobian(observationIndex);
-  transformList.push_back(lP_T_WBtj);
+  AlignedVector<okvis::kinematics::Transformation> lP_transformList = transformList;
+  lP_transformList.reserve(4);
+  kinematics::Transformation lP_T_WBtj =
+      pointDataPtr->T_WBtij_ForJacobian(observationIndex);
+  lP_transformList.push_back(lP_T_WBtj);
+  transformList.push_back(T_WBtj);
   exponentList.push_back(-1);
 
   std::vector<size_t> camIndices{camIdx};
@@ -542,14 +546,14 @@ bool MSCKF2::measurementJacobian(
   std::vector<size_t> observationIndices{observationIndex};
   uint64_t poseId = pointDataPtr->frameId(observationIndex);
   std::vector<uint64_t> frameIndices{poseId};
-  AlignedVector<okvis::kinematics::Transformation> lP_T_WBt_list{lP_T_WBtj};
+  AlignedVector<okvis::kinematics::Transformation> T_WBt_list{T_WBtj};
 
   Eigen::Matrix<double, 4, 3> dhomo_dparams; // dHomogeneousPoint_dParameters.
   dhomo_dparams.setZero();
 
   okvis::kinematics::Transformation T_CtjX; // X is W or \f$C_{t(i,a)}\f$ or \f$C_{t(a)}\f$.
-
-  if (pointLandmarkOptions_.landmarkModelId == msckf::InverseDepthParameterization::kModelId) {
+  if (pointLandmarkOptions_.landmarkModelId ==
+      msckf::InverseDepthParameterization::kModelId) {
     size_t anchorCamIdx = pointDataPtr->anchorIds()[0].cameraIndex_;
     const okvis::kinematics::Transformation T_BCa =
         camera_rig_.getCameraExtrinsic(anchorCamIdx);
@@ -567,9 +571,11 @@ bool MSCKF2::measurementJacobian(
     okvis::kinematics::Transformation T_WCta = T_WBta * T_BCa;
     T_CtjX = (T_WBtj * T_BCj).inverse() * T_WCta;
 
-    transformList.push_back(lP_T_WBta);
-
+    lP_transformList.push_back(lP_T_WBta);
+    transformList.push_back(T_WBta);
     exponentList.push_back(1);
+
+    lP_transformList.push_back(T_BCa);
     transformList.push_back(T_BCa);
     exponentList.push_back(1);
 
@@ -582,7 +588,7 @@ bool MSCKF2::measurementJacobian(
     extrinsicModelIdList.push_back(anchorExtrinsicModelId);
     observationIndices.push_back(anchorObservationIndex);
     frameIndices.push_back(pointDataPtr->anchorIds()[0].frameId_);
-    lP_T_WBt_list.push_back(lP_T_WBta);
+    T_WBt_list.push_back(T_WBta);
 
     dhomo_dparams(0, 0) = 1;
     dhomo_dparams(1, 1) = 1;
@@ -612,6 +618,7 @@ bool MSCKF2::measurementJacobian(
     }
   }
 
+  okvis::MultipleTransformPointJacobian lP_mtpj(lP_transformList, exponentList, homogeneousPoint);
   okvis::MultipleTransformPointJacobian mtpj(transformList, exponentList, homogeneousPoint);
   std::vector<std::pair<size_t, size_t>> startIndexToMinDim;
   AlignedVector<Eigen::MatrixXd> dpoint_dX; // drhoxpCtj_dParameters
@@ -642,26 +649,31 @@ bool MSCKF2::measurementJacobian(
     }
 
     // Jacobians relative to nav states
+    Eigen::Matrix<double, 4, 6> lP_dpoint_dT_WBt = lP_mtpj.dp_dT(mtpjPoseIndices[ja]);
     Eigen::Matrix<double, 4, 6> dpoint_dT_WBt = mtpj.dp_dT(mtpjPoseIndices[ja]);
     auto stateIter = statesMap_.find(frameIndices[ja]);
     int orderInCov = stateIter->second.global.at(GlobalStates::T_WS).startIndexInCov;
     size_t navStateIndex = orderInCov - startIndexCameraParams;
     startIndexToMinDim.emplace_back(navStateIndex, 6u);
-    dpoint_dX.emplace_back(dpoint_dT_WBt);
+
     // Jacobians relative to time parameters and velocity.
     if (ja == 1u && !pointLandmarkOptions_.anchorAtObservationTime) {
       // Because the anchor frame is at state epoch, then its pose to
       // time and velocity are zero.
+      dpoint_dX.emplace_back(lP_dpoint_dT_WBt);
     } else {
-      Eigen::Vector3d lP_v_WBt =
-          pointDataPtr->v_WBtij_ForJacobian(observationIndices[ja]);
+      Eigen::Matrix3d Phi_pq_tij_tj = pointDataPtr->Phi_pq_feature(observationIndices[ja]);
+      lP_dpoint_dT_WBt.rightCols(3) += lP_dpoint_dT_WBt.leftCols(3) * Phi_pq_tij_tj;
+      dpoint_dX.emplace_back(lP_dpoint_dT_WBt);
+      Eigen::Vector3d v_WBt =
+          pointDataPtr->v_WBtij(observationIndices[ja]);
       Eigen::Matrix<double, 6, 1> dT_WBt_dt;
       dT_WBt_dt.head<3>() =
-          msckf::SimpleImuPropagationJacobian::dp_dt(lP_v_WBt);
+          msckf::SimpleImuPropagationJacobian::dp_dt(v_WBt);
       Eigen::Vector3d omega_Btij =
           pointDataPtr->omega_Btij(observationIndices[ja]);
       dT_WBt_dt.tail<3>() = msckf::SimpleImuPropagationJacobian::dtheta_dt(
-          omega_Btij, lP_T_WBt_list[ja].q());
+          omega_Btij, T_WBt_list[ja].q());
       Eigen::Vector2d dt_dtdtr(1, 1);
       dt_dtdtr[1] = pointDataPtr->normalizedRow(observationIndices[ja]);
 
@@ -670,22 +682,16 @@ bool MSCKF2::measurementJacobian(
       startIndexToMinDim.emplace_back(cameraDelayIntraIndex, 2u);
       dpoint_dX.emplace_back(dpoint_dT_WBt * dT_WBt_dt * dt_dtdtr.transpose());
 
-      Eigen::Matrix<double, 6, 3> dT_WBt_dv_WB;
       double featureDelay =
           pointDataPtr->normalizedFeatureTime(observationIndices[ja]);
-      dT_WBt_dv_WB.topRows<3>() =
-          msckf::SimpleImuPropagationJacobian::dp_dv_WB(featureDelay);
-      dT_WBt_dv_WB.bottomRows<3>().setZero();
-
       startIndexToMinDim.emplace_back(navStateIndex + 6u, 3u);
-      dpoint_dX.emplace_back(dpoint_dT_WBt * dT_WBt_dv_WB);
+      dpoint_dX.emplace_back(lP_dpoint_dT_WBt.leftCols(3) * featureDelay);
     }
   }
 
   // According to Li 2013 IJRR high precision, eq 41 and 55, among all Jacobian
-  // components, only the Jacobian ddpoint_dX, i.e.,
-  // \f$\frac{\partial \rho p^{C(t_{i,j})}}{\partial \delta X}\f$, need to use
-  // first estimates. The Jacobians relative to the intrinsic parameters, and
+  // components, only the Jacobian of nav states need to use first estimates of
+  // position and velocity. The Jacobians relative to intrinsic parameters, and
   // relative to \f$\rho p^{C(t_{i,j})}\f$ do not need to use first estimates.
 
   // Accumulate Jacobians relative to nav states.
@@ -707,8 +713,8 @@ bool MSCKF2::measurementJacobian(
   // According to Li 2013 IJRR high precision, eq 41 and 55, J_pfi does not need
   // to use first estimates. As a result, expression 2 should be used.
   // And tests show that (1) often cause divergence for mono MSCKF.
-  (*J_pfi) = dz_drhoxpCtj * mtpj.dp_dpoint().topRows<3>() * dhomo_dparams; //  (1)
-  // (*J_pfi) = dz_drhoxpCtj * T_CtjX.T().topRows<3>() * dhomo_dparams; // (2)
+//  (*J_pfi) = dz_drhoxpCtj * lP_mtpj.dp_dpoint().topRows<3>() * dhomo_dparams; //  (1)
+  (*J_pfi) = dz_drhoxpCtj * T_CtjX.T().topRows<3>() * dhomo_dparams; // (2)
   return true;
 }
 
@@ -797,9 +803,9 @@ bool MSCKF2::measurementJacobianHPPMono(
     }
   }
   (*J_pfi) = dz_dpCtij * T_CW.C();
-
+  Eigen::Matrix3d Phi_pq = pointDataPtr->Phi_pq_feature(observationIndex);
   factorJ_XBj << -Eigen::Matrix3d::Identity(),
-      okvis::kinematics::crossMx(v3Point - lP_T_WB.r()),
+      okvis::kinematics::crossMx(v3Point - lP_T_WB.r()) - Phi_pq,
       -Eigen::Matrix3d::Identity() * featureTime;
 
   (*J_XBj) = (*J_pfi) * factorJ_XBj;
