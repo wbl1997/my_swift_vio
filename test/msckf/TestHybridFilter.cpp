@@ -50,6 +50,10 @@ DEFINE_double(
     simul_frame_readout_time_sec, 0.0,
     "readout time for one frame in secs");
 
+DEFINE_double(sim_imu_noise_factor, 1.0, "downscale the IMU noise by this factor");
+
+DEFINE_double(sim_imu_bias_noise_factor, 1.0, "downscale the IMU BIAS noise by this factor");
+
 typedef boost::iterator_range<std::vector<std::pair<double, double>>::iterator>
     HistogramType;
 
@@ -385,10 +389,11 @@ void testHybridFilterSinusoid(const std::string& outputPath,
     filterTimer.start();
 
     srand((unsigned int)time(0)); // comment out to make tests deterministic
-    double noise_factor = 1.0;
     okvis::TestSetting testSetting{okvis::TestSetting(
         true, FLAGS_add_prior_noise, FLAGS_add_system_error,
-        true, useImageMeasurement, noise_factor, noise_factor,
+        true, useImageMeasurement,
+        FLAGS_sim_imu_noise_factor,
+        FLAGS_sim_imu_bias_noise_factor,
         estimatorAlgorithm, useEpipolarConstraint, cameraObservationModelId,
         landmarkModelId)};
 
