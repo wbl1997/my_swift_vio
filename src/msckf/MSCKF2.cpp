@@ -563,10 +563,12 @@ bool MSCKF2::measurementJacobian(
     kinematics::Transformation lP_T_WBta;
     if (pointLandmarkOptions_.anchorAtObservationTime) {
       T_WBta = pointDataPtr->T_WB_mainAnchor();
-      lP_T_WBta = pointDataPtr->T_WB_mainAnchorForJacobian();
+      lP_T_WBta = pointDataPtr->T_WB_mainAnchorForJacobian(
+            FLAGS_use_first_estimate);
     } else {
       T_WBta = pointDataPtr->T_WB_mainAnchorStateEpoch();
-      lP_T_WBta = pointDataPtr->T_WB_mainAnchorStateEpochForJacobian();
+      lP_T_WBta = pointDataPtr->T_WB_mainAnchorStateEpochForJacobian(
+            FLAGS_use_first_estimate);
     }
     okvis::kinematics::Transformation T_WCta = T_WBta * T_BCa;
     T_CtjX = (T_WBtj * T_BCj).inverse() * T_WCta;
