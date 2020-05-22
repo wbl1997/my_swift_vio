@@ -22,7 +22,7 @@ class VioSystemWrap {
   static void registerCallbacks(const std::string& output_dir,
                                        const okvis::VioParameters& parameters,
                                        okvis::ThreadedKFVio* vioSystem,
-                                       okvis::Publisher* publisher,
+                                       okvis::StreamPublisher* publisher,
                                        okvis::PgoPublisher* pgoPublisher);
 };
 }  // namespace okvis

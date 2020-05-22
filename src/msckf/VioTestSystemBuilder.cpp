@@ -121,7 +121,7 @@ void VioTestSystemBuilder::createVioSystem(
         inertialStream.reset(new std::ofstream(imuLogFile, std::ofstream::out));
         (*inertialStream)
             << "% timestamp, gx, gy, gz[rad/sec], acc x, acc y, acc "
-               "z[m/s^2], and noisy gxyz, acc xyz"
+               "z[m/s^2], gyro bias xyz, acc bias xyz, noisy gxyz, acc xyz"
             << std::endl;
       }
       imu::addNoiseToImuReadings(imuParameters, &imuMeasurements_, &trueBiases_,

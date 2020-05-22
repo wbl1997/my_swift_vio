@@ -3247,7 +3247,7 @@ uint64_t HybridFilter::getMinValidStateId() const {
   // We keep at least one keyframe which is required for visualization.
   uint64_t lastKeyframeId = currentKeyframeId();
   // Also keep at least numImuFrames frames.
-  uint64_t keepFrameId;
+  uint64_t keepFrameId(0u);
   size_t i = 0u;
   size_t numFrameToKeep = numImuFrames_ + numKeyframes_;
   for (std::map<uint64_t, States>::const_reverse_iterator rit = statesMap_.rbegin();

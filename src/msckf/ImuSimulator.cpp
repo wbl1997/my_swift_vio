@@ -694,6 +694,8 @@ void addNoiseToImuReadings(const okvis::ImuParameters& imuParameters,
                         << " " << porterGyro[1] << " " << porterGyro[2] << " "
                         << porterAcc[0] << " " << porterAcc[1] << " "
                         << porterAcc[2];
+      (*inertialStream) << " " << bgk[0] << " " << bgk[1] << " " << bgk[2]
+                        << " " << bak[0] << " " << bak[1] << " " << bak[2];
     }
 
     trueBiases->at(i).measurement.gyroscopes = bgk;

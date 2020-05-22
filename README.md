@@ -168,7 +168,7 @@ An comparison of the CMakeLists.txt between msckf and okvis_ros does not reveal 
 
 ### 3. CATKIN_ENABLE_TESTING
 BUILD_TESTS=ON tells the program to build tests which depends on gmock and gtest. 
-If the program is built outside a catkin environment, then we will download and build gmock and gtest.
+If the program is built outside a catkin environment, then we will automatically download and build gmock and gtest.
 Otherwise, if the program is built by catkin, the ros stack provides gmock and gtest. 
 Additional build of gmock and gtest will cause the error 
 "add_library cannot create imported target "gmock" because another target with the same name already exists."

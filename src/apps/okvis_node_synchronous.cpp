@@ -71,15 +71,9 @@
 #include <msckf/VioFactoryMethods.hpp>
 #include "VioSystemWrap.hpp"
 
-DEFINE_double(skip_first_seconds, 0, "Number of seconds to skip from the beginning!");
-
-DEFINE_string(bagname, "", "Bag filename.");
-
-DEFINE_string(camera_topics, "/cam0/image_raw,/cam1/image_raw",
-              "Used image topics inside the bag. Should agree with the number "
-              "of cameras in the config file");
-
-DEFINE_string(imu_topic, "/imu0", "Imu topic inside the bag");
+DEFINE_bool(
+    publish_via_ros, true,
+    "If to publish via ros, rosnode will be created, and rostopics registers.");
 
 class RosbagIteratorChecker {
  public:
@@ -125,6 +119,20 @@ class RosbagIteratorChecker {
   size_t numCameras_;
 };
 
+bool messageCenterOk() {
+  if (FLAGS_publish_via_ros) {
+    return ros::ok();
+  } else {
+    return true;
+  }
+}
+
+void messageCenterSpinOnce() {
+  if (FLAGS_publish_via_ros) {
+    return ros::spinOnce();
+  }
+}
+
 // this is just a workbench. most of the stuff here will go into the Frontend
 // class.
 int main(int argc, char **argv) {
@@ -134,9 +142,13 @@ int main(int argc, char **argv) {
   FLAGS_stderrthreshold = 0;  // INFO: 0, WARNING: 1, ERROR: 2, FATAL: 3
   FLAGS_colorlogtostderr = 1;
 
-  const std::string nodeName = "okvis_node_synchronous";
-  ros::init(argc, argv, nodeName);
-  ros::NodeHandle nh("okvis_node"); // use okvis_node because it is the prefix for topics shown in rviz.
+  std::shared_ptr<ros::NodeHandle> nh;
+  if (FLAGS_publish_via_ros) {
+    const std::string nodeName = "okvis_node_synchronous";
+    ros::init(argc, argv, nodeName);
+    // use okvis_node because it is the prefix for topics shown in rviz.
+    nh.reset(new ros::NodeHandle("okvis_node"));
+  }
 
   std::string configFilename;
   std::string lcdConfigFilename;
@@ -146,10 +158,9 @@ int main(int argc, char **argv) {
       lcdConfigFilename = argv[2];
     }
   } else {
-    if (!nh.getParam("config_filename", configFilename)) {
-      LOG(ERROR) << "Usage:" << argv[0] << " <config yml> <lcd config yml> [extra gflags]";
-      return 1;
-    }
+    LOG(ERROR) << "Usage:" << argv[0]
+               << " <config yml> <lcd config yml> [extra gflags]";
+    return 1;
   }
 
   okvis::RosParametersReader vio_parameters_reader(configFilename);
@@ -160,8 +171,13 @@ int main(int argc, char **argv) {
   // Caution: Objects including shared_ptrs are destroyed in reverse order of construction,
   // and an object shared by shared_ptr will be destroyed when no shared_ptr shares its ownership.
   // Publisher is created before ThreadedKFVio as it depends on publisher in publisherLoop().
-  okvis::Publisher publisher(nh);
-  publisher.setParameters(parameters);
+  std::shared_ptr<okvis::StreamPublisher> publisher;
+  if (FLAGS_publish_via_ros) {
+    publisher.reset(new okvis::Publisher(*nh));
+  } else {
+    publisher.reset(new okvis::StreamPublisher());
+  }
+  publisher->setParameters(parameters);
   okvis::PgoPublisher pgoPublisher;
 
   std::shared_ptr<okvis::Estimator> estimator =
@@ -191,7 +207,7 @@ int main(int argc, char **argv) {
   okvis::ThreadedKFVio okvis_estimator(parameters, estimator, frontend,
                                        loopClosureMethod);
   okvis::VioSystemWrap::registerCallbacks(
-      FLAGS_output_dir, parameters, &okvis_estimator, &publisher,
+      FLAGS_output_dir, parameters, &okvis_estimator, publisher.get(),
       &pgoPublisher);
 
   okvis_estimator.setBlocking(true);
@@ -253,8 +269,8 @@ int main(int argc, char **argv) {
   int counter = 0;
   okvis::Time start(0.0);
   RosbagIteratorChecker endGuard(view_imu, view_cams_ptr);
-  while (ros::ok()) {
-    ros::spinOnce();
+  while (messageCenterOk()) {
+    messageCenterSpinOnce();
     okvis_estimator.display();
 
     // check if at the end

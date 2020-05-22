@@ -72,8 +72,13 @@ Publisher::Publisher()
   cameraPoseVisual_.setLineWidth(0.05);
 }
 
-Publisher::~Publisher()
-{
+Publisher::~Publisher() {}
+
+StreamPublisher::StreamPublisher() {
+
+}
+
+StreamPublisher::~StreamPublisher() {
   // close file
   if (csvLandmarksFile_) {
     // write down also the current landmarks
@@ -176,7 +181,7 @@ void Publisher::setNodeHandle(ros::NodeHandle& nh)
 }
 
 // Write CSV header.
-bool Publisher::writeCsvDescription(const std::string& headerLine) {
+bool StreamPublisher::writeCsvDescription(const std::string& headerLine) {
   if (!csvFile_) return false;
   if (!csvFile_->good()) return false;
   *csvFile_ << headerLine << std::endl;
@@ -184,7 +189,7 @@ bool Publisher::writeCsvDescription(const std::string& headerLine) {
 }
 
 // Write CSV header for landmarks file.
-bool Publisher::writeLandmarksCsvDescription() {
+bool StreamPublisher::writeLandmarksCsvDescription() {
   if (!csvLandmarksFile_) return false;
   if (!csvLandmarksFile_->good()) return false;
   *csvLandmarksFile_ << FLAGS_datafile_separator << "id"
@@ -198,7 +203,7 @@ bool Publisher::writeLandmarksCsvDescription() {
 }
 
 // Set an odometry output CSV file.
-bool Publisher::setCsvFile(std::fstream &csvFile, const std::string& headerLine) {
+bool StreamPublisher::setCsvFile(std::fstream &csvFile, const std::string& headerLine) {
   if (csvFile_) {
     csvFile_->close();
   }
@@ -206,15 +211,16 @@ bool Publisher::setCsvFile(std::fstream &csvFile, const std::string& headerLine)
   writeCsvDescription(headerLine);
   return csvFile_->good();
 }
+
 // Set an odometry output CSV file.
-bool Publisher::setCsvFile(const std::string &csvFileName, const std::string& headerLine) {
+bool StreamPublisher::setCsvFile(const std::string &csvFileName, const std::string& headerLine) {
   csvFile_.reset(new std::fstream(csvFileName.c_str(), std::ios_base::out));
   writeCsvDescription(headerLine);
   return csvFile_->good();
 }
 
 // Set a CVS file where the landmarks will be saved to.
-bool Publisher::setLandmarksCsvFile(std::fstream& csvFile)
+bool StreamPublisher::setLandmarksCsvFile(std::fstream& csvFile)
 {
   if (csvLandmarksFile_) {
     csvLandmarksFile_->close();
@@ -224,7 +230,7 @@ bool Publisher::setLandmarksCsvFile(std::fstream& csvFile)
   return csvLandmarksFile_->good();
 }
 // Set a CVS file where the landmarks will be saved to.
-bool Publisher::setLandmarksCsvFile(std::string& csvFileName)
+bool StreamPublisher::setLandmarksCsvFile(std::string& csvFileName)
 {
   csvLandmarksFile_.reset(
       new std::fstream(csvFileName.c_str(), std::ios_base::out));
@@ -232,7 +238,7 @@ bool Publisher::setLandmarksCsvFile(std::string& csvFileName)
   return csvLandmarksFile_->good();
 }
 // Set a CVS file where the landmarks will be saved to.
-bool Publisher::setLandmarksCsvFile(std::string csvFileName)
+bool StreamPublisher::setLandmarksCsvFile(std::string csvFileName)
 {
   csvLandmarksFile_.reset(
       new std::fstream(csvFileName.c_str(), std::ios_base::out));
@@ -632,6 +638,14 @@ void Publisher::csvSaveFullStateAsCallback(
   setTime(t);
   setOdometry(T_WS, speedAndBiases, omega_S);  // TODO: provide setters for this hack
   setFrustum(T_WS, *parameters_.nCameraSystem.T_SC(0));
+  StreamPublisher::csvSaveFullStateAsCallback(t, T_WS, speedAndBiases, omega_S,
+                                              frameIdInSource);
+}
+
+void StreamPublisher::csvSaveFullStateAsCallback(
+    const okvis::Time &t, const okvis::kinematics::Transformation &T_WS,
+    const Eigen::Matrix<double, 9, 1> &speedAndBiases,
+    const Eigen::Matrix<double, 3, 1> &/*omega_S*/, const int frameIdInSource) {
   if (csvFile_) {
     //LOG(INFO)<<"filePtr: ok; ";
     if (csvFile_->good()) {
@@ -671,6 +685,18 @@ void Publisher::csvSaveFullStateWithExtrinsicsAsCallback(
   setTime(t);
   setOdometry(T_WS, speedAndBiases, omega_S);  // TODO: provide setters for this hack
   setFrustum(T_WS, extrinsics[0]);
+  StreamPublisher::csvSaveFullStateWithExtrinsicsAsCallback(
+      t, T_WS, speedAndBiases, omega_S, frameIdInSource, extrinsics);
+}
+
+void StreamPublisher::csvSaveFullStateWithExtrinsicsAsCallback(
+    const okvis::Time &t, const okvis::kinematics::Transformation &T_WS,
+    const Eigen::Matrix<double, 9, 1> &speedAndBiases,
+    const Eigen::Matrix<double, 3, 1> &/*omega_S*/, const int frameIdInSource,
+    const std::vector<
+        okvis::kinematics::Transformation,
+        Eigen::aligned_allocator<okvis::kinematics::Transformation>>
+        &extrinsics) {
   if (csvFile_) {
     if (csvFile_->good()) {
       Eigen::Vector3d p_WS_W = T_WS.r();
@@ -726,6 +752,24 @@ void Publisher::csvSaveFullStateWithAllCalibrationAsCallback(
   setOdometry(T_WS, speedAndBiases,
               omega_S);  // TODO(sleuten): provide setters for this hack
   setFrustum(T_WS, T_BC_list[0]);
+  StreamPublisher::csvSaveFullStateWithAllCalibrationAsCallback(
+      t, T_WS, speedAndBiases, omega_S, frameIdInSource, extrinsics,
+      imuAugmentedParams, cameraParams, stateVarianceDiagonal, T_BC_list);
+}
+
+void StreamPublisher::csvSaveFullStateWithAllCalibrationAsCallback(
+    const okvis::Time &t, const okvis::kinematics::Transformation &T_WS,
+    const Eigen::Matrix<double, 9, 1> &speedAndBiases,
+    const Eigen::Matrix<double, 3, 1> &/*omega_S*/, const int frameIdInSource,
+    const std::vector<Eigen::VectorXd,
+                      Eigen::aligned_allocator<Eigen::VectorXd>> &extrinsics,
+    const Eigen::Matrix<double, Eigen::Dynamic, 1> &imuAugmentedParams,
+    const Eigen::Matrix<double, Eigen::Dynamic, 1> &cameraParams,
+    const Eigen::Matrix<double, Eigen::Dynamic, 1> &stateVarianceDiagonal,
+    const std::vector<
+        okvis::kinematics::Transformation,
+        Eigen::aligned_allocator<okvis::kinematics::Transformation>>
+        &/*T_BC_list*/) {
   if (csvFile_) {
     if (csvFile_->good()) {
       Eigen::Vector3d p_WS_W = T_WS.r();
@@ -785,11 +829,17 @@ void Publisher::publishLandmarksAsCallback(
 
 // Set and write landmarks to file.
 void Publisher::csvSaveLandmarksAsCallback(
-    const okvis::Time & /*t*/, const okvis::MapPointVector & actualLandmarks,
-    const okvis::MapPointVector & transferredLandmarks)
-{
+    const okvis::Time &t, const okvis::MapPointVector &actualLandmarks,
+    const okvis::MapPointVector &transferredLandmarks) {
   okvis::MapPointVector empty;
   setPoints(actualLandmarks, empty, transferredLandmarks);
+  StreamPublisher::csvSaveLandmarksAsCallback(t, actualLandmarks,
+                                              transferredLandmarks);
+}
+
+void StreamPublisher::csvSaveLandmarksAsCallback(
+    const okvis::Time & /*t*/, const okvis::MapPointVector &actualLandmarks,
+    const okvis::MapPointVector &/*transferredLandmarks*/) {
   if (csvLandmarksFile_) {
     if (csvLandmarksFile_->good()) {
       for (size_t l = 0; l < actualLandmarks.size(); ++l) {
@@ -818,12 +868,30 @@ void Publisher::publishPoints()
 }
 
 // Set the images to be published next.
-void Publisher::setImages(const std::vector<cv::Mat> & images)
+void StreamPublisher::setImages(const std::vector<cv::Mat> & images)
 {
   // copy over
   images_.resize(images.size());
   for (size_t i = 0; i < images.size(); ++i)
     images_[i] = images[i];
+}
+
+void StreamPublisher::publishFullStateAsCallback(
+    const okvis::Time & /*t*/, const okvis::kinematics::Transformation & /*T_WS*/,
+    const Eigen::Matrix<double, 9, 1> & /*speedAndBiases*/,
+    const Eigen::Matrix<double, 3, 1> & /*omega_S*/) {
+
+}
+
+void StreamPublisher::publishStateAsCallback(
+    const okvis::Time& /*t*/, const okvis::kinematics::Transformation& /*T_WS*/) {
+
+}
+
+void StreamPublisher::publishLandmarksAsCallback(
+    const okvis::Time & /*t*/, const okvis::MapPointVector & /*actualLandmarks*/,
+    const okvis::MapPointVector & /*transferredLandmarks*/) {
+
 }
 
 // Add a pose to the path that is published next. The path contains a maximum of

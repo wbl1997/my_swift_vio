@@ -71,13 +71,166 @@
 namespace okvis {
 
 /**
+ * @brief This class publishes to files.
+ */
+class StreamPublisher {
+public:
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+  StreamPublisher();
+  virtual ~StreamPublisher();
+
+  /// \brief Set the parameters
+  /// @param parameters The parameters.
+  void setParameters(const okvis::VioParameters & parameters){
+    parameters_ = parameters;
+  }
+
+  /// \brief Set an odometry output CSV file.
+  /// \param csvFile The file
+  bool setCsvFile(std::fstream& csvFile, const std::string& headerLine);
+  /// \brief Set an odometry output CSV file.
+  /// \param csvFileName The filename of a new file
+  bool setCsvFile(const std::string& csvFileName, const std::string& headerLine="");
+
+  /// \brief              Set a CVS file where the landmarks will be saved to.
+  /// \param csvFile      The file
+  bool setLandmarksCsvFile(std::fstream& csvFile);
+  /// \brief              Set a CVS file where the landmarks will be saved to.
+  /// \param csvFileName  The filename of a new file
+  bool setLandmarksCsvFile(std::string& csvFileName);
+  /// \brief              Set a CVS file where the landmarks will be saved to.
+  /// \param csvFileName  The filename of a new file
+  bool setLandmarksCsvFile(std::string csvFileName);
+
+  /// @brief Set the images to be published next.
+  void setImages(const std::vector<cv::Mat> & images);
+
+  /**
+   * @brief Set and publish full state.
+   * @remark This can be registered with the VioInterface.
+   * @param t Timestamp of state.
+   * @param T_WS The pose.
+   * @param speedAndBiases The speeds and IMU biases.
+   * @param omega_S Rotational speed of the sensor frame.
+   */
+  virtual void publishFullStateAsCallback(
+      const okvis::Time & t, const okvis::kinematics::Transformation & T_WS,
+      const Eigen::Matrix<double, 9, 1> & speedAndBiases,
+      const Eigen::Matrix<double, 3, 1> & omega_S);
+
+  /**
+   * @brief Set and publish pose.
+   * @remark This can be registered with the VioInterface.
+   * @param t     Timestamp of pose.
+   * @param T_WS  The pose.
+   */
+  virtual void publishStateAsCallback(
+      const okvis::Time& t, const okvis::kinematics::Transformation& T_WS);
+
+  /**
+   * @brief Set and publish landmarks.
+   * @remark This can be registered with the VioInterface.
+   * @param t Timestamp.
+   * @param actualLandmarks Landmarks.
+   * @param transferredLandmarks Landmarks that were marginalised out.
+   */
+  virtual void publishLandmarksAsCallback(
+      const okvis::Time & t, const okvis::MapPointVector & actualLandmarks,
+      const okvis::MapPointVector & transferredLandmarks);
+  /**
+   * @brief Set and write full state to CSV file.
+   * @remark This can be registered with the VioInterface.
+   * @param t Timestamp of state.
+   * @param T_WS The pose.
+   * @param speedAndBiases The speeds and IMU biases.
+   * @param omega_S Rotational speed of the sensor frame.
+   */
+  virtual void csvSaveFullStateAsCallback(
+      const okvis::Time & t, const okvis::kinematics::Transformation & T_WS,
+      const Eigen::Matrix<double, 9, 1> & speedAndBiases,
+      const Eigen::Matrix<double, 3, 1> & omega_S, const int frameIdInSource = -1);
+
+  /**
+   * @brief Set and write full state including camera extrinsics to file.
+   * @remark This can be registered with the VioInterface.
+   * @param t Timestamp of state.
+   * @param T_WS The pose.
+   * @param speedAndBiases The speeds and IMU biases.
+   * @param omega_S Rotation speed of the sensor frame.
+   * @param extrinsics Camera extrinsics.
+   */
+  virtual void csvSaveFullStateWithExtrinsicsAsCallback(
+      const okvis::Time & t,
+      const okvis::kinematics::Transformation & T_WS,
+      const Eigen::Matrix<double, 9, 1> & speedAndBiases,
+      const Eigen::Matrix<double, 3, 1> & omega_S,
+      const int frameIdInSource,
+      const std::vector<okvis::kinematics::Transformation,
+          Eigen::aligned_allocator<okvis::kinematics::Transformation> > & extrinsics);
+
+  /**
+   * @brief Set and write full state including call calibration parameters to file.
+   * @warning Make sure this function uses similar format to Estimator.print().
+   * @remark This can be registered with the VioInterface.
+   * @param t Timestamp of state.
+   * @param T_WS The pose.
+   * @param speedAndBiases The speeds and IMU biases.
+   * @param omega_S Rotation speed of the sensor frame.
+   * @param extrinsics Camera extrinsic parameters in terms of T_BC's optimized coeffs.
+   * @param vTgsa Augmented imu parameters except for biases.
+   * @param cameraParams projection intrinsics, distortion, time offset and frame readout time.
+   * @param variance variance of the states including nav states, imu parameters,
+   *     camera extrinsic parameters, and camera intrinsic parameters and
+   *     time offset and frame readout time.
+   * @param T_BC_list Camera extrinsic in terms of T_BC.
+   */
+  virtual void csvSaveFullStateWithAllCalibrationAsCallback(
+      const okvis::Time & t,
+      const okvis::kinematics::Transformation & T_WS,
+      const Eigen::Matrix<double, 9, 1> & speedAndBiases,
+      const Eigen::Matrix<double, 3, 1> & omega_S,
+      const int frameIdInSource,
+      const std::vector<Eigen::VectorXd,
+          Eigen::aligned_allocator<Eigen::VectorXd>> & extrinsics,
+      const Eigen::Matrix<double, Eigen::Dynamic, 1>& vTgsa,
+      const Eigen::Matrix<double, Eigen::Dynamic, 1>& cameraParams,
+      const Eigen::Matrix<double, Eigen::Dynamic, 1>& variance,
+      const std::vector<okvis::kinematics::Transformation,
+          Eigen::aligned_allocator<okvis::kinematics::Transformation> > & T_BC_list);
+
+  /**
+   * @brief Set and write landmarks to file.
+   * @remark This can be registered with the VioInterface.
+   * @param t Timestamp.
+   * @param actualLandmarks Landmarks.
+   * @param transferredLandmarks Landmarks that were marginalised out.
+   */
+  virtual void csvSaveLandmarksAsCallback(
+      const okvis::Time & t, const okvis::MapPointVector & actualLandmarks,
+      const okvis::MapPointVector & transferredLandmarks);
+
+ protected:
+  /// @brief Write CSV header.
+  bool writeCsvDescription(const std::string& headerLine);
+  /// @brief Write CSV header for landmarks file.
+  bool writeLandmarksCsvDescription();
+
+  okvis::VioParameters parameters_; ///< All the parameters including publishing options.
+
+  std::vector<cv::Mat> images_; ///< The images.
+  okvis::MapPointVector pointsMatched2_;  ///< Matched points vector.
+  std::shared_ptr<std::fstream> csvLandmarksFile_;  ///< CSV file to save landmarks in.
+  std::shared_ptr<std::fstream> csvFile_; ///< CSV file to save state in.
+
+};
+
+/**
  * @brief This class handles the publishing to either ROS topics or files.
  */
-class Publisher
+class Publisher : public StreamPublisher
 {
-  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
  public:
-
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
   /// \brief Default constructor.
   Publisher();
   ~Publisher();
@@ -97,22 +250,6 @@ class Publisher
    */
   void setNodeHandle(ros::NodeHandle& nh);
 
-  /// \brief Set an odometry output CSV file.
-  /// \param csvFile The file
-  bool setCsvFile(std::fstream& csvFile, const std::string& headerLine);
-  /// \brief Set an odometry output CSV file.
-  /// \param csvFileName The filename of a new file
-  bool setCsvFile(const std::string& csvFileName, const std::string& headerLine="");
-
-  /// \brief              Set a CVS file where the landmarks will be saved to.
-  /// \param csvFile      The file
-  bool setLandmarksCsvFile(std::fstream& csvFile);
-  /// \brief              Set a CVS file where the landmarks will be saved to.
-  /// \param csvFileName  The filename of a new file
-  bool setLandmarksCsvFile(std::string& csvFileName);
-  /// \brief              Set a CVS file where the landmarks will be saved to.
-  /// \param csvFileName  The filename of a new file
-  bool setLandmarksCsvFile(std::string csvFileName);
 
   /**
    * @brief Set the pose message that is published next.
@@ -138,12 +275,6 @@ class Publisher
   void setFrustum(const okvis::kinematics::Transformation& T_WB,
                   const okvis::kinematics::Transformation& T_BC);
 
-  /// \brief Set the parameters
-  /// @param parameters The parameters.
-  void setParameters(const okvis::VioParameters & parameters){
-    parameters_ = parameters;
-  }
-
   /**
    * @brief Set the points that are published next.
    * @param pointsMatched Vector of 3D points that have been matched with existing landmarks.
@@ -160,8 +291,6 @@ class Publisher
     _t = ros::Time(t.sec, t.nsec);
   }
 
-  /// @brief Set the images to be published next.
-  void setImages(const std::vector<cv::Mat> & images);
 
   /// @brief Add a pose to the path that is published next. The path contains a maximum of
   ///        \e pathLength_ (change with setPathLength)poses that are published. Once the
@@ -184,7 +313,7 @@ class Publisher
    * @param T_WS  The pose.
    */
   void publishStateAsCallback(const okvis::Time & t,
-                              const okvis::kinematics::Transformation & T_WS);
+                              const okvis::kinematics::Transformation & T_WS) final;
 
   /**
    * @brief Set and publish full state.
@@ -197,7 +326,7 @@ class Publisher
   void publishFullStateAsCallback(
       const okvis::Time & t, const okvis::kinematics::Transformation & T_WS,
       const Eigen::Matrix<double, 9, 1> & speedAndBiases,
-      const Eigen::Matrix<double, 3, 1> & omega_S);
+      const Eigen::Matrix<double, 3, 1> & omega_S) final;
 
   /**
    * @brief Set and publish landmarks.
@@ -208,7 +337,7 @@ class Publisher
    */
   void publishLandmarksAsCallback(
       const okvis::Time & t, const okvis::MapPointVector & actualLandmarks,
-      const okvis::MapPointVector & transferredLandmarks);
+      const okvis::MapPointVector & transferredLandmarks) final;
 
   /**
    * @brief Set and write full state to CSV file.
@@ -221,7 +350,7 @@ class Publisher
   void csvSaveFullStateAsCallback(
       const okvis::Time & t, const okvis::kinematics::Transformation & T_WS,
       const Eigen::Matrix<double, 9, 1> & speedAndBiases,
-      const Eigen::Matrix<double, 3, 1> & omega_S, const int frameIdInSource = -1);
+      const Eigen::Matrix<double, 3, 1> & omega_S, const int frameIdInSource = -1) final;
 
   /**
    * @brief Set and write full state including camera extrinsics to file.
@@ -239,7 +368,7 @@ class Publisher
       const Eigen::Matrix<double, 3, 1> & omega_S,
       const int frameIdInSource,
       const std::vector<okvis::kinematics::Transformation,
-          Eigen::aligned_allocator<okvis::kinematics::Transformation> > & extrinsics);
+          Eigen::aligned_allocator<okvis::kinematics::Transformation> > & extrinsics) final;
 
   /**
    * @brief Set and write full state including call calibration parameters to file.
@@ -269,7 +398,7 @@ class Publisher
       const Eigen::Matrix<double, Eigen::Dynamic, 1>& cameraParams,
       const Eigen::Matrix<double, Eigen::Dynamic, 1>& variance,
       const std::vector<okvis::kinematics::Transformation,
-          Eigen::aligned_allocator<okvis::kinematics::Transformation> > & T_BC_list);
+          Eigen::aligned_allocator<okvis::kinematics::Transformation> > & T_BC_list) final;
   /**
    * @brief Set and write landmarks to file.
    * @remark This can be registered with the VioInterface.
@@ -279,7 +408,7 @@ class Publisher
    */
   void csvSaveLandmarksAsCallback(
       const okvis::Time & t, const okvis::MapPointVector & actualLandmarks,
-      const okvis::MapPointVector & transferredLandmarks);
+      const okvis::MapPointVector & transferredLandmarks) final;
 
   /// @brief Publish the last set odometry.
   void publishOdometry();
@@ -293,11 +422,6 @@ class Publisher
   /// @}
 
  private:
-
-  /// @brief Write CSV header.
-  bool writeCsvDescription(const std::string& headerLine);
-  /// @brief Write CSV header for landmarks file.
-  bool writeLandmarksCsvDescription();
 
   /// @name Node and subscriber related
   /// @{
@@ -322,7 +446,7 @@ class Publisher
   ros::Time _t; ///< Header timestamp.
   geometry_msgs::TransformStamped poseMsg_; ///< Pose message.
   nav_msgs::Odometry odometryMsg_;  ///< Odometry message.
-  okvis::MapPointVector pointsMatched2_;  ///< Matched points vector.
+
   pcl::PointCloud<pcl::PointXYZRGB> pointsMatched_; ///< Point cloud for matched points.
   pcl::PointCloud<pcl::PointXYZRGB> pointsUnmatched_; ///< Point cloud for unmatched points.
   pcl::PointCloud<pcl::PointXYZRGB> pointsTransferred_; ///< Point cloud for transferred/marginalised points.
@@ -331,7 +455,6 @@ class Publisher
 //  visualization_msgs::Marker pointsUnmatched_; ///< Point cloud for unmatched points.
 //  visualization_msgs::Marker pointsTransferred_; ///< Point cloud for transferred/marginalised points.
 
-  std::vector<cv::Mat> images_; ///< The images.
   nav_msgs::Path path_; ///< The path message.
   visualization_msgs::Marker meshMsg_; ///< Mesh message.
 
@@ -341,14 +464,10 @@ class Publisher
   ros::Time lastOdometryTime2_; ///< Timestamp of the last published odometry message. (publishOdometry())
   ros::Time lastTransfromTime_; ///< Timestamp of the last published transform. (publishTransform())
 
-  okvis::VioParameters parameters_; ///< All the parameters including publishing options.
-
   uint32_t ctr2_; ///< The counter for the amount of transferred points. Used for the seq parameter in the header.
 
   CameraPoseVisualization cameraPoseVisual_; ///< List of camera frustums.
 
-  std::shared_ptr<std::fstream> csvFile_; ///< CSV file to save state in.
-  std::shared_ptr<std::fstream> csvLandmarksFile_;  ///< CSV file to save landmarks in.
 
 };
 

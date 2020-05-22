@@ -32,6 +32,16 @@ DEFINE_int32(start_index, 0, "index of the first frame to be processed");
 
 DEFINE_int32(finish_index, 0, "index of the last frame to be processed");
 
+DEFINE_double(skip_first_seconds, 0, "Number of seconds to skip from the beginning!");
+
+DEFINE_string(bagname, "", "Bag filename.");
+
+DEFINE_string(camera_topics, "/cam0/image_raw,/cam1/image_raw",
+              "Used image topics inside the bag. Should agree with the number "
+              "of cameras in the config file");
+
+DEFINE_string(imu_topic, "/imu0", "Imu topic inside the bag");
+
 namespace okvis {
 bool setInputParameters(okvis::InputData *input) {
   input->videoFile = FLAGS_video_file;

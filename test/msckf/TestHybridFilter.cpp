@@ -31,8 +31,12 @@
 DEFINE_bool(
     add_prior_noise, true,
     "add noise to initial states, including velocity, gyro bias, accelerometer "
-    "bias, imu misalignment matrices, extrinsic parameters, camera projection "
-    "and distortion intrinsic parameters, td, tr");
+    "bias");
+
+DEFINE_bool(
+    add_system_error, false,
+    "add noise to sensor parameters, including camera extrinsic, intrinsic "
+    "and temporal parameters, and IMU parameters.");
 
 DEFINE_int32(num_runs, 5, "How many times to run one simulation?");
 
@@ -184,13 +188,15 @@ void computeErrors(
     estimator->getSensorStateEstimateAs<okvis::ceres::CameraTimeParamBlock>(
         currFrameId, 0, okvis::HybridFilter::SensorStates::Camera,
         okvis::HybridFilter::CameraSensorStates::TD, td_est);
-    (*squaredError)[index] = td_est * td_est;
+    double delta_td = ref_camera_geometry->imageDelay() - td_est;
+    (*squaredError)[index] = delta_td * delta_td;
     ++index;
 
     estimator->getSensorStateEstimateAs<okvis::ceres::CameraTimeParamBlock>(
         currFrameId, 0, okvis::HybridFilter::SensorStates::Camera,
         okvis::HybridFilter::CameraSensorStates::TR, tr_est);
-    (*squaredError)[index] = tr_est * tr_est;
+    double delta_tr = ref_camera_geometry->readoutTime() - tr_est;
+    (*squaredError)[index] = delta_tr * delta_tr;
     ++index;
   } else {
     squaredError->segment(index, projOptModelDim + nDistortionCoeffDim + 2)
@@ -381,8 +387,8 @@ void testHybridFilterSinusoid(const std::string& outputPath,
     srand((unsigned int)time(0)); // comment out to make tests deterministic
     double noise_factor = 1.0;
     okvis::TestSetting testSetting{okvis::TestSetting(
-        true, FLAGS_add_prior_noise, false, true, useImageMeasurement,
-        noise_factor, noise_factor,
+        true, FLAGS_add_prior_noise, FLAGS_add_system_error,
+        true, useImageMeasurement, noise_factor, noise_factor,
         estimatorAlgorithm, useEpipolarConstraint, cameraObservationModelId,
         landmarkModelId)};
 
@@ -551,13 +557,15 @@ void testHybridFilterSinusoid(const std::string& outputPath,
           truthStream << *iter << " " << id << " " << std::setfill(' ')
                       << T_WS.parameters().transpose().format(spaceInitFmt)
                       << " " << v_WS_true.transpose().format(spaceInitFmt)
-                      << " 0 0 0 0 0 0 "
+                      << " " << trueBiasIter->measurement.gyroscopes.transpose().format(spaceInitFmt)
+                      << " " << trueBiasIter->measurement.accelerometers.transpose().format(spaceInitFmt)
                       << "1 0 0 0 1 0 0 0 1 "
                       << "0 0 0 0 0 0 0 0 0 "
                       << "1 0 0 0 1 0 0 0 1 "
                       << T_SC_0->inverse().r().transpose().format(spaceInitFmt)
                       << " " << allIntrinsics.transpose().format(spaceInitFmt)
-                      << " 0 0" << std::endl;
+                      << " " << cameraGeometry0->imageDelay()
+                      << " " << cameraGeometry0->readoutTime() << std::endl;
         }
 
         Eigen::Vector3d normalizedSquaredError;

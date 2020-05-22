@@ -18,6 +18,14 @@ DECLARE_int32(start_index);
 
 DECLARE_int32(finish_index);
 
+DECLARE_double(skip_first_seconds);
+
+DECLARE_string(bagname);
+
+DECLARE_string(camera_topics);
+
+DECLARE_string(imu_topic);
+
 namespace okvis {
 
 bool setInputParameters(okvis::InputData *input);
