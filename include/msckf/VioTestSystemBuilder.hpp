@@ -62,7 +62,7 @@ public:
     return trueCameraSystem_;
   }
 
-  okvis::InitialNavState initialNavState() const {
+  const okvis::InitialNavState& initialNavState() const {
     return initialNavState_;
   }
 
