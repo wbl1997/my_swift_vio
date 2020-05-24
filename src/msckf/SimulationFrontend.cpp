@@ -96,6 +96,20 @@ void createBoxLandmarkGrid(
       lmIds->push_back(okvis::IdProvider::instance().newId());
     }
   }
+
+//  std::vector<double> zlist{-zLimit, zLimit};
+//  for (double z : zlist) {
+//    for (x = -xyLimit; x <= xyLimit; x += xyIncrement) {
+//      for (y = -xyLimit; y <= xyLimit; y += xyIncrement) {
+//        homogeneousPoints->push_back(
+//            Eigen::Vector4d(x + vio::gauss_rand(0, offsetNoiseMag),
+//                            y + vio::gauss_rand(0, offsetNoiseMag),
+//                            z + vio::gauss_rand(0, offsetNoiseMag), 1));
+//        lmIds->push_back(okvis::IdProvider::instance().newId());
+//      }
+//    }
+//  }
+
   saveLandmarkGrid(*homogeneousPoints, *lmIds, pointFile);
 }
 
@@ -393,7 +407,7 @@ int SimulationFrontend::addMatchToEstimator(
 
       okvis::kinematics::Transformation T_WSa = T_WSp_ref;
       okvis::kinematics::Transformation T_WSb = T_WSc_ref;
-      // TODO(jhuai): do we use estimates or reference values?
+      // Use estimated values rather than reference ones.
       estimator.get_T_WS(IdA.frameId, T_WSa);
       estimator.get_T_WS(IdB.frameId, T_WSb);
 
@@ -437,7 +451,12 @@ int SimulationFrontend::addMatchToEstimator(
         currFrames->setLandmarkId(landmarkMatch.currentKeypoint.cameraIndex,
                                   landmarkMatch.currentKeypoint.keypointIndex,
                                   landmarkMatch.landmarkId);
-        estimator.addLandmark(landmarkMatch.landmarkId, T_WCa * hP_Ca);
+
+        Eigen::Vector4d hP_W = homogeneousPoints_[landmarkMatch.landmarkIdInVector];
+        // Use estimated landmark position because true position does not
+        // affect VIO results much.
+        hP_W = T_WCa * hP_Ca;
+        estimator.addLandmark(landmarkMatch.landmarkId, hP_W);
         estimator.setLandmarkInitialized(landmarkMatch.landmarkId,
                                          canBeInitialized);
         switch (constraintScheme_) {
