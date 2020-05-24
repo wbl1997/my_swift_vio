@@ -11,7 +11,7 @@ DEFINE_double(sim_sigma_a_c, 8e-3, "simulated accelerometer noise density");
 DEFINE_double(sim_sigma_gw_c, 2e-5, "simulated gyro bias noise density");
 DEFINE_double(sim_sigma_aw_c, 5.5e-5, "simulated accelerometer bias noise density");
 
-namespace imu {
+namespace simul {
 CircularSinusoidalTrajectory::CircularSinusoidalTrajectory()
     : wz(17 * M_PI / 41),
       wxy(7 * M_PI / 37),
@@ -279,13 +279,13 @@ TorusTrajectory::computeGlobalPose(const okvis::Time time) const {
 
 SphereTrajectory::SphereTrajectory()
     : CircularSinusoidalTrajectory() {
-  rxy = 37 / 19;
+  rxy = 37.0 / 19;
 }
 
 SphereTrajectory::SphereTrajectory(
     double imuFreq, Eigen::Vector3d ginw)
     : CircularSinusoidalTrajectory(imuFreq, ginw) {
-  rxy = 37 / 19;
+  rxy = 37.0 / 19;
 }
 
 Eigen::Vector3d SphereTrajectory::computeGlobalAngularRate(
@@ -829,4 +829,4 @@ Eigen::Matrix<T, 3, 3> WavyCircle::orientation(T t) const {
   return R_WB;
 }
 
-}  // namespace imu
+}  // namespace simul

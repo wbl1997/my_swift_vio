@@ -13,7 +13,7 @@ void PointLandmarkSimulationRS::projectLandmarksToNFrame(
     const std::vector<Eigen::Vector4d,
                       Eigen::aligned_allocator<Eigen::Vector4d>>&
         homogeneousPoints,
-    std::shared_ptr<const imu::CircularSinusoidalTrajectory> simulatedTrajectory,
+    std::shared_ptr<const simul::CircularSinusoidalTrajectory> simulatedTrajectory,
     okvis::Time trueCentralRowEpoch,
     std::shared_ptr<const okvis::cameras::NCameraSystem> cameraSystemRef,
     std::shared_ptr<okvis::MultiFrame> framesInOut,

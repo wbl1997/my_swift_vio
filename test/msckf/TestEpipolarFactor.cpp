@@ -33,12 +33,12 @@ TEST(EpipolarFactor, Jacobians) {
   double sigma_td = 5e-3;
   bool zeroImuIntrinsicParamNoise = !addSystemError;
   okvis::ImuParameters imuParameters;
-  imu::initImuNoiseParams(&imuParameters, addPriorNoise, addSystemError,
+  simul::initImuNoiseParams(&imuParameters, addPriorNoise, addSystemError,
                           bg_std, ba_std, Tg_std, Ts_std, Ta_std,
                           zeroImuIntrinsicParamNoise);
 
-  std::shared_ptr<imu::CircularSinusoidalTrajectory> cst;
-  cst.reset(new imu::RoundedSquare(imuParameters.rate,
+  std::shared_ptr<simul::CircularSinusoidalTrajectory> cst;
+  cst.reset(new simul::RoundedSquare(imuParameters.rate,
                                    Eigen::Vector3d(0, 0, -imuParameters.g),
                                    okvis::Time(0, 0), 1.0, 0, 0.8));
   const std::vector<okvis::Time> twoTimes{okvis::Time{20},

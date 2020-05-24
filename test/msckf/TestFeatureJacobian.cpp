@@ -128,11 +128,11 @@ void testPointLandmarkJacobian(std::string projOptModelName,
   okvis::TestSetting testSetting(true, addPriorNoise, false, true, true, noise_factor,
                                  noise_factor, okvis::EstimatorAlgorithm::MSCKF, useEpipolarConstraint,
                                  cameraObservationModelId, landmarkModelId);
-  int trajectoryId = 0; // Torus
+  simul::SimulatedTrajectoryType trajectoryType = simul::SimulatedTrajectoryType::Torus;
   int cameraModelId = 0;
   double landmarkRadius = 5;
   simul::CameraOrientation cameraOrientationId = simul::CameraOrientation::Forward;
-  vioSystemBuilder.createVioSystem(testSetting, trajectoryId,
+  vioSystemBuilder.createVioSystem(testSetting, trajectoryType,
                                    projOptModelName, extrinsicModelName,
                                    cameraModelId,
                                    cameraOrientationId, timeOffset, readoutTime,

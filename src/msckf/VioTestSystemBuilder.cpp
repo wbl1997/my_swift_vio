@@ -20,7 +20,8 @@ DEFINE_bool(zero_imu_intrinsic_param_noise, true,
 
 namespace simul {
 void VioTestSystemBuilder::createVioSystem(
-    const okvis::TestSetting& testSetting, int trajectoryId,
+    const okvis::TestSetting& testSetting,
+    SimulatedTrajectoryType trajectoryType,
     std::string projOptModelName, std::string extrinsicModelName,
     int cameraModelId,
     CameraOrientation cameraOrientationId, double td, double tr,
@@ -45,7 +46,7 @@ void VioTestSystemBuilder::createVioSystem(
                         zeroCameraIntrinsicParamNoise);
 
   okvis::ImuParameters imuParameters;
-  imu::initImuNoiseParams(&imuParameters, testSetting.addPriorNoise,
+  simul::initImuNoiseParams(&imuParameters, testSetting.addPriorNoise,
                           testSetting.addSystemError, bg_std, ba_std,
                           Tg_std, Ts_std, Ta_std,
                           zeroImuIntrinsicParamNoise);
@@ -54,39 +55,44 @@ void VioTestSystemBuilder::createVioSystem(
   const okvis::Time tStart(20);
   const okvis::Time tEnd(20 + DURATION);
 
-  switch (trajectoryId) {
-    case imu::TorusTrajectory::kTrajectoryId:
-      circularSinusoidalTrajectory.reset(new imu::TorusTrajectory(
+  switch (trajectoryType) {
+    case SimulatedTrajectoryType::Sinusoid:
+      circularSinusoidalTrajectory.reset(
+          new simul::CircularSinusoidalTrajectory(
+              imuParameters.rate, Eigen::Vector3d(0, 0, -imuParameters.g)));
+      break;
+    case SimulatedTrajectoryType::Torus:
+      circularSinusoidalTrajectory.reset(new simul::TorusTrajectory(
           imuParameters.rate, Eigen::Vector3d(0, 0, -imuParameters.g)));
       break;
-    case imu::RoundedSquare::kRoundedSquareId:
-      circularSinusoidalTrajectory.reset(new imu::RoundedSquare(
+    case SimulatedTrajectoryType::Squircle:
+      circularSinusoidalTrajectory.reset(new simul::RoundedSquare(
           imuParameters.rate, Eigen::Vector3d(0, 0, -imuParameters.g)));
       break;
-    case imu::RoundedSquare::kCircleId:
-      circularSinusoidalTrajectory.reset(new imu::RoundedSquare(
+    case SimulatedTrajectoryType::Circle:
+      circularSinusoidalTrajectory.reset(new simul::RoundedSquare(
           imuParameters.rate, Eigen::Vector3d(0, 0, -imuParameters.g),
           okvis::Time(0, 0), 1.0, 0, 0.8));
       break;
-    case imu::RoundedSquare::kDotId:
-      circularSinusoidalTrajectory.reset(new imu::RoundedSquare(
+    case SimulatedTrajectoryType::Dot:
+      circularSinusoidalTrajectory.reset(new simul::RoundedSquare(
           imuParameters.rate, Eigen::Vector3d(0, 0, -imuParameters.g),
           okvis::Time(0, 0), 1e-3, 0, 0.8e-3));
       break;
-    case imu::WavyCircle::kTrajectoryId:
-      circularSinusoidalTrajectory.reset(new imu::WavyCircle(
+    case SimulatedTrajectoryType::WavyCircle:
+      circularSinusoidalTrajectory.reset(new simul::WavyCircle(
           imuParameters.rate, Eigen::Vector3d(0, 0, -imuParameters.g)));
       break;
-    case imu::Motionless::kTrajectoryId:
-      circularSinusoidalTrajectory.reset(new imu::Motionless(
+    case SimulatedTrajectoryType::Motionless:
+      circularSinusoidalTrajectory.reset(new simul::Motionless(
           imuParameters.rate, Eigen::Vector3d(0, 0, -imuParameters.g)));
       break;
-    case imu::SphereTrajectory::kTrajectoryId:
-      circularSinusoidalTrajectory.reset(new imu::SphereTrajectory(
+    case SimulatedTrajectoryType::Ball:
+      circularSinusoidalTrajectory.reset(new simul::SphereTrajectory(
           imuParameters.rate, Eigen::Vector3d(0, 0, -imuParameters.g)));
       break;
     default:
-      LOG(ERROR) << "Unknown trajectory id " << trajectoryId;
+      LOG(ERROR) << "Unknown trajectory id " << static_cast<int>(trajectoryType);
       break;
   }
 
@@ -124,7 +130,7 @@ void VioTestSystemBuilder::createVioSystem(
                "z[m/s^2], gyro bias xyz, acc bias xyz, noisy gxyz, acc xyz"
             << std::endl;
       }
-      imu::addNoiseToImuReadings(imuParameters, &imuMeasurements_, &trueBiases_,
+      simul::addNoiseToImuReadings(imuParameters, &imuMeasurements_, &trueBiases_,
                                  testSetting.sim_ga_noise_factor,
                                  testSetting.sim_ga_bias_noise_factor,
                                  inertialStream.get());

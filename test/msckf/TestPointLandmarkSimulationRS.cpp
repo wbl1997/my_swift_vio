@@ -13,7 +13,7 @@ class PointLandmarkSimulationRSTest : public ::testing::Test {
     // create the trajectory
     double imuRate = 100;
     double gravity = 9.80;
-    cst.reset(new imu::WavyCircle(imuRate, Eigen::Vector3d(0, 0, -gravity)));
+    cst.reset(new simul::WavyCircle(imuRate, Eigen::Vector3d(0, 0, -gravity)));
 
     // create multiframe
     uint64_t id = 1000u;
@@ -87,7 +87,7 @@ class PointLandmarkSimulationRSTest : public ::testing::Test {
   void SetUp() override{};
 
  private:
-  std::shared_ptr<imu::CircularSinusoidalTrajectory> cst;
+  std::shared_ptr<simul::CircularSinusoidalTrajectory> cst;
   double td;
   double tr;
   std::shared_ptr<okvis::cameras::CameraBase> cameraGeometry0;

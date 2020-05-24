@@ -116,7 +116,7 @@ class CameraObservationJacobianTest {
   }
 
   uint64_t addNavStatesAndExtrinsic(
-      std::shared_ptr<const imu::CircularSinusoidalTrajectory> cameraMotion,
+      std::shared_ptr<const simul::CircularSinusoidalTrajectory> cameraMotion,
       okvis::Time startEpoch);
 
   uint64_t addImuAugmentedParameterBlocks(okvis::Time stateEpoch);
@@ -186,7 +186,7 @@ class CameraObservationJacobianTest {
 };
 
 uint64_t CameraObservationJacobianTest::addNavStatesAndExtrinsic(
-    std::shared_ptr<const imu::CircularSinusoidalTrajectory> cameraMotion,
+    std::shared_ptr<const simul::CircularSinusoidalTrajectory> cameraMotion,
     okvis::Time startEpoch) {
   okvis::kinematics::Transformation T_disturb;
   T_disturb.setRandom(1, 0.02);
@@ -1082,8 +1082,8 @@ void setupPoseOptProblem(bool perturbPose, bool rollingShutter,
   Eigen::Vector3d ginw(0, 0, -imuParameters.g);
   okvis::Time startEpoch(1.0);
   okvis::Time endEpoch(3.0);  // poses separated by 1 sec.
-  std::shared_ptr<imu::CircularSinusoidalTrajectory> cameraMotion(
-      new imu::RoundedSquare(imuFreq, ginw, okvis::Time(0, 0), 1.0, 6.0, 0.8));
+  std::shared_ptr<simul::CircularSinusoidalTrajectory> cameraMotion(
+      new simul::RoundedSquare(imuFreq, ginw, okvis::Time(0, 0), 1.0, 6.0, 0.8));
 
   okvis::ImuMeasurementDeque imuMeasurements;
   cameraMotion->getTrueInertialMeasurements(startEpoch - okvis::Duration(1),

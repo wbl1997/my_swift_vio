@@ -198,7 +198,7 @@ SimulationFrontend::SimulationFrontend(
 
 int SimulationFrontend::dataAssociationAndInitialization(
     okvis::Estimator& estimator,
-    std::shared_ptr<const imu::CircularSinusoidalTrajectory> simulatedTrajectory,
+    std::shared_ptr<const simul::CircularSinusoidalTrajectory> simulatedTrajectory,
     okvis::Time trueCentralRowEpoch,
     std::shared_ptr<const okvis::cameras::NCameraSystem> cameraSystemRef,
     std::shared_ptr<okvis::MultiFrame> framesInOut, bool* asKeyframe) {

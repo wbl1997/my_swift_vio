@@ -14,7 +14,8 @@ public:
   }
   virtual ~VioTestSystemBuilder() {}
 
-  void createVioSystem(const okvis::TestSetting& testSetting, int trajectoryId,
+  void createVioSystem(const okvis::TestSetting& testSetting,
+                       SimulatedTrajectoryType trajectoryId,
                        std::string projOptModelName, std::string extrinsicModelName,
                        int cameraModelId,
                        CameraOrientation cameraOrientationId, double td, double tr,
@@ -30,7 +31,7 @@ public:
     return frontend;
   }
 
-  std::shared_ptr<const imu::CircularSinusoidalTrajectory> sinusoidalTrajectory() {
+  std::shared_ptr<const simul::CircularSinusoidalTrajectory> sinusoidalTrajectory() {
     return circularSinusoidalTrajectory;
   }
 
@@ -70,7 +71,7 @@ private:
   std::shared_ptr<okvis::Estimator> estimator;
   std::shared_ptr<::ceres::EvaluationCallback> evaluationCallback_;
   std::shared_ptr<okvis::SimulationFrontend> frontend;
-  std::shared_ptr<imu::CircularSinusoidalTrajectory> circularSinusoidalTrajectory;
+  std::shared_ptr<simul::CircularSinusoidalTrajectory> circularSinusoidalTrajectory;
   std::string distortionType_;
   std::string imuModelType_;
   std::vector<okvis::Time> times_;
