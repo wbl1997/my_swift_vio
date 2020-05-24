@@ -314,6 +314,7 @@ list(APPEND TEST_SRC_FILES
 
     test/std/TestBinaryOperators.cpp
     test/std/TestCallMemberFunctionAtConstruction.cpp
+    test/std/TestConstStaticInBaseClass.cpp
     test/std/TestDequeIterator.cpp
     test/std/TestDerivedClass.cpp
     test/std/TestMapKeyOrder.cpp
