@@ -90,7 +90,7 @@ endTime = data(end, 1);
 sec_to_nanos = 1e9;
 if ~exist('cmp_data_file','var')
     % eg., 'Seagate/temp/parkinglot/opt_states.txt';
-    cmp_data_file = input('okvis_classic:', 's'); 
+    cmp_data_file = input('cmp_data_file:', 's'); 
 end
 if ~exist('gt_file','var')
     % ground truth file must have the same number of rows as output data
@@ -113,7 +113,7 @@ if (gt_file)
     % associate the data by timestamps, discrepancy less than 0.02sec
     starter =1;
     assocIndex = zeros(size(data,1), 1);
-    for(i=1:size(data,1))
+    for i=1:size(data,1)
         index = find(abs(gt(starter:end,1) - data(i,1))<2.5e7);
         [~, uniqIndex] = min(abs(gt(starter+ index -1,1) - data(i,1)));
         assocIndex(i,1)= index(uniqIndex)+starter-1;
@@ -168,8 +168,15 @@ end
 
 if (cmp_data_file)
     cmp_data = readmatrix(cmp_data_file, 'NumHeaderLines', 1);
-    plot3(cmp_data(:, 4), cmp_data(:, 5), cmp_data(:, 6), '-g');
-    legend_list{end+1} = 'okvis';
+    if cmp_data(1, 1) > sec_to_nanos
+        cmp_data(:,1) = (cmp_data(:,1) - startTime) / sec_to_nanos;
+    else
+        cmp_data(:,1) = cmp_data(:,1) - startTime / sec_to_nanos;
+    end
+    plot3(cmp_data(:, 3), cmp_data(:, 4), cmp_data(:, 5), '-g');
+    legend_list{end+1} = 'cmp';
+else
+    cmp_data = [];
 end
 legend(legend_list);
 title('p_B^G');
@@ -258,6 +265,12 @@ export_fig(outputfig);
 
 figure;
 draw_ekf_triplet_with_std(data, msckf_index_server.b_g, msckf_index_server.b_g_std, 180/pi);
+if ~isempty(cmp_data)
+    hold on;
+    plot(cmp_data(:, 1), cmp_data(:, 13), 'r-');
+    plot(cmp_data(:, 1), cmp_data(:, 14), 'g-');
+    plot(cmp_data(:, 1), cmp_data(:, 15), 'b-');
+end
 ylabel(['b_g[' char(176) '/s]']);
 outputfig = [output_dir, '/b_g.eps'];
 if exist(outputfig, 'file')==2
@@ -267,6 +280,12 @@ export_fig(outputfig);
 
 figure;
 draw_ekf_triplet_with_std(data, msckf_index_server.b_a, msckf_index_server.b_a_std, 1.0);
+if ~isempty(cmp_data)
+    hold on;
+    plot(cmp_data(:, 1), cmp_data(:, 16), 'r-');
+    plot(cmp_data(:, 1), cmp_data(:, 17), 'g-');
+    plot(cmp_data(:, 1), cmp_data(:, 18), 'b-');
+end
 ylabel('b_a[m/s^2]');
 outputfig = [output_dir, '/b_a.eps'];
 if exist(outputfig, 'file')==2
