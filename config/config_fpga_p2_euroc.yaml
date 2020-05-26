@@ -38,7 +38,7 @@ camera_params:
     sigma_absolute_orientation: 0.0 # The standard deviation of the camera extrinsics orientation, e.g. 1.0e-3 for online-calib [rad].
     sigma_c_relative_translation: 0.0 # The std. dev. of the cam. extr. transl. change between frames, e.g. 1.0e-6 for adaptive online calib (not less for numerics) [m].
     sigma_c_relative_orientation: 0.0 # The std. dev. of the cam. extr. orient. change between frames, e.g. 1.0e-6 for adaptive online calib (not less for numerics) [rad].
-    timestamp_tolerance: 0.005 #[s]stereo frame out-of-sync tolerance
+    timestamp_tolerance: 0.005 # [s] stereo frame out-of-sync tolerance
     sigma_focal_length: 5.0
     sigma_principal_point: 5.0
     sigma_distortion: [0.05, 0.01, 0.001, 0.001, 0.0001]
@@ -47,7 +47,7 @@ camera_params:
 
 imu_params:
     a_max: 176.0 # acceleration saturation [m/s^2]
-    g_max: 31.4 # gyro saturation [rad/s]
+    g_max: 7.8 # gyro saturation [rad/s]
     sigma_g_c: 12.0e-4 # gyro noise density [rad/s/sqrt(Hz)]
     sigma_a_c: 8.0e-3 # accelerometer noise density [m/s^2/sqrt(Hz)]
     sigma_bg: 0.03 # gyro bias prior [rad/s]
@@ -64,9 +64,9 @@ imu_params:
          0.0000, 1.0000, 0.0000, 0.0000,
          0.0000, 0.0000, 1.0000, 0.0000,
          0.0000, 0.0000, 0.0000, 1.0000]
-    sigma_TGElement: 5e-4
-    sigma_TSElement: 1e-4
-    sigma_TAElement: 5e-4
+    sigma_TGElement: 5e-3
+    sigma_TSElement: 1e-3
+    sigma_TAElement: 5e-3
 
 # Estimator parameters
 numKeyframes: 5 # number of keyframes in optimisation window
@@ -104,7 +104,7 @@ imageDelay: 0.0  # in case you are using a custom setup, you will have to calibr
 displayImages: true  # displays debug video and keyframe matches. May be slow.
 
 # use direct driver
-useDriver: false 
+useDriver: false
 
 # some options for how and what to publish -- optional in ROS-free version
 publishing_options:
