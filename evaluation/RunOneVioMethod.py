@@ -3,15 +3,16 @@ import shutil
 import textwrap
 
 import dir_utility_functions
+import rosbag_utility_functions
 import utility_functions
+
 import AlgoConfig
 import OkvisConfigComposer
 import RoscoreManager
 
-
-ROS_TOPICS = [["/cam0/image_raw", "/cam1/image_raw", "/imu0"],
-              ["/snappy_cam/stereo_l", "/snappy_cam/stereo_r", "/snappy_imu"]]
-
+ROS_TOPICS = {"euroc": ["/cam0/image_raw", "/cam1/image_raw", "/imu0"],
+              "tum-vi": ["/cam0/image_raw", "/cam1/image_raw", "/imu0"],
+              "uzh-fpv": ["/snappy_cam/stereo_l", "/snappy_cam/stereo_r", "/snappy_imu"]}
 
 class RunOneVioMethod(object):
     """Run one vio method on a number of data missions"""
@@ -68,7 +69,7 @@ class RunOneVioMethod(object):
                 self.vio_config_template, bag_fullname, vio_yaml_mission)
 
             # apply sensor calibration parameters
-            config_composer.create_config_for_mission()
+            config_composer.create_config_for_mission(self.algo_code_flags["algo_code"])
 
             # apply algorithm parameters
             AlgoConfig.apply_config_to_yaml(
@@ -143,7 +144,7 @@ class RunOneVioMethod(object):
         self.create_vio_config_yaml()
         self.create_lcd_config_yaml()
 
-        mock = 'async' in algo_name
+        mock = 'async' in algo_name or (not AlgoConfig.doWePublishViaRos(self.algo_code_flags))
         roscore_manager = RoscoreManager.RosCoreManager(mock)
         roscore_manager.start_roscore()
         return_code = 0
@@ -185,13 +186,13 @@ class RunOneVioMethod(object):
                 user_msg = 'Running vio method with cmd\n{}\n'.format(cmd)
                 print(textwrap.fill(user_msg, 120))
                 out_stream.write(user_msg)
+                bag_duration = rosbag_utility_functions.get_rosbag_duration(bag_fullname)
+                time_out = bag_duration * 2
                 if log_vio:
-                    rc, msg = utility_functions.subprocess_cmd(cmd, out_stream, err_stream)
+                    rc, msg = utility_functions.subprocess_cmd(cmd, out_stream, err_stream, time_out)
                 else:
-                    rc, msg = utility_functions.subprocess_cmd(cmd)
+                    rc, msg = utility_functions.subprocess_cmd(cmd, None, None, time_out)
                 if rc != 0:
-                    err_msg = 'Error code {} with cmd:\n{}\nand error msg:{}\n'.format(rc, cmd, msg)
-                    print(textwrap.fill(err_msg, 120))
                     return_code = rc
                 vio_estimate_csv = os.path.join(output_dir_trial, 'msckf_estimates.csv')
                 converted_vio_file = os.path.join(

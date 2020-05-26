@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 
 """
-The evaluation procedure runs synchronously because it depends on roscore adn
-roscore does not accept nodes with the same name.
+The evaluation procedure will run synchronously if publish_via_ros is true
+because it depends on roscore which does not accept nodes with the same name.
 
 Input Data Structure
 
@@ -205,30 +205,42 @@ from colorama import init, Fore
 init(autoreset=True)
 
 
-def find_all_bags_with_gt(euroc_dir, uzh_fpv_dir):
+def find_all_bags_with_gt(euroc_dir, uzh_fpv_dir, tum_vi_dir):
     euroc_bags = dir_utility_functions.find_bags(euroc_dir, '.bag', discount_key='calibration')
     euroc_gt_list = dir_utility_functions.get_converted_euroc_gt_files(euroc_bags)
 
     uzh_fpv_bags = dir_utility_functions.find_bags_with_gt(uzh_fpv_dir, 'snapdragon_with_gt.bag')
     uzh_fpv_gt_list = dir_utility_functions.get_uzh_fpv_gt_files(uzh_fpv_bags)
 
+    tumvi_bags = dir_utility_functions.find_bags(tum_vi_dir, "dataset-room", "dataset-calib")
+    tumvi_gt_list = dir_utility_functions.get_tum_vi_gt_files(tumvi_bags)
+
     for gt_file in euroc_gt_list:
         if not os.path.isfile(gt_file):
-            raise Exception(Fore.RED + "Ground truth file {} deos not exist. Do you "
+            raise Exception(Fore.RED + "Ground truth file {} does not exist. Do you "
                                        "forget to convert data.csv to data.txt, e.g.,"
-                                       " with convert_euroc_gt_csv.py}".format(gt_file))
+                                       " with convert_euroc_gt_csv.py".format(gt_file))
 
     for gt_file in uzh_fpv_gt_list:
         if not os.path.isfile(gt_file):
-            raise Exception(Fore.RED + "Ground truth file {} deos not exist. Do you "
+            raise Exception(Fore.RED + "Ground truth file {} does not exist. Do you "
                                        "forget to extract gt from bag files, e.g.,"
-                                       " with extract_uzh_fpv_gt.py}".format(gt_file))
+                                       " with extract_uzh_fpv_gt.py".format(gt_file))
 
-    bag_list = uzh_fpv_bags
-    gt_list = uzh_fpv_gt_list
+    for gt_file in tumvi_gt_list:
+        if not os.path.isfile(gt_file):
+            raise Exception(Fore.RED + "Ground truth file {} does not exist. Do you "
+                                       "forget to extract gt from bag files, e.g.,"
+                                       " with extract_tum_vi_gt.py".format(gt_file))
+
+    # bag_list = uzh_fpv_bags
+    # gt_list = uzh_fpv_gt_list
 
     # bag_list.extend(euroc_bags)
     # gt_list.extend(euroc_gt_list)
+
+    bag_list = tumvi_bags
+    gt_list = tumvi_gt_list
     return bag_list, gt_list
 
 
@@ -236,7 +248,8 @@ if __name__ == '__main__':
     args = parse_args.parse_args()
 
     bag_list, gt_list = find_all_bags_with_gt(
-        args.euroc_dir, args.uzh_fpv_dir)
+        args.euroc_dir, args.uzh_fpv_dir, args.tumvi_dir)
+
     print('For evaluation, #bags {} #gtlist {}'.format(len(bag_list), len(gt_list)))
     for index, gt in enumerate(gt_list):
         print('{}: {}'.format(bag_list[index], gt))
@@ -278,18 +291,18 @@ if __name__ == '__main__':
         #                "sigma_absolute_translation": "0.02",
         #                "sigma_absolute_orientation": "0.01"
         #                },
-        # 'OKVIS_nframe': {"algo_code": "OKVIS",
-        #                  "extra_gflags": "",
-        #                  "numKeyframes": 5,
-        #                  "numImuFrames": 3,
-        #                  "monocular_input": 0,
-        #                  "landmarkModelId": 0,
-        #                  "anchorAtObservationTime": 0,
-        #                  "extrinsic_opt_mode_main_camera": "p_BC_q_BC",
-        #                  "extrinsic_opt_mode_other_camera": "p_BC_q_BC",
-        #                  "sigma_absolute_translation": "0.0",
-        #                  "sigma_absolute_orientation": "0.0",
-        #                  "loop_closure_method": 0},
+        'OKVIS_nframe': {"algo_code": "OKVIS",
+                         "extra_gflags": "--publish_via_ros=false",
+                         "numKeyframes": 5,
+                         "numImuFrames": 3,
+                         "monocular_input": 0,
+                         "landmarkModelId": 0,
+                         "anchorAtObservationTime": 0,
+                         "extrinsic_opt_mode_main_camera": "p_BC_q_BC",
+                         "extrinsic_opt_mode_other_camera": "p_BC_q_BC",
+                         "sigma_absolute_translation": "0.0",
+                         "sigma_absolute_orientation": "0.0",
+                         "loop_closure_method": 0},
     }
 
     # 'MSCKF_i': AlgoConfig.create_algo_config(['MSCKF', '--use_IEKF=true', 10, 3]),

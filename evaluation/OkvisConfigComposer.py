@@ -21,9 +21,19 @@ BAGKEY_CALIBRATION = {
 
 def dataset_code(bagname):
     if 'snapdragon' in bagname or 'davis' in bagname:
-        return 1
+        return "uzh-fpv"
     if 'euroc' in bagname:
-        return 0
+        return "euroc"
+    if 'TUM-VI' in bagname or 'tum-vi' in bagname:
+        return "tum-vi"
+
+
+def calibration_format(dataset_type):
+    if dataset_type == "uzh-fpv":
+        calib_format = "kalibr"
+    else:
+        calib_format = dataset_type
+    return calib_format
 
 
 class OkvisConfigComposer(object):
@@ -41,6 +51,8 @@ class OkvisConfigComposer(object):
 
     def get_calib_files(self):
         eval_script_dir = os.path.dirname(os.path.abspath(__file__))
+        imu_calib_file = ""
+        camera_calib_files = ""
         for bagkey in BAGKEY_CALIBRATION.keys():
             if bagkey in self.bag_fullname:
                 imu_calib_file = os.path.join(eval_script_dir, BAGKEY_CALIBRATION[bagkey][0])
@@ -50,15 +62,11 @@ class OkvisConfigComposer(object):
                 break
         return imu_calib_file, camera_calib_files
 
-    def create_config_for_mission(self):
+    def create_config_for_mission(self, algo_code):
         dataset_type = dataset_code(self.bag_fullname)
         imu_calib_file, camera_calib_files = self.get_calib_files()
-        if dataset_type == 0:
-            calib_format = "euroc"
-        elif dataset_type == 1:
-            calib_format = "kalibr"
-        else:
-            raise Exception("Unknown dataset type {}".format(dataset_type))
+        calib_format = calibration_format(dataset_type)
+
         kalibr_okvis_config.create_okvis_config_yaml(
             self.vio_config_template, calib_format, camera_calib_files,
-            imu_calib_file, self.vio_yaml_mission)
+            imu_calib_file, algo_code, self.vio_yaml_mission)

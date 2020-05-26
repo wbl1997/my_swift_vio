@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 import subprocess
-
+import textwrap
 
 def subprocess_cmd(command, out_stream=None, err_stream=None, timeout=10 * 60):
     """
@@ -14,8 +14,9 @@ def subprocess_cmd(command, out_stream=None, err_stream=None, timeout=10 * 60):
         rc = subprocess.call(command, stdout=out_stream, stderr=err_stream,
                              shell=True, close_fds=True, timeout=timeout)
     except Exception as err:
-        print("Unexpected error:{}".format(err))
-        return 1, "Unexpected error"
+        err_msg = "Unexpected error:{}".format(err)
+        print(textwrap.fill(err_msg, 120))
+        return 1, "Exception raised"
     return rc, ""
 
 

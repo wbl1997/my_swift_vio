@@ -15,6 +15,62 @@ OKVIS_EUROC_IMU_PARAMETERS = {"sigma_g_c": 12.0e-4,
                               "sigma_gw_c": 4.0e-6,
                               "sigma_aw_c": 4.0e-5}
 
+MSCKF_TUMVI_IMU_PARAMETERS = {"sigma_g_c": 1e-3,
+                              "sigma_a_c": 2e-2,
+                              "sigma_gw_c": 1.1e-5,
+                              "sigma_aw_c": 4.3e-4}
+
+TUMVI_PARAMETERS = {
+    "cameras": [
+        {"T_SC": [-0.99953071, 0.00744168, -0.02971511, 0.04536566,
+                  0.0294408, -0.03459565, -0.99896766, -0.071996,
+                  -0.00846201, -0.99937369, 0.03436032, -0.04478181,
+                  0.0, 0.0, 0.0, 1.0],
+         "image_dimension": [512, 512],
+         "distortion_coefficients": [0.0034823894022493434, 0.0007150348452162257, -0.0020532361418706202,
+                                     0.00020293673591811182],
+         "distortion_type": "equidistant",
+         "focal_length": [190.97847715128717, 190.9733070521226],
+         "principal_point": [254.93170605935475, 256.8974428996504],
+         "projection_opt_mode": "FXY_CXY",
+         "extrinsic_opt_mode": "P_CB",
+         "image_delay": 0.0,
+         "image_readout_time": 0.00},
+        {"T_SC":
+             [-0.99951678, 0.00803569, -0.03002713, -0.05566603,
+              0.03012473, 0.01231336, -0.9994703, -0.07010225,
+              -0.0076617, -0.9998919, -0.01254948, -0.0475471,
+              0., 0., 0., 1.],
+         "image_dimension": [512, 512],
+         "distortion_coefficients": [0.0034003170790442797, 0.001766278153469831, -0.00266312569781606,
+                                     0.0003299517423931039],
+         "distortion_type": "equidistant",
+         "focal_length": [190.44236969414825, 190.4344384721956],
+         "principal_point": [252.59949716835982, 254.91723064636983],
+         "projection_opt_mode": "FXY_CXY",
+         "extrinsic_opt_mode": "P_BC_Q_BC",
+         "image_delay": 0.0,
+         "image_readout_time": 0.00
+         }],
+    "imu_params": {
+        'g_max': 7.8,
+        'sigma_g_c': 0.004,
+        'sigma_a_c': 0.07,
+        'sigma_gw_c': 4.4e-5,
+        'sigma_aw_c': 1.72e-3,
+        'g': 9.80766,
+        'sigma_TGElement': 5e-3,
+        'sigma_TSElement': 1e-3,
+        'sigma_TAElement': 5e-3, },
+    'ceres_options': {
+        'timeLimit': -1,
+    },
+    "displayImages": "false",
+    "publishing_options": {
+        'publishLandmarks': "false", }
+}
+
+
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("okvis_config_template",
@@ -34,6 +90,11 @@ def parse_args():
     parser.add_argument("--output_okvis_config",
                         help="Output okvis config yaml accommodating the sensor parameters",
                         required=True)
+    parser.add_argument("--algo_code",
+                        help="Which algorithm to use, MSCKF or OKVIS. This only affects"
+                             " IMU noise parameters in TUM VI config yaml.",
+                        default="",
+                        required=False)
     args = parser.parse_args()
     return args
 
@@ -90,6 +151,7 @@ def printCameraBlock(camConfig):
 
 def create_okvis_config_yaml(okvis_config_template, calib_format,
                              camera_config_yamls, imu_config_yaml,
+                             algo_code,
                              output_okvis_config):
     out_config = open(output_okvis_config, 'w')
     yaml = YAML()
@@ -161,7 +223,17 @@ def create_okvis_config_yaml(okvis_config_template, calib_format,
         template_data['imu_params']['sigma_aw_c'] =OKVIS_EUROC_IMU_PARAMETERS['sigma_aw_c']
         template_data['imu_params']['sigma_g_c'] = OKVIS_EUROC_IMU_PARAMETERS['sigma_g_c']
         template_data['imu_params']['sigma_gw_c'] = OKVIS_EUROC_IMU_PARAMETERS['sigma_gw_c']
-
+    elif calib_format == "tum-vi":
+        for cameraid in range(0, 2):
+            for key in TUMVI_PARAMETERS['cameras'][cameraid].keys():
+                template_data['cameras'][cameraid][key] = TUMVI_PARAMETERS['cameras'][cameraid][key]
+        for group in ["imu_params", "ceres_options", "publishing_options"]:
+            for key in TUMVI_PARAMETERS[group].keys():
+                template_data[group][key] = TUMVI_PARAMETERS[group][key]
+        template_data["displayImages"] = TUMVI_PARAMETERS["displayImages"]
+        if algo_code == "MSCKF":
+            for key in MSCKF_TUMVI_IMU_PARAMETERS.keys():
+                template_data["imu_params"][key] = MSCKF_TUMVI_IMU_PARAMETERS[key]
 
     # camera_config_str = printCameraBlock(template_data["cameras"][0])
     # camera_config_str += printCameraBlock(template_data["cameras"][1])

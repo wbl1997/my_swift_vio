@@ -4,6 +4,7 @@ import shutil
 from colorama import init, Fore
 init(autoreset=True)
 
+
 def find_bags_with_gt(uzh_fpv_dir, bagname_key, discount_key='.orig.bag'):
     """This function finds ros bags named like 'xxx_with_gt.bag',
     works with uzh-fpv dataset."""
@@ -15,21 +16,26 @@ def find_bags_with_gt(uzh_fpv_dir, bagname_key, discount_key='.orig.bag'):
             bags_with_gt_list.append(os.path.join(uzh_fpv_dir, filename))
     return bags_with_gt_list
 
+
 def find_bags(root_dir, bagname_key, discount_key='.orig.bag'):
     """find bags recursively under root_dir"""
     bag_list = []
     for dir_name, subdir_list, file_list in os.walk(root_dir):
         for fname in file_list:
-            if '.bag' in fname and bagname_key in fname \
+            if fname.endswith('.bag') and bagname_key in fname \
                     and discount_key not in fname and discount_key not in dir_name:
                 bag_list.append(os.path.join(dir_name, fname))
     return bag_list
+
 
 def get_uzh_fpv_gt_files(uzh_fpv_bag_list):
     gt_list = []
     for bag in uzh_fpv_bag_list:
         gt_list.append(os.path.splitext(bag)[0] + ".txt")
     return gt_list
+
+def get_tum_vi_gt_files(tum_vi_bag_list):
+    return get_uzh_fpv_gt_files(tum_vi_bag_list)
 
 def get_original_euroc_gt_files(euroc_bag_list):
     gt_list = []
@@ -119,4 +125,3 @@ def get_number_suffix(string_number):
         return None, ""
     segment = string_number[start_index:end_index]
     return int(segment), segment
-

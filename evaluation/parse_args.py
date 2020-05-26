@@ -32,8 +32,14 @@ def parse_args():
         '--uzh_fpv_dir', type=str,
         help="Folder containing the UZH-FPV dataset with a structure layout"
              " depicted at the header. You need to extract ground truth from "
-             "the bag file beforehand. This can be done with bag_to_file.py"
-             " under rpg_trajectory_evaluation", default='')
+             "the bag file beforehand. This can be done with extract_uzh_fpv_gt.py",
+             default='')
+    parser.add_argument(
+        '--tumvi_dir', type=str,
+        help="Folder containing the TUM-VI dataset with a structure layout"
+             " depicted at the header. You need to extract ground truth from "
+             "the bag file beforehand. This can be done with extract_tum_vi_gt.py",
+             default='')
     parser.add_argument('--homebrew_data_dir', type=str,
                         help="Folder containing the homebrew rosbags", default='')
 
