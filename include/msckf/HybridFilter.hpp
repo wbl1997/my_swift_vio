@@ -401,11 +401,13 @@ class HybridFilter : public Estimator {
    * @param camIdx
    * @return
    */
-  inline size_t startIndexOfCameraParamsFast(size_t camIdx) const {
+  inline size_t startIndexOfCameraParamsFast(
+      size_t camIdx,
+      CameraSensorStates camParamBlockName = CameraSensorStates::T_SCi) const {
     return statesMap_.rbegin()
         ->second.sensors.at(SensorStates::Camera)
         .at(camIdx)
-        .at(CameraSensorStates::T_SCi)
+        .at(camParamBlockName)
         .startIndexInCov;
   }
 
