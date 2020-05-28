@@ -1,4 +1,4 @@
-function draw_data_columns(data, triple_index, scalar, plot3d, line_styles)
+function line_handles = draw_data_columns(data, triple_index, scalar, plot3d, line_styles)
 % first column of data is x-axis
 % triple_indeix identify columns for y-axis
 if nargin < 5
@@ -14,7 +14,7 @@ end
 dimen = length(triple_index);
 
 if plot3d
-    plot3(data(:, triple_index(1)), data(:, triple_index(2)), ...
+    line_handles = plot3(data(:, triple_index(1)), data(:, triple_index(2)), ...
         data(:, triple_index(3)), line_styles{1}); 
     grid on; axis equal;
     xlabel('x');
@@ -22,8 +22,9 @@ if plot3d
     zlabel('z');
     return;
 end
-plot(data(:,1), data(:, triple_index(1))*scalar, line_styles{1}); hold on;
+line_handles = zeros(1, dimen);
+line_handles(1) = plot(data(:,1), data(:, triple_index(1))*scalar, line_styles{1}); hold on;
 for i=2:dimen
-    plot(data(:,1), data(:, triple_index(i))*scalar, line_styles{i});
+    line_handles(i) = plot(data(:,1), data(:, triple_index(i))*scalar, line_styles{i});
 end
 end

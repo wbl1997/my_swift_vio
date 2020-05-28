@@ -1,7 +1,8 @@
-function plotMSCKF2Result(msckf_csv, export_fig_path, voicebox_path, output_dir, ...
-    cmp_data_file, gt_file, avg_since_start, avg_trim_end, ...
+function plotMSCKF2Result(msckf_csv, export_fig_path, voicebox_path, ...
+    gt_file, output_dir, avg_since_start, avg_trim_end, ...
     misalignment_dim, extrinsic_dim, project_intrinsic_dim, ...
     distort_intrinsic_dim, fix_extrinsic, fix_intrinsic)
+addpath('cgraumann-umeyama');
 if nargin < 1
     disp(['Usage:plotMSCKF2Result msckf_csv ...']);
     return;
@@ -29,16 +30,11 @@ end
 addpath(export_fig_path);
 addpath(voicebox_path);
 
-filename = msckf_csv;
-if isempty(filename)
-    return
-end
 if ~exist('output_dir','var')
     output_dir = input('output_dir, if empty, set to dir of the csv:', 's');
 end
 if isempty(output_dir)
-    [filepath, ~, ~] = fileparts(filename);
-    output_dir = filepath;
+    [output_dir, ~, ~] = fileparts(msckf_csv);
     disp(['output_dir is set to ', output_dir]);
 end
 
@@ -81,68 +77,82 @@ msckf_index_server = Msckf2Constants(misalignment_dim, extrinsic_dim, ...
     project_intrinsic_dim, distort_intrinsic_dim, fix_extrinsic, fix_intrinsic);
 
 fontsize = 18;
-msckf_estimates = readmatrix(filename, 'NumHeaderLines', 1);
-data = msckf_estimates;
+data = readmatrix(msckf_csv, 'NumHeaderLines', 1);
 original_data = data;
+
+sec_to_nanos = 1e9;
+data(:,1)= data(:,1) /sec_to_nanos;
 startTime = data(1, 1);
 endTime = data(end, 1);
 
-sec_to_nanos = 1e9;
-if ~exist('cmp_data_file','var')
-    % eg., 'Seagate/temp/parkinglot/opt_states.txt';
-    cmp_data_file = input('cmp_data_file:', 's'); 
-end
 if ~exist('gt_file','var')
     % ground truth file must have the same number of rows as output data
     gt_file = input('Ground truth csv:', 's');
 end
 
 if (gt_file)
-    gt = csvread(gt_file);
-    index= find(abs(gt(:,1) - startTime)<10000);
+    gt_index.r = 3:5;
+    gt_index.q = 6:9;
+    gt_index.v = 10:12;
+    applyUmeyama = 0;
+
+    gt = readmatrix(gt_file, 'NumHeaderLines', 1);
+    index= find(abs(gt(:,1) - startTime)<5e-2);
     gt = gt(index:end,:);
     if(endTime>gt(end,1))
         endTime = gt(end,1);
-        index= find(abs(endTime - data(:,1))<2.5e7, 1);
+        index= find(abs(endTime - data(:,1))<2.5e-2, 1);
         data= data(1:index,:);
     else
-        index= find(abs(gt(:,1) - endTime)<10000);
+        index= find(abs(gt(:,1) - endTime)<5e-2);
         gt= gt(1:index,:);
     end
-    
+
     % associate the data by timestamps, discrepancy less than 0.02sec
     starter =1;
     assocIndex = zeros(size(data,1), 1);
     for i=1:size(data,1)
-        index = find(abs(gt(starter:end,1) - data(i,1))<2.5e7);
+        index = find(abs(gt(starter:end,1) - data(i,1))<2.5e-2);
         [~, uniqIndex] = min(abs(gt(starter+ index -1,1) - data(i,1)));
         assocIndex(i,1)= index(uniqIndex)+starter-1;
         starter = index(uniqIndex) + starter-1;
     end
     % association end
-    
-    gt(:,1) = (gt(:,1)- startTime)/1e9;
-    data(:,1)= (data(:,1)- startTime)/1e9;
-    % umeyama transform to gt
-    src = data(100:end, 3:5);
-    dst = gt(assocIndex(100:end), 2:4);
-    [R_res, t_res] = umeyama(src',dst');
-    data(:,3:5) = (R_res*data(:, 3:5)'+repmat(t_res, 1, size(data,1)))';
-    
+
+    gt(:,1) = gt(:,1)- startTime;
+
+    if applyUmeyama
+        % umeyama transform to gt
+        src = data(100:end, msckf_index_server.r);
+        dst = gt(assocIndex(100:end), gt_index.r);
+        [R_res, t_res] = umeyama(src',dst')
+        data(:,msckf_index_server.r) = (R_res*data(:, msckf_index_server.r)'+ ...
+            repmat(t_res, 1, size(data,1)))';
+
+        q_res= rotro2qr(R_res);
+        for i=1:size(data,1)
+            res4 = qrmult(q_res, [data(i,msckf_index_server.q(4)), ...
+                data(i, msckf_index_server.q(1:3))]');
+            data(i,msckf_index_server.q(1:3)) = res4(2:4);
+            data(i,msckf_index_server.q(4)) = res4(1);
+        end
+        data(:,msckf_index_server.v) = (R_res*data(:, msckf_index_server.v)')';
+    end
+
+    data_diff = data;
+    data_diff(:, msckf_index_server.r) = ...
+        data_diff(:, msckf_index_server.r) - gt(assocIndex, gt_index.r);
     alpha= zeros(size(data,1),3);
     for i=1:size(data,1)
-        qs2w= gt(assocIndex(i), 5:8);
-        qs2w_hat = data(i, [9,6:8]);
+        qs2w= gt(assocIndex(i), [gt_index.q(4), gt_index.q(1:3)]);
+        qs2w_hat = data(i, [msckf_index_server.q(4), msckf_index_server.q(1:3)]);
         alpha(i,:)= unskew(rotqr2ro(qs2w')*rotqr2ro(qs2w_hat')'-eye(3))';
     end
-    
-    q_res= rotro2qr(R_res);
-    for i=1:size(data,1)
-        res4= quatmult_v001(q_res, [data(i,9), data(i, 6:8)]', 0);
-        data(i,6:8) = res4(2:4);
-        data(i,9) = res4(1);
+    data_diff(:, msckf_index_server.q(1:3)) = alpha;
+    if size(gt, 2) >= gt_index.v(3)
+        data_diff(:, msckf_index_server.v) = ...
+            data_diff(:, msckf_index_server.v) - gt(assocIndex, gt_index.v);
     end
-    data(:,10:12) = (R_res*data(:, 10:12)')';
 else
     gt = [];
     if data(1, 1) > sec_to_nanos
@@ -150,6 +160,7 @@ else
     else
         data(:,1) = data(:,1) - startTime;
     end
+    data_diff = [];
 end
 
 figure;
@@ -162,22 +173,10 @@ plot3(data(end, msckf_index_server.r(1)), data(end, msckf_index_server.r(2)), ..
 legend_list = {'msckf2', 'start', 'finish'};
 
 if(~isempty(gt))
-    plot3(gt(:,2), gt(:,3), gt(:,4), '-r');
+    plot3(gt(:, gt_index.r(1)), gt(:, gt_index.r(2)), gt(:, gt_index.r(3)), '-r');
     legend_list{end+1} = 'gt';
 end
 
-if (cmp_data_file)
-    cmp_data = readmatrix(cmp_data_file, 'NumHeaderLines', 1);
-    if cmp_data(1, 1) > sec_to_nanos
-        cmp_data(:,1) = (cmp_data(:,1) - startTime) / sec_to_nanos;
-    else
-        cmp_data(:,1) = cmp_data(:,1) - startTime / sec_to_nanos;
-    end
-    plot3(cmp_data(:, 3), cmp_data(:, 4), cmp_data(:, 5), '-g');
-    legend_list{end+1} = 'cmp';
-else
-    cmp_data = [];
-end
 legend(legend_list);
 title('p_B^G');
 xlabel('x[m]');
@@ -187,44 +186,38 @@ axis equal;
 grid on;
 outputfig = [output_dir, '/p_GB.eps'];
 if exist(outputfig, 'file')==2
-  delete(outputfig);
+    delete(outputfig);
 end
 export_fig(outputfig);
 
 if(~isempty(gt))
     % compute totla distance, max error, rmse
-    distance = totalDistance(gt(assocIndex, 2:4));
-    errorPosition = data(:,3:5)- gt(assocIndex, 2:4);
+    distance = totalDistance(gt(assocIndex, gt_index.r));
+    errorPosition = data(:,msckf_index_server.r)- gt(assocIndex, gt_index.r);
     absError = sqrt(sum(errorPosition.^2,2));
     [maxError, idx]= max(absError)
     maxError/distance
     rmse = sqrt(sum(sum(errorPosition.^2,2))/size(data,1))
     rmse/distance
-    
-    % error plot
-    figNumber = figNumber +1;
-    figure(figNumber);
-    plot(data(:,1), data(:,3)- gt(assocIndex, 2), '-r'); hold on;
-    plot(data(:,1), data(:,4)- gt(assocIndex, 3), '-g');
-    plot(data(:,1), data(:,5)- gt(assocIndex, 4), '-b');
-    legend('x','y','z');
-    title 'position error';
-    xlabel 'time [sec]';
-    ylabel '[m]';
-    grid on;
-    set(gca,'FontSize',fontsize);
-    
-    figNumber = figNumber +1;
-    figure(figNumber);
-    plot(data(:,1), alpha(:,1), '-r'); hold on;
-    plot(data(:,1), alpha(:,2), '-g');
-    plot(data(:,1), alpha(:,3), '-b');
-    legend('x','y','z');
-    title 'attitude error';
-    xlabel 'time [sec]';
-    ylabel 'rad/sec';
-    grid on;
-    set(gca,'FontSize',fontsize);
+
+    figure;
+    draw_ekf_triplet_with_std(data_diff, msckf_index_server.r, msckf_index_server.r_std, 1, 1);
+    ylabel('$\delta \mathbf{t}_{WB}$ (m)', 'Interpreter', 'Latex');
+    saveas(gcf,[output_dir, '\Error p_WB'],'epsc');
+
+    figure;
+    draw_ekf_triplet_with_std(data_diff, msckf_index_server.q(1:3), ...
+        msckf_index_server.q_std, 180/pi, 1);
+    ylabel('$\delta \mathbf{\theta}_{WB}{} (^{\circ})$', 'Interpreter', 'Latex');
+    saveas(gcf,[output_dir, '\Error R_WB'],'epsc');
+
+    figure;
+    if size(gt, 2) >= 11
+        draw_ekf_triplet_with_std(data_diff, msckf_index_server.v, ...
+            msckf_index_server.v_std, 1, 1);
+        ylabel('$\mathbf{v}_{WB} (m/s)$', 'Interpreter', 'Latex');
+        saveas(gcf,[output_dir, '\Error v_WB'],'epsc');
+    end
 end
 
 figure;
@@ -234,9 +227,9 @@ plot(data(:,1), data(:, msckf_index_server.q(2)), '-g');
 plot(data(:,1), data(:, msckf_index_server.q(3)), '-b');
 
 if(~isempty(gt))
-    plot(gt(:,1), gt(:,6), '--r');
-    plot(gt(:,1), gt(:,7), '--g');
-    plot(gt(:,1), gt(:,8), '--b');
+    plot(gt(:,1), gt(:,gt_index.q(1)), '--r');
+    plot(gt(:,1), gt(:,gt_index.q(2)), '--g');
+    plot(gt(:,1), gt(:,gt_index.q(3)), '--b');
     legend('qx', 'qy', 'qz', 'gt qx', 'gt qy', 'gt qz');
 else
     legend('qx', 'qy', 'qz');
@@ -265,12 +258,6 @@ export_fig(outputfig);
 
 figure;
 draw_ekf_triplet_with_std(data, msckf_index_server.b_g, msckf_index_server.b_g_std, 180/pi);
-if ~isempty(cmp_data)
-    hold on;
-    plot(cmp_data(:, 1), cmp_data(:, 13), 'r-');
-    plot(cmp_data(:, 1), cmp_data(:, 14), 'g-');
-    plot(cmp_data(:, 1), cmp_data(:, 15), 'b-');
-end
 ylabel(['b_g[' char(176) '/s]']);
 outputfig = [output_dir, '/b_g.eps'];
 if exist(outputfig, 'file')==2
@@ -280,12 +267,7 @@ export_fig(outputfig);
 
 figure;
 draw_ekf_triplet_with_std(data, msckf_index_server.b_a, msckf_index_server.b_a_std, 1.0);
-if ~isempty(cmp_data)
-    hold on;
-    plot(cmp_data(:, 1), cmp_data(:, 16), 'r-');
-    plot(cmp_data(:, 1), cmp_data(:, 17), 'g-');
-    plot(cmp_data(:, 1), cmp_data(:, 18), 'b-');
-end
+
 ylabel('b_a[m/s^2]');
 outputfig = [output_dir, '/b_a.eps'];
 if exist(outputfig, 'file')==2

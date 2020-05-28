@@ -20,7 +20,7 @@ T_BC = [0, 0, 1, 0;
                  0, -1, 0, 0;
                  0, 0, 0, 1];
 T_WB = eye(4);
-anchorIndex = 30;
+anchorIndex = 37;
 T_WB(1:3, 4) = trajectory(anchorIndex, r)';
 T_WB(1:3, 1:3) = rotqr2ro([trajectory(anchorIndex, q(4)), ...
     trajectory(anchorIndex, q(1:3))]');
