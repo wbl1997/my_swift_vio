@@ -60,7 +60,7 @@ BAGNAME_DATANAME_LABEL = {
     'dataset-outdoors6_512_16': ('outdoors6', 'out6'),
     'dataset-outdoors7_512_16': ('outdoors7', 'out7'),
     'dataset-outdoors8_512_16': ('outdoors8', 'out8'),
-    'dataset-room1_512_16': ('room1', 'rm1'),
+    'dataset-room1_512_16': ('room1', 'rm1'), # only room sessions of tum vi dataset have throughout ground truth.
     'dataset-room2_512_16': ('room2', 'rm2'),
     'dataset-room3_512_16': ('room3', 'rm3'),
     'dataset-room4_512_16': ('room4', 'rm4'),

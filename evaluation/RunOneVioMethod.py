@@ -136,6 +136,13 @@ class RunOneVioMethod(object):
             bag_fullname)
         return src_cmd + export_lib_cmd + launch_cmd
 
+    def timeout(self, bag_fullname):
+        bag_duration = rosbag_utility_functions.get_rosbag_duration(bag_fullname)
+        time_out = bag_duration * 2
+        if "OKVIS" in self.algo_code_flags["algo_code"]:
+            time_out = bag_duration * 4
+        return time_out
+
     def run_method(self, algo_name, pose_conversion_script, log_vio=True):
         '''
         run a method
@@ -186,8 +193,7 @@ class RunOneVioMethod(object):
                 user_msg = 'Running vio method with cmd\n{}\n'.format(cmd)
                 print(textwrap.fill(user_msg, 120))
                 out_stream.write(user_msg)
-                bag_duration = rosbag_utility_functions.get_rosbag_duration(bag_fullname)
-                time_out = bag_duration * 2
+                time_out = self.timeout(bag_fullname)
                 if log_vio:
                     rc, msg = utility_functions.subprocess_cmd(cmd, out_stream, err_stream, time_out)
                 else:

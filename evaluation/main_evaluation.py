@@ -349,6 +349,8 @@ if __name__ == '__main__':
 
     # also evaluate PGO results for every VIO method.
     for method_name, options in algoname_to_options.items():
+        if options["loop_closure_method"] == 0:
+            continue
         method_results_dir = os.path.join(args.output_dir, method_name + "_pgo")
         method_eval_output_dir = os.path.join(args.output_dir, method_name + "_pgo_eval")
 
