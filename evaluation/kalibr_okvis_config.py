@@ -15,10 +15,10 @@ OKVIS_EUROC_IMU_PARAMETERS = {"sigma_g_c": 12.0e-4,
                               "sigma_gw_c": 4.0e-6,
                               "sigma_aw_c": 4.0e-5}
 
-MSCKF_TUMVI_IMU_PARAMETERS = {"sigma_g_c": 1e-3,
-                              "sigma_a_c": 2e-2,
-                              "sigma_gw_c": 1.1e-5,
-                              "sigma_aw_c": 4.3e-4}
+MSCKF_TUMVI_IMU_PARAMETERS = {"sigma_g_c": 2e-3,
+                              "sigma_a_c": 1.75e-2,
+                              "sigma_gw_c": 4.4e-5,
+                              "sigma_aw_c": 1.72e-3}
 
 TUMVI_PARAMETERS = {
     "cameras": [
