@@ -38,11 +38,11 @@ DEFINE_bool(use_RK4, false,
 DEFINE_bool(use_first_estimate, true,
             "use first estimate jacobians to compute covariance?");
 
-DEFINE_bool(cov_add_td_uncertainty, false,
-            "Do we add the uncertainty of camera time offset to covariance "
-            "matrix following eq 30, li ijrr 2014 VIN with RS cameras? "
-            "Simulation tests show that it does harm keyframe-based "
-            "structureless filter esp. in NEES, agreeing with our KSF paper.");
+//DEFINE_bool(cov_add_td_uncertainty, false,
+//            "Do we add the uncertainty of camera time offset to covariance "
+//            "matrix following eq 30, li ijrr 2014 VIN with RS cameras? "
+//            "Simulation tests show that it does harm keyframe-based "
+//            "structureless filter esp. in NEES, agreeing with our KSF paper.");
 
 DECLARE_bool(use_mahalanobis);
 
@@ -650,52 +650,52 @@ void HybridFilter::addCovForClonedStates() {
   covarianceAugmented.block(numOldNavImuCamPoseStates, 0, 9, covDimAugmented) =
       covarianceAugmented.topLeftCorner(9, covDimAugmented);
 
-  if (FLAGS_cov_add_td_uncertainty) {
-    // add uncertainty for the time offset of the main camera of the
-    // NCameraSystem
-    Eigen::Matrix<double, kClonedStateMinimalDimen, 1> Jt;
-    std::map<uint64_t, States>::reverse_iterator lastElementIterator =
-        statesMap_.rbegin();
-    const States& stateInQuestion = lastElementIterator->second;
-    uint64_t stateId = stateInQuestion.id;
-    std::shared_ptr<ceres::PoseParameterBlock> poseParamBlockPtr =
-        std::static_pointer_cast<ceres::PoseParameterBlock>(
-            mapPtr_->parameterBlockPtr(stateId));
-    kinematics::Transformation T_WB = poseParamBlockPtr->estimate();
+//  if (FLAGS_cov_add_td_uncertainty) {
+//    // add uncertainty for the time offset of the main camera of the
+//    // NCameraSystem
+//    Eigen::Matrix<double, kClonedStateMinimalDimen, 1> Jt;
+//    std::map<uint64_t, States>::reverse_iterator lastElementIterator =
+//        statesMap_.rbegin();
+//    const States& stateInQuestion = lastElementIterator->second;
+//    uint64_t stateId = stateInQuestion.id;
+//    std::shared_ptr<ceres::PoseParameterBlock> poseParamBlockPtr =
+//        std::static_pointer_cast<ceres::PoseParameterBlock>(
+//            mapPtr_->parameterBlockPtr(stateId));
+//    kinematics::Transformation T_WB = poseParamBlockPtr->estimate();
 
-    const int imuIdx = 0;
-    uint64_t SBId = stateInQuestion.sensors.at(SensorStates::Imu)
-                        .at(imuIdx)
-                        .at(ImuSensorStates::SpeedAndBias)
-                        .id;
-    std::shared_ptr<ceres::SpeedAndBiasParameterBlock> sbParamBlockPtr =
-        std::static_pointer_cast<ceres::SpeedAndBiasParameterBlock>(
-            mapPtr_->parameterBlockPtr(SBId));
-    SpeedAndBiases sb = sbParamBlockPtr->estimate();
+//    const int imuIdx = 0;
+//    uint64_t SBId = stateInQuestion.sensors.at(SensorStates::Imu)
+//                        .at(imuIdx)
+//                        .at(ImuSensorStates::SpeedAndBias)
+//                        .id;
+//    std::shared_ptr<ceres::SpeedAndBiasParameterBlock> sbParamBlockPtr =
+//        std::static_pointer_cast<ceres::SpeedAndBiasParameterBlock>(
+//            mapPtr_->parameterBlockPtr(SBId));
+//    SpeedAndBiases sb = sbParamBlockPtr->estimate();
 
-    Eigen::Matrix<double, 27, 1> vTgTsTa =
-        imu_rig_.getImuAugmentedEuclideanParams();
-    IMUErrorModel<double> iem(sb.tail<6>(), vTgTsTa, true);
-    okvis::ImuMeasurement interpolatedInertialData;
-    IMUOdometry::interpolateInertialData(*stateInQuestion.imuReadingWindow, iem,
-                                         stateInQuestion.timestamp,
-                                         interpolatedInertialData);
+//    Eigen::Matrix<double, 27, 1> vTgTsTa =
+//        imu_rig_.getImuAugmentedEuclideanParams();
+//    IMUErrorModel<double> iem(sb.tail<6>(), vTgTsTa, true);
+//    okvis::ImuMeasurement interpolatedInertialData;
+//    IMUOdometry::interpolateInertialData(*stateInQuestion.imuReadingWindow, iem,
+//                                         stateInQuestion.timestamp,
+//                                         interpolatedInertialData);
 
-    Jt.head<3>() = sb.head<3>();
-    Jt.segment<3>(3) =
-        T_WB.C() * interpolatedInertialData.measurement.gyroscopes;
-    Jt.tail<3>() =
-        T_WB.C() * interpolatedInertialData.measurement.accelerometers +
-        Eigen::Vector3d(0, 0, -imuParametersVec_.at(imuIdx).g);
-    int td0Index =
-        startIndexOfCameraParamsFast(kMainCameraIndex, CameraSensorStates::TD);
-    covarianceAugmented.block(0, numOldNavImuCamPoseStates, covDimAugmented,
-                              kClonedStateMinimalDimen) +=
-        covarianceAugmented.col(td0Index) * Jt.transpose();
-    covarianceAugmented.block(numOldNavImuCamPoseStates, 0,
-                              kClonedStateMinimalDimen, covDimAugmented) +=
-        Jt * covarianceAugmented.row(td0Index);
-  }
+//    Jt.head<3>() = sb.head<3>();
+//    Jt.segment<3>(3) =
+//        T_WB.C() * interpolatedInertialData.measurement.gyroscopes;
+//    Jt.tail<3>() =
+//        T_WB.C() * interpolatedInertialData.measurement.accelerometers +
+//        Eigen::Vector3d(0, 0, -imuParametersVec_.at(imuIdx).g);
+//    int td0Index =
+//        startIndexOfCameraParamsFast(kMainCameraIndex, CameraSensorStates::TD);
+//    covarianceAugmented.block(0, numOldNavImuCamPoseStates, covDimAugmented,
+//                              kClonedStateMinimalDimen) +=
+//        covarianceAugmented.col(td0Index) * Jt.transpose();
+//    covarianceAugmented.block(numOldNavImuCamPoseStates, 0,
+//                              kClonedStateMinimalDimen, covDimAugmented) +=
+//        Jt * covarianceAugmented.row(td0Index);
+//  }
 
   covariance_ = covarianceAugmented;
 }
@@ -1903,13 +1903,13 @@ void HybridFilter::updateStates(
   // number of navigation, imu, and camera states in the covariance
   const size_t numNavImuCamPoseStates =
       numNavImuCamStates + 9 * statesMap_.size();
-  if (!FLAGS_cov_add_td_uncertainty) {
+//  if (!FLAGS_cov_add_td_uncertainty) {
     CHECK_LT((deltaX.head<9>() - deltaX.segment<9>(numNavImuCamPoseStates - 9))
                  .lpNorm<Eigen::Infinity>(),
              1e-8)
         << "Correction to the current states from head and tail should be "
            "identical!";
-  }
+//  }
 
   std::map<uint64_t, States>::reverse_iterator lastElementIterator =
       statesMap_.rbegin();
