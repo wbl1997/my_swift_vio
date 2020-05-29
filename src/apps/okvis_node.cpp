@@ -50,10 +50,9 @@ int main(int argc, char **argv) {
       lcdConfigFilename = argv[2];
     }
   } else {
-    if (!nh.getParam("config_filename", configFilename)) {
-      LOG(ERROR) << "Usage:" << argv[0] << " <config yml> <lcd config yml> [extra gflags]";
-      return 1;
-    }
+    LOG(ERROR) << "Usage:" << argv[0]
+               << " <config yml> <lcd config yml> [extra gflags]";
+    return 1;
   }
 
   okvis::RosParametersReader vio_parameters_reader(configFilename);

@@ -55,7 +55,7 @@ class RunOneVioMethod(object):
     def get_sync_exe(self):
         return os.path.join(self.catkin_ws, "devel/lib/msckf/okvis_node_synchronous")
 
-    def get_async_lannch_file(self):
+    def get_async_launch_file(self):
         return os.path.join(self.catkin_ws, "src/msckf/launch/okvis_node_rosbag.launch")
 
     def create_vio_config_yaml(self):
@@ -113,6 +113,7 @@ class RunOneVioMethod(object):
         return export_lib_cmd + cmd
 
     def create_async_command(self, custom_vio_config,
+                             custom_lcd_config,
                              vio_trial_output_dir, bag_fullname):
         launch_file = "okvis_node_rosbag.launch"
         setup_bash_file = os.path.join(self.catkin_ws, "devel/setup.bash")
@@ -129,11 +130,10 @@ class RunOneVioMethod(object):
         src_cmd = "cd {}\nsource {}\n".format(self.catkin_ws, setup_bash_file)
         export_lib_cmd = "export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:{}\n".\
             format(self.extra_lib_path)
-        launch_cmd = "roslaunch msckf {} config_filename:={} output_dir:={}" \
-                     " {} {} bag_file:={} start_into_bag:=0 play_rate:=1.0".format(
-            launch_file, custom_vio_config, vio_trial_output_dir,
-            arg_topics, arg_feature_method,
-            bag_fullname)
+        launch_cmd = "roslaunch msckf {} config_filename:={} lcd_config_filename:={} " \
+                     "output_dir:={} {} {} bag_file:={} start_into_bag:=0 play_rate:=1.0".format(
+            launch_file, custom_vio_config, custom_lcd_config, vio_trial_output_dir,
+            arg_topics, arg_feature_method, bag_fullname)
         return src_cmd + export_lib_cmd + launch_cmd
 
     def timeout(self, bag_fullname):
@@ -178,10 +178,11 @@ class RunOneVioMethod(object):
                 err_stream = open(os.path.join(output_dir_trial, "err.log"), 'w')
 
                 if 'async' in algo_name:
-                    cmd = self.create_async_command(custom_vio_config, output_dir_trial, bag_fullname)
+                    cmd = self.create_async_command(custom_vio_config, custom_lcd_config,
+                                                    output_dir_trial, bag_fullname)
                     # We put all commands in a bash script because source
                     # command is unavailable when running in python subprocess.
-                    src_wrap = os.path.join(self.algo_dir, "source_wrap.sh")
+                    src_wrap = os.path.join(output_dir_trial, "source_wrap.sh")
                     with open(src_wrap, 'w') as stream:
                         stream.write('#!/bin/bash\n')
                         stream.write('{}\n'.format(cmd))
