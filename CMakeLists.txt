@@ -297,6 +297,7 @@ list(APPEND TEST_SRC_FILES
     test/msckf/TestMatrixSqrt.cpp
     test/msckf/TestMergeTwoLandmarks.cpp
     test/msckf/TestOkvisTriangulateFast.cpp
+    test/msckf/TestOkvisTime.cpp
     test/msckf/TestPointLandmark.cpp
     test/msckf/TestPointLandmarkSimulationRS.cpp
     test/msckf/TestPointObsJacobian.cpp
