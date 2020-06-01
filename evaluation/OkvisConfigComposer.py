@@ -68,5 +68,6 @@ class OkvisConfigComposer(object):
         calib_format = calibration_format(dataset_type)
 
         kalibr_okvis_config.create_okvis_config_yaml(
-            self.vio_config_template, calib_format, camera_calib_files,
-            imu_calib_file, algo_code, self.vio_yaml_mission)
+            self.vio_config_template, calib_format,
+            self.vio_yaml_mission, camera_calib_files,
+            imu_calib_file, algo_code, self.bag_fullname)

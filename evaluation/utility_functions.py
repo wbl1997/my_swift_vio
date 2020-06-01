@@ -2,7 +2,8 @@
 import subprocess
 import textwrap
 
-def subprocess_cmd(command, out_stream=None, err_stream=None, timeout=10 * 60):
+
+def subprocess_cmd(command, out_stream=None, err_stream=None, timeout=None):
     """
     Run command in a subprocess shell and wait until completion by default.
     This is a reference implementation for debugging.
@@ -48,6 +49,7 @@ def subprocess_cmd_unsafe(cmd, out_stream=subprocess.PIPE, err_stream=subprocess
 def de_underscore(strin):
     return strin.replace('_', '-')
 
+
 def load_rel_error_stats(rel_error_stat_txt):
     algo_rel_trans_rot = {}
     with open(rel_error_stat_txt, 'r') as stream:
@@ -58,6 +60,7 @@ def load_rel_error_stats(rel_error_stat_txt):
                 stats = [segment.strip() for segment in line.split('&')]
                 algo_rel_trans_rot[stats[0]] = [float(stats[1]), float(stats[2])]
     return algo_rel_trans_rot
+
 
 def get_arg_value_from_gflags(cmd_gflags, key_str):
     index = cmd_gflags.find(key_str)
@@ -71,6 +74,7 @@ def get_arg_value_from_gflags(cmd_gflags, key_str):
             return cmd_gflags[val_start_index:]
         else:
             return cmd_gflags[val_start_index:next_arg_index]
+
 
 def resize_dict(d, maxsize):
     """

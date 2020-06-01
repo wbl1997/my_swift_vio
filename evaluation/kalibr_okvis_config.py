@@ -5,6 +5,8 @@ author: Yukai Lin
 author: Jianzhu Huai
 """
 import argparse
+import copy
+import os
 from ruamel.yaml import YAML
 
 import numpy as np
@@ -70,6 +72,81 @@ TUMVI_PARAMETERS = {
         'publishLandmarks': "false", }
 }
 
+ADVIO_CAMERA_INTRINSIC_PARAMETERS = {
+    range(1, 13): [1077.2, 1079.3, 362.14, 636.39, 0.0478, 0.0339, -0.0003, -0.0009],
+    range(13, 18): [1082.4, 1084.4, 364.68, 643.31, 0.0366, 0.0803, 0.0007, -0.0002],
+    range(18, 20): [1076.9, 1078.5, 360.96, 639.31, 0.0510, -0.0354, -0.0054, 0.0473],
+    range(20, 24): [1081.1, 1082.1, 359.59, 640.79, 0.0556, -0.0454, 0.0009, -0.0018],
+}
+
+ADVIO_PARAMETERS = {
+    "cameras":
+        {"T_CpS": [0.9999763379093255, -0.004079205042965442, -0.005539287650170447, -0.008977668364731128,
+                  -0.004066386342107199, -0.9999890330121858, 0.0023234365646622014, 0.07557012320238939,
+                  -0.00554870467502187, -0.0023008567036498766, -0.9999819588046867, -0.005545773942541918,
+                  0.0, 0.0, 0.0, 1.0],
+         "image_dimension": [720, 1280],
+         "distortion_coefficients": [],
+         "distortion_type": "radial-tangential",
+         "focal_length": [],
+         "principal_point": [],
+         "projection_opt_mode": "FX_CXY",
+         "extrinsic_opt_mode": "P_CB",
+         "image_delay": 0.0,
+         "image_readout_time": 0.00},
+    "imu_params": {
+        "imu_rate" : 100,
+        'g_max': 7.8,
+        'sigma_g_c': 2.4e-3,
+        'sigma_a_c': 4.8e-3,
+        'sigma_gw_c': 5.1e-5,
+        'sigma_aw_c': 2.1e-4,
+        'g': 9.819, # at Helsinki according to https://units.fandom.com/wiki/Gravity_of_Earth
+        'sigma_TGElement': 5e-3,
+        'sigma_TSElement': 1e-3,
+        'sigma_TAElement': 5e-3, },
+    'ceres_options': {
+        'timeLimit': -1,
+    },
+    "displayImages": "false",
+    "publishing_options": {
+        'publishLandmarks': "false", }
+}
+
+def advio_transform_C_Cp_and_halve():
+    """
+    The given advio params are in Cp frame, this function applies
+     T_CCp = [R_CCp, 0; 0, 1] on relevant quantities, and halve the camera size.
+     R_CCp = [0, 1, 0; -1, 0, 0; 0, 0, 1]
+    :return:
+    """
+    coeff = 0.5
+    swapped_intrinsics = copy.deepcopy(ADVIO_CAMERA_INTRINSIC_PARAMETERS)
+    for key in swapped_intrinsics.keys():
+        oldvalue = swapped_intrinsics[key]
+        swapped_intrinsics[key] =\
+            [oldvalue[1] * coeff, oldvalue[0] * coeff,
+             oldvalue[3] * coeff, oldvalue[2] * coeff,
+             oldvalue[4], oldvalue[5], oldvalue[7], oldvalue[6]]
+
+    swapped_parameters = copy.deepcopy(ADVIO_PARAMETERS)
+    T_CpS = np.array(swapped_parameters["cameras"]["T_CpS"]).reshape([4, 4])
+    T_CCp = np.array([[0, 1, 0, 0],
+                      [-1, 0, 0, 0],
+                      [0, 0, 1, 0],
+                      [0.0, 0.0, 0.0, 1.0]])
+    T_SC = np.linalg.inv(np.matmul(T_CCp, T_CpS))
+    swapped_parameters["cameras"]["T_SC"] = sum(T_SC.tolist(), [])
+    image_shape = swapped_parameters["cameras"]["image_dimension"]
+    swapped_parameters["cameras"]["image_dimension"] = \
+        [image_shape[1] * coeff, image_shape[0] * coeff]
+    return swapped_parameters, swapped_intrinsics
+
+
+def get_advio_sequence_unmber(bagname):
+    barename = os.path.basename(bagname).split('.')[0]
+    return int(barename.split('-')[1])
+
 
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -82,10 +159,11 @@ def parse_args():
 
     parser.add_argument("--camera_config_yamls", type=str, nargs='+',
                         help="A list of camera sensor config yamls",
-                        required=True)
+                        required=False)
+
     parser.add_argument("--imu_config_yaml",
                         help="The IMU sensor config yaml",
-                        required=True)
+                        required=False)
 
     parser.add_argument("--output_okvis_config",
                         help="Output okvis config yaml accommodating the sensor parameters",
@@ -93,6 +171,11 @@ def parse_args():
     parser.add_argument("--algo_code",
                         help="Which algorithm to use, MSCKF or OKVIS. This only affects"
                              " IMU noise parameters in TUM VI config yaml.",
+                        default="",
+                        required=False)
+    parser.add_argument("--rosbag",
+                        help="Name of the rosbag for which the config will be used. "
+                             "Only needed for advio to extract sequence number.",
                         default="",
                         required=False)
     args = parser.parse_args()
@@ -115,6 +198,7 @@ def parse_args():
 #        distortion_type: equidistant,
 #        focal_length: [460.27046835000937, 458.7889758618953],
 #        principal_point: [355.2403080101758, 232.60725397709305]}
+
 
 def printCameraBlock(camConfig):
     T_SC = np.array(camConfig['T_SC']).reshape([4, 4])
@@ -150,9 +234,21 @@ def printCameraBlock(camConfig):
 
 
 def create_okvis_config_yaml(okvis_config_template, calib_format,
-                             camera_config_yamls, imu_config_yaml,
-                             algo_code,
-                             output_okvis_config):
+                             output_okvis_config, camera_config_yamls=None,
+                             imu_config_yaml="",
+                             algo_code="", bagname=""):
+    """
+
+    :param okvis_config_template:
+    :param calib_format: supported calibration format: uzh-fpv uses kalibr format,
+     euroc format, tumvi format, amd advio format.
+    :param camera_config_yamls:
+    :param imu_config_yaml:
+    :param algo_code: MSCKF or OKVIS, only for TUM-VI calibration format.
+    :param bagname: only for ADVIO dataset to extract sequence number
+    :param output_okvis_config:
+    :return:
+    """
     out_config = open(output_okvis_config, 'w')
     yaml = YAML()
     yaml.version = (1, 2)
@@ -234,6 +330,42 @@ def create_okvis_config_yaml(okvis_config_template, calib_format,
         if algo_code == "MSCKF":
             for key in MSCKF_TUMVI_IMU_PARAMETERS.keys():
                 template_data["imu_params"][key] = MSCKF_TUMVI_IMU_PARAMETERS[key]
+    elif calib_format == 'advio':
+        swapped_parameters, swapped_intrinsics = advio_transform_C_Cp_and_halve()
+        cameraid = 0
+        template_data['cameras'][cameraid]['T_SC'] = \
+            swapped_parameters["cameras"]['T_SC']
+        seq_num = get_advio_sequence_unmber(bagname)
+        intrinsics = []
+        for key in swapped_intrinsics.keys():
+            if seq_num in key:
+                intrinsics = swapped_intrinsics[key]
+                break
+
+        template_data['cameras'][cameraid]['image_dimension'] = \
+            swapped_parameters["cameras"]["image_dimension"]
+        template_data['cameras'][cameraid]['distortion_coefficients'] = \
+            intrinsics[4:]
+        template_data['cameras'][cameraid]['focal_length'] = \
+            intrinsics[0:2]
+        template_data['cameras'][cameraid]['principal_point'] = \
+            intrinsics[2:4]
+        template_data['cameras'][cameraid]['distortion_type'] = 'radialtangential'
+
+        template_data['cameras'][cameraid]['projection_opt_mode'] = \
+            swapped_parameters["cameras"]["projection_opt_mode"]
+        template_data['cameras'][cameraid]['extrinsic_opt_mode'] = \
+            swapped_parameters["cameras"]["extrinsic_opt_mode"]
+        template_data['cameras'][cameraid]['image_delay'] = \
+            swapped_parameters["cameras"]["image_delay"]
+        template_data['cameras'][cameraid]['image_readout_time'] = \
+            swapped_parameters["cameras"]["image_readout_time"]
+        template_data["camera_params"]["camera_rate"] = 60
+
+        for group in ["imu_params", "ceres_options", "publishing_options"]:
+            for key in swapped_parameters[group].keys():
+                template_data[group][key] = swapped_parameters[group][key]
+        template_data["displayImages"] = TUMVI_PARAMETERS["displayImages"]
 
     # camera_config_str = printCameraBlock(template_data["cameras"][0])
     # camera_config_str += printCameraBlock(template_data["cameras"][1])

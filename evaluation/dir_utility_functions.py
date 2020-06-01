@@ -28,6 +28,17 @@ def find_bags(root_dir, bagname_key, discount_key='.orig.bag'):
     return bag_list
 
 
+def find_zips(root_dir, name_key, discount_key='.orig.zip'):
+    """find zip files recursively under root_dir"""
+    zip_list = []
+    for dir_name, subdir_list, file_list in os.walk(root_dir):
+        for fname in file_list:
+            if fname.endswith('.zip') and name_key in fname \
+                    and discount_key not in fname and discount_key not in dir_name:
+                zip_list.append(os.path.join(dir_name, fname))
+    return zip_list
+
+
 def get_uzh_fpv_gt_files(uzh_fpv_bag_list):
     gt_list = []
     for bag in uzh_fpv_bag_list:
