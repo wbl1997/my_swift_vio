@@ -19,7 +19,6 @@ import parse_args
 import rpg_eval_tool_wrap
 import utility_functions
 
-import AlgoConfig
 import ResultsDirManager
 import RunOneVioMethod
 

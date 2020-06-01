@@ -22,9 +22,14 @@ def find_bags(root_dir, bagname_key, discount_key='.orig.bag'):
     bag_list = []
     for dir_name, subdir_list, file_list in os.walk(root_dir):
         for fname in file_list:
-            if fname.endswith('.bag') and bagname_key in fname \
-                    and discount_key not in fname and discount_key not in dir_name:
-                bag_list.append(os.path.join(dir_name, fname))
+            if discount_key:
+                if fname.endswith('.bag') and bagname_key in fname \
+                        and discount_key not in fname and \
+                        discount_key not in dir_name:
+                    bag_list.append(os.path.join(dir_name, fname))
+            else:
+                if fname.endswith('.bag') and bagname_key in fname:
+                    bag_list.append(os.path.join(dir_name, fname))
     return bag_list
 
 
@@ -39,20 +44,19 @@ def find_zips(root_dir, name_key, discount_key='.orig.zip'):
     return zip_list
 
 
-def get_uzh_fpv_gt_files(uzh_fpv_bag_list):
+def get_gt_file_for_bags(bag_list):
     gt_list = []
-    for bag in uzh_fpv_bag_list:
+    for bag in bag_list:
         gt_list.append(os.path.splitext(bag)[0] + ".txt")
     return gt_list
 
-def get_tum_vi_gt_files(tum_vi_bag_list):
-    return get_uzh_fpv_gt_files(tum_vi_bag_list)
 
 def get_original_euroc_gt_files(euroc_bag_list):
     gt_list = []
     for bag in euroc_bag_list:
         gt_list.append(os.path.join(os.path.dirname(bag), 'data.csv'))
     return gt_list
+
 
 def get_converted_euroc_gt_files(euroc_bag_list):
     gt_list = []

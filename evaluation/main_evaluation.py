@@ -205,33 +205,30 @@ from colorama import init, Fore
 init(autoreset=True)
 
 
-def find_all_bags_with_gt(euroc_dir, uzh_fpv_dir, tum_vi_dir):
+def find_all_bags_with_gt(euroc_dir="", uzh_fpv_dir="", tum_vi_dir="", advio_dir=""):
     euroc_bags = dir_utility_functions.find_bags(euroc_dir, '.bag', discount_key='calibration')
     euroc_gt_list = dir_utility_functions.get_converted_euroc_gt_files(euroc_bags)
 
     uzh_fpv_bags = dir_utility_functions.find_bags_with_gt(uzh_fpv_dir, 'snapdragon_with_gt.bag')
-    uzh_fpv_gt_list = dir_utility_functions.get_uzh_fpv_gt_files(uzh_fpv_bags)
+    uzh_fpv_gt_list = dir_utility_functions.get_gt_file_for_bags(uzh_fpv_bags)
 
-    tumvi_bags = dir_utility_functions.find_bags(tum_vi_dir, "dataset-room", "dataset-calib")
-    tumvi_gt_list = dir_utility_functions.get_tum_vi_gt_files(tumvi_bags)
+    tumvi_bags = dir_utility_functions.find_bags(tum_vi_dir, "dataset-", "dataset-calib")
+    tumvi_gt_list = dir_utility_functions.get_gt_file_for_bags(tumvi_bags)
 
-    for gt_file in euroc_gt_list:
+    advio_bags = dir_utility_functions.find_bags(advio_dir, "advio-")
+    advio_gt_list = dir_utility_functions.get_gt_file_for_bags(advio_bags)
+
+    all_gt_list = euroc_gt_list
+    all_gt_list.extend(uzh_fpv_gt_list)
+    all_gt_list.extend(tumvi_gt_list)
+    all_gt_list.extend(advio_gt_list)
+
+    for gt_file in all_gt_list:
         if not os.path.isfile(gt_file):
-            raise Exception(Fore.RED + "Ground truth file {} does not exist. Do you "
-                                       "forget to convert data.csv to data.txt, e.g.,"
-                                       " with convert_euroc_gt_csv.py".format(gt_file))
-
-    for gt_file in uzh_fpv_gt_list:
-        if not os.path.isfile(gt_file):
-            raise Exception(Fore.RED + "Ground truth file {} does not exist. Do you "
-                                       "forget to extract gt from bag files, e.g.,"
-                                       " with extract_uzh_fpv_gt.py".format(gt_file))
-
-    for gt_file in tumvi_gt_list:
-        if not os.path.isfile(gt_file):
-            raise Exception(Fore.RED + "Ground truth file {} does not exist. Do you "
-                                       "forget to extract gt from bag files, e.g.,"
-                                       " with extract_tum_vi_gt.py".format(gt_file))
+            raise Exception(
+                Fore.RED + "Ground truth file {} does not exist. Do you "
+                           "forget to convert data.csv to data.txt or "
+                           "extract ground truth from rosbags?".format(gt_file))
 
     # bag_list = uzh_fpv_bags
     # gt_list = uzh_fpv_gt_list
@@ -248,7 +245,7 @@ if __name__ == '__main__':
     args = parse_args.parse_args()
 
     bag_list, gt_list = find_all_bags_with_gt(
-        args.euroc_dir, args.uzh_fpv_dir, args.tumvi_dir)
+        args.euroc_dir, args.uzh_fpv_dir, args.tumvi_dir, args.advio_dir)
 
     print('For evaluation, #bags {} #gtlist {}'.format(len(bag_list), len(gt_list)))
     for index, gt in enumerate(gt_list):

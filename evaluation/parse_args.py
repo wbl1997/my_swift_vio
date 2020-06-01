@@ -16,6 +16,7 @@ def check_common_args(args):
     for arg in vars(args):
         print(arg, getattr(args, arg))
 
+
 def parse_args():
     parser = argparse.ArgumentParser(
         description='''Evaluate algorithms inside msckf project on many EUROC 
@@ -39,6 +40,12 @@ def parse_args():
         help="Folder containing the TUM-VI dataset with a structure layout"
              " depicted at the header. You need to extract ground truth from "
              "the bag file beforehand. This can be done with extract_tum_vi_gt.py",
+             default='')
+    parser.add_argument(
+        '--advio_dir', type=str,
+        help="Folder containing the ADVIO dataset rosbags and ground truth files."
+             " You need to extract convert ground truth from pose.csv."
+             " This can be done with create_rosbags_for_advio.py",
              default='')
     parser.add_argument('--homebrew_data_dir', type=str,
                         help="Folder containing the homebrew rosbags", default='')

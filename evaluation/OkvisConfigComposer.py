@@ -1,6 +1,7 @@
 import os
 import shutil
 
+import dataset_parameters
 import kalibr_okvis_config
 
 """If the bagname keyword is found in the bag's full path, then the 
@@ -17,23 +18,6 @@ BAGKEY_CALIBRATION = {
     'outdoor_forward': ('calibration/uzh_fpv/imu-snapdragon_imu.yaml',
                         'calibration/uzh_fpv/camchain-imucam-outdoor_forward_calib_snapdragon_imu.yaml'),
 }
-
-
-def dataset_code(bagname):
-    if 'snapdragon' in bagname or 'davis' in bagname:
-        return "uzh-fpv"
-    if 'euroc' in bagname:
-        return "euroc"
-    if 'TUM-VI' in bagname or 'tum-vi' in bagname:
-        return "tum-vi"
-
-
-def calibration_format(dataset_type):
-    if dataset_type == "uzh-fpv":
-        calib_format = "kalibr"
-    else:
-        calib_format = dataset_type
-    return calib_format
 
 
 class OkvisConfigComposer(object):
@@ -63,9 +47,9 @@ class OkvisConfigComposer(object):
         return imu_calib_file, camera_calib_files
 
     def create_config_for_mission(self, algo_code):
-        dataset_type = dataset_code(self.bag_fullname)
+        dataset_type = dataset_parameters.dataset_code(self.bag_fullname)
         imu_calib_file, camera_calib_files = self.get_calib_files()
-        calib_format = calibration_format(dataset_type)
+        calib_format = dataset_parameters.calibration_format(dataset_type)
 
         kalibr_okvis_config.create_okvis_config_yaml(
             self.vio_config_template, calib_format,

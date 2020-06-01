@@ -1,6 +1,9 @@
 import os
 import shutil
 import textwrap
+import warnings
+
+import dataset_parameters
 
 import dir_utility_functions
 import rosbag_utility_functions
@@ -9,10 +12,6 @@ import utility_functions
 import AlgoConfig
 import OkvisConfigComposer
 import RoscoreManager
-
-ROS_TOPICS = {"euroc": ["/cam0/image_raw", "/cam1/image_raw", "/imu0"],
-              "tum-vi": ["/cam0/image_raw", "/cam1/image_raw", "/imu0"],
-              "uzh-fpv": ["/snappy_cam/stereo_l", "/snappy_cam/stereo_r", "/snappy_imu"]}
 
 class RunOneVioMethod(object):
     """Run one vio method on a number of data missions"""
@@ -92,9 +91,11 @@ class RunOneVioMethod(object):
 
     def create_sync_command(self, custom_vio_config, custom_lcd_config,
                             vio_trial_output_dir, bag_fullname):
-        data_type = OkvisConfigComposer.dataset_code(bag_fullname)
+        data_type = dataset_parameters.dataset_code(bag_fullname)
         arg_topics = r'--camera_topics="{},{}" --imu_topic={}'.format(
-            ROS_TOPICS[data_type][0], ROS_TOPICS[data_type][1], ROS_TOPICS[data_type][2])
+            dataset_parameters.ROS_TOPICS[data_type][0],
+            dataset_parameters.ROS_TOPICS[data_type][1],
+            dataset_parameters.ROS_TOPICS[data_type][2])
 
         export_lib_cmd = ""
         if self.extra_lib_path:
@@ -123,9 +124,11 @@ class RunOneVioMethod(object):
             arg_feature_method = ''
         else:
             arg_feature_method = "feature_tracking_method:={}".format(arg_val_str)
-        data_type = OkvisConfigComposer.dataset_code(bag_fullname)
+        data_type = dataset_parameters.dataset_code(bag_fullname)
         arg_topics = "image_topic:={} image_topic1:={} imu_topic:={}".format(
-            ROS_TOPICS[data_type][0], ROS_TOPICS[data_type][1], ROS_TOPICS[data_type][2])
+            dataset_parameters.ROS_TOPICS[data_type][0],
+            dataset_parameters.ROS_TOPICS[data_type][1],
+            dataset_parameters.ROS_TOPICS[data_type][2])
 
         src_cmd = "cd {}\nsource {}\n".format(self.catkin_ws, setup_bash_file)
         export_lib_cmd = "export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:{}\n".\
@@ -201,6 +204,9 @@ class RunOneVioMethod(object):
                 else:
                     rc, msg = utility_functions.subprocess_cmd(cmd, None, None, time_out)
                 if rc != 0:
+                    err_msg = "Error code {} and msg {} in running vio method with cmd:\n{}".\
+                        format(rc, msg, cmd)
+                    warnings.warn(textwrap.fill(err_msg, 120))
                     return_code = rc
                 vio_estimate_csv = os.path.join(output_dir_trial, 'msckf_estimates.csv')
                 converted_vio_file = os.path.join(
