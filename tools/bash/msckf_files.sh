@@ -15,7 +15,6 @@ cmd="$MSCKF_WS/devel/lib/msckf/okvis_node_synchronous \
  --output_dir=$MSCKF_OUTPUT_DIR \
  --start_index=$START_INDEX     --finish_index=$FINISH_INDEX  \
  --max_inc_tol=10.0     --dump_output_option=$DUMP_OUTPUT_OPTION \
- --feature_tracking_method=0   \
  --epipolar_sigma_keypoint_size=$SIGMA_KEYPOINT_SIZE   \
  --two_view_obs_seq_type=$TWO_VIEW_OBS_SEQ_TYPE \
  --load_input_option=1   \

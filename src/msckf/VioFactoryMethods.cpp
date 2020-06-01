@@ -13,18 +13,19 @@
 
 namespace msckf {
 std::shared_ptr<okvis::Frontend> createFrontend(
-    int numCameras, bool initializeWithoutEnoughParallax,
+    int numCameras, const okvis::FrontendOptions& frontendOptions,
     okvis::EstimatorAlgorithm algorithm) {
   switch (algorithm) {
     case okvis::EstimatorAlgorithm::General:
     case okvis::EstimatorAlgorithm::Priorless:
     case okvis::EstimatorAlgorithm::OKVIS:
-      return std::shared_ptr<okvis::Frontend>(new okvis::Frontend(numCameras));
+      return std::shared_ptr<okvis::Frontend>(
+          new okvis::Frontend(numCameras, frontendOptions));
     default:
       break;
   }
   return std::shared_ptr<okvis::Frontend>(
-      new okvis::HybridFrontend(numCameras, initializeWithoutEnoughParallax));
+      new okvis::HybridFrontend(numCameras, frontendOptions));
 }
 
 std::shared_ptr<okvis::Estimator> createBackend(okvis::EstimatorAlgorithm algorithm) {

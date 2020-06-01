@@ -184,7 +184,7 @@ int main(int argc, char **argv) {
       msckf::createBackend(parameters.optimization.algorithm);
   std::shared_ptr<okvis::Frontend> frontend = msckf::createFrontend(
       parameters.nCameraSystem.numCameras(),
-      parameters.optimization.initializeWithoutEnoughParallax,
+      parameters.frontendOptions,
       parameters.optimization.algorithm);
   std::shared_ptr<VIO::LoopClosureDetectorParams> lcParams(
         new VIO::LoopClosureDetectorParams());

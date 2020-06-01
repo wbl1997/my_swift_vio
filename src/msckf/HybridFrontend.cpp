@@ -33,20 +33,14 @@
 
 #include <opengv/sac/Ransac.hpp>
 
-DEFINE_int32(feature_tracking_method, 0,
-             "0 default okvis brisk keyframe and back-to-back frame matching, "
-             "1 KLT back-to-back frame matching, "
-             "2 brisk back-to-back frame matching");
-
 msckf_vio::Feature::OptimizationConfig msckf_vio::Feature::optimization_config;
 
 /// \brief okvis Main namespace of this package.
 namespace okvis {
 
 // Constructor.
-HybridFrontend::HybridFrontend(size_t numCameras, bool initializeWithoutEnoughParallax)
-    : Frontend(numCameras),
-      initializeWithoutEnoughParallax_(initializeWithoutEnoughParallax) {
+HybridFrontend::HybridFrontend(size_t numCameras, const FrontendOptions& frontendOptions)
+    : Frontend(numCameras, frontendOptions) {
 
 }
 
@@ -76,7 +70,7 @@ bool HybridFrontend::dataAssociationAndInitialization(
                       "mixed frame types are not supported yet");
   }
   int num3dMatches = 0;
-  if (FLAGS_feature_tracking_method == 1) {
+  if (frontendOptions_.featureTrackingMethod == 1) {
     int requiredMatches = 5;
     bool rotationOnly = false;
     // match to last frame
@@ -121,10 +115,10 @@ bool HybridFrontend::dataAssociationAndInitialization(
     }
     matchToLastFrameTimer.stop();
     if (!isInitialized_) {
-      if (initializeWithoutEnoughParallax_ || !rotationOnly) {
+      if (frontendOptions_.initializeWithoutEnoughParallax || !rotationOnly) {
         isInitialized_ = true;
         LOG(INFO) << "Initialized: initializeWithoutEnoughParallax ? "
-                  << initializeWithoutEnoughParallax_ << " rotationOnly ? "
+                  << frontendOptions_.initializeWithoutEnoughParallax << " rotationOnly ? "
                   << rotationOnly;
       }
     }
@@ -150,7 +144,7 @@ bool HybridFrontend::dataAssociationAndInitialization(
     double uncertainMatchFraction = 0;
     bool rotationOnly = false;
 
-    if (FLAGS_feature_tracking_method == 0) {
+    if (frontendOptions_.featureTrackingMethod == 0) {
     // match to last keyframe
     TimerSwitchable matchKeyframesTimer("2.4.1 matchToKeyframes");
     switch (distortionType) {
@@ -196,10 +190,10 @@ bool HybridFrontend::dataAssociationAndInitialization(
     }
     matchKeyframesTimer.stop();
     if (!isInitialized_) {
-      if (initializeWithoutEnoughParallax_ || !rotationOnly) {
+      if (frontendOptions_.initializeWithoutEnoughParallax || !rotationOnly) {
         isInitialized_ = true;
         LOG(INFO) << "Initialized: initializeWithoutEnoughParallax ? "
-                  << initializeWithoutEnoughParallax_ << " rotationOnly ? "
+                  << frontendOptions_.initializeWithoutEnoughParallax << " rotationOnly ? "
                   << rotationOnly;
       }
     }
@@ -252,12 +246,12 @@ bool HybridFrontend::dataAssociationAndInitialization(
         break;
     }
     matchToLastFrameTimer.stop();
-    if (FLAGS_feature_tracking_method != 0) {
+    if (frontendOptions_.featureTrackingMethod != 0) {
       if (!isInitialized_) {
-        if (initializeWithoutEnoughParallax_ || !rotationOnly) {
+        if (frontendOptions_.initializeWithoutEnoughParallax || !rotationOnly) {
           isInitialized_ = true;
           LOG(INFO) << "Initialized: initializeWithoutEnoughParallax ? "
-                    << initializeWithoutEnoughParallax_ << " rotationOnly ? "
+                    << frontendOptions_.initializeWithoutEnoughParallax << " rotationOnly ? "
                     << rotationOnly;
         }
       }
@@ -272,7 +266,11 @@ bool HybridFrontend::dataAssociationAndInitialization(
     *asKeyframe = true;  // first frame needs to be keyframe
 
   // do stereo match to get new landmarks
-  matchStereoSwitch(distortionType, estimator, framesInOut);
+  if (frontendOptions_.stereoMatchWithEpipolarCheck) {
+    matchStereoWithEpipolarCheckSwitch(distortionType, estimator, framesInOut);
+  } else {
+    matchStereoSwitch(distortionType, estimator, framesInOut);
+  }
 
   return true;
 }
@@ -400,7 +398,7 @@ int HybridFrontend::matchToLastFrame(
 
   uint64_t lastFrameId = estimator.frameIdByAge(1);
 
-  if (FLAGS_feature_tracking_method == 0 &&
+  if (frontendOptions_.featureTrackingMethod == 0 &&
       estimator.isKeyframe(lastFrameId)) {
     // already done
     return 0;
@@ -603,7 +601,7 @@ int HybridFrontend::checkMotionByRansac2d2d(okvis::Estimator& estimator,
 }
 
 bool HybridFrontend::isDescriptorBasedMatching() const {
-  return FLAGS_feature_tracking_method != 1;
+  return frontendOptions_.featureTrackingMethod != 1;
 }
 
 void HybridFrontend::setLandmarkTriangulationParameters(double triangulationTranslationThreshold,

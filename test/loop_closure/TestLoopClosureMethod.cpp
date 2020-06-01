@@ -48,9 +48,9 @@ class LCDFixture :public ::testing::Test {
   LCDFixture()
       : lcd_test_data_path_(FLAGS_test_data_path +
                             std::string("/ForLoopClosureDetector")),
-        equalize_image_(false), epipolarThreshold_(3.0),
+        equalize_image_(false), epipolarThreshold_(3.0f),
         cameraSystem_(new okvis::cameras::NCameraSystem),
-        frontend_(new okvis::Frontend(2)),
+        frontend_(new okvis::Frontend(2, okvis::FrontendOptions())),
         cut_matches_lowe_(true),
         lcd_params_(new VIO::LoopClosureDetectorParams()),
         ref1_to_cur1_pose_(),
@@ -130,8 +130,8 @@ class LCDFixture :public ::testing::Test {
                                 size_t camIdi, size_t camIdj,
                                 std::vector<int>* i_indices,
                                 std::vector<int>* j_indices,
-                                double epipolarThreshold) const {
-    double threshold2 = epipolarThreshold * epipolarThreshold;
+                                float epipolarThreshold) const {
+    float threshold2 = epipolarThreshold * epipolarThreshold;
     okvis::kinematics::Transformation T_CjCi =
         nframe->T_SC(camIdj)->inverse() * (*nframe->T_SC(camIdi));
     double focal_length =
@@ -154,7 +154,7 @@ class LCDFixture :public ::testing::Test {
           ->geometryAs<CAMERA_GEOMETRY_T>(camIdj)
           ->backProject(keypoint_j, &bearing_j);
 
-      double dist2 = okvis::TwoViewGeometry::computeErrorEssentialMat(
+      float dist2 = okvis::TwoViewGeometry::computeErrorEssentialMat(
           T_CjCi, bearing_i, bearing_j, focal_length, focal_length);
       if (dist2 >= threshold2) {
         status[k] = false;
@@ -380,7 +380,7 @@ class LCDFixture :public ::testing::Test {
 
   okvis::Optimization frontendParams_;
   bool equalize_image_;
-  double epipolarThreshold_;
+  float epipolarThreshold_;
   std::shared_ptr<okvis::cameras::NCameraSystem> cameraSystem_;
   std::shared_ptr<okvis::Frontend> frontend_;      ///< The frontend to detect and describe image keypoints.
 

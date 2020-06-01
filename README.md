@@ -267,7 +267,6 @@ Parameters of the second group are typically configured through yaml.
 |---|---|---|
 |  load_input_option |  0 subscribe to rostopics, 1 load video and IMU csv |  1 |
 | dump_output_option | 0 only publish to rostopics, 1 also save nav states to csv, 2, also save nav states and extrinsic parameters, 3 also save nav states and all calibration parameters to csv. | 3 |
-| feature_tracking_method | 0 BRISK brute force in OKVIS with 3d2d RANSAC, 1 KLT back-to-back, 2 BRISK back-to-back | 0 |
 | use_IEKF | true iterated EKF, false EKF. For filters only | false |
 | max_inc_tol | the maximum infinity norm of the filter correction. 10.0 for outdoors, 2.0 for indoors, though its value should be insensitive | 2.0 |
 | head_tail | Use the fixed head and receding tail observations or the entire feature track to compose two-view constraints in TF_VIO | false |
@@ -300,6 +299,7 @@ Remark: set sigma_{param} to zero to disable estimating "param" in filtering met
 | sigma_TAElement | For MSCKF and TF_VIO only, set to say 5e-3 to estimate the Ta matrix for accelerometers, set to 0 to fix the matrix as Identity | 0 |
 | numKeyframes | For OKVIS, number of keyframes in optimisation window | 5 |
 | numImuFrames | For OKVIS, number of average frames in optimisation window, 3 recommended; For MSCKF and TF_VIO, numKeyframes + numImuFrames is the maximum allowed cloned states in the entire state vector, 30 recommended for their sum. | 2 |
+| featureTrackingMethod | 0 BRISK brute force in OKVIS with 3d2d RANSAC, 1 KLT back-to-back, 2 BRISK back-to-back | 0 |
 
 ### Process measurements from a video and an IMU csv
 ```
@@ -308,7 +308,7 @@ msckf_ws/devel/lib/msckf/okvis_node $HOME/Documents/docker/msckf_ws/src/msckf/co
  --video_file="/media/$USER/Seagate/data/spin-lab/west_campus_parking_lot/Jisun/20151111_120342.mp4" 
  --imu_file="/media/$USER/Seagate/data/spin-lab/west_campus_parking_lot/Jisun/mystream_11_11_12_3_13.csv" 
  --start_index=18800 --finish_index=28900 --max_inc_tol=10.0
- --dump_output_option=0 --feature_tracking_method=0
+ --dump_output_option=0
 ```
 The running program will exit once the sequence finishes.
 
@@ -325,7 +325,6 @@ The running program will exit once the sequence finishes.
 ```
 rosrun msckf okvis_node $HOME/Documents/docker/msckf_ws/src/msckf/config/config_fpga_p2_euroc_dissertation.yaml
  --dump_output_option=0 --load_input_option=0 --output_dir=$HOME/Desktop/temp 
- --feature_tracking_method=0
 
 rosbag play --pause --start=5.0 --rate=1.0 /media/$USER/Seagate/$USER/data/euroc/MH_01_easy.bag /cam0/image_raw:=/camera0 /imu0:=/imu
 
@@ -341,7 +340,7 @@ Note the program will not exit if Ctrl+C is entered in the terminal of roscore.
 $HOME/Documents/docker/msckf_ws/src/msckf/config/config_tum_vi_50_20_msckf.yaml \
  --output_dir=$HOME/Seagate/data/TUM-VI/postprocessed/ \
  --max_inc_tol=10.0 --dump_output_option=0 \
- --feature_tracking_method=0 --load_input_option=0
+ --load_input_option=0
 
 ```
 

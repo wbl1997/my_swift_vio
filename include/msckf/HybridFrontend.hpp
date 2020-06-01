@@ -37,7 +37,7 @@ class HybridFrontend : public Frontend {
    * @brief Constructor.
    * @param numCameras Number of cameras in the sensor configuration.
    */
-  HybridFrontend(size_t numCameras, bool initializeWithoutMuchParallax);
+  HybridFrontend(size_t numCameras, const okvis::FrontendOptions& frontendOptions);
   virtual ~HybridFrontend() {}
 
   ///@{
@@ -74,15 +74,7 @@ class HybridFrontend : public Frontend {
       double triangulationMaxDepth) final;
 
  private:
-
-  ///< Initialize the frontend under insufficient parallax, e.g., during pure rotation?
-  bool initializeWithoutEnoughParallax_;
-  
-
-
-
   feature_tracker::FeatureTracker featureTracker_;
-
 
   /**
    * @brief Decision whether a new frame should be keyframe or not after the

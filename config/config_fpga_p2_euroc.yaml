@@ -76,7 +76,12 @@ optimization:
     algorithm: "MSCKF"
     useEpipolarConstraint: false
     cameraObservationModelId: 0
+
+frontend:
     initializeWithoutEnoughParallax: true
+    stereoMatchWithEpipolarCheck: true
+    epipolarDistanceThreshold: 2.5
+    featureTrackingMethod: 0
 
 point_landmark:
     landmarkModelId: 1

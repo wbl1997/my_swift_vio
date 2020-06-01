@@ -12,7 +12,7 @@
 
 namespace msckf {
 std::shared_ptr<okvis::Frontend> createFrontend(
-    int numCameras, bool initializeWithoutEnoughParallax,
+    int numCameras, const okvis::FrontendOptions& frontendOptions,
     okvis::EstimatorAlgorithm algorithm);
 
 std::shared_ptr<okvis::Estimator> createBackend(okvis::EstimatorAlgorithm algorithm);
