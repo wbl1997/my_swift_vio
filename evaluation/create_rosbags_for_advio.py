@@ -18,6 +18,8 @@ if __name__ == '__main__':
         sys.exit(1)
     script, advio_dir, bagcreator, output_dir = sys.argv
 
+    shift_secs = 1000  # shift the start epoch to avoid 0 rospy time.
+
     zip_list = dir_utility_functions.find_zips(advio_dir, "advio-")
     print('Extracting zip files \n{}'.format('\n'.join(zip_list)))
 
@@ -43,22 +45,24 @@ if __name__ == '__main__':
         video_time_csv = os.path.join(iphone_dir, "frames.csv")
 
         output_bag = os.path.join(bag_output_dir, os.path.basename(session_dir) + ".bag")
-        cmd = "chmod +x {bc};{bc} --video {v} --imu {g} {a} --video_time_file {t} --output_bag {o}".\
-            format(bc=bagcreator, v=video, g=gyro_csv, a=accel_csv, t=video_time_csv, o=output_bag)
+        cmd = "chmod +x {bc};{bc} --video {v} --imu {g} {a} --video_time_file {t} " \
+              "--shift_secs {s} --output_bag {o}".\
+            format(bc=bagcreator, v=video, g=gyro_csv, a=accel_csv,
+                   t=video_time_csv, s=shift_secs, o=output_bag)
         out_stream = open(os.path.join(session_dir, "bag_out.log"), 'w')
         err_stream = open(os.path.join(session_dir, "bag_err.log"), 'w')
+        print("Running cmd: {}".format(cmd))
         utility_functions.subprocess_cmd(cmd, out_stream, err_stream)
         out_stream.close()
         err_stream.close()
-
     print('Created rosbags for {} missions'.format(len(extract_dir_list)))
 
     convert_pose_script = os.path.join(os.path.dirname(bagcreator), "convert_pose_format.py")
     for session_dir in extract_dir_list:
         ground_truth_csv = os.path.join(session_dir, "ground-truth", "pose.csv")
         converted_txt = os.path.join(bag_output_dir, os.path.basename(session_dir) + ".txt")
-        cmd = 'python3 {} {} --in_quat_order wxyz --outfile {} --output_delimiter=" "' \
-              .format(convert_pose_script, ground_truth_csv, converted_txt)
+        cmd = 'python3 {} {} --in_quat_order wxyz --outfile {} --shift_secs {} --output_delimiter=" "' \
+              .format(convert_pose_script, ground_truth_csv, converted_txt, shift_secs)
         out_stream = open(os.path.join(session_dir, "gt_out.log"), 'w')
         err_stream = open(os.path.join(session_dir, "gt_err.log"), 'w')
         utility_functions.subprocess_cmd(cmd, out_stream, err_stream)
