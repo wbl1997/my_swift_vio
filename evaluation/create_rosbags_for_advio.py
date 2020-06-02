@@ -21,6 +21,7 @@ if __name__ == '__main__':
     shift_secs = 1000  # shift the start epoch to avoid 0 rospy time.
 
     zip_list = dir_utility_functions.find_zips(advio_dir, "advio-")
+    zip_list.sort()
     print('Extracting zip files \n{}'.format('\n'.join(zip_list)))
 
     extract_dir_list = []
@@ -35,6 +36,10 @@ if __name__ == '__main__':
             print("Error in unzipping {}".format(zip_file))
     print('Unzipped data for {} advio missions'.format(len(extract_dir_list)))
 
+    convert_pose_script = os.path.join(os.path.dirname(bagcreator), "convert_pose_format.py")
+    cmd = "chmod +x {bc};chmod +x {cp};".format(bc=bagcreator, cp=convert_pose_script)
+    utility_functions.subprocess_cmd(cmd)
+
     bag_output_dir = os.path.join(output_dir, "iphone")
     dir_utility_functions.mkdir_p(bag_output_dir)
     for session_dir in extract_dir_list:
@@ -45,7 +50,7 @@ if __name__ == '__main__':
         video_time_csv = os.path.join(iphone_dir, "frames.csv")
 
         output_bag = os.path.join(bag_output_dir, os.path.basename(session_dir) + ".bag")
-        cmd = "chmod +x {bc};{bc} --video {v} --imu {g} {a} --video_time_file {t} " \
+        cmd = "{bc} --video {v} --imu {g} {a} --video_time_file {t} " \
               "--shift_secs {s} --output_bag {o}".\
             format(bc=bagcreator, v=video, g=gyro_csv, a=accel_csv,
                    t=video_time_csv, s=shift_secs, o=output_bag)
@@ -57,7 +62,6 @@ if __name__ == '__main__':
         err_stream.close()
     print('Created rosbags for {} missions'.format(len(extract_dir_list)))
 
-    convert_pose_script = os.path.join(os.path.dirname(bagcreator), "convert_pose_format.py")
     for session_dir in extract_dir_list:
         ground_truth_csv = os.path.join(session_dir, "ground-truth", "pose.csv")
         converted_txt = os.path.join(bag_output_dir, os.path.basename(session_dir) + ".txt")

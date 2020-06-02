@@ -30,9 +30,14 @@ if __name__ == '__main__':
 
     euroc_bags = dir_utility_functions.find_bags(args.euroc_dir, '.bag', discount_key='calibration')
     euroc_gt_list = dir_utility_functions.get_converted_euroc_gt_files(euroc_bags)
-    bag_list = [euroc_bags[0]]
-    gt_list = [euroc_gt_list[0]]
-    
+
+    advio_bags = dir_utility_functions.find_bags(args.advio_dir, '.bag')
+    advio_gt_list = dir_utility_functions.get_gt_file_for_bags(advio_bags)
+
+    bag_gt_list = sorted(zip(euroc_bags, euroc_gt_list))
+    bag_list = [bag_gt_list[0][0]]
+    gt_list = [bag_gt_list[0][1]]
+
     print('For evaluation, #bags {} #gtlist {}'.format(len(bag_list), len(gt_list)))
     for index, gt in enumerate(gt_list):
         print('{}: {}'.format(bag_list[index], gt))
@@ -90,7 +95,7 @@ if __name__ == '__main__':
                        "extrinsic_opt_mode_main_camera": "p_CB",
                        "extrinsic_opt_mode_other_camera": "p_C0C_q_C0C"},
         'OKVIS': {"algo_code": "OKVIS",
-                         "extra_gflags": "",
+                         "extra_gflags": "--publish_via_ros=false",
                          "numKeyframes": 5,
                          "numImuFrames": 3,
                          "monocular_input": 1,
