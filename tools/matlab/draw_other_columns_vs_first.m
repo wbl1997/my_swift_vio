@@ -1,4 +1,4 @@
-function plot_bundle(data, colorstring, linespec)
+function draw_other_columns_vs_first(data, colorstring, linespec)
 % plot the second to last columns relative to the first column as x axis
 % data rows x (1+n), n <= 4
 % for each of the second to last column, the style is chosen from 

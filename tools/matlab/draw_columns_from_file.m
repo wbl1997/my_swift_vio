@@ -21,7 +21,8 @@ dimen = length(indices);
 draw_data_columns(data, indices, 1.0, plot3d, line_styles);
 if plot3d
     legend('xyz');
-else if dimen == 3
+else
+    if dimen == 3
         legend('x', 'y', 'z');
     else
         labels = cell(dimen, 1);
