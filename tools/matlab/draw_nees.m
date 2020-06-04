@@ -1,30 +1,17 @@
-function draw_nees(est_file, num_runs, cmp_file, label_est, label_cmp)
+function draw_nees(est_files, num_runs, labels)
+% sim_dir = '/media/jhuai/Seagate/jhuai/temp/';
+% draw_nees({[sim_dir, 'msckf_simul_test_nofej/MSCKF_WavyCircle_NEES.txt'], ...
+% [sim_dir, 'msckf_simul_wave/MSCKF_WavyCircle_NEES.txt'], ...
+% [sim_dir, 'msckf_simul_ball/MSCKF_Ball_NEES.txt']}, ...
+% 1000, {'Naive', 'Wave', 'Torus'});
+
 export_fig_path = '/media/jhuai/Seagate/jhuai/tools/export_fig/';
 addpath(export_fig_path);
-if nargin < 5
-    label_cmp = 'cmp';
-end
-if nargin < 4
-    label_est = 'est';
-end
- 
-if nargin < 3
-    cmp_data = [];
-else
-    cmp_data = readmatrix(cmp_file, 'NumHeaderLines', 1);
-end
 
-est_line_style = {'r', 'g', 'b'};
-cmp_line_style = {'--r', '--g', '--b'};
-[result_dir, ~, ~] = fileparts(est_file);
+line_styles = {{':r', ':g', ':b'}, {'-r', '-g', '-b'}, {'--r', '--g', '--b'}};
+[result_dir, ~, ~] = fileparts(est_files{1});
 
 indices = 2:4;
-
-est_data = readmatrix(est_file, 'NumHeaderLines', 1);
-startTime = est_data(1, 1);
-
-est_data(:, 1) = est_data(:, 1) - startTime;
-
 Q = 0.05;
 [Tl, Tr] = two_sided_prob_region_nees(Q, 6, num_runs);
 [rl, rr] = two_sided_prob_region_nees(Q, 3, num_runs);
@@ -32,11 +19,29 @@ Q = 0.05;
 
 close all;
 figure;
-draw_data_columns(est_data, indices, 1.0, false, est_line_style);
-if ~isempty(cmp_data)
-    cmp_data(:, 1) = cmp_data(:, 1) - startTime;
-    draw_data_columns(cmp_data, indices, 1.0, false, cmp_line_style);
+    
+startTime = 0;
+
+for i = 1:length(est_files)
+    est_data = readmatrix(est_files{i}, 'NumHeaderLines', 1);
+    if startTime == 0
+        startTime = est_data(1, 1);
+    end
+    est_data(:, 1) = est_data(:, 1) - startTime;
+    
+    draw_data_columns(est_data, indices, 1.0, false, line_styles{i});
+   
+    % find average of last 10 secs.
+    avg_period = 10;
+    time_tol = 0.05;
+    startIndex = find(abs(est_data(end, 1) - avg_period - est_data(:,1)) <...
+        time_tol, 1);
+    if isempty(startIndex)
+        startIndex = size(est_data, 1) - 100;
+    end
+    est_avg = mean(est_data(startIndex:end, indices), 1)
 end
+
 xlim([-10, est_data(end, 1) + 10]);
 ylim([0, 20]);
 xlabel('time (sec)');
@@ -51,28 +56,18 @@ ylabel('NEES (1)');
 % plot(est_data([1, end], 1), [6, 6], 'b--');
 % plot(est_data([1, end], 1), [Tl, Tl], 'b-.');
 % plot(est_data([1, end], 1), [Tr, Tr], 'b-.');
-
-% find average of last 10 secs.
-avg_period = 10;
-time_tol = 0.05;
-startIndex = find(abs(est_data(end, 1) - avg_period - est_data(:,1)) <...
-    time_tol, 1);
-if isempty(startIndex)
-    startIndex = size(est_data, 1) - 100;
+label_list = cell(1, length(est_files) * 3);
+for i = 1:length(est_files)
+    label_list(1, (i-1) * 3 + (1:3)) = {[labels{i}, '-Position'], ...
+        [labels{i}, '-Orientation'], [labels{i}, '-Pose']};
 end
-startIndex
-size(est_data, 1)
-est_avg = mean(est_data(startIndex:end, indices), 1)
-cmp_avg = mean(cmp_data(startIndex:end, indices), 1)
-
-leg = legend([label_est, '-Position'], [label_est, '-Orientation'], [label_est, '-Pose'], ...
-    [label_cmp, '-Position'], [label_cmp, '-Orientation'], [label_cmp, '-Pose']);
+leg = legend(label_list);
 set(leg,'Interpreter', 'none');
 set(gcf, 'Color', 'None');
 grid on;
-outputfig = [result_dir, '/', 'nees_fej_vs_naive.eps'];
+outputfig = [result_dir, '/', 'nees.eps'];
 if exist(outputfig, 'file')==2
-  delete(outputfig);
+    delete(outputfig);
 end
 export_fig(outputfig);
 end
