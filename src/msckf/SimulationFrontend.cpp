@@ -51,8 +51,11 @@ void saveLandmarkGrid(
 void createBoxLandmarkGrid(
     std::vector<Eigen::Vector4d, Eigen::aligned_allocator<Eigen::Vector4d>>
         *homogeneousPoints,
-    std::vector<uint64_t> *lmIds, std::string pointFile = "") {
-  const double xyLimit = 5, zLimit = 1.5,
+    std::vector<uint64_t> *lmIds,
+    double halfz,
+    double addFloorCeling,
+    std::string pointFile = "") {
+  const double xyLimit = 5, zLimit = halfz,
       xyIncrement = 1.0, zIncrement = 0.5, offsetNoiseMag = 0.0;
   // four walls
   double x(xyLimit), y(xyLimit), z(zLimit);
@@ -97,18 +100,20 @@ void createBoxLandmarkGrid(
     }
   }
 
-//  std::vector<double> zlist{-zLimit, zLimit};
-//  for (double z : zlist) {
-//    for (x = -xyLimit; x <= xyLimit; x += xyIncrement) {
-//      for (y = -xyLimit; y <= xyLimit; y += xyIncrement) {
-//        homogeneousPoints->push_back(
-//            Eigen::Vector4d(x + vio::gauss_rand(0, offsetNoiseMag),
-//                            y + vio::gauss_rand(0, offsetNoiseMag),
-//                            z + vio::gauss_rand(0, offsetNoiseMag), 1));
-//        lmIds->push_back(okvis::IdProvider::instance().newId());
-//      }
-//    }
-//  }
+  if (addFloorCeling) {
+    std::vector<double> zlist{-zLimit, zLimit};
+    for (double z : zlist) {
+      for (x = -xyLimit; x <= xyLimit; x += xyIncrement) {
+        for (y = -xyLimit; y <= xyLimit; y += xyIncrement) {
+          homogeneousPoints->push_back(
+              Eigen::Vector4d(x + vio::gauss_rand(0, offsetNoiseMag),
+                              y + vio::gauss_rand(0, offsetNoiseMag),
+                              z + vio::gauss_rand(0, offsetNoiseMag), 1));
+          lmIds->push_back(okvis::IdProvider::instance().newId());
+        }
+      }
+    }
+  }
 
   saveLandmarkGrid(*homogeneousPoints, *lmIds, pointFile);
 }
@@ -178,22 +183,33 @@ void initCameraNoiseParams(
 // Constructor.
 SimulationFrontend::SimulationFrontend(
     size_t numCameras, bool addImageNoise,
-    int maxTrackLength, double landmarkRadius,
+    int maxTrackLength,
     VisualConstraints constraintScheme,
+    LandmarkGridType gridType,
+    double landmarkRadius,
     std::string pointFile)
     : isInitialized_(true), numCameras_(numCameras),
       addImageNoise_(addImageNoise),
       maxTrackLength_(maxTrackLength),
       constraintScheme_(constraintScheme) {
-  if (landmarkRadius < SimulationFrontend::kRangeThreshold) {
-    createBoxLandmarkGrid(&homogeneousPoints_, &lmIds_, pointFile);
-  } else {
-    createCylinderLandmarkGrid(&homogeneousPoints_, &lmIds_,
-                               landmarkRadius,
-                               pointFile);
+  double halfz = 1.5;
+  bool addFloorCeiling = false;
+  switch (gridType) {
+    case LandmarkGridType::FourWalls:
+      createBoxLandmarkGrid(&homogeneousPoints_, &lmIds_, halfz,
+                            addFloorCeiling, pointFile);
+      break;
+    case LandmarkGridType::FourWallsFloorCeiling:
+      halfz = 2.5;
+      addFloorCeiling = true;
+      createBoxLandmarkGrid(&homogeneousPoints_, &lmIds_, halfz,
+                            addFloorCeiling, pointFile);
+      break;
+    case LandmarkGridType::Cylinder:
+      createCylinderLandmarkGrid(&homogeneousPoints_, &lmIds_, landmarkRadius,
+                                 pointFile);
+      break;
   }
-  double axisSigma = 0.1;
-  addLandmarkNoise(homogeneousPoints_, &noisyHomogeneousPoints_, axisSigma);
 }
 
 int SimulationFrontend::dataAssociationAndInitialization(

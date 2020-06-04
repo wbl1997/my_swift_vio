@@ -4,6 +4,7 @@
 
 #include <mutex>
 
+#include <msckf/CameraSystemCreator.hpp>
 #include <msckf/ImuSimulator.h>
 
 #include <okvis/DenseMatcher.hpp>
@@ -22,6 +23,12 @@
 /// \brief okvis Main namespace of this package.
 namespace okvis {
 
+enum class LandmarkGridType {
+  FourWalls = 0,
+  FourWallsFloorCeiling,
+  Cylinder,
+};
+
 /**
  * @brief A frontend using BRISK features
  */
@@ -35,8 +42,11 @@ class SimulationFrontend {
    * @param numCameras Number of cameras in the sensor configuration.
    */
   SimulationFrontend(size_t numCameras, bool addImageNoise, int maxTrackLength,
+                     VisualConstraints constraintScheme,
+                     LandmarkGridType gridType,
                      double landmarkRadius,
-                     VisualConstraints constraintScheme, std::string pointFile);
+                     std::string pointFile);
+
   virtual ~SimulationFrontend() {}
 
   ///@{
@@ -106,8 +116,6 @@ class SimulationFrontend {
   std::vector<Eigen::Vector4d, Eigen::aligned_allocator<Eigen::Vector4d>>
       homogeneousPoints_;
   std::vector<uint64_t> lmIds_;
-  std::vector<Eigen::Vector4d, Eigen::aligned_allocator<Eigen::Vector4d>>
-      noisyHomogeneousPoints_;
 
 
   struct LandmarkKeypointMatch {
@@ -194,6 +202,10 @@ struct TestSetting {
   bool useEpipolarConstraint;
   int cameraObservationModelId;
   int landmarkModelId;
+  simul::SimCameraModelType cameraModelId;
+  simul::CameraOrientation cameraOrientationId;
+  LandmarkGridType gridType;
+  double landmarkRadius; // radius of the cylinder on whose surface the landmarks are distributed.
 
   TestSetting(bool _addImuNoise = true, bool _addPriorNoise = true,
               bool _addSystemError = false, bool _addImageNoise = true,
@@ -202,8 +214,13 @@ struct TestSetting {
               okvis::EstimatorAlgorithm _estimator_algorithm =
                   okvis::EstimatorAlgorithm::MSCKF,
               bool _useEpipolarConstraint = false,
-              int _cameraObservationModelId = 0,
-              int _landmarkModelId = 0)
+              int _cameraObservationModelId = 0, int _landmarkModelId = 0,
+              simul::SimCameraModelType _cameraModelId =
+                  simul::SimCameraModelType::EUROC,
+              simul::CameraOrientation _cameraOrientationId =
+                  simul::CameraOrientation::Forward,
+              LandmarkGridType _gridType = LandmarkGridType::FourWalls,
+              double _landmarkRadius = 5)
       : addImuNoise(_addImuNoise),
         addPriorNoise(_addPriorNoise),
         addSystemError(_addSystemError),
@@ -214,10 +231,13 @@ struct TestSetting {
         estimator_algorithm(_estimator_algorithm),
         useEpipolarConstraint(_useEpipolarConstraint),
         cameraObservationModelId(_cameraObservationModelId),
-        landmarkModelId(_landmarkModelId)
-  {}
+        landmarkModelId(_landmarkModelId),
+        cameraModelId(_cameraModelId),
+        cameraOrientationId(_cameraOrientationId),
+        gridType(_gridType),
+        landmarkRadius(_landmarkRadius) {}
 
-  std::string print() {
+  std::string print() const {
     std::stringstream ss;
     ss << "addImuNoise " << addImuNoise << " addPriorNoise " << addPriorNoise
        << " addSystemError " << addSystemError << " addImageNoise "
@@ -228,7 +248,11 @@ struct TestSetting {
        << okvis::EstimatorAlgorithmIdToName(estimator_algorithm)
        << " use epipolar constraint? " << useEpipolarConstraint
        << " camera observation model id " << cameraObservationModelId
-       << " camera landmark model id " << landmarkModelId;
+       << " camera landmark model id " << landmarkModelId
+       << " camera geometry type " << static_cast<int>(cameraModelId)
+       << " camera orientation type " << static_cast<int>(cameraOrientationId)
+       << " landmark grid type " << static_cast<int>(gridType)
+       << " landmark radius " << landmarkRadius;
     return ss.str();
   }
 };

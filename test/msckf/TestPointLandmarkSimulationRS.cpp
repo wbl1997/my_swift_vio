@@ -24,7 +24,8 @@ class PointLandmarkSimulationRSTest : public ::testing::Test {
 
   void checkProjection(bool withDistortion, bool centerRow, double eps) {
     // create camera system
-    simul::CameraSystemCreator csc(0, simul::CameraOrientation::Forward,
+    simul::CameraSystemCreator csc(simul::SimCameraModelType::EUROC,
+                                   simul::CameraOrientation::Forward,
                                    "FXY_CXY", "P_CB", td, tr);
     if (withDistortion) {
       okvis::ExtrinsicsEstimationParameters extrinsicsEstimationParameters;

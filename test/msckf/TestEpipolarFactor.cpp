@@ -58,7 +58,7 @@ TEST(EpipolarFactor, Jacobians) {
   // create camera geometry
   std::string projOptModelName = "FXY_CXY";
   std::string extrinsicModelName = "P_CB";
-  int cameraModelId = 0;
+  simul::SimCameraModelType cameraModelId = simul::SimCameraModelType::EUROC;
   simul::CameraOrientation cameraOrientationId = simul::CameraOrientation::Forward;
   simul::CameraSystemCreator csc(cameraModelId, cameraOrientationId,
                                  projOptModelName, extrinsicModelName, 0.0,

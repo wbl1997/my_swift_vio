@@ -125,18 +125,21 @@ void testPointLandmarkJacobian(std::string projOptModelName,
   bool addPriorNoise = true;
   bool useEpipolarConstraint = false;
   double noise_factor = 1.0;
-  okvis::TestSetting testSetting(true, addPriorNoise, false, true, true, noise_factor,
-                                 noise_factor, okvis::EstimatorAlgorithm::MSCKF, useEpipolarConstraint,
-                                 cameraObservationModelId, landmarkModelId);
-  simul::SimulatedTrajectoryType trajectoryType = simul::SimulatedTrajectoryType::Torus;
-  int cameraModelId = 0;
-  double landmarkRadius = 5;
+  simul::SimCameraModelType cameraModelId = simul::SimCameraModelType::EUROC;
   simul::CameraOrientation cameraOrientationId = simul::CameraOrientation::Forward;
+  double landmarkRadius = 5;
+  okvis::TestSetting testSetting(true, addPriorNoise, false, true, true, noise_factor,
+                                 noise_factor, okvis::EstimatorAlgorithm::MSCKF,
+                                 useEpipolarConstraint,
+                                 cameraObservationModelId, landmarkModelId,
+                                 cameraModelId, cameraOrientationId,
+                                 okvis::LandmarkGridType::FourWalls, landmarkRadius);
+  simul::SimulatedTrajectoryType trajectoryType = simul::SimulatedTrajectoryType::Torus;
+
+
   vioSystemBuilder.createVioSystem(testSetting, trajectoryType,
                                    projOptModelName, extrinsicModelName,
-                                   cameraModelId,
-                                   cameraOrientationId, timeOffset, readoutTime,
-                                   landmarkRadius,
+                                   timeOffset, readoutTime,
                                    "", "");
   std::vector<uint64_t> multiFrameIds;
   size_t kale = 0;  // imu data counter

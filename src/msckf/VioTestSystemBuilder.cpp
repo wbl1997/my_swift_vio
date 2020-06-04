@@ -22,10 +22,9 @@ namespace simul {
 void VioTestSystemBuilder::createVioSystem(
     const okvis::TestSetting& testSetting,
     SimulatedTrajectoryType trajectoryType,
-    std::string projOptModelName, std::string extrinsicModelName,
-    int cameraModelId,
-    CameraOrientation cameraOrientationId, double td, double tr,
-    double landmarkRadius,
+    std::string projOptModelName,
+    std::string extrinsicModelName,
+    double td, double tr,
     std::string imuLogFile,
     std::string pointFile) {
   const double DURATION = 300.0;  // length of motion in seconds
@@ -87,9 +86,14 @@ void VioTestSystemBuilder::createVioSystem(
       circularSinusoidalTrajectory.reset(new simul::Motionless(
           imuParameters.rate, Eigen::Vector3d(0, 0, -imuParameters.g)));
       break;
-    case SimulatedTrajectoryType::Ball:
+    case SimulatedTrajectoryType::Torus2:
       circularSinusoidalTrajectory.reset(new simul::SphereTrajectory(
           imuParameters.rate, Eigen::Vector3d(0, 0, -imuParameters.g)));
+      break;
+    case SimulatedTrajectoryType::Ball:
+      circularSinusoidalTrajectory.reset(new simul::SphereTrajectory(
+          imuParameters.rate, Eigen::Vector3d(0, 0, -imuParameters.g), 1.0,
+          0.4 * M_PI));
       break;
     default:
       LOG(ERROR) << "Unknown trajectory id " << static_cast<int>(trajectoryType);
@@ -149,16 +153,13 @@ void VioTestSystemBuilder::createVioSystem(
   CHECK_EQ(tempIter != trueBiases_.end(), true) << "No imu reading close to motion start epoch by 1e-8";
   trueBiases_.erase(trueBiases_.begin(), tempIter);
 
-  // create the map
-  // TODO(jhuai): when the evaluationCallback is given to the map,
-  // OKVIS estimator crashes at problem solve().
   evaluationCallback_.reset(new msckf::VioEvaluationCallback());
   std::shared_ptr<okvis::ceres::Map> mapPtr(new okvis::ceres::Map(evaluationCallback_.get()));
-
   // std::shared_ptr<okvis::ceres::Map> mapPtr(new okvis::ceres::Map());
 
-  simul::CameraSystemCreator csc(cameraModelId, cameraOrientationId, projOptModelName,
-                                 extrinsicModelName, td, tr);
+  simul::CameraSystemCreator csc(testSetting.cameraModelId,
+                                 testSetting.cameraOrientationId,
+                                 projOptModelName, extrinsicModelName, td, tr);
   // reference camera system
   std::shared_ptr<okvis::cameras::CameraBase> cameraGeometry0;
   csc.createNominalCameraSystem(&cameraGeometry0, &trueCameraSystem_);
@@ -215,8 +216,10 @@ void VioTestSystemBuilder::createVioSystem(
 
   frontend.reset(new okvis::SimulationFrontend(trueCameraSystem_->numCameras(),
                                                testSetting.addImageNoise, 60,
-                                               landmarkRadius,
-                                               constraintScheme, pointFile));
+                                               constraintScheme,
+                                               testSetting.gridType,
+                                               testSetting.landmarkRadius,
+                                               pointFile));
 
   estimator->addImu(imuParameters);
   estimator->addCameraSystem(

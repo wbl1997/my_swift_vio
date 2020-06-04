@@ -12,25 +12,26 @@ DEFINE_double(sim_sigma_gw_c, 2e-5, "simulated gyro bias noise density");
 DEFINE_double(sim_sigma_aw_c, 5.5e-5, "simulated accelerometer bias noise density");
 
 namespace simul {
-CircularSinusoidalTrajectory::CircularSinusoidalTrajectory()
+CircularSinusoidalTrajectory::CircularSinusoidalTrajectory(double _maxThetaZ)
     : wz(17 * M_PI / 41),
       wxy(7 * M_PI / 37),
       rz(1),
       rxy(61.0 / 19),
       freq(100),
       interval(1 / freq),
-      maxThetaZ(0.2 * M_PI),
+      maxThetaZ(_maxThetaZ),
       gw(0, 0, -9.8) {}
 
 CircularSinusoidalTrajectory::CircularSinusoidalTrajectory(double imuFreq,
-                                                           Eigen::Vector3d ginw)
+                                                           Eigen::Vector3d ginw,
+                                                           double _maxThetaZ)
     : wz(17 * M_PI / 41),
       wxy(7 * M_PI / 37),
       rz(1),
       rxy(61.0 / 19),
       freq(imuFreq),
       interval(1 / freq),
-      maxThetaZ(0.2 * M_PI),
+      maxThetaZ(_maxThetaZ),
       gw(ginw) {}
 
 void CircularSinusoidalTrajectory::getTrueInertialMeasurements(
@@ -277,15 +278,15 @@ TorusTrajectory::computeGlobalPose(const okvis::Time time) const {
           Eigen::AngleAxisd(thetaZ, Eigen::Vector3d::UnitY()));
 }
 
-SphereTrajectory::SphereTrajectory()
-    : CircularSinusoidalTrajectory() {
-  rxy = 37.0 / 19;
+SphereTrajectory::SphereTrajectory(double _rxy, double _maxThetaZ)
+    : CircularSinusoidalTrajectory(_maxThetaZ) {
+  rxy = rxy;
 }
 
 SphereTrajectory::SphereTrajectory(
-    double imuFreq, Eigen::Vector3d ginw)
-    : CircularSinusoidalTrajectory(imuFreq, ginw) {
-  rxy = 37.0 / 19;
+    double imuFreq, Eigen::Vector3d ginw, double _rxy, double _maxThetaZ)
+    : CircularSinusoidalTrajectory(imuFreq, ginw, _maxThetaZ) {
+  rxy = _rxy;
 }
 
 Eigen::Vector3d SphereTrajectory::computeGlobalAngularRate(
