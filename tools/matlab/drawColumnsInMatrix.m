@@ -1,4 +1,4 @@
-function line_handles = draw_data_columns(data, triple_index, scalar, plot3d, line_styles)
+function line_handles = drawColumnsInMatrix(data, triple_index, scalar, plot3d, line_styles)
 % first column of data is x-axis
 % triple_indeix identify columns for y-axis
 if nargin < 5

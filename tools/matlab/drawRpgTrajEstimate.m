@@ -15,7 +15,7 @@ function drawVioResultsForSession(ref_dir, result_dir, session, trials)
 % draw vio results from ref_dir, and result_dir for one data session.
 % result_dir may contain VIO results of multiple trials for the session. 
 figure;
-draw_columns_from_file([ref_dir, session, '/stamped_traj_estimate.txt'], 2:4, 1);
+drawColumnsInFile([ref_dir, session, '/stamped_traj_estimate.txt'], 2:4, 1);
 hold on;
 linestyles = {'k-', 'g-', 'b-', 'y-', 'm-'};
 datalabels= cell(1, trials + 1);
@@ -28,7 +28,7 @@ for index = 1:trials
         result_file = [result_dir, session, '/stamped_traj_estimate', num2str(index-1), '.txt'];
     end
     if isfile(result_file)
-        draw_columns_from_file(result_file, 2:4, 1, {linestyles{index}});
+        drawColumnsInFile(result_file, 2:4, 1, {linestyles{index}});
         validresults = validresults + 1;
         datalabels{validresults} = num2str(index-1);        
     end

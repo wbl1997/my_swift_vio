@@ -24,10 +24,10 @@ for i = 1:length(sessions)
     legends = cell(length(est_files), 1);
     figure('units','normalized','outerposition',[0 0 1 1]);
     for j = 1:trials
-        draw_columns_from_file(est_files{j}, 2:4, 1, {styles{j}}); hold on;
+        drawColumnsInFile(est_files{j}, 2:4, 1, {styles{j}}); hold on;
         legends{j} = ['est ', num2str(j-1)];
     end
-    draw_columns_from_file(est_files{trials + 1}, 2:4, 1, {'g'}); 
+    drawColumnsInFile(est_files{trials + 1}, 2:4, 1, {'g'}); 
     legends{trials + 1} = 'gt';
     legend(legends);
     title([algo, '-', sessions{i}]);

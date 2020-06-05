@@ -1,5 +1,5 @@
-function draw_nees(est_files, labels, num_runs)
-% sim_dir = '/media/jhuai/Seagate/jhuai/temp/';
+function drawNees(est_files, labels, num_runs)
+% sim_dir = '';
 % draw_nees({[sim_dir, 'msckf_simul_test_nofej/MSCKF_WavyCircle_NEES.txt'], ...
 % [sim_dir, 'msckf_simul_wave/MSCKF_WavyCircle_NEES.txt'], ...
 % [sim_dir, 'msckf_simul_ball/MSCKF_Ball_NEES.txt']}, ...
@@ -28,17 +28,13 @@ for i = 1:length(est_files)
     end
     est_data(:, 1) = est_data(:, 1) - startTime;
     
-    draw_data_columns(est_data, indices, 1.0, false, line_styles{i});
+    drawColumnsInMatrix(est_data, indices, 1.0, false, line_styles{i});
    
     % find average of last 10 secs.
-    avg_period = 10;
-    time_tol = 0.05;
-    startIndex = find(abs(est_data(end, 1) - avg_period - est_data(:,1)) <...
-        time_tol, 1);
-    if isempty(startIndex)
-        startIndex = size(est_data, 1) - 100;
-    end
-    est_avg = mean(est_data(startIndex:end, indices), 1)
+    avgPeriod = 10;
+    timeTol = 0.05;
+    [avg, ~, ~] = averageAtOneEnd(est_data, avgPeriod, indices, 1, timeTol);
+    disp(['average of position, ori., pose, in the last 10 secs: ', num2str(avg)]);
 end
 
 xlim([-10, est_data(end, 1) + 10]);
@@ -46,15 +42,6 @@ ylim([0, 20]);
 xlabel('time (sec)');
 ylabel('NEES (1)');
 
-% plot(est_data([1, end], 1), [3, 3], 'r--');
-% plot(est_data([1, end], 1), [rl, rl], 'r-.');
-% plot(est_data([1, end], 1), [rr, rr], 'r-.');
-% plot(est_data([1, end], 1), [3, 3], 'g--');
-% plot(est_data([1, end], 1), [rl, rl], 'g-.');
-% plot(est_data([1, end], 1), [rr, rr], 'g-.');
-% plot(est_data([1, end], 1), [6, 6], 'b--');
-% plot(est_data([1, end], 1), [Tl, Tl], 'b-.');
-% plot(est_data([1, end], 1), [Tr, Tr], 'b-.');
 label_list = cell(1, length(est_files) * 3);
 for i = 1:length(est_files)
     label_list(1, (i-1) * 3 + (1:3)) = {[labels{i}, '-Position'], ...

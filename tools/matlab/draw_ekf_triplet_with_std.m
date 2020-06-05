@@ -16,7 +16,7 @@ if nargin < 4
 end
 dimen = length(triple_index);
 line_handles = zeros(1, dimen * 3);
-line_handles(1:dimen) = draw_data_columns(data, triple_index, scalar, 0, line_styles);
+line_handles(1:dimen) = drawColumnsInMatrix(data, triple_index, scalar, 0, line_styles);
 
 if iserror
     for i=1:dimen

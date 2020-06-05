@@ -1,4 +1,4 @@
-function draw_columns_from_file(data_file, indices, plot3d, line_styles)
+function drawColumnsInFile(data_file, indices, plot3d, line_styles)
 % draw columns of data loaded from data_file
 % the first row of the data file will be removed as a header
 % the first column serves as the x axis
@@ -18,7 +18,7 @@ if data(1, 1) > 1e9
 end
 data(:, 1) = data(:, 1) - data(1, 1);
 dimen = length(indices);
-draw_data_columns(data, indices, 1.0, plot3d, line_styles);
+drawColumnsInMatrix(data, indices, 1.0, plot3d, line_styles);
 if plot3d
     legend('xyz');
 else
