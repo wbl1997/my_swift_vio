@@ -206,17 +206,17 @@ init(autoreset=True)
 
 
 def find_all_bags_with_gt(euroc_dir="", uzh_fpv_dir="", tum_vi_dir="", advio_dir=""):
-    euroc_bags = dir_utility_functions.find_bags(euroc_dir, '.bag', discount_key='calibration')
-    euroc_gt_list = dir_utility_functions.get_converted_euroc_gt_files(euroc_bags)
+    euroc_bag_list = dir_utility_functions.find_bags(euroc_dir, '.bag', discount_key='calibration')
+    euroc_gt_list = dir_utility_functions.get_converted_euroc_gt_files(euroc_bag_list)
 
-    uzh_fpv_bags = dir_utility_functions.find_bags_with_gt(uzh_fpv_dir, 'snapdragon_with_gt.bag')
-    uzh_fpv_gt_list = dir_utility_functions.get_gt_file_for_bags(uzh_fpv_bags)
+    uzh_fpv_bag_list = dir_utility_functions.find_bags_with_gt(uzh_fpv_dir, 'snapdragon_with_gt.bag')
+    uzh_fpv_gt_list = dir_utility_functions.get_gt_file_for_bags(uzh_fpv_bag_list)
 
-    tumvi_bags = dir_utility_functions.find_bags(tum_vi_dir, "dataset-", "dataset-calib")
-    tumvi_gt_list = dir_utility_functions.get_gt_file_for_bags(tumvi_bags)
+    tumvi_bag_list = dir_utility_functions.find_bags(tum_vi_dir, "dataset-", "dataset-calib")
+    tumvi_gt_list = dir_utility_functions.get_gt_file_for_bags(tumvi_bag_list)
 
-    advio_bags = dir_utility_functions.find_bags(advio_dir, "advio-")
-    advio_gt_list = dir_utility_functions.get_gt_file_for_bags(advio_bags)
+    advio_bag_list = dir_utility_functions.find_bags(advio_dir, "advio-")
+    advio_gt_list = dir_utility_functions.get_gt_file_for_bags(advio_bag_list)
 
     all_gt_list = euroc_gt_list
     all_gt_list.extend(uzh_fpv_gt_list)
@@ -230,14 +230,17 @@ def find_all_bags_with_gt(euroc_dir="", uzh_fpv_dir="", tum_vi_dir="", advio_dir
                            "forget to convert data.csv to data.txt or "
                            "extract ground truth from rosbags?".format(gt_file))
 
-    # bag_list = uzh_fpv_bags
+    # bag_list = uzh_fpv_bag_list
     # gt_list = uzh_fpv_gt_list
 
     # bag_list.extend(euroc_bags)
     # gt_list.extend(euroc_gt_list)
 
-    bag_list = tumvi_bags
+    bag_list = tumvi_bag_list
     gt_list = tumvi_gt_list
+
+    # bag_list = advio_bag_list
+    # gt_list = advio_gt_list
     return bag_list, gt_list
 
 
