@@ -16,9 +16,9 @@ r = [3:5];
 q = [6:9];
 % body frame FLU, camera frame forward motion
 T_BC = [0, 0, 1, 0;
-                 -1, 0, 0, 0;
-                 0, -1, 0, 0;
-                 0, 0, 0, 1];
+    -1, 0, 0, 0;
+    0, -1, 0, 0;
+    0, 0, 0, 1];
 T_WB = eye(4);
 anchorIndex = 37;
 T_WB(1:3, 4) = trajectory(anchorIndex, r)';

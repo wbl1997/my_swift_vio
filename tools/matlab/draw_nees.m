@@ -1,4 +1,4 @@
-function draw_nees(est_files, num_runs, labels)
+function draw_nees(est_files, labels, num_runs)
 % sim_dir = '/media/jhuai/Seagate/jhuai/temp/';
 % draw_nees({[sim_dir, 'msckf_simul_test_nofej/MSCKF_WavyCircle_NEES.txt'], ...
 % [sim_dir, 'msckf_simul_wave/MSCKF_WavyCircle_NEES.txt'], ...
@@ -19,7 +19,6 @@ Q = 0.05;
 
 close all;
 figure;
-    
 startTime = 0;
 
 for i = 1:length(est_files)
