@@ -7,7 +7,7 @@ end
 figure;
 data(:, msckf_index_server.T_g_diag) = data(:, msckf_index_server.T_g_diag) ...
     - ones(size(data, 1), 3);
-draw_ekf_triplet_with_std(data, msckf_index_server.T_g, ...
+drawMeanAndStdBound(data, msckf_index_server.T_g, ...
     msckf_index_server.T_g_std);
 ylabel('$\mathbf{T}_g$[1]' , 'Interpreter', 'Latex');
 outputfig = [outputPath, '/T_g.eps'];
@@ -17,7 +17,7 @@ end
 export_fig(outputfig);
 
 figure;
-draw_ekf_triplet_with_std(data, msckf_index_server.T_s, ...
+drawMeanAndStdBound(data, msckf_index_server.T_s, ...
     msckf_index_server.T_s_std);
 ylabel('$\mathbf{T}_s$[1]' , 'Interpreter', 'Latex');
 outputfig = [outputPath, '/T_s.eps'];
@@ -29,7 +29,7 @@ export_fig(outputfig);
 figure;
 data(:, msckf_index_server.T_a_diag) = data(:, msckf_index_server.T_a_diag) ...
     - ones(size(data, 1), 3);
-draw_ekf_triplet_with_std(data, msckf_index_server.T_a, ...
+drawMeanAndStdBound(data, msckf_index_server.T_a, ...
     msckf_index_server.T_a_std);
 ylabel('$\mathbf{T}_a$[1]' , 'Interpreter', 'Latex');
 outputfig = [outputPath, '/T_a.eps'];
@@ -39,7 +39,7 @@ end
 export_fig(outputfig);
 
 figure;
-draw_ekf_single_with_std(data, msckf_index_server.td, ...
+drawMeanAndStdBound(data, msckf_index_server.td, ...
     msckf_index_server.td_std, 1000);
 legend('t_d', '3\sigma_t_d');
 ylabel('$t_d$[ms]', 'Interpreter', 'Latex');
@@ -50,7 +50,7 @@ end
 export_fig(outputfig);
 
 figure;
-draw_ekf_single_with_std(data, msckf_index_server.tr, ...
+drawMeanAndStdBound(data, msckf_index_server.tr, ...
     msckf_index_server.tr_std, 1000);
 legend('t_r', '3\sigma_{t_r}');
 ylabel('$t_r$[ms]', 'Interpreter', 'Latex');

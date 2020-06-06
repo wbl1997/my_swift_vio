@@ -1,9 +1,9 @@
 function plot_simulation_scenario_iros2020(data_dir, scene)
 % to generate the figures for the iros 2020 paper
-% plot_simulation_scenario('/media/jhuai/Seagate/jhuai/RSS-2020/results/msckf_simulation', 'Dot')
-% plot_simulation_scenario('/media/jhuai/Seagate/jhuai/RSS-2020/results/msckf_simulation', 'Motionless')
-% plot_simulation_scenario('/media/jhuai/Seagate/jhuai/RSS-2020/results/msckf_simulation', 'Squircle')
-% plot_simulation_scenario('/media/jhuai/Seagate/jhuai/RSS-2020/results/msckf_simulation', 'WavyCircle')
+% plot_simulation_scenario('/RSS-2020/results/msckf_simulation', 'Dot')
+% plot_simulation_scenario('/RSS-2020/results/msckf_simulation', 'Motionless')
+% plot_simulation_scenario('/RSS-2020/results/msckf_simulation', 'Squircle')
+% plot_simulation_scenario('/RSS-2020/results/msckf_simulation', 'WavyCircle')
 export_fig_path = '/media/jhuai/Seagate/jhuai/tools/export_fig/';
 voicebox_path = '/media/jhuai/Seagate/jhuai/tools/voicebox/';
 addpath(voicebox_path);

@@ -1,4 +1,4 @@
-function draw_all_rmse_iros2020(output_dir, index)
+function draw_all_rmse_iros2020(output_dir, index, export_fig_path)
 % draw the rmse curves for all estimators
 % output_dir the dir of the simulation log dir
 % index which index of RMSE to draw, 2,3,4, x, y, z
@@ -6,9 +6,10 @@ function draw_all_rmse_iros2020(output_dir, index)
 % -1, sqrt(x^2 + y^2 + z^2)
 % -2, sqrt(roll^2 + pitch^2 + yaw^2)
 % to generate the IROS202O figures
-% draw_all_rmse_iros2020('/media/jhuai/Seagate/jhuai/RSS-2020/results/msckf_simulation', -1)
-% draw_all_rmse_iros2020('/media/jhuai/Seagate/jhuai/RSS-2020/results/msckf_simulation', -2)
-addpath('/media/jhuai/Seagate/jhuai/tools/export_fig/');
+% draw_all_rmse_iros2020('RSS-2020/results/msckf_simulation', -1, '/tools/export_fig')
+% draw_all_rmse_iros2020('RSS-2020/results/msckf_simulation', -2, '/tools/export_fig')
+
+addpath(export_fig_path);
 background_color='None'; % set to None for paper.
 motion_list = {'WavyCircle', 'Squircle', 'Dot', 'Motionless'};
 estimator_list = {'OKVIS_Proj_Euc_F', 'MSCKF_Proj_Idp_F', ...

@@ -1,11 +1,10 @@
-function drawNees(est_files, labels, num_runs)
+function drawNees(est_files, labels, num_runs, export_fig_path)
 % sim_dir = '';
 % draw_nees({[sim_dir, 'msckf_simul_test_nofej/MSCKF_WavyCircle_NEES.txt'], ...
 % [sim_dir, 'msckf_simul_wave/MSCKF_WavyCircle_NEES.txt'], ...
 % [sim_dir, 'msckf_simul_ball/MSCKF_Ball_NEES.txt']}, ...
-% 1000, {'Naive', 'Wave', 'Torus'});
+% 1000, {'Naive', 'Wave', 'Torus'}, '/tools/export_fig');
 
-export_fig_path = '/media/jhuai/Seagate/jhuai/tools/export_fig/';
 addpath(export_fig_path);
 
 line_styles = {{':r', ':g', ':b'}, {'-r', '-g', '-b'}, {'--r', '--g', '--b'}};

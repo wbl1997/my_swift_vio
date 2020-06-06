@@ -1,12 +1,12 @@
-function draw_simul_pqv_and_std(msckf_traj_list, gt_traj, traj_labels, ...
+function drawPqvAndStdBound(msckf_traj_list, gt_traj, traj_labels, ...
  misalignment_dim, extrinsic_dim, project_intrinsic_dim, ...
     distort_intrinsic_dim, fix_extrinsic, fix_intrinsic)
-% result_dir = '/media/jhuai/Seagate/jhuai/paper_projects/keyframe_based_filter_2020/results/simulation';
+% result_dir = '/keyframe_based_filter_2020/results/simulation';
 % results = {[result_dir, '/msckf_simul_wave/MSCKF_WavyCircle_0.txt'], ...
 % [result_dir, '/msckf_simul_wave_nofej/MSCKF_WavyCircle_0.txt']};
 % traj_labels = {'FEJ', 'Naive'};
 % gt_traj = [result_dir, '/msckf_simul_wave_nofej/WavyCircle.txt'];
-% draw_simul_pqv_and_std(results, gt_traj, traj_labels, 27, 3, 4, 4, 0, 0);
+% drawPqvAndStdBound(results, gt_traj, traj_labels, 27, 3, 4, 4, 0, 0);
 
 line_styles = {{'-r', '-g', '-b', '-k'},...
     {'-.m', '-.c', '-.k', '-.y'}, ...
@@ -90,7 +90,7 @@ legends_template = {'$x$', '$y$', '$z$', '$3\sigma_x$', '$3\sigma_y$', '$3\sigma
 legends = cell(1, 6 * num_results);
 
 for j = 1:length(msckf_traj_list)
-    line_handles = draw_ekf_triplet_with_std(data_diff_list{j}, msckf_index_server.r, ...
+    line_handles = drawMeanAndStdBound(data_diff_list{j}, msckf_index_server.r, ...
         msckf_index_server.r_std, 1, 1, line_styles{j}, std_line_styles{j});
     select_line_handles((j-1) * 3 + (1:3)) = line_handles(1:3);
     select_line_handles(3 * num_results + (j-1) * 3 + (1:3)) = line_handles(4:6);
@@ -113,7 +113,7 @@ export_fig(outputfig);
 figure;
 select_line_handles = zeros(1, 6 * num_results);
 for j = 1:length(msckf_traj_list)
-    line_handles = draw_ekf_triplet_with_std(data_diff_list{j}, msckf_index_server.q(1:3), ...
+    line_handles = drawMeanAndStdBound(data_diff_list{j}, msckf_index_server.q(1:3), ...
         msckf_index_server.q_std, 180/pi, 1, line_styles{j}, std_line_styles{j});
     select_line_handles((j-1) * 3 + (1:3)) = line_handles(1:3);
     select_line_handles(3 * num_results + (j-1) * 3 + (1:3)) = line_handles(4:6);
@@ -131,7 +131,7 @@ export_fig(outputfig);
 figure;
 select_line_handles = zeros(1, 6 * num_results);
 for j = 1:length(msckf_traj_list)
-    line_handles = draw_ekf_triplet_with_std(data_diff_list{j}, msckf_index_server.v, ...
+    line_handles = drawMeanAndStdBound(data_diff_list{j}, msckf_index_server.v, ...
         msckf_index_server.v_std, 1, 1, line_styles{j}, std_line_styles{j});
     select_line_handles((j-1) * 3 + (1:3)) = line_handles(1:3);
     select_line_handles(3 * num_results + (j-1) * 3 + (1:3)) = line_handles(4:6);

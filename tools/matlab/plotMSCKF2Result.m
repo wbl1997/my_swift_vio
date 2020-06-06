@@ -201,19 +201,19 @@ if(~isempty(gt))
     rmse/distance
 
     figure;
-    draw_ekf_triplet_with_std(data_diff, msckf_index_server.r, msckf_index_server.r_std, 1, 1);
+    drawMeanAndStdBound(data_diff, msckf_index_server.r, msckf_index_server.r_std, 1, 1);
     ylabel('$\delta \mathbf{t}_{WB}$ (m)', 'Interpreter', 'Latex');
     saveas(gcf,[output_dir, '\Error p_WB'],'epsc');
 
     figure;
-    draw_ekf_triplet_with_std(data_diff, msckf_index_server.q(1:3), ...
+    drawMeanAndStdBound(data_diff, msckf_index_server.q(1:3), ...
         msckf_index_server.q_std, 180/pi, 1);
     ylabel('$\delta \mathbf{\theta}_{WB}{} (^{\circ})$', 'Interpreter', 'Latex');
     saveas(gcf,[output_dir, '\Error R_WB'],'epsc');
 
     figure;
     if size(gt, 2) >= 11
-        draw_ekf_triplet_with_std(data_diff, msckf_index_server.v, ...
+        drawMeanAndStdBound(data_diff, msckf_index_server.v, ...
             msckf_index_server.v_std, 1, 1);
         ylabel('$\mathbf{v}_{WB} (m/s)$', 'Interpreter', 'Latex');
         saveas(gcf,[output_dir, '\Error v_WB'],'epsc');
@@ -248,7 +248,7 @@ if msckf_index_server.v_std(1) > size(data, 2)
 end
 
 figure;
-draw_ekf_triplet_with_std(data, msckf_index_server.v, msckf_index_server.v_std);
+drawMeanAndStdBound(data, msckf_index_server.v, msckf_index_server.v_std);
 ylabel('v_{GB}[m/s]');
 outputfig = [output_dir, '/v_GB.eps'];
 if exist(outputfig, 'file')==2
@@ -257,7 +257,7 @@ end
 export_fig(outputfig);
 
 figure;
-draw_ekf_triplet_with_std(data, msckf_index_server.b_g, msckf_index_server.b_g_std, 180/pi);
+drawMeanAndStdBound(data, msckf_index_server.b_g, msckf_index_server.b_g_std, 180/pi);
 ylabel(['b_g[' char(176) '/s]']);
 outputfig = [output_dir, '/b_g.eps'];
 if exist(outputfig, 'file')==2
@@ -266,7 +266,7 @@ end
 export_fig(outputfig);
 
 figure;
-draw_ekf_triplet_with_std(data, msckf_index_server.b_a, msckf_index_server.b_a_std, 1.0);
+drawMeanAndStdBound(data, msckf_index_server.b_a, msckf_index_server.b_a_std, 1.0);
 
 ylabel('b_a[m/s^2]');
 outputfig = [output_dir, '/b_a.eps'];
@@ -278,7 +278,7 @@ export_fig(outputfig);
 if ~isempty(msckf_index_server.p_BC_std)
 figure;
 
-draw_ekf_triplet_with_std(data, msckf_index_server.p_BC, msckf_index_server.p_BC_std, 100.0);
+drawMeanAndStdBound(data, msckf_index_server.p_BC, msckf_index_server.p_BC_std, 100.0);
 
 ylabel('p_{BC}[cm]');
 outputfig = [output_dir, '/p_BC.eps'];
@@ -296,7 +296,7 @@ if ~isempty(msckf_index_server.fxy_cxy_std)
 figure;
 data(:, msckf_index_server.fxy_cxy) = data(:, msckf_index_server.fxy_cxy) - ...
     repmat(nominal_intrinsics, size(data, 1), 1);
-draw_ekf_triplet_with_std(data, msckf_index_server.fxy_cxy, ...
+drawMeanAndStdBound(data, msckf_index_server.fxy_cxy, ...
     msckf_index_server.fxy_cxy_std);
 legend('f_x','f_y','c_x','c_y','3\sigma_f_x', '3\sigma_f_y','3\sigma_c_x','3\sigma_c_y');
 ylabel('deviation from nominal values ($f_x$, $f_y$), ($c_x$, $c_y$)[px]', 'Interpreter', 'Latex');
@@ -309,7 +309,7 @@ end
 
 if ~isempty(msckf_index_server.k1_k2_std)
 figure;
-draw_ekf_triplet_with_std(data, msckf_index_server.k1_k2, msckf_index_server.k1_k2_std);
+drawMeanAndStdBound(data, msckf_index_server.k1_k2, msckf_index_server.k1_k2_std);
 ylabel('k_1 and k_2[1]');
 legend('k_1','k_2', '3\sigma_{k_1}', '3\sigma_{k_2}');
 outputfig = [output_dir, '/k1_k2.eps'];
@@ -322,7 +322,7 @@ end
 if ~isempty(msckf_index_server.p1_p2_std)
 figure;
 p1p2Scale = 1e2;
-draw_ekf_triplet_with_std(data, msckf_index_server.p1_p2, msckf_index_server.p1_p2_std, p1p2Scale);
+drawMeanAndStdBound(data, msckf_index_server.p1_p2, msckf_index_server.p1_p2_std, p1p2Scale);
 ylabel('p_1 and p_2[0.01]');
 legend('p_1','p_2', '3\sigma_{p_1}', '3\sigma_{p_2}');
 outputfig = [output_dir, '/p1_p2.eps'];

@@ -13,6 +13,15 @@ function drawColumnsInMultipleMatrices(matrices, matrixLabels, ...
 if nargin < 6
     dataMultiplier = 1.0;
 end
+if nargin < 5
+    matrixColumnStyles =  {
+        {'-r', '-g', '-b', '-k', '.k', '.b', ...
+        '-c', '-m', '-y'},
+        {'--r', '--g', '--b', '--k', '-.k', '-.b', ...
+        '--c', '--m', '--y'},
+        {':r', ':g', ':b', ':k', '-.r', '-.g', ...
+        ':c', ':m', ':y'}};
+end
 legend_list = cell(1, length(matrices) * length(columnLabels));
 startTime = 0;
 dataBegin = 0;
