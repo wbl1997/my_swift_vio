@@ -159,12 +159,12 @@ void addLandmarkNoise(
 
 void initCameraNoiseParams(
     okvis::ExtrinsicsEstimationParameters* cameraNoiseParams,
-    double sigma_abs_position, bool fixCameraInteranlParams) {
+    double sigma_abs_position, bool fixCameraInternalParams) {
   cameraNoiseParams->sigma_absolute_translation = sigma_abs_position;
   cameraNoiseParams->sigma_absolute_orientation = 0;
   cameraNoiseParams->sigma_c_relative_translation = 0;
   cameraNoiseParams->sigma_c_relative_orientation = 0;
-  if (fixCameraInteranlParams) {
+  if (fixCameraInternalParams) {
     cameraNoiseParams->sigma_focal_length = 0;
     cameraNoiseParams->sigma_principal_point = 0;
     cameraNoiseParams->sigma_distortion.resize(5, 0);

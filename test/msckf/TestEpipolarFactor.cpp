@@ -22,8 +22,8 @@ TEST(EpipolarFactor, Jacobians) {
   srand((unsigned int)time(0));
   bool rollingShutter = true;
   // create two view geometry poses, imu meas, from a simulation trajectory
-  bool addPriorNoise = false;
-  bool addSystemError = false;
+  bool noisyInitialSpeedAndBiases = false;
+  bool noisyInitialSensorParams = false;
   bool addImageNoise = true;
   double bg_std = 5e-3;
   double ba_std = 2e-2;
@@ -31,11 +31,11 @@ TEST(EpipolarFactor, Jacobians) {
   double Ts_std = 1e-3;
   double Ta_std = 5e-3;
   double sigma_td = 5e-3;
-  bool zeroImuIntrinsicParamNoise = !addSystemError;
+  bool zeroImuIntrinsicParamNoise = !noisyInitialSensorParams;
   okvis::ImuParameters imuParameters;
-  simul::initImuNoiseParams(&imuParameters, addPriorNoise, addSystemError,
-                          bg_std, ba_std, Tg_std, Ts_std, Ta_std,
-                          zeroImuIntrinsicParamNoise);
+  simul::initImuNoiseParams(&imuParameters, noisyInitialSpeedAndBiases,
+                            noisyInitialSensorParams, bg_std, ba_std, Tg_std,
+                            Ts_std, Ta_std, zeroImuIntrinsicParamNoise);
 
   std::shared_ptr<simul::CircularSinusoidalTrajectory> cst;
   cst.reset(new simul::RoundedSquare(imuParameters.rate,

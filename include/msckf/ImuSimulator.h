@@ -431,8 +431,8 @@ Eigen::Matrix2d rotMat2d(double theta);
 /**
  * @brief initImuNoiseParams
  * @param imuParameters
- * @param addPriorNoise
- * @param addSystemError
+ * @param noisyInitialSpeedAndBiases
+ * @param noisyInitialSensorParams
  * @param sigma_bg std dev of initial gyroscope bias.
  * @param sigma_ba std dev of initial accelerometer bias.
  * @param std_Ta_elem
@@ -441,8 +441,8 @@ Eigen::Matrix2d rotMat2d(double theta);
  *     to fix IMU intrinsic parameters in estimator.
  */
 void initImuNoiseParams(
-    okvis::ImuParameters* imuParameters, bool addPriorNoise,
-    bool addSystemError,
+    okvis::ImuParameters* imuParameters, bool noisyInitialSpeedAndBiases,
+    bool noisyInitialSensorParams,
     double sigma_bg, double sigma_ba, double std_Tg_elem,
     double std_Ts_elem, double std_Ta_elem,
     bool fixImuInternalParams);

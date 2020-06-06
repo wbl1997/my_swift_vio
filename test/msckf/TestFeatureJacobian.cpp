@@ -122,13 +122,13 @@ void testPointLandmarkJacobian(std::string projOptModelName,
                                int landmarkModelId = 0,
                                bool examineMeasurementJacobian = false) {
   simul::VioTestSystemBuilder vioSystemBuilder;
-  bool addPriorNoise = true;
+  bool noisyInitialSpeedAndBiases = true;
   bool useEpipolarConstraint = false;
   double noise_factor = 1.0;
   simul::SimCameraModelType cameraModelId = simul::SimCameraModelType::EUROC;
   simul::CameraOrientation cameraOrientationId = simul::CameraOrientation::Forward;
   double landmarkRadius = 5;
-  okvis::TestSetting testSetting(true, addPriorNoise, false, true, true, noise_factor,
+  okvis::TestSetting testSetting(true, noisyInitialSpeedAndBiases, false, true, true, noise_factor,
                                  noise_factor, okvis::EstimatorAlgorithm::MSCKF,
                                  useEpipolarConstraint,
                                  cameraObservationModelId, landmarkModelId,

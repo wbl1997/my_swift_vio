@@ -10,13 +10,11 @@
 
 DEFINE_bool(zero_camera_intrinsic_param_noise, true,
             "Set the variance of the camera intrinsic parameters zero."
-            " Otherwise, these parameters will be estimated by the filter."
-            "If addSystemNoise is true, this parameter will have no effect.");
+            " Otherwise, these parameters will be estimated by the filter.");
 
 DEFINE_bool(zero_imu_intrinsic_param_noise, true,
             "Set the variance of the IMU augmented intrinsic parameters zero."
-            " Otherwise, these parameters will be estimated by the filter."
-            "If addSystemNoise is true, this parameter will have no effect.");
+            " Otherwise, these parameters will be estimated by the filter.");
 
 namespace simul {
 void VioTestSystemBuilder::createVioSystem(
@@ -36,17 +34,14 @@ void VioTestSystemBuilder::createVioSystem(
   double Ta_std = 5e-3;
   bool zeroCameraIntrinsicParamNoise = FLAGS_zero_camera_intrinsic_param_noise;
   bool zeroImuIntrinsicParamNoise = FLAGS_zero_imu_intrinsic_param_noise;
-  if (testSetting.addSystemError) {
-    zeroCameraIntrinsicParamNoise = false;
-    zeroImuIntrinsicParamNoise = false;
-  }
+
   okvis::ExtrinsicsEstimationParameters extrinsicsEstimationParameters;
   initCameraNoiseParams(&extrinsicsEstimationParameters, pCB_std,
                         zeroCameraIntrinsicParamNoise);
 
   okvis::ImuParameters imuParameters;
-  simul::initImuNoiseParams(&imuParameters, testSetting.addPriorNoise,
-                          testSetting.addSystemError, bg_std, ba_std,
+  simul::initImuNoiseParams(&imuParameters, testSetting.noisyInitialSpeedAndBiases,
+                          testSetting.noisyInitialSensorParams, bg_std, ba_std,
                           Tg_std, Ts_std, Ta_std,
                           zeroImuIntrinsicParamNoise);
   imuModelType_ = imuParameters.model_type;
@@ -116,7 +111,7 @@ void VioTestSystemBuilder::createVioSystem(
       circularSinusoidalTrajectory->computeGlobalPose(startEpoch);
   Eigen::Vector3d p_WS = truePose.r();
   Eigen::Vector3d v_WS = circularSinusoidalTrajectory->computeGlobalLinearVelocity(startEpoch);
-  if (testSetting.addPriorNoise) {
+  if (testSetting.noisyInitialSpeedAndBiases) {
     v_WS += vio::Sample::gaussian(1, 3).cwiseProduct(initialNavState_.std_v_WS);
   }
 
@@ -172,7 +167,7 @@ void VioTestSystemBuilder::createVioSystem(
   // camera system used for initilizing the estimator
   std::shared_ptr<okvis::cameras::CameraBase> cameraGeometry2;
   std::shared_ptr<okvis::cameras::NCameraSystem> cameraSystem2;
-  if (testSetting.addSystemError) {
+  if (testSetting.noisyInitialSensorParams) {
     csc.createNoisyCameraSystem(&cameraGeometry2, &cameraSystem2,
                                 extrinsicsEstimationParameters);
   } else {

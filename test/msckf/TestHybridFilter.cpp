@@ -29,14 +29,16 @@
 #include <msckf/VioTestSystemBuilder.hpp>
 
 DEFINE_bool(
-    add_prior_noise, true,
-    "add noise to initial states, including velocity, gyro bias, accelerometer "
-    "bias");
+    noisyInitialSpeedAndBiases, true,
+    "add noise to the initial value of velocity, gyro bias, accelerometer "
+    "bias which is used to initialize an estimator.");
 
-DEFINE_bool(
-    add_system_error, false,
-    "add noise to sensor parameters, including camera extrinsic, intrinsic "
-    "and temporal parameters, and IMU parameters.");
+DEFINE_bool(noisyInitialSensorParams, false,
+            "add noise to the initial value of sensor parameters, including "
+            "camera extrinsic, intrinsic "
+            "and temporal parameters, and IMU parameters except for biases "
+            "which is used to initialize an estimator. But the noise may be "
+            "zero by setting e.g. zero_imu_intrinsic_param_noise");
 
 DEFINE_int32(num_runs, 5, "How many times to run one simulation?");
 
@@ -50,9 +52,11 @@ DEFINE_double(
     sim_frame_readout_time_sec, 0.0,
     "readout time for one frame in secs");
 
-DEFINE_double(sim_imu_noise_factor, 1.0, "downscale the IMU noise by this factor");
+DEFINE_double(sim_imu_noise_factor, 1.0,
+              "weaken the IMU noise added to IMU readings by this factor");
 
-DEFINE_double(sim_imu_bias_noise_factor, 1.0, "downscale the IMU BIAS noise by this factor");
+DEFINE_double(sim_imu_bias_noise_factor, 1.0,
+              "weaken the IMU BIAS noise added to IMU readings by this factor");
 
 DEFINE_string(sim_trajectory_label, "WavyCircle",
               "Ball has the most exciting motion, wavycircle is general");
@@ -655,8 +659,8 @@ TEST(DeadreckoningM, TrajectoryLabel) {
   int landmarkModelId = 1;
   double landmarkRadius = 5;
   okvis::TestSetting testSetting(
-      true, FLAGS_add_prior_noise, FLAGS_add_system_error, addImageNoise,
-      useImageObservation, FLAGS_sim_imu_noise_factor,
+      true, FLAGS_noisyInitialSpeedAndBiases, FLAGS_noisyInitialSensorParams,
+      addImageNoise, useImageObservation, FLAGS_sim_imu_noise_factor,
       FLAGS_sim_imu_bias_noise_factor, okvis::EstimatorAlgorithm::MSCKF,
       useEpipolarConstraint, cameraObservationModelId, landmarkModelId,
       simul::SimCameraModelType::EUROC, simul::CameraOrientation::Forward,
@@ -673,8 +677,8 @@ TEST(DeadreckoningO, TrajectoryLabel) {
   int landmarkModelId = 0;
   double landmarkRadius = 5;
   okvis::TestSetting testSetting(
-      true, FLAGS_add_prior_noise, FLAGS_add_system_error, addImageNoise,
-      useImageObservation, FLAGS_sim_imu_noise_factor,
+      true, FLAGS_noisyInitialSpeedAndBiases, FLAGS_noisyInitialSensorParams,
+      addImageNoise, useImageObservation, FLAGS_sim_imu_noise_factor,
       FLAGS_sim_imu_bias_noise_factor, okvis::EstimatorAlgorithm::OKVIS,
       useEpipolarConstraint, cameraObservationModelId, landmarkModelId,
       simul::SimCameraModelType::EUROC, simul::CameraOrientation::Forward,
@@ -691,8 +695,8 @@ TEST(MSCKF, TrajectoryLabel) {
   int landmarkModelId = 1;
   double landmarkRadius = 5;
   okvis::TestSetting testSetting(
-      true, FLAGS_add_prior_noise, FLAGS_add_system_error, addImageNoise,
-      useImageObservation, FLAGS_sim_imu_noise_factor,
+      true, FLAGS_noisyInitialSpeedAndBiases, FLAGS_noisyInitialSensorParams,
+      addImageNoise, useImageObservation, FLAGS_sim_imu_noise_factor,
       FLAGS_sim_imu_bias_noise_factor, okvis::EstimatorAlgorithm::MSCKF,
       useEpipolarConstraint, cameraObservationModelId, landmarkModelId,
       simul::SimCameraModelType::EUROC, simul::CameraOrientation::Forward,
@@ -709,14 +713,14 @@ TEST(MSCKF, HuaiThesis) {
   int landmarkModelId = 1;
   double landmarkRadius = 5;
   okvis::TestSetting testSetting(
-      true, FLAGS_add_prior_noise, FLAGS_add_system_error, addImageNoise,
-      useImageObservation, FLAGS_sim_imu_noise_factor,
+      true, FLAGS_noisyInitialSpeedAndBiases, FLAGS_noisyInitialSensorParams,
+      addImageNoise, useImageObservation, FLAGS_sim_imu_noise_factor,
       FLAGS_sim_imu_bias_noise_factor, okvis::EstimatorAlgorithm::MSCKF,
       useEpipolarConstraint, cameraObservationModelId, landmarkModelId,
       simul::SimCameraModelType::EUROC, simul::CameraOrientation::Forward,
       okvis::LandmarkGridType::FourWallsFloorCeiling, landmarkRadius);
-  testHybridFilterSinusoid(testSetting, FLAGS_log_dir, "MSCKF",
-                           "Ball", FLAGS_num_runs);
+  testHybridFilterSinusoid(testSetting, FLAGS_log_dir, "MSCKF", "Ball",
+                           FLAGS_num_runs);
 }
 
 TEST(MSCKF, CircleFarPoints) {
@@ -727,8 +731,8 @@ TEST(MSCKF, CircleFarPoints) {
   bool useEpipolarConstraint = false;
   double landmarkRadius = 50;
   okvis::TestSetting testSetting(
-      true, FLAGS_add_prior_noise, FLAGS_add_system_error, addImageNoise,
-      useImageObservation, FLAGS_sim_imu_noise_factor,
+      true, FLAGS_noisyInitialSpeedAndBiases, FLAGS_noisyInitialSensorParams,
+      addImageNoise, useImageObservation, FLAGS_sim_imu_noise_factor,
       FLAGS_sim_imu_bias_noise_factor, okvis::EstimatorAlgorithm::MSCKF,
       useEpipolarConstraint, cameraObservationModelId, landmarkModelId,
       simul::SimCameraModelType::EUROC, simul::CameraOrientation::Forward,
@@ -745,8 +749,8 @@ TEST(General, TrajectoryLabel) {
   int landmarkModelId = 0;
   double landmarkRadius = 5;
   okvis::TestSetting testSetting(
-      true, FLAGS_add_prior_noise, FLAGS_add_system_error, addImageNoise,
-      useImageObservation, FLAGS_sim_imu_noise_factor,
+      true, FLAGS_noisyInitialSpeedAndBiases, FLAGS_noisyInitialSensorParams,
+      addImageNoise, useImageObservation, FLAGS_sim_imu_noise_factor,
       FLAGS_sim_imu_bias_noise_factor, okvis::EstimatorAlgorithm::General,
       useEpipolarConstraint, cameraObservationModelId, landmarkModelId,
       simul::SimCameraModelType::EUROC, simul::CameraOrientation::Forward,
@@ -763,8 +767,8 @@ TEST(OKVIS, TrajectoryLabel) {
   int landmarkModelId = 0;
   double landmarkRadius = 5;
   okvis::TestSetting testSetting(
-      true, FLAGS_add_prior_noise, FLAGS_add_system_error, addImageNoise,
-      useImageObservation, FLAGS_sim_imu_noise_factor,
+      true, FLAGS_noisyInitialSpeedAndBiases, FLAGS_noisyInitialSensorParams,
+      addImageNoise, useImageObservation, FLAGS_sim_imu_noise_factor,
       FLAGS_sim_imu_bias_noise_factor, okvis::EstimatorAlgorithm::OKVIS,
       useEpipolarConstraint, cameraObservationModelId, landmarkModelId,
       simul::SimCameraModelType::EUROC, simul::CameraOrientation::Forward,
@@ -781,8 +785,8 @@ TEST(MSCKFWithReprojectionErrorPAP, TrajectoryLabel) {
   int landmarkModelId = 2;
   double landmarkRadius = 5;
   okvis::TestSetting testSetting(
-      true, FLAGS_add_prior_noise, FLAGS_add_system_error, addImageNoise,
-      useImageObservation, FLAGS_sim_imu_noise_factor,
+      true, FLAGS_noisyInitialSpeedAndBiases, FLAGS_noisyInitialSensorParams,
+      addImageNoise, useImageObservation, FLAGS_sim_imu_noise_factor,
       FLAGS_sim_imu_bias_noise_factor, okvis::EstimatorAlgorithm::MSCKF,
       useEpipolarConstraint, cameraObservationModelId, landmarkModelId,
       simul::SimCameraModelType::EUROC, simul::CameraOrientation::Forward,
@@ -800,15 +804,14 @@ TEST(MSCKFWithEuclidean, TrajectoryLabel) {
   int landmarkModelId = 0;
   double landmarkRadius = 5;
   okvis::TestSetting testSetting(
-      true, FLAGS_add_prior_noise, FLAGS_add_system_error, addImageNoise,
-      useImageObservation, FLAGS_sim_imu_noise_factor,
+      true, FLAGS_noisyInitialSpeedAndBiases, FLAGS_noisyInitialSensorParams,
+      addImageNoise, useImageObservation, FLAGS_sim_imu_noise_factor,
       FLAGS_sim_imu_bias_noise_factor, okvis::EstimatorAlgorithm::MSCKF,
       useEpipolarConstraint, cameraObservationModelId, landmarkModelId,
       simul::SimCameraModelType::EUROC, simul::CameraOrientation::Forward,
       okvis::LandmarkGridType::FourWalls, landmarkRadius);
-  testHybridFilterSinusoid(testSetting, FLAGS_log_dir,
-                           "MSCKFWithEuclidean", FLAGS_sim_trajectory_label,
-                           FLAGS_num_runs);
+  testHybridFilterSinusoid(testSetting, FLAGS_log_dir, "MSCKFWithEuclidean",
+                           FLAGS_sim_trajectory_label, FLAGS_num_runs);
 }
 
 TEST(SlidingWindowSmoother, TrajectoryLabel) {
@@ -819,8 +822,8 @@ TEST(SlidingWindowSmoother, TrajectoryLabel) {
   int landmarkModelId = 0;
   double landmarkRadius = 5;
   okvis::TestSetting testSetting(
-      true, FLAGS_add_prior_noise, FLAGS_add_system_error, addImageNoise,
-      useImageObservation, FLAGS_sim_imu_noise_factor,
+      true, FLAGS_noisyInitialSpeedAndBiases, FLAGS_noisyInitialSensorParams,
+      addImageNoise, useImageObservation, FLAGS_sim_imu_noise_factor,
       FLAGS_sim_imu_bias_noise_factor,
       okvis::EstimatorAlgorithm::SlidingWindowSmoother, useEpipolarConstraint,
       cameraObservationModelId, landmarkModelId,
@@ -838,8 +841,8 @@ TEST(TFVIO, TrajectoryLabel) {
   int landmarkModelId = 0;
   double landmarkRadius = 5;
   okvis::TestSetting testSetting(
-      true, FLAGS_add_prior_noise, FLAGS_add_system_error, addImageNoise,
-      useImageObservation, FLAGS_sim_imu_noise_factor,
+      true, FLAGS_noisyInitialSpeedAndBiases, FLAGS_noisyInitialSensorParams,
+      addImageNoise, useImageObservation, FLAGS_sim_imu_noise_factor,
       FLAGS_sim_imu_bias_noise_factor, okvis::EstimatorAlgorithm::TFVIO,
       useEpipolarConstraint, cameraObservationModelId, landmarkModelId,
       simul::SimCameraModelType::EUROC, simul::CameraOrientation::Forward,
@@ -856,8 +859,8 @@ TEST(MSCKFWithPAP, TrajectoryLabel) {
   int landmarkModelId = 2;
   double landmarkRadius = 5;
   okvis::TestSetting testSetting(
-      true, FLAGS_add_prior_noise, FLAGS_add_system_error, addImageNoise,
-      useImageObservation, FLAGS_sim_imu_noise_factor,
+      true, FLAGS_noisyInitialSpeedAndBiases, FLAGS_noisyInitialSensorParams,
+      addImageNoise, useImageObservation, FLAGS_sim_imu_noise_factor,
       FLAGS_sim_imu_bias_noise_factor, okvis::EstimatorAlgorithm::MSCKF,
       useEpipolarConstraint, cameraObservationModelId, landmarkModelId,
       simul::SimCameraModelType::EUROC, simul::CameraOrientation::Forward,
@@ -874,8 +877,8 @@ TEST(MSCKFWithPAP, SquircleBackward) {
   int landmarkModelId = 2;
   double landmarkRadius = 5;
   okvis::TestSetting testSetting(
-      true, FLAGS_add_prior_noise, FLAGS_add_system_error, addImageNoise,
-      useImageObservation, FLAGS_sim_imu_noise_factor,
+      true, FLAGS_noisyInitialSpeedAndBiases, FLAGS_noisyInitialSensorParams,
+      addImageNoise, useImageObservation, FLAGS_sim_imu_noise_factor,
       FLAGS_sim_imu_bias_noise_factor, okvis::EstimatorAlgorithm::MSCKF,
       useEpipolarConstraint, cameraObservationModelId, landmarkModelId,
       simul::SimCameraModelType::EUROC, simul::CameraOrientation::Backward,
@@ -892,8 +895,8 @@ TEST(MSCKFWithPAP, SquircleSideways) {
   int landmarkModelId = 2;
   double landmarkRadius = 5;
   okvis::TestSetting testSetting(
-      true, FLAGS_add_prior_noise, FLAGS_add_system_error, addImageNoise,
-      useImageObservation, FLAGS_sim_imu_noise_factor,
+      true, FLAGS_noisyInitialSpeedAndBiases, FLAGS_noisyInitialSensorParams,
+      addImageNoise, useImageObservation, FLAGS_sim_imu_noise_factor,
       FLAGS_sim_imu_bias_noise_factor, okvis::EstimatorAlgorithm::MSCKF,
       useEpipolarConstraint, cameraObservationModelId, landmarkModelId,
       simul::SimCameraModelType::EUROC, simul::CameraOrientation::Right,
@@ -910,8 +913,8 @@ TEST(MSCKFWithEpipolarConstraint, TrajectoryLabel) {
   int landmarkModelId = 1;
   double landmarkRadius = 5;
   okvis::TestSetting testSetting(
-      true, FLAGS_add_prior_noise, FLAGS_add_system_error, addImageNoise,
-      useImageObservation, FLAGS_sim_imu_noise_factor,
+      true, FLAGS_noisyInitialSpeedAndBiases, FLAGS_noisyInitialSensorParams,
+      addImageNoise, useImageObservation, FLAGS_sim_imu_noise_factor,
       FLAGS_sim_imu_bias_noise_factor, okvis::EstimatorAlgorithm::MSCKF,
       useEpipolarConstraint, cameraObservationModelId, landmarkModelId,
       simul::SimCameraModelType::EUROC, simul::CameraOrientation::Forward,
@@ -929,8 +932,8 @@ TEST(MSCKFWithEpipolarConstraint, CircleFarPoints) {
   int landmarkModelId = 1;
   double landmarkRadius = 50;
   okvis::TestSetting testSetting(
-      true, FLAGS_add_prior_noise, FLAGS_add_system_error, addImageNoise,
-      useImageObservation, FLAGS_sim_imu_noise_factor,
+      true, FLAGS_noisyInitialSpeedAndBiases, FLAGS_noisyInitialSensorParams,
+      addImageNoise, useImageObservation, FLAGS_sim_imu_noise_factor,
       FLAGS_sim_imu_bias_noise_factor, okvis::EstimatorAlgorithm::MSCKF,
       useEpipolarConstraint, cameraObservationModelId, landmarkModelId,
       simul::SimCameraModelType::EUROC, simul::CameraOrientation::Forward,

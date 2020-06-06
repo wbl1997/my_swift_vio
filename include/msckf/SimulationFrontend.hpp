@@ -183,8 +183,8 @@ void initCameraNoiseParams(
 
 struct TestSetting {
   bool addImuNoise; ///< add noise to IMU readings?
-  bool addPriorNoise; ///< add noise to the prior position, quaternion, velocity, bias in gyro, bias in accelerometer?
-  bool addSystemError; ///< add system error to IMU on scale and misalignment and g-sensitivity and to camera on projection and distortion parameters?
+  bool noisyInitialSpeedAndBiases; ///< add noise to the prior position, quaternion, velocity, bias in gyro, bias in accelerometer?
+  bool noisyInitialSensorParams; ///< add system error to IMU on scale and misalignment and g-sensitivity and to camera on projection and distortion parameters?
   bool addImageNoise; ///< add noise to image measurements in pixels?
   bool useImageObservs; ///< use image observations in an estimator?
 
@@ -207,8 +207,8 @@ struct TestSetting {
   LandmarkGridType gridType;
   double landmarkRadius; // radius of the cylinder on whose surface the landmarks are distributed.
 
-  TestSetting(bool _addImuNoise = true, bool _addPriorNoise = true,
-              bool _addSystemError = false, bool _addImageNoise = true,
+  TestSetting(bool _addImuNoise = true, bool _noisyInitialSpeedAndBiases = true,
+              bool _noisyInitialSensorParams = false, bool _addImageNoise = true,
               bool _useImageObservs = true, double _sim_ga_noise_factor = 1.0,
               double _sim_ga_bias_noise_factor = 1.0,
               okvis::EstimatorAlgorithm _estimator_algorithm =
@@ -222,8 +222,8 @@ struct TestSetting {
               LandmarkGridType _gridType = LandmarkGridType::FourWalls,
               double _landmarkRadius = 5)
       : addImuNoise(_addImuNoise),
-        addPriorNoise(_addPriorNoise),
-        addSystemError(_addSystemError),
+        noisyInitialSpeedAndBiases(_noisyInitialSpeedAndBiases),
+        noisyInitialSensorParams(_noisyInitialSensorParams),
         addImageNoise(_addImageNoise),
         useImageObservs(_useImageObservs),
         sim_ga_noise_factor(_sim_ga_noise_factor),
@@ -239,12 +239,12 @@ struct TestSetting {
 
   std::string print() const {
     std::stringstream ss;
-    ss << "addImuNoise " << addImuNoise << " addPriorNoise " << addPriorNoise
-       << " addSystemError " << addSystemError << " addImageNoise "
-       << addImageNoise << " useImageObservs " << useImageObservs
-       << " sim_ga_noise_factor " << sim_ga_noise_factor
-       << " sim_ga_bias_noise_factor " << sim_ga_bias_noise_factor
-       << " stimator_algorithm "
+    ss << "addImuNoise " << addImuNoise << " noisyInitialSpeedAndBiases "
+       << noisyInitialSpeedAndBiases << " noisyInitialSensorParams "
+       << noisyInitialSensorParams << " addImageNoise " << addImageNoise
+       << " useImageObservs " << useImageObservs << " sim_ga_noise_factor "
+       << sim_ga_noise_factor << " sim_ga_bias_noise_factor "
+       << sim_ga_bias_noise_factor << " stimator_algorithm "
        << okvis::EstimatorAlgorithmIdToName(estimator_algorithm)
        << " use epipolar constraint? " << useEpipolarConstraint
        << " camera observation model id " << cameraObservationModelId
