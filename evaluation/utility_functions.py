@@ -13,7 +13,7 @@ def subprocess_cmd(command, out_stream=None, err_stream=None, timeout=None):
         # https://thraxil.org/users/anders/posts/2008/03/13/Subprocess-Hanging-PIPE-is-your-enemy/
         # we should set stdout stderr to None in order to avoid external program choke.
         rc = subprocess.call(command, stdout=out_stream, stderr=err_stream,
-                             shell=True, close_fds=True, timeout=timeout)
+                             shell=True, close_fds=True)
     except Exception as err:
         err_msg = "Unexpected error:{}".format(err)
         print(textwrap.fill(err_msg, 120))

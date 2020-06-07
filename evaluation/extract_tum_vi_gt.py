@@ -22,7 +22,8 @@ if __name__ == '__main__':
 
     for bagname in bag_with_gt_list:
         shortname = os.path.basename(os.path.splitext(bagname)[0])
-        cmd = 'python2 {} {} /vrpn_client/raw_transform --msg_type=TransformStamped ' \
+        cmd = 'python {} {} /vrpn_client/raw_transform --msg_type=TransformStamped ' \
               '--output={}.txt'.format(bag_to_pose_script, bagname, shortname)
+        print cmd
         utility_functions.subprocess_cmd(cmd)
     print('Extracted ground truth for {} missions'.format(len(bag_with_gt_list)))

@@ -8,14 +8,18 @@ init(autoreset=True)
 def find_bags_with_gt(uzh_fpv_dir, bagname_key, discount_key='.orig.bag'):
     """This function finds ros bags named like 'xxx_with_gt.bag',
     works with uzh-fpv dataset."""
-    filename_list = os.listdir(uzh_fpv_dir)
-    bags_with_gt_list = []
-    for filename in filename_list:
-        if 'with_gt.bag' in filename and bagname_key in filename \
-                and discount_key not in filename:
-            bags_with_gt_list.append(os.path.join(uzh_fpv_dir, filename))
-    return bags_with_gt_list
-
+    bag_list = []
+    for dir_name, subdir_list, file_list in os.walk(uzh_fpv_dir):
+        for fname in file_list:
+            if discount_key:
+                if fname.endswith('with_gt.bag') and bagname_key in fname \
+                        and discount_key not in fname and \
+                        discount_key not in dir_name:
+                    bag_list.append(os.path.join(dir_name, fname))
+            else:
+                if fname.endswith('with_gt.bag') and bagname_key in fname:
+                    bag_list.append(os.path.join(dir_name, fname))
+    return bag_list
 
 def find_bags(root_dir, bagname_key, discount_key='.orig.bag'):
     """find bags recursively under root_dir"""

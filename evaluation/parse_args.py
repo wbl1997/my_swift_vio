@@ -6,8 +6,9 @@ def check_common_args(args):
     assert os.path.isfile(args.vio_config_yaml)
     euroc_exist = os.path.exists(args.euroc_dir)
     uzh_fpv_exist = os.path.exists(args.uzh_fpv_dir)
+    tumvi_exist = os.path.exists(args.tumvi_dir)
     homebrew_exist = os.path.exists(args.homebrew_data_dir)
-    assert euroc_exist or uzh_fpv_exist or homebrew_exist, \
+    assert euroc_exist or uzh_fpv_exist or tumvi_exist or homebrew_exist, \
         "Data dirs for euroc, uzh-fpv, and homebrew do not exist"
 
     assert os.path.exists(args.rpg_eval_tool_dir), \
