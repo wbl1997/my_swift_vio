@@ -4,6 +4,7 @@
 #include <Eigen/QR>
 
 #include <gflags/gflags.h>
+#include <glog/logging.h>
 
 #include <vio/eigen_utils.h>
 
@@ -14,12 +15,9 @@ DEFINE_double(max_inc_tol, 2,
 
 namespace okvis {
 PreconditionedEkfUpdater::PreconditionedEkfUpdater(const Eigen::MatrixXd &cov,
+                                                   int obsVarStartIndex,
                                                    int variable_dim)
-    : cov_ref_(cov), cov_dim_(cov_ref_.rows()), variable_dim_(variable_dim) {
-  if (!cov_ref_.allFinite()) {
-    std::cout << "Input cov not finite\n";
-  }
-}
+    : DefaultEkfUpdater(cov, obsVarStartIndex, variable_dim) {}
 
 Eigen::Matrix<double, Eigen::Dynamic, 1>
 PreconditionedEkfUpdater::computeCorrection(
@@ -28,8 +26,8 @@ PreconditionedEkfUpdater::computeCorrection(
     const Eigen::MatrixXd &R_q,
     const Eigen::Matrix<double, Eigen::Dynamic, 1> *totalCorrection) {
   Eigen::MatrixXd Py = T_H *
-                           cov_ref_.block(okvis::ceres::ode::OdoErrorStateDim,
-                                          okvis::ceres::ode::OdoErrorStateDim,
+                           cov_ref_.block(observationVariableStartIndex_,
+                                          observationVariableStartIndex_,
                                           variable_dim_, variable_dim_) *
                            T_H.transpose() +
                        R_q;
@@ -58,7 +56,7 @@ PreconditionedEkfUpdater::computeCorrection(
   //  PyScaledInv.setIdentity();
   //  llt_py.solveInPlace(PyScaledInv);
   //  Eigen::MatrixXd KScaled =
-  //      (cov_ref_.block(0, okvis::ceres::ode::OdoErrorStateDim, cov_dim_,
+  //      (cov_ref_.block(0, observationVariableStartIndex_, cov_dim_,
   //                         variable_dim_) *
   //       T_H.transpose()) *
   //      SVecI.asDiagonal() * PyScaledInv;
@@ -67,7 +65,7 @@ PreconditionedEkfUpdater::computeCorrection(
   Eigen::MatrixXd KScaled_transpose =
       llt_py.solve(SVecI.asDiagonal() *
                    (T_H * cov_ref_
-                              .block(0, okvis::ceres::ode::OdoErrorStateDim,
+                              .block(0, observationVariableStartIndex_,
                                      cov_dim_, variable_dim_)
                               .transpose()));
   KScaled_ = KScaled_transpose.transpose();
@@ -79,7 +77,7 @@ PreconditionedEkfUpdater::computeCorrection(
   } else {
     deltaX = KScaled_ * (rqScaled - SVecI.asDiagonal() * T_H *
                                         totalCorrection->segment(
-                                            okvis::ceres::ode::OdoErrorStateDim,
+                                            observationVariableStartIndex_,
                                             variable_dim_)) + (*totalCorrection);
   }
   if (!deltaX.allFinite()) {
@@ -87,29 +85,24 @@ PreconditionedEkfUpdater::computeCorrection(
               << rqScaled.allFinite() << " SVec1 " << SVecI.allFinite()
               << " T_H " << T_H.allFinite() << " cov_ref block a "
               << cov_ref_
-                     .block(0, okvis::ceres::ode::OdoErrorStateDim, cov_dim_,
+                     .block(0, observationVariableStartIndex_, cov_dim_,
                             variable_dim_)
                      .allFinite()
               << " block b "
-              << cov_ref_.block(okvis::ceres::ode::OdoErrorStateDim,
-                                okvis::ceres::ode::OdoErrorStateDim,
+              << cov_ref_.block(observationVariableStartIndex_,
+                                observationVariableStartIndex_,
                                 variable_dim_, variable_dim_).allFinite()
               << " R_q " << R_q.allFinite() << std::endl;
     OKVIS_ASSERT_TRUE(Exception, false, "nan in kalman filter");
   }
 
-  // for debugging
-  double tempNorm = deltaX.head<15>().lpNorm<Eigen::Infinity>();
-  if (tempNorm > FLAGS_max_inc_tol) {
-    std::cout << "PyScaled of condition number:"
-              << vio::getConditionNumberOfMatrix(PyScaled_)
-              << std::endl;
-    std::cout << "deltaX\n"
-              << deltaX.transpose() << std::endl;
-    OKVIS_ASSERT_LT(Exception, tempNorm, FLAGS_max_inc_tol,
-                    "Warn too large increment may imply wrong association ");
+  double incNorm = deltaX.head<15>().lpNorm<Eigen::Infinity>();
+  if (incNorm > FLAGS_max_inc_tol) {
+    LOG(WARNING) << "Correction in norm " << incNorm << " is greater than "
+                 << FLAGS_max_inc_tol << ".\nPyScaled of condition number: "
+                 << vio::getConditionNumberOfMatrix(PyScaled_)
+                 << "\ndeltaX: " << deltaX.transpose();
   }
-  // end debugging
   return deltaX;
 }
 
@@ -130,8 +123,11 @@ void PreconditionedEkfUpdater::updateCovariance(
 }
 
 DefaultEkfUpdater::DefaultEkfUpdater(const Eigen::MatrixXd &cov,
-                                     int variable_dim)
-    : cov_ref_(cov), cov_dim_(cov_ref_.rows()), variable_dim_(variable_dim) {
+                                     int obsVarStartIndex, int variable_dim)
+    : cov_ref_(cov),
+      cov_dim_(cov_ref_.rows()),
+      observationVariableStartIndex_(obsVarStartIndex),
+      variable_dim_(variable_dim) {
   if (!cov_ref_.allFinite()) {
     std::cout << "Input cov not finite\n";
   }
@@ -143,8 +139,8 @@ Eigen::Matrix<double, Eigen::Dynamic, 1> DefaultEkfUpdater::computeCorrection(
     const Eigen::MatrixXd &R_q,
     const Eigen::Matrix<double, Eigen::Dynamic, 1> *totalCorrection) {
   PyScaled_ = T_H *
-                  cov_ref_.block(okvis::ceres::ode::OdoErrorStateDim,
-                                 okvis::ceres::ode::OdoErrorStateDim,
+                  cov_ref_.block(observationVariableStartIndex_,
+                                 observationVariableStartIndex_,
                                  variable_dim_, variable_dim_) *
                   T_H.transpose() +
               R_q;
@@ -164,7 +160,7 @@ Eigen::Matrix<double, Eigen::Dynamic, 1> DefaultEkfUpdater::computeCorrection(
   }
   Eigen::MatrixXd KScaled_transpose =
       llt_py.solve((T_H * cov_ref_
-                              .block(0, okvis::ceres::ode::OdoErrorStateDim,
+                              .block(0, observationVariableStartIndex_,
                                      cov_dim_, variable_dim_)
                               .transpose()));
   KScaled_ = KScaled_transpose.transpose();
@@ -176,7 +172,7 @@ Eigen::Matrix<double, Eigen::Dynamic, 1> DefaultEkfUpdater::computeCorrection(
   } else {
     deltaX =
         KScaled_ * (rqScaled - T_H * totalCorrection->segment(
-                                         okvis::ceres::ode::OdoErrorStateDim,
+                                         observationVariableStartIndex_,
                                          variable_dim_)) + (*totalCorrection);
   }
   if (!deltaX.allFinite()) {
@@ -184,29 +180,26 @@ Eigen::Matrix<double, Eigen::Dynamic, 1> DefaultEkfUpdater::computeCorrection(
               << rqScaled.allFinite() << " T_H " << T_H.allFinite()
               << " cov_ref block a "
               << cov_ref_
-                     .block(0, okvis::ceres::ode::OdoErrorStateDim, cov_dim_,
+                     .block(0, observationVariableStartIndex_, cov_dim_,
                             variable_dim_)
                      .allFinite()
               << " block b "
               << cov_ref_
-                     .block(okvis::ceres::ode::OdoErrorStateDim,
-                            okvis::ceres::ode::OdoErrorStateDim, variable_dim_,
+                     .block(observationVariableStartIndex_,
+                            observationVariableStartIndex_, variable_dim_,
                             variable_dim_)
                      .allFinite()
               << " R_q " << R_q.allFinite() << std::endl;
     OKVIS_ASSERT_TRUE(Exception, false, "nan in kalman filter");
   }
 
-  // for debugging
-  double tempNorm = deltaX.head<15>().lpNorm<Eigen::Infinity>();
-  if (tempNorm > FLAGS_max_inc_tol) {
-    std::cout << "PyScaled of condition number:"
-              << vio::getConditionNumberOfMatrix(PyScaled_) << std::endl;
-    std::cout << "deltaX\n" << deltaX.transpose() << std::endl;
-    OKVIS_ASSERT_LT(Exception, tempNorm, FLAGS_max_inc_tol,
-                    "Warn too large increment may imply wrong association ");
+  double incNorm = deltaX.head<15>().lpNorm<Eigen::Infinity>();
+  if (incNorm > FLAGS_max_inc_tol) {
+    LOG(WARNING) << "Correction in norm " << incNorm << " is greater than "
+                 << FLAGS_max_inc_tol << ".\nPyScaled of condition number: "
+                 << vio::getConditionNumberOfMatrix(PyScaled_)
+                 << "\ndeltaX: " << deltaX.transpose();
   }
-  // end debugging
   return deltaX;
 }
 

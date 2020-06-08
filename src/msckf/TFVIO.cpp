@@ -165,7 +165,7 @@ void TFVIO::optimize(size_t /*numIter*/, size_t /*numThreads*/, bool verbose) {
   int numTracked = 0;
   int featureVariableDimen = cameraParamsMinimalDimFast(0u) +
                              kClonedStateMinimalDimen * statesMap_.size();
-
+  int navAndImuParamsDim = navStateAndImuParamsMinimalDim();
   for (okvis::PointMap::iterator it = landmarksMap_.begin();
        it != landmarksMap_.end(); ++it) {
     ResidualizeCase toResidualize = NotInState_NotTrackedNow;
@@ -186,9 +186,8 @@ void TFVIO::optimize(size_t /*numIter*/, size_t /*numThreads*/, bool verbose) {
   if (FLAGS_use_IEKF) {
       StatePointerAndEstimateList initialStates;
       cloneFilterStates(&initialStates);
-
       int numIteration = 0;
-      DefaultEkfUpdater pceu(covariance_, featureVariableDimen);
+      DefaultEkfUpdater pceu(covariance_, navAndImuParamsDim, featureVariableDimen);
       while (numIteration < maxNumIteration_) {
         Eigen::MatrixXd T_H, R_q;
         Eigen::Matrix<double, Eigen::Dynamic, 1> r_q;
@@ -220,7 +219,7 @@ void TFVIO::optimize(size_t /*numIter*/, size_t /*numThreads*/, bool verbose) {
       minValidStateId_ = getMinValidStateId();
       return;  // no need to optimize
     }
-    DefaultEkfUpdater pceu(covariance_, featureVariableDimen);
+    DefaultEkfUpdater pceu(covariance_, navAndImuParamsDim, featureVariableDimen);
     computeKalmanGainTimer.start();
     Eigen::Matrix<double, Eigen::Dynamic, 1> deltaX =
         pceu.computeCorrection(T_H, r_q, R_q);

@@ -89,6 +89,7 @@ int MSCKF2::marginalizeRedundantFrames(size_t numKeyframes, size_t numImuFrames)
   size_t nMarginalizedFeatures = 0u;
   int featureVariableDimen = minimalDimOfAllCameraParams() +
       kClonedStateMinimalDimen * (statesMap_.size() - 1);
+  int navAndImuParamsDim = navStateAndImuParamsMinimalDim();
   int startIndexCamParams = startIndexOfCameraParamsFast(0u);
   const Eigen::MatrixXd featureVariableCov =
       covariance_.block(startIndexCamParams, startIndexCamParams,
@@ -163,7 +164,7 @@ int MSCKF2::marginalizeRedundantFrames(size_t numKeyframes, size_t numImuFrames)
     FilterHelper::shrinkResidual(H_o, r_o, R_o, &T_H, &r_q, &R_q);
 
     // perform filter update covariance and states (EKF)
-    DefaultEkfUpdater pceu(covariance_, featureVariableDimen);
+    DefaultEkfUpdater pceu(covariance_, navAndImuParamsDim, featureVariableDimen);
     computeKalmanGainTimer.start();
     Eigen::Matrix<double, Eigen::Dynamic, 1> deltaX =
         pceu.computeCorrection(T_H, r_q, R_q);
@@ -1209,7 +1210,7 @@ void MSCKF2::optimize(size_t /*numIter*/, size_t /*numThreads*/, bool verbose) {
   int numTracked = 0;
   int featureVariableDimen = minimalDimOfAllCameraParams() +
       kClonedStateMinimalDimen * (statesMap_.size() - 1);
-
+  int navAndImuParamsDim = navStateAndImuParamsMinimalDim();
   for (okvis::PointMap::iterator it = landmarksMap_.begin(); it != landmarksMap_.end(); ++it) {
     ResidualizeCase toResidualize = NotInState_NotTrackedNow;
     for (auto itObs = it->second.observations.rbegin(),
@@ -1245,7 +1246,7 @@ void MSCKF2::optimize(size_t /*numIter*/, size_t /*numThreads*/, bool verbose) {
     cloneFilterStates(&initialStates);
 
     int numIteration = 0;
-    DefaultEkfUpdater pceu(covariance_, featureVariableDimen);
+    DefaultEkfUpdater pceu(covariance_, navAndImuParamsDim, featureVariableDimen);
     while (numIteration < maxNumIteration_) {
       Eigen::MatrixXd T_H, R_q;
       Eigen::Matrix<double, Eigen::Dynamic, 1> r_q;
@@ -1278,7 +1279,7 @@ void MSCKF2::optimize(size_t /*numIter*/, size_t /*numThreads*/, bool verbose) {
       minValidStateId_ = getMinValidStateId();
       return;  // no need to optimize
     }
-    DefaultEkfUpdater pceu(covariance_, featureVariableDimen);
+    DefaultEkfUpdater pceu(covariance_, navAndImuParamsDim, featureVariableDimen);
     computeKalmanGainTimer.start();
     Eigen::Matrix<double, Eigen::Dynamic, 1> deltaX =
         pceu.computeCorrection(T_H, r_q, R_q);

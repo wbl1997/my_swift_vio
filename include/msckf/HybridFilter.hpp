@@ -321,11 +321,10 @@ class HybridFilter : public Estimator {
                              .startIndexInCov +
                          1;
     size_t totalImuDim = statesMap_.rbegin()
-                             ->second.sensors.at(SensorStates::Imu)
-                             .back()
-                             .at(ImuSensorStates::TA)
-                             .startIndexInCov +
-                         9;
+                             ->second.sensors.at(SensorStates::Camera)
+                             .at(0u)
+                             .at(CameraSensorStates::T_SCi)
+                             .startIndexInCov;
     return totalCamDim - totalImuDim;
   }
 
@@ -366,7 +365,7 @@ class HybridFilter : public Estimator {
   }
 
   inline size_t startIndexOfClonedStates() const {
-    size_t dim = okvis::ceres::ode::NavErrorStateDim + imu_rig_.getImuParamsMinimalDim(0);
+    size_t dim = okvis::ceres::ode::kNavErrorStateDim + imu_rig_.getImuParamsMinimalDim(0);
     for (size_t j = 0; j < camera_rig_.numberCameras(); ++j) {
       dim += cameraParamsMinimalDimen(j);
     }
@@ -388,7 +387,7 @@ class HybridFilter : public Estimator {
   }
 
   inline size_t startIndexOfCameraParams(size_t camIdx = 0u) const {
-    size_t dim = okvis::ceres::ode::NavErrorStateDim + imu_rig_.getImuParamsMinimalDim(0);
+    size_t dim = okvis::ceres::ode::kNavErrorStateDim + imu_rig_.getImuParamsMinimalDim(0);
     for (size_t i = 0u; i < camIdx; ++i) {
       dim += cameraParamsMinimalDimen(i);
     }
@@ -426,12 +425,22 @@ class HybridFilter : public Estimator {
                                    .at(camParamBlockName)
                                    .startIndexInCov;
     size_t totalExclusiveDim = statesMap_.rbegin()
-                                   ->second.sensors.at(SensorStates::Imu)
-                                   .back()
-                                   .at(ImuSensorStates::TA)
-                                   .startIndexInCov +
-                               9;
+                                   ->second.sensors.at(SensorStates::Camera)
+                                   .at(0u)
+                                   .at(CameraSensorStates::T_SCi)
+                                   .startIndexInCov;
     return totalInclusiveDim - totalExclusiveDim;
+  }
+
+  /**
+   * @brief navStateAndImuParamsMinimalDim
+   * @warning assume only one IMU is used.
+   * @param imuIdx
+   * @return
+   */
+  inline size_t navStateAndImuParamsMinimalDim(size_t imuIdx = 0u) {
+    return okvis::ceres::ode::kNavErrorStateDim +
+           imu_rig_.getImuParamsMinimalDim(imuIdx);
   }
 
   // error state: \delta p, \alpha for q, \delta v

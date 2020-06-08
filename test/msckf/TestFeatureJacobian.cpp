@@ -182,7 +182,7 @@ void testPointLandmarkJacobian(std::string projOptModelName,
   Eigen::VectorXd navError(9);
 
   const int kNavImuCamParamDim =
-      okvis::ceres::ode::NavErrorStateDim +
+      okvis::ceres::ode::kNavErrorStateDim +
       okvis::ImuModelGetMinimalDim(
           okvis::ImuModelNameToId(vioSystemBuilder.imuModelType())) +
       estimator->cameraParamsMinimalDimen();

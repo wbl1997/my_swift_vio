@@ -483,7 +483,7 @@ void testHybridFilterSinusoid(const okvis::TestSetting& testSetting,
             const int kDistortionCoeffDim =
                 okvis::cameras::RadialTangentialDistortion::NumDistortionIntrinsics;
             const int kNavImuCamParamDim =
-                okvis::ceres::ode::NavErrorStateDim +
+                okvis::ceres::ode::kNavErrorStateDim +
                 okvis::ImuModelGetMinimalDim(
                     okvis::ImuModelNameToId(vioSystemBuilder.imuModelType())) +
                 2 + kDistortionCoeffDim +

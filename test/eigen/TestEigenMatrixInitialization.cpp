@@ -58,7 +58,12 @@ TEST(EigenMatrix, RowMajor) {
 }
 
 TEST(EigenMatrix, DynamicResize) {
+  Eigen::Matrix<double, -1, 1> vec;
+  EXPECT_EQ(vec.size(), 0);
+
   Eigen::MatrixXd mat;
+  EXPECT_EQ(mat.size(), 0);
+
   mat.resize(0, 5);
   EXPECT_EQ(mat.rows(), 0);
   EXPECT_EQ(mat.cols(), 5);
@@ -66,6 +71,14 @@ TEST(EigenMatrix, DynamicResize) {
   mat.resize(3, Eigen::NoChange);
   EXPECT_EQ(mat.rows(), 3);
   EXPECT_EQ(mat.cols(), 5);
+
+  Eigen::VectorXd vec3(3, 1);
+  vec3 << 3, 2, 1;
+  Eigen::VectorXd oldvec3 = vec3;
+  Eigen::VectorXd vec0;
+
+  vec3.tail(0) = vec0;
+  EXPECT_LT((vec3 - oldvec3).lpNorm<Eigen::Infinity>(), 1e-8);
 }
 
 TEST(EigenMatrix, setIdentity) {
