@@ -67,6 +67,7 @@ imu_params:
     sigma_TGElement: 5e-3
     sigma_TSElement: 1e-3
     sigma_TAElement: 5e-3
+    model_type: BG_BA_TG_TS_TA
 
 # Estimator parameters
 numKeyframes: 5 # number of keyframes in optimisation window

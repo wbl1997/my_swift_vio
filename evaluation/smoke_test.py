@@ -28,13 +28,13 @@ init(autoreset=True)
 if __name__ == '__main__':
     args = parse_args.parse_args()
 
-    euroc_bags = dir_utility_functions.find_bags(args.euroc_dir, '.bag', discount_key='calibration')
-    euroc_gt_list = dir_utility_functions.get_converted_euroc_gt_files(euroc_bags)
+    euroc_bag_list = dir_utility_functions.find_bags(args.euroc_dir, '.bag', discount_key='calibration')
+    euroc_gt_list = dir_utility_functions.get_converted_euroc_gt_files(euroc_bag_list)
 
-    advio_bags = dir_utility_functions.find_bags(args.advio_dir, '.bag')
-    advio_gt_list = dir_utility_functions.get_gt_file_for_bags(advio_bags)
+    advio_bag_list = dir_utility_functions.find_bags(args.advio_dir, '.bag')
+    advio_gt_list = dir_utility_functions.get_gt_file_for_bags(advio_bag_list)
 
-    bag_gt_list = sorted(zip(euroc_bags, euroc_gt_list))
+    bag_gt_list = sorted(zip(euroc_bag_list, euroc_gt_list))
     bag_list = [bag_gt_list[0][0]]
     gt_list = [bag_gt_list[0][1]]
 
@@ -47,6 +47,18 @@ if __name__ == '__main__':
     algoname_to_options = {
         # We disable online extrinsic calibration for OKVIS by zeroing
         # sigma_absolute_translation and sigma_absolute_orientation.
+        'MSCKF_BgBa': {"algo_code": "MSCKF",
+                       "extra_gflags": "--publish_via_ros=false",
+                       "numKeyframes": 5,
+                       "numImuFrames": 5,
+                       "monocular_input": 1,
+                       "landmarkModelId": 1,
+                       "anchorAtObservationTime": 0,
+                       "model_type": "BG_BA",
+                       "extrinsic_opt_mode_main_camera": "p_BC_q_BC",
+                       "extrinsic_opt_mode_other_camera": "p_C0C_q_C0C",
+                       "sigma_absolute_translation": "0.02",
+                       "sigma_absolute_orientation": "0.01",},
         'MSCKF_n_aidp': {"algo_code": "MSCKF",
                          "extra_gflags": "--publish_via_ros=false",
                          "numKeyframes": 10,

@@ -15,9 +15,9 @@ def subprocess_cmd(command, out_stream=None, err_stream=None, timeout=None):
         rc = subprocess.call(command, stdout=out_stream, stderr=err_stream,
                              shell=True, close_fds=True, timeout=timeout)
     except Exception as err:
-        err_msg = "Unexpected error:{}".format(err)
+        err_msg = "Error:{}".format(err)
         print(textwrap.fill(err_msg, 120))
-        return 1, "Exception raised"
+        return 1, err_msg
     return rc, ""
 
 

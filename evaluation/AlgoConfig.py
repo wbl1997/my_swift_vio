@@ -86,6 +86,7 @@ def apply_config_to_yaml(config_dict, vio_yaml, debug_output_dir):
     sed_cmd += sed_line_with_parameter(config_dict, "sigma_principal_point", padding, vio_yaml)
     sed_cmd += sed_line_with_parameter(config_dict, "sigma_distortion", padding, vio_yaml)
 
+    sed_cmd += sed_line_with_parameter(config_dict, "model_type", padding, vio_yaml)
     sed_cmd += sed_line_with_parameter(config_dict, "sigma_TGElement", padding, vio_yaml)
     sed_cmd += sed_line_with_parameter(config_dict, "sigma_TSElement", padding, vio_yaml)
     sed_cmd += sed_line_with_parameter(config_dict, "sigma_TAElement", padding, vio_yaml)
