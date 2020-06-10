@@ -141,9 +141,9 @@ class RunOneVioMethod(object):
 
     def timeout(self, bag_fullname):
         bag_duration = rosbag_utility_functions.get_rosbag_duration(bag_fullname)
-        time_out = bag_duration * 3
+        time_out = bag_duration * 4
         if "OKVIS" in self.algo_code_flags["algo_code"]:
-            time_out = bag_duration * 6
+            time_out = bag_duration * 8
         time_out = max(60 * 5, time_out)
         return time_out
 

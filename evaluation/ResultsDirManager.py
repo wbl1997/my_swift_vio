@@ -32,7 +32,7 @@ class ResultsDirManager(object):
             if reply == 'y' or reply == 'Y':
                 dir_utility_functions.empty_dir(self.results_dir)
         else:
-            dir_utility_functions.mkdir_p(self.results_dir)
+            dir_utility_functions.makedirs_p(self.results_dir)
 
         platform_dir = os.path.join(self.results_dir, self.platform)
         dir_utility_functions.mkdir_p(platform_dir)
@@ -43,6 +43,12 @@ class ResultsDirManager(object):
             for bag_fullname in self.bag_list:
                 data_result_dir = self.get_result_dir(algo_name, bag_fullname)
                 dir_utility_functions.mkdir_p(data_result_dir)
+
+    def save_config(self, config_dict, directory):
+        config_logfile = os.path.join(directory, "README.md")
+        with open(config_logfile, 'w') as stream:
+            for name, options in config_dict.items():
+                stream.write("{}: {}\n".format(name, options))
 
     def create_eval_config_yaml(self):
         algo_label_list = [name.replace('_', '-') for name in self.algo_name_list]

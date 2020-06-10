@@ -55,6 +55,7 @@ TUMVI_PARAMETERS = {
          "image_readout_time": 0.00
          }],
     "imu_params": {
+        'imu_rate': 200,
         'g_max': 7.8,
         'sigma_g_c': 0.004,
         'sigma_a_c': 0.07,
@@ -95,7 +96,7 @@ ADVIO_PARAMETERS = {
          "image_delay": 0.0,
          "image_readout_time": 0.00},
     "imu_params": {
-        "imu_rate" : 100,
+        "imu_rate": 100,
         'g_max': 7.8,
         'sigma_g_c': 2.4e-3,
         'sigma_a_c': 4.8e-3,

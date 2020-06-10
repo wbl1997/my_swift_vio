@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+from itertools import islice
 import subprocess
 import textwrap
 
@@ -95,3 +96,16 @@ def resize_dict(d, maxsize):
         if num_removed == num_duds:
             break
     return r
+
+
+def chunks(data, maxsize):
+    """
+    chunks of dictionary, each of maxsize
+    https://stackoverflow.com/questions/22878743/how-to-split-dictionary-into-multiple-dictionaries-fast
+    :param data: dictionary
+    :param maxsize:
+    :return:
+    """
+    it = iter(data)
+    for i in range(0, len(data), maxsize):
+        yield {k:data[k] for k in islice(it, maxsize)}
