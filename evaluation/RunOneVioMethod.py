@@ -7,11 +7,13 @@ import dataset_parameters
 
 import dir_utility_functions
 import rosbag_utility_functions
+import rpg_eval_tool_wrap
 import utility_functions
 
 import AlgoConfig
 import OkvisConfigComposer
 import RoscoreManager
+
 
 class RunOneVioMethod(object):
     """Run one vio method on a number of data missions"""
@@ -147,7 +149,8 @@ class RunOneVioMethod(object):
         time_out = max(60 * 5, time_out)
         return time_out
 
-    def run_method(self, algo_name, pose_conversion_script, log_vio=True):
+    def run_method(self, algo_name, pose_conversion_script,
+                   gt_align_type='posyaw', log_vio=True):
         '''
         run a method
         :return:
@@ -166,6 +169,8 @@ class RunOneVioMethod(object):
                 shutil.copy2(self.gt_list[bag_index], gt_file)
             eval_config_file = os.path.join(output_dir_mission, 'eval_cfg.yaml')
             shutil.copy2(self.eval_cfg_template, eval_config_file)
+            rpg_eval_tool_wrap.change_eval_cfg(eval_config_file, gt_align_type, -1)
+
             custom_vio_config = self.custom_vio_config_list[bag_index]
             custom_lcd_config = self.custom_lcd_config_list[bag_index]
             for trial_index in range(self.num_trials):
