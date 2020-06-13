@@ -260,10 +260,131 @@ if __name__ == '__main__':
     # python3.7 will remember insertion order of items, see
     # https://stackoverflow.com/questions/39980323/are-dictionaries-ordered-in-python-3-6
     algoname_to_options = {
-        'openvins-mono': {"algo_code": "openvins-mono"
+        'openvins-mono-x1': {"algo_code": "openvins-mono",
+                          "sigma_a_c": 0.07,
+                          "sigma_aw_c": 0.00172,
+                          "sigma_g_c": 0.004,
+                          "sigma_gw_c": 0.000044,
+                          "coeff_c": 0.4,
+                          "coeff_wc": 0.25
                              },
-        'openvins-stereo': {"algo_code": "openvins-stereo"
+
+        'openvins-mono-x2': {"algo_code": "openvins-mono",
+                          "sigma_a_c": 0.07,
+                          "sigma_aw_c": 0.00172,
+                          "sigma_g_c": 0.004,
+                          "sigma_gw_c": 0.000044,
+                          "coeff_c": 0.4,
+                          "coeff_wc": 0.5
                              },
+        'openvins-mono-x3': {"algo_code": "openvins-mono",
+                          "sigma_a_c": 0.07,
+                          "sigma_aw_c": 0.00172,
+                          "sigma_g_c": 0.004,
+                          "sigma_gw_c": 0.000044,
+                          "coeff_c": 0.6,
+                          "coeff_wc": 0.25
+                             },
+        'openvins-mono-x4': {"algo_code": "openvins-mono",
+                          "sigma_a_c": 0.07,
+                          "sigma_aw_c": 0.00172,
+                          "sigma_g_c": 0.004,
+                          "sigma_gw_c": 0.000044,
+                          "coeff_c": 0.6,
+                          "coeff_wc": 0.5
+                             },
+        'openvins-mono-x5': {"algo_code": "openvins-mono",
+                          "sigma_a_c": 0.07,
+                          "sigma_aw_c": 0.00172,
+                          "sigma_g_c": 0.004,
+                          "sigma_gw_c": 0.000044,
+                          "coeff_c": 0.8,
+                          "coeff_wc": 0.25
+                             },
+        'openvins-mono-x6': {"algo_code": "openvins-mono",
+                          "sigma_a_c": 0.07,
+                          "sigma_aw_c": 0.00172,
+                          "sigma_g_c": 0.004,
+                          "sigma_gw_c": 0.000044,
+                          "coeff_c": 0.8,
+                          "coeff_wc": 0.5
+                             },
+        'openvins-stereo-x1': {"algo_code": "openvins-mono",
+                          "sigma_a_c": 0.07,
+                          "sigma_aw_c": 0.00172,
+                          "sigma_g_c": 0.004,
+                          "sigma_gw_c": 0.000044,
+                          "coeff_c": 0.4,
+                          "coeff_wc": 0.5
+                             },
+
+        'openvins-stereo-x2': {"algo_code": "openvins-mono",
+                          "sigma_a_c": 0.07,
+                          "sigma_aw_c": 0.00172,
+                          "sigma_g_c": 0.004,
+                          "sigma_gw_c": 0.000044,
+                          "coeff_c": 0.4,
+                          "coeff_wc": 0.25
+                             },
+        'openvins-stereo-x3': {"algo_code": "openvins-mono",
+                          "sigma_a_c": 0.07,
+                          "sigma_aw_c": 0.00172,
+                          "sigma_g_c": 0.004,
+                          "sigma_gw_c": 0.000044,
+                          "coeff_c": 0.2,
+                          "coeff_wc": 0.25
+                             },
+        'openvins-stereo-x4': {"algo_code": "openvins-mono",
+                          "sigma_a_c": 0.07,
+                          "sigma_aw_c": 0.00172,
+                          "sigma_g_c": 0.004,
+                          "sigma_gw_c": 0.000044,
+                          "coeff_c": 0.2,
+                          "coeff_wc": 0.1
+                             },
+        'openvins-stereo-x5': {"algo_code": "openvins-mono",
+                          "sigma_a_c": 0.07,
+                          "sigma_aw_c": 0.00172,
+                          "sigma_g_c": 0.004,
+                          "sigma_gw_c": 0.000044,
+                          "coeff_c": 0.1,
+                          "coeff_wc": 0.1
+                             },
+        'openvins-stereo-x6': {"algo_code": "openvins-mono",
+                          "sigma_a_c": 0.07,
+                          "sigma_aw_c": 0.00172,
+                          "sigma_g_c": 0.004,
+                          "sigma_gw_c": 0.000044,
+                          "coeff_c": 0.1,
+                          "coeff_wc": 0.05
+                             },
+        'openvins-stereo-x7': {"algo_code": "openvins-mono",
+                          "sigma_a_c": 0.07,
+                          "sigma_aw_c": 0.00172,
+                          "sigma_g_c": 0.004,
+                          "sigma_gw_c": 0.000044,
+                          "coeff_c": 0.05,
+                          "coeff_wc": 0.05
+                             },
+        'openvins-stereo-x8': {"algo_code": "openvins-mono",
+                          "sigma_a_c": 0.07,
+                          "sigma_aw_c": 0.00172,
+                          "sigma_g_c": 0.004,
+                          "sigma_gw_c": 0.000044,
+                          "coeff_c": 0.02,
+                          "coeff_wc": 0.05
+                             },
+
+
+
+        # 'openvins-stereo-x1': {"algo_code": "openvins-stereo",
+        #                   "sigma_a_c": 0.07,
+        #                   "sigma_aw_c": 0.00172,
+        #                   "sigma_g_c": 0.004,
+        #                   "sigma_gw_c": 0.000044,
+        #                   "coeff_c": 0.1,
+        #                   "coeff_wc": 0.1
+        #                      },
     }
 
     # 'MSCKF_i': AlgoConfig.create_algo_config(['MSCKF', '--use_IEKF=true', 10, 3]),
@@ -296,10 +417,10 @@ if __name__ == '__main__':
             print(bag_fullname)
             result_dir = results_dir_manager.get_result_dir(name, bag_fullname)
 
-            if name == 'openvins-mono':
+            if 'mono' in name:
                 max_cameras = 1
                 use_stereo = 'false'
-            elif name == 'openvins-stereo':
+            elif 'stereo' in name:
                 max_cameras = 2
                 use_stereo = 'true'
 
@@ -317,7 +438,8 @@ if __name__ == '__main__':
                 bag_start = 0
 
                 if dataset == "euroc":
-                    launch_file = "pgeneva_ros_eth.launch"
+                    # launch_file = "pgeneva_ros_eth.launch"
+                    launch_file = "pgeneva_serial_eth.launch"
                     init_imu_thresh = 1.5
                     if "MH_01" in bag_fullname:
                         bag_start = 40
@@ -330,15 +452,28 @@ if __name__ == '__main__':
                     elif "MH_05" in bag_fullname:
                         bag_start = 20
                     eval_cfg_template = os.path.join(args.catkin_ws, "src/msckf/evaluation/config/eval_cfg.yaml")
+
+                    launch_cmd = "roslaunch ov_msckf {} max_cameras:={} use_stereo:={} " \
+                                 "bag:={} bag_start:={} init_imu_thresh:={} dosave:=true path_est:={}".format(
+                        launch_file, max_cameras, use_stereo,
+                        bag_fullname, bag_start, init_imu_thresh, result_file)
+
                 elif dataset == "tumvi":
-                    launch_file = "pgeneva_ros_tum.launch"
+                    # launch_file = "pgeneva_ros_tum.launch"
+                    launch_file = "pgeneva_serial_tum.launch"
                     init_imu_thresh = 0.7
                     eval_cfg_template = os.path.join(args.catkin_ws, "src/msckf/evaluation/config/eval_cfg_se3.yaml")
 
-                launch_cmd = "roslaunch ov_msckf {} max_cameras:={} use_stereo:={} " \
-                             "bag:={} bag_start:={} init_imu_thresh:={} dosave:=true path_est:={}".format(
-                    launch_file, max_cameras, use_stereo,
-                    bag_fullname, bag_start, init_imu_thresh, result_file)
+                    launch_cmd = "roslaunch ov_msckf {} max_cameras:={} use_stereo:={} " \
+                                 "bag:={} bag_start:={} init_imu_thresh:={} dosave:=true path_est:={} " \
+                                 "gyroscope_noise_density:={} gyroscope_random_walk:={} " \
+                                 "accelerometer_noise_density:={} accelerometer_random_walk:={} ".format(
+                        launch_file, max_cameras, use_stereo,
+                        bag_fullname, bag_start, init_imu_thresh, result_file,
+                        options["sigma_g_c"]*options["coeff_c"], options["sigma_gw_c"]*options["coeff_wc"], 
+                        options["sigma_a_c"]*options["coeff_c"], options["sigma_aw_c"]*options["coeff_wc"])
+
+
                 cmd = src_cmd + launch_cmd
                 src_wrap = os.path.join(result_dir, "source_wrap.sh")
                 with open(src_wrap, 'w') as stream:

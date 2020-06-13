@@ -281,9 +281,9 @@ if __name__ == '__main__':
 
     results_dir_manager = ResultsDirManager.ResultsDirManager(
         results_dir, bag_list, algo_name_list)
-    # results_dir_manager.create_results_dir()
-    # results_dir_manager.create_eval_config_yaml()
-    # results_dir_manager.create_eval_output_dir(eval_output_dir)
+    results_dir_manager.create_results_dir()
+    results_dir_manager.create_eval_config_yaml()
+    results_dir_manager.create_eval_output_dir(eval_output_dir)
     returncode = 0
 
 
@@ -315,16 +315,16 @@ if __name__ == '__main__':
                     config_path = "/home/youkely/dev/basalt-mirror/data/tumvi_512_config.json"
                     cmd = "~/dev/basalt-mirror/build/basalt_vio --dataset-path {} --cam-calib {} --dataset-type bag --config-path {} --save-trajectory tum --show-gui 0".format(
                         bag_fullname, calib_path, config_path)
-                    eval_cfg_template = os.path.join(args.catkin_ws, "src/msckf/evaluation/config/eval_cfg_se3.yaml")
+                    eval_cfg_template = os.path.join(args.catkin_ws, "src/msckf/evaluation/config/eval_cfg.yaml")
 
-                # print(cmd)
-                # rc, msg = utility_functions.subprocess_cmd(cmd)
-                # if rc != 0:
-                #     err_msg = "Error code {} and msg {} in running vio method with cmd:\n{}".\
-                #         format(rc, msg, cmd)
-                #     print(err_msg)
-                # else:
-                #     shutil.move("trajectory.txt", result_file)
+                print(cmd)
+                rc, msg = utility_functions.subprocess_cmd(cmd)
+                if rc != 0:
+                    err_msg = "Error code {} and msg {} in running vio method with cmd:\n{}".\
+                        format(rc, msg, cmd)
+                    print(err_msg)
+                else:
+                    shutil.move("trajectory.txt", result_file)
             gt_file = os.path.join(result_dir, 'stamped_groundtruth.txt')
             shutil.copy2(gt_list[bag_index], gt_file)
             eval_cfg_file = os.path.join(result_dir, 'eval_cfg.yaml')
