@@ -8,7 +8,6 @@
 #include <msckf/GeneralEstimator.hpp>
 #include <msckf/PriorlessEstimator.hpp>
 
-#include <okvis/LoopClosureParameters.hpp>
 #include <loop_closure/LoopClosureDetector.h>
 
 namespace msckf {

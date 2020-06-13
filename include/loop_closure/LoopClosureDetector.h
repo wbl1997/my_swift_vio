@@ -34,6 +34,8 @@
 #include <okvis/LoopFrameAndMatches.hpp>
 #include <okvis/LoopClosureMethod.hpp>
 
+#ifdef HAVE_GTSAM
+#include "loop_closure/gtsam-definitions.h"
 /* ------------------------------------------------------------------------ */
 // Forward declare KimeraRPGO, a private dependency.
 namespace KimeraRPGO {
@@ -218,5 +220,16 @@ class LoopClosureDetector : public okvis::LoopClosureMethod {
  private:
   using DMatchVec = std::vector<cv::DMatch>;
 };  // class LoopClosureDetector
-
 }  // namespace VIO
+#else // create a dummy loop closure method when gtsam is not available.
+namespace VIO {
+class LoopClosureDetector : public okvis::LoopClosureMethod {
+ public:
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+
+  LoopClosureDetector(std::shared_ptr<LoopClosureDetectorParams> lcd_params) {}
+
+  virtual ~LoopClosureDetector() {}
+};
+} // namespace VIO
+#endif

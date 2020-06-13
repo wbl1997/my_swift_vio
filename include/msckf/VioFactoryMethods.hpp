@@ -8,7 +8,7 @@
 #include <okvis/LoopClosureMethod.hpp>
 #include <okvis/LoopClosureParameters.hpp>
 
-#include <loop_closure/LoopClosureDetector.h>
+#include <loop_closure/LoopClosureDetectorParams.h>
 
 namespace msckf {
 std::shared_ptr<okvis::Frontend> createFrontend(

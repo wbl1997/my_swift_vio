@@ -36,9 +36,12 @@ else()
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mssse3")
 endif()
 
-find_package(catkin REQUIRED  
-  pcl_conversions
-  pcl_ros
+list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/okvis/cmake")
+find_package(Eigen REQUIRED)
+include_directories(${EIGEN_INCLUDE_DIR}) 
+
+LIST(APPEND ROS_DEPENDENT_PACKAGES
+  rosbag
   roscpp
   sensor_msgs
   image_transport
@@ -46,9 +49,28 @@ find_package(catkin REQUIRED
   dynamic_reconfigure
   geometry_msgs
   image_geometry
+  tf
 )
 
-find_package(vio_common)
+if($ENV{ROS_DISTRO} STREQUAL "melodic")
+  LIST(APPEND ROS_DEPENDENT_PACKAGES
+    pcl_conversions
+    pcl_ros)
+  add_definitions(-DHAVE_PCL)
+elseif($ENV{ROS_DISTRO} STREQUAL "kinetic")
+  message("Publishing with PCL point cloud is disabled with ROS kinetic because"
+      " libpcl-dev on Ubuntu 16 depends on the system-wide Eigen \nwhich"
+      " is incompatible with ceres solver 14.0.")
+else()
+  message("Unknown ROS distro:")
+  message($ENV{ROS_DISTRO})
+endif()
+
+find_package(catkin REQUIRED  
+  ${ROS_DEPENDENT_PACKAGES}
+)
+
+find_package(vio_common REQUIRED)
 
 # generate dynamic reconfigure stuff
 generate_dynamic_reconfigure_options(cfg/Camera.cfg)
@@ -69,7 +91,6 @@ set(BUILD_SHARED_LIBS OFF)
 add_subdirectory(okvis)
 
 # libvisensor
-list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/okvis/cmake")
 find_package(VISensor)
 
 if(VISENSORDRIVER_FOUND)
@@ -174,10 +195,7 @@ LIST(APPEND SOURCEFILES
     src/io_wrap/StreamHelper.cpp
     src/io_wrap/Subscriber.cpp
 
-    src/loop_closure/GtsamWrap.cpp
-    src/loop_closure/LoopClosureDetector.cpp
     src/loop_closure/LoopClosureDetectorParams.cpp
-    src/loop_closure/LcdThirdPartyWrapper.cpp
 
     src/msckf/CameraSystemCreator.cpp
     src/msckf/VioFactoryMethods.cpp
@@ -201,6 +219,14 @@ LIST(APPEND SOURCEFILES
     src/msckf/triangulate.cpp
     src/msckf/triangulateFast.cpp
 )
+
+if(GTSAM_FOUND)
+list(APPEND SOURCEFILES
+    src/loop_closure/GtsamWrap.cpp
+    src/loop_closure/LoopClosureDetector.cpp
+    src/loop_closure/LcdThirdPartyWrapper.cpp
+)
+endif(GTSAM_FOUND)
 
 add_library(${PROJECT_NAME} STATIC
   ${SOURCEFILES}

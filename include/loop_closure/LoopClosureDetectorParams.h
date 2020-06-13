@@ -22,7 +22,7 @@
 #include <opencv2/opencv.hpp>
 
 #include "loop_closure/LoopClosureDetector-definitions.h"
-//#include "kimera-vio/pipeline/PipelineParams.h"
+
 #include "loop_closure/YamlParser.h"
 #include <okvis/LoopClosureParameters.hpp>
 

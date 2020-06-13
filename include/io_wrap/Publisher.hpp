@@ -44,7 +44,7 @@
 #include <fstream>
 #include <memory>
 
-#include <pcl/point_types.h>
+
 
 #include <geometry_msgs/PoseStamped.h>
 #include <sensor_msgs/PointCloud2.h>
@@ -54,7 +54,12 @@
 #include <opencv2/core/core.hpp>
 #include <ros/ros.h>
 #include <tf/transform_broadcaster.h>
+
+#ifdef HAVE_PCL
+#include <pcl/point_types.h>
 #include <pcl_ros/point_cloud.h>
+#endif
+
 #pragma GCC diagnostic pop
 #include <nav_msgs/Odometry.h>
 #include <nav_msgs/Path.h>
@@ -446,15 +451,15 @@ class Publisher : public StreamPublisher
   ros::Time _t; ///< Header timestamp.
   geometry_msgs::TransformStamped poseMsg_; ///< Pose message.
   nav_msgs::Odometry odometryMsg_;  ///< Odometry message.
-
+#ifdef HAVE_PCL
   pcl::PointCloud<pcl::PointXYZRGB> pointsMatched_; ///< Point cloud for matched points.
   pcl::PointCloud<pcl::PointXYZRGB> pointsUnmatched_; ///< Point cloud for unmatched points.
   pcl::PointCloud<pcl::PointXYZRGB> pointsTransferred_; ///< Point cloud for transferred/marginalised points.
-
-//  visualization_msgs::Marker pointsMatched_; ///< Point cloud for matched points.
-//  visualization_msgs::Marker pointsUnmatched_; ///< Point cloud for unmatched points.
-//  visualization_msgs::Marker pointsTransferred_; ///< Point cloud for transferred/marginalised points.
-
+#else
+  visualization_msgs::Marker pointsMatched_; ///< Point cloud for matched points.
+  visualization_msgs::Marker pointsUnmatched_; ///< Point cloud for unmatched points.
+  visualization_msgs::Marker pointsTransferred_; ///< Point cloud for transferred/marginalised points.
+#endif
   nav_msgs::Path path_; ///< The path message.
   visualization_msgs::Marker meshMsg_; ///< Mesh message.
 

@@ -114,55 +114,57 @@ void Publisher::setNodeHandle(ros::NodeHandle& nh)
   nh_ = &nh;
 
   // advertise
+#ifdef HAVE_PCL
   pubPointsMatched_ = nh_->advertise<sensor_msgs::PointCloud2>(
       "okvis_points_matched", 1);
   pubPointsUnmatched_ = nh_->advertise<sensor_msgs::PointCloud2>(
       "okvis_points_unmatched", 1);
   pubPointsTransferred_ = nh_->advertise<sensor_msgs::PointCloud2>(
       "okvis_points_transferred", 1);
-  
+#else
   // Alternatively, use Marker::Points instead of PointCloud2,
   // but it appears visually worse than PointCloud2.
-  // float fPointSize = 0.01;
-  // pointsMatched_.header.frame_id = "world";
-  // pointsMatched_.ns = "okvis_points_matched";
-  // pointsMatched_.id = 0;
-  // pointsMatched_.type = visualization_msgs::Marker::POINTS;
-  // pointsMatched_.scale.x = fPointSize;
-  // pointsMatched_.scale.y = fPointSize;
-  // pointsMatched_.pose.orientation.w = 1.0;
-  // pointsMatched_.action = visualization_msgs::Marker::ADD;
-  // pointsMatched_.color.r = 1.0f;
-  // pointsMatched_.color.a = 1.0;
+  float fPointSize = 0.01;
+  pointsMatched_.header.frame_id = "world";
+  pointsMatched_.ns = "okvis_points_matched";
+  pointsMatched_.id = 0;
+  pointsMatched_.type = visualization_msgs::Marker::POINTS;
+  pointsMatched_.scale.x = fPointSize;
+  pointsMatched_.scale.y = fPointSize;
+  pointsMatched_.pose.orientation.w = 1.0;
+  pointsMatched_.action = visualization_msgs::Marker::ADD;
+  pointsMatched_.color.r = 1.0f;
+  pointsMatched_.color.a = 1.0;
 
-  // pointsUnmatched_.header.frame_id = "world";
-  // pointsUnmatched_.ns = "okvis_points_unmatched";
-  // pointsUnmatched_.id = 1;
-  // pointsUnmatched_.type = visualization_msgs::Marker::POINTS;
-  // pointsUnmatched_.scale.x = fPointSize;
-  // pointsUnmatched_.scale.y = fPointSize;
-  // pointsUnmatched_.pose.orientation.w = 1.0;
-  // pointsUnmatched_.action = visualization_msgs::Marker::ADD;
-  // pointsUnmatched_.color.g = 1.0f;
-  // pointsUnmatched_.color.a = 1.0;
+  pointsUnmatched_.header.frame_id = "world";
+  pointsUnmatched_.ns = "okvis_points_unmatched";
+  pointsUnmatched_.id = 1;
+  pointsUnmatched_.type = visualization_msgs::Marker::POINTS;
+  pointsUnmatched_.scale.x = fPointSize;
+  pointsUnmatched_.scale.y = fPointSize;
+  pointsUnmatched_.pose.orientation.w = 1.0;
+  pointsUnmatched_.action = visualization_msgs::Marker::ADD;
+  pointsUnmatched_.color.g = 1.0f;
+  pointsUnmatched_.color.a = 1.0;
 
-  // pointsTransferred_.header.frame_id = "world";
-  // pointsTransferred_.ns = "okvis_points_transferred";
-  // pointsTransferred_.id = 2;
-  // pointsTransferred_.type = visualization_msgs::Marker::POINTS;
-  // pointsTransferred_.scale.x = fPointSize;
-  // pointsTransferred_.scale.y = fPointSize;
-  // pointsTransferred_.pose.orientation.w = 1.0;
-  // pointsTransferred_.action = visualization_msgs::Marker::ADD;
-  // pointsTransferred_.color.b = 1.0f;
-  // pointsTransferred_.color.a = 1.0;
+  pointsTransferred_.header.frame_id = "world";
+  pointsTransferred_.ns = "okvis_points_transferred";
+  pointsTransferred_.id = 2;
+  pointsTransferred_.type = visualization_msgs::Marker::POINTS;
+  pointsTransferred_.scale.x = fPointSize;
+  pointsTransferred_.scale.y = fPointSize;
+  pointsTransferred_.pose.orientation.w = 1.0;
+  pointsTransferred_.action = visualization_msgs::Marker::ADD;
+  pointsTransferred_.color.b = 1.0f;
+  pointsTransferred_.color.a = 1.0;
 
-  // pubPointsMatched_ =
-  //     nh_->advertise<visualization_msgs::Marker>("okvis_points_matched", 1);
-  // pubPointsUnmatched_ =
-  //     nh_->advertise<visualization_msgs::Marker>("okvis_points_unmatched", 1);
-  // pubPointsTransferred_ =
-  //     nh_->advertise<visualization_msgs::Marker>("okvis_points_transferred", 1);
+  pubPointsMatched_ =
+      nh_->advertise<visualization_msgs::Marker>("okvis_points_matched", 1);
+  pubPointsUnmatched_ =
+      nh_->advertise<visualization_msgs::Marker>("okvis_points_unmatched", 1);
+  pubPointsTransferred_ =
+      nh_->advertise<visualization_msgs::Marker>("okvis_points_transferred", 1);
+#endif
 
   pubObometry_ = nh_->advertise<nav_msgs::Odometry>("okvis_odometry", 1);
   pubPath_ = nh_->advertise<nav_msgs::Path>("okvis_path", 1);
@@ -434,16 +436,18 @@ void Publisher::setPoints(const okvis::MapPointVector& pointsMatched,
 {
   pointsMatched2_.clear();
   pointsMatched2_ = pointsMatched;
-  // pointsMatched_.points.clear();
-  // pointsMatched_.colors.clear();
-  // pointsUnmatched_.points.clear();
-  // pointsUnmatched_.colors.clear();
-  // pointsTransferred_.points.clear();
-  // pointsTransferred_.colors.clear();
-  
+#ifdef HAVE_PCL
   pointsMatched_.clear();
   pointsUnmatched_.clear();
   pointsTransferred_.clear();
+#else
+  pointsMatched_.points.clear();
+  pointsMatched_.colors.clear();
+  pointsUnmatched_.points.clear();
+  pointsUnmatched_.colors.clear();
+  pointsTransferred_.points.clear();
+  pointsTransferred_.colors.clear();
+#endif
   
   // transform points into custom world frame:
   const Eigen::Matrix4d T_Wc_W = parameters_.publishing.T_Wc_W.T(); 
@@ -457,6 +461,7 @@ void Publisher::setPoints(const okvis::MapPointVector& pointsMatched,
         parameters_.publishing.landmarkQualityThreshold)
       continue;
 
+#ifdef HAVE_PCL
     pointsMatched_.push_back(pcl::PointXYZRGB());
     const Eigen::Vector4d point = T_Wc_W * pointsMatched[i].pointHomog;
     pointsMatched_.back().x = point[0] / point[3];
@@ -465,25 +470,30 @@ void Publisher::setPoints(const okvis::MapPointVector& pointsMatched,
     pointsMatched_.back().g = 255
         * (std::min(parameters_.publishing.maxLandmarkQuality, (float)pointsMatched[i].quality)
             / parameters_.publishing.maxLandmarkQuality);
-			
-    // pointsMatched_.points.push_back(geometry_msgs::Point());
-    // const Eigen::Vector4d point = pointsMatched[i].pointHomog;
-    // pointsMatched_.points.back().x = point[0] / point[3];
-    // pointsMatched_.points.back().y = point[1] / point[3];
-    // pointsMatched_.points.back().z = point[2] / point[3];
-    // pointsMatched_.colors.push_back(std_msgs::ColorRGBA());
-    // pointsMatched_.colors.back().g =
-    //     1.0f * (std::min(parameters_.publishing.maxLandmarkQuality,
-    //                      static_cast<float>(pointsMatched[i].quality)) /
-    //             parameters_.publishing.maxLandmarkQuality);
-    // pointsMatched_.colors.back().a = 1.0f;
+#else
+    pointsMatched_.points.push_back(geometry_msgs::Point());
+    const Eigen::Vector4d point = pointsMatched[i].pointHomog;
+    pointsMatched_.points.back().x = point[0] / point[3];
+    pointsMatched_.points.back().y = point[1] / point[3];
+    pointsMatched_.points.back().z = point[2] / point[3];
+    pointsMatched_.colors.push_back(std_msgs::ColorRGBA());
+    pointsMatched_.colors.back().g =
+        1.0f * (std::min(parameters_.publishing.maxLandmarkQuality,
+                         static_cast<float>(pointsMatched[i].quality)) /
+                parameters_.publishing.maxLandmarkQuality);
+    pointsMatched_.colors.back().a = 1.0f;
+#endif
   }
   pointsMatched_.header.frame_id = "world";
 
+#ifdef HAVE_PCL
 #if PCL_VERSION >= PCL_VERSION_CALC(1,7,0)
   std_msgs::Header header;
   header.stamp = _t;
   pointsMatched_.header.stamp = pcl_conversions::toPCL(header).stamp;
+#else
+  pointsMatched_.header.stamp=_t;
+#endif
 #else
   pointsMatched_.header.stamp=_t;
 #endif
@@ -496,7 +506,7 @@ void Publisher::setPoints(const okvis::MapPointVector& pointsMatched,
     // check quality
     if (pointsUnmatched[i].quality < parameters_.publishing.landmarkQualityThreshold)
       continue;
-
+#ifdef HAVE_PCL
     pointsUnmatched_.push_back(pcl::PointXYZRGB());
     const Eigen::Vector4d point = T_Wc_W * pointsUnmatched[i].pointHomog;
     pointsUnmatched_.back().x = point[0] / point[3];
@@ -505,23 +515,28 @@ void Publisher::setPoints(const okvis::MapPointVector& pointsMatched,
     pointsUnmatched_.back().b = 255
         * (std::min(parameters_.publishing.maxLandmarkQuality, (float)pointsUnmatched[i].quality)
             / parameters_.publishing.maxLandmarkQuality);
-	
-    // pointsUnmatched_.points.push_back(geometry_msgs::Point());
-    // const Eigen::Vector4d point = pointsUnmatched[i].pointHomog;
-    // pointsUnmatched_.points.back().x = point[0] / point[3];
-    // pointsUnmatched_.points.back().y = point[1] / point[3];
-    // pointsUnmatched_.points.back().z = point[2] / point[3];
-    // pointsUnmatched_.colors.push_back(std_msgs::ColorRGBA());
-    // pointsUnmatched_.colors.back().b =
-    //     1.0f * (std::min(parameters_.publishing.maxLandmarkQuality,
-    //                      static_cast<float>(pointsUnmatched[i].quality)) /
-    //             parameters_.publishing.maxLandmarkQuality);
-    // pointsUnmatched_.colors.back().a = 1.0f;
+#else
+    pointsUnmatched_.points.push_back(geometry_msgs::Point());
+    const Eigen::Vector4d point = pointsUnmatched[i].pointHomog;
+    pointsUnmatched_.points.back().x = point[0] / point[3];
+    pointsUnmatched_.points.back().y = point[1] / point[3];
+    pointsUnmatched_.points.back().z = point[2] / point[3];
+    pointsUnmatched_.colors.push_back(std_msgs::ColorRGBA());
+    pointsUnmatched_.colors.back().b =
+        1.0f * (std::min(parameters_.publishing.maxLandmarkQuality,
+                         static_cast<float>(pointsUnmatched[i].quality)) /
+                parameters_.publishing.maxLandmarkQuality);
+    pointsUnmatched_.colors.back().a = 1.0f;
+#endif    
   }
   pointsUnmatched_.header.frame_id = "world";
 
+#ifdef HAVE_PCL
 #if PCL_VERSION >= PCL_VERSION_CALC(1,7,0)
   pointsUnmatched_.header.stamp = pcl_conversions::toPCL(header).stamp;
+#else
+  pointsUnmatched_.header.stamp=_t;
+#endif
 #else
   pointsUnmatched_.header.stamp=_t;
 #endif
@@ -535,7 +550,7 @@ void Publisher::setPoints(const okvis::MapPointVector& pointsMatched,
     // check quality
     if (pointsTransferred[i].quality < parameters_.publishing.landmarkQualityThreshold)
       continue;
-
+#ifdef HAVE_PCL
     pointsTransferred_.push_back(pcl::PointXYZRGB());
     const Eigen::Vector4d point = T_Wc_W * pointsTransferred[i].pointHomog;
     pointsTransferred_.back().x = point[0] / point[3];
@@ -549,27 +564,32 @@ void Publisher::setPoints(const okvis::MapPointVector& pointsMatched,
     pointsTransferred_.back().b = 255 * intensity;
 
     //_omfile << point[0] << " " << point[1] << " " << point[2] << ";" <<std::endl;
-	
-    // pointsTransferred_.points.push_back(geometry_msgs::Point());
-    // const Eigen::Vector4d point = pointsTransferred[i].pointHomog;
-    // pointsTransferred_.points.back().x = point[0] / point[3];
-    // pointsTransferred_.points.back().y = point[1] / point[3];
-    // pointsTransferred_.points.back().z = point[2] / point[3];
-    /*float intensity =
+#else
+    pointsTransferred_.points.push_back(geometry_msgs::Point());
+    const Eigen::Vector4d point = pointsTransferred[i].pointHomog;
+    pointsTransferred_.points.back().x = point[0] / point[3];
+    pointsTransferred_.points.back().y = point[1] / point[3];
+    pointsTransferred_.points.back().z = point[2] / point[3];
+    float intensity =
         std::min(parameters_.publishing.maxLandmarkQuality,
                  static_cast<float>(pointsTransferred[i].quality)) /
-        parameters_.publishing.maxLandmarkQuality; */
-    // pointsTransferred_.colors.push_back(std_msgs::ColorRGBA());
-    // pointsTransferred_.colors.back().r = 1.0;  // intensity;
-    // pointsTransferred_.colors.back().g = 0;    // intensity;
-    // pointsTransferred_.colors.back().b = 0;    // intensity;
-    // pointsTransferred_.colors.back().a = 1.0f;
+        parameters_.publishing.maxLandmarkQuality;
+    pointsTransferred_.colors.push_back(std_msgs::ColorRGBA());
+    pointsTransferred_.colors.back().r = 1.0;  // intensity;
+    pointsTransferred_.colors.back().g = 0;    // intensity;
+    pointsTransferred_.colors.back().b = 0;    // intensity;
+    pointsTransferred_.colors.back().a = 1.0f;
+#endif
   }
   pointsTransferred_.header.frame_id = "world";
   pointsTransferred_.header.seq = ctr2_++;
 
+#ifdef HAVE_PCL
 #if PCL_VERSION >= PCL_VERSION_CALC(1,7,0)
   pointsTransferred_.header.stamp = pcl_conversions::toPCL(header).stamp;
+#else
+  pointsTransferred_.header.stamp=_t;
+#endif
 #else
   pointsTransferred_.header.stamp=_t;
 #endif

@@ -178,6 +178,14 @@ But since this the default value in catkin, we do not need to specify it.
 ### 4. DO_TIMING
 Add this cmake flag to enable timing statistics.
 
+### 5. Error "ceres-solver/include/ceres/jet.h:887:8: error: ‘ScalarBinaryOpTraits’ is not a class template".
+This error arises when the system wide Eigen, e.g., on Ubuntu 16, is incompatible with ceres solver 14.0 
+which requires Eigen version >= 3.3.
+You need to pass EIGEN_INCLUDE_DIR and EIGEN3_INCLUDE_DIR to this package and also eschew PCL 
+which depends on system wide Eigen.
+In the end, the workspace should be clear of traces of system wide Eigen. That is, 
+no /usr/include/eigen3 should appear when searching in the workspace.
+
 ## Build and run tests
 * To build all tests
 ```
