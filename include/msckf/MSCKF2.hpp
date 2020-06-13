@@ -79,7 +79,7 @@ class MSCKF2 : public HybridFilter {
    * @param pointDataPtr shared data of the point.
    * @param anchorId
    * @param T_WBa
-   * @param H_x Jacobians of the image observation relative to the camera parameters and cloned states.
+   * @param J_x Jacobians of the image observation relative to the camera parameters and cloned states.
    *     It ought to be allocated in advance.
    * @param J_pfi Jacobian of the image observation relative to [\alpha, \beta, \rho].
    * @param residual
@@ -89,7 +89,7 @@ class MSCKF2 : public HybridFilter {
       const Eigen::Vector4d& homogeneousPoint,
       const Eigen::Vector2d& obs, size_t observationIndex,
       std::shared_ptr<const msckf::PointSharedData> pointDataPtr,
-      Eigen::Matrix<double, 2, Eigen::Dynamic>* H_x,
+      Eigen::Matrix<double, 2, Eigen::Dynamic>* J_x,
       Eigen::Matrix<double, 2, 3>* J_pfi, Eigen::Vector2d* residual) const;
 
   /**

@@ -23,18 +23,20 @@ typedef std::vector<okvis::ImuMeasurement,
 
 enum class SimulatedTrajectoryType {
   Sinusoid = 0,
-  Torus = 1,
-  Ball = 2,
-  Squircle = 3,
-  Circle = 4,
-  Dot = 5,
-  WavyCircle = 6,
-  Motionless = 7,
+  Torus,
+  Torus2,
+  Ball,
+  Squircle,
+  Circle,
+  Dot,
+  WavyCircle,
+  Motionless,
 };
 
 static const std::map<std::string, SimulatedTrajectoryType> trajectoryLabelToId{
     {"Sinusoid", SimulatedTrajectoryType::Sinusoid},
     {"Torus", SimulatedTrajectoryType::Torus},
+    {"Torus2", SimulatedTrajectoryType::Torus2},
     {"Ball", SimulatedTrajectoryType::Ball},
     {"Squircle", SimulatedTrajectoryType::Squircle},
     {"Circle", SimulatedTrajectoryType::Circle},
@@ -212,8 +214,9 @@ class CircularSinusoidalTrajectory {
 
  public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
-  CircularSinusoidalTrajectory();
-  CircularSinusoidalTrajectory(double imuFreq, Eigen::Vector3d ginw);
+  CircularSinusoidalTrajectory(double _maxThetaZ = 0.2 * M_PI);
+  CircularSinusoidalTrajectory(
+      double imuFreq, Eigen::Vector3d ginw, double _maxThetaZ = 0.2 * M_PI);
   virtual ~CircularSinusoidalTrajectory() {}
   virtual void getTrueInertialMeasurements(
       const okvis::Time tStart, const okvis::Time tEnd,
@@ -267,8 +270,9 @@ class SphereTrajectory : public CircularSinusoidalTrajectory {
  protected:
  public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
-  SphereTrajectory();
-  SphereTrajectory(double imuFreq, Eigen::Vector3d ginw);
+  SphereTrajectory(double _rxy = 37.0/19, double _maxThetaZ = 0.2 * M_PI);
+  SphereTrajectory(double imuFreq, Eigen::Vector3d ginw,
+                   double _rxy = 37.0/19, double _maxThetaZ = 0.2 * M_PI);
   virtual ~SphereTrajectory() {}
   virtual Eigen::Vector3d computeGlobalAngularRate(const okvis::Time time) const;
 
@@ -427,8 +431,8 @@ Eigen::Matrix2d rotMat2d(double theta);
 /**
  * @brief initImuNoiseParams
  * @param imuParameters
- * @param addPriorNoise
- * @param addSystemError
+ * @param noisyInitialSpeedAndBiases
+ * @param noisyInitialSensorParams
  * @param sigma_bg std dev of initial gyroscope bias.
  * @param sigma_ba std dev of initial accelerometer bias.
  * @param std_Ta_elem
@@ -437,8 +441,8 @@ Eigen::Matrix2d rotMat2d(double theta);
  *     to fix IMU intrinsic parameters in estimator.
  */
 void initImuNoiseParams(
-    okvis::ImuParameters* imuParameters, bool addPriorNoise,
-    bool addSystemError,
+    okvis::ImuParameters* imuParameters, bool noisyInitialSpeedAndBiases,
+    bool noisyInitialSensorParams,
     double sigma_bg, double sigma_ba, double std_Tg_elem,
     double std_Ts_elem, double std_Ta_elem,
     bool fixImuInternalParams);

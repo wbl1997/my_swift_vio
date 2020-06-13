@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+from itertools import islice
 import subprocess
 import textwrap
 
@@ -15,9 +16,9 @@ def subprocess_cmd(command, out_stream=None, err_stream=None, timeout=None):
         rc = subprocess.call(command, stdout=out_stream, stderr=err_stream,
                              shell=True, close_fds=True)
     except Exception as err:
-        err_msg = "Unexpected error:{}".format(err)
+        err_msg = "Error:{}".format(err)
         print(textwrap.fill(err_msg, 120))
-        return 1, "Exception raised"
+        return 1, err_msg
     return rc, ""
 
 
@@ -95,3 +96,16 @@ def resize_dict(d, maxsize):
         if num_removed == num_duds:
             break
     return r
+
+
+def chunks(data, maxsize):
+    """
+    chunks of dictionary, each of maxsize
+    https://stackoverflow.com/questions/22878743/how-to-split-dictionary-into-multiple-dictionaries-fast
+    :param data: dictionary
+    :param maxsize:
+    :return:
+    """
+    it = iter(data)
+    for i in range(0, len(data), maxsize):
+        yield {k:data[k] for k in islice(it, maxsize)}

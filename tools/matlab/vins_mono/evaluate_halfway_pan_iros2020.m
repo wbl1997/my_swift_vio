@@ -1,9 +1,9 @@
-function evaluate_halfway_pan_iros2020()
+function evaluate_halfway_pan_iros2020(export_fig_path)
 % evaluate estimators' results for data sessions of sideways motion with halfway
 % panning, only panning, or only standstill.
-addpath('/media/jhuai/Seagate/jhuai/tools/export_fig/');
+addpath(export_fig_path);
 % root_dit is the folder of estimator results for a batch of data.
-result_dir='/media/jhuai/Seagate/jhuai/PAVIO_cvpr2020/results/post_processed';
+result_dir='/PAVIO_cvpr2020/results/post_processed';
 root_dir_list = {
     [result_dir, '/hailun_house/halfway_pan_init'], ...
     [result_dir, '/hailun_house/halfway_pan'], ...

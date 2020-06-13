@@ -32,6 +32,9 @@ static void check_p_near(const Eigen::Matrix<double, 3, 1>& p_WS_W0,
   EXPECT_LT((p_WS_W1 - p_WS_W0).norm(), tol);
 }
 
+const int kImuAugmentedParamsDim = 27;
+const int kNavAndImuParamsDim = 42;
+
 struct CovPropConfig {
  private:
   const double g;
@@ -45,7 +48,7 @@ struct CovPropConfig {
   Eigen::Quaterniond q_WS0;
   okvis::SpeedAndBiases sb0;
   okvis::ImuMeasurementDeque imuMeasurements;
-  Eigen::Matrix<double, 27, 1> vTgTsTa;
+  Eigen::Matrix<double, kImuAugmentedParamsDim, 1> vTgTsTa;
   okvis::ImuParameters imuParams;
 
   const bool bNominalTgTsTa;  // use nominal values for Tg Ts Ta, i.e.,
@@ -91,10 +94,10 @@ struct CovPropConfig {
     }
     // if to test Leutenegger's propagation method, set vTgTsTa as nominal
     // values
-    vTgTsTa = Eigen::Matrix<double, 27, 1>::Zero();
+    vTgTsTa = Eigen::Matrix<double, kImuAugmentedParamsDim, 1>::Zero();
     // otherwise, random initialization is OK
     if (!bNominalTgTsTa)
-      vTgTsTa = 1e-2 * (Eigen::Matrix<double, 27, 1>::Random());
+      vTgTsTa = 1e-2 * (Eigen::Matrix<double, kImuAugmentedParamsDim, 1>::Random());
 
     for (int jack = 0; jack < 3; ++jack) {
       vTgTsTa[jack * 4] += 1;
@@ -114,7 +117,7 @@ struct CovPropConfig {
   okvis::ImuMeasurementDeque get_imu_measurements() const {
     return imuMeasurements;
   }
-  Eigen::Matrix<double, 27, 1> get_vTgTsTa() const { return vTgTsTa; }
+  Eigen::Matrix<double, kImuAugmentedParamsDim, 1> get_vTgTsTa() const { return vTgTsTa; }
   okvis::ImuParameters get_imu_params() const { return imuParams; }
   okvis::Time get_meas_begin_time() const {
     return imuMeasurements.begin()->timeStamp;
@@ -203,12 +206,13 @@ private:
 };
 
 TEST_F(BackwardIntegrationTest, BackwardRK) {
-  okvis::IMUOdometry::propagation_RungeKutta(
+  ImuErrorModel<double> iem(sb.tail<6>(), cpc.get_vTgTsTa());
+  okvis::ImuOdometry::propagation_RungeKutta(
       cpc.get_imu_measurements(), cpc.get_imu_params(), T_WB, sb,
-      cpc.get_vTgTsTa(), cpc.get_meas_begin_time(), cpc.get_meas_end_time());
-  okvis::IMUOdometry::propagationBackward_RungeKutta(
+      iem, cpc.get_meas_begin_time(), cpc.get_meas_end_time());
+  okvis::ImuOdometry::propagationBackward_RungeKutta(
       cpc.get_imu_measurements(), imuParams, T_WB, sb,
-      cpc.get_vTgTsTa(), cpc.get_meas_end_time(), cpc.get_meas_begin_time());
+      iem, cpc.get_meas_end_time(), cpc.get_meas_begin_time());
   p_WS_W = T_WB.r();
   q_WS = T_WB.q();
 
@@ -231,12 +235,13 @@ TEST_F(BackwardIntegrationTest, StepwiseBackwardRK) {
   for (auto iter = imuMeasurements.begin(); iter != imuMeasurements.end();
        ++iter) {
     if (iter == imuMeasurements.begin()) continue;
+    ImuErrorModel<double> iem(sb.tail<6>(), cpc.get_vTgTsTa());
     okvis::ceres::ode::integrateOneStep_RungeKutta(
         iterLast->measurement.gyroscopes, iterLast->measurement.accelerometers,
         iter->measurement.gyroscopes, iter->measurement.accelerometers,
         cpc.get_g(), cpc.get_sigma_g_c(), cpc.get_sigma_a_c(),
         cpc.get_sigma_gw_c(), cpc.get_sigma_aw_c(), cpc.get_dt(), p_WS_W, q_WS,
-        sb, cpc.get_vTgTsTa());
+        sb, iem);
     iterLast = iter;
   }
 
@@ -248,12 +253,13 @@ TEST_F(BackwardIntegrationTest, StepwiseBackwardRK) {
   for (auto iterR = imuMeasurements.rbegin(); iterR != imuMeasurements.rend();
        ++iterR) {
     if (iterR == imuMeasurements.rbegin()) continue;
+    ImuErrorModel<double> iem(sb.tail<6>(), cpc.get_vTgTsTa());
     okvis::ceres::ode::integrateOneStepBackward_RungeKutta(
         iterR->measurement.gyroscopes, iterR->measurement.accelerometers,
         iterRLast->measurement.gyroscopes,
         iterRLast->measurement.accelerometers, cpc.get_g(), cpc.get_sigma_g_c(),
         cpc.get_sigma_a_c(), cpc.get_sigma_gw_c(), cpc.get_sigma_aw_c(),
-        cpc.get_dt(), p_WS_W, q_WS, sb, cpc.get_vTgTsTa());
+        cpc.get_dt(), p_WS_W, q_WS, sb, iem);
     iterRLast = iterR;
   }
 
@@ -271,8 +277,8 @@ TEST_F(BackwardIntegrationTest, StepwiseBackwardRK) {
 
 TEST_F(BackwardIntegrationTest, BackwardEuler) {
   Eigen::Vector3d tempV_WS = sb.head<3>();
-  IMUErrorModel<double> iem(sb.tail<6>(), cpc.get_vTgTsTa());
-  okvis::IMUOdometry::propagation(cpc.get_imu_measurements(), cpc.get_imu_params(),
+  ImuErrorModel<double> iem(sb.tail<6>(), cpc.get_vTgTsTa());
+  okvis::ImuOdometry::propagation(cpc.get_imu_measurements(), cpc.get_imu_params(),
                            T_WB, tempV_WS, iem, cpc.get_meas_begin_time(),
                            cpc.get_meas_end_time());
 
@@ -280,7 +286,7 @@ TEST_F(BackwardIntegrationTest, BackwardEuler) {
   sb.head<3>() = tempV_WS;
   print_p_q_sb(T_WB.r(), T_WB.q(), sb);
 
-  okvis::IMUOdometry::propagationBackward(
+  okvis::ImuOdometry::propagationBackward(
       cpc.get_imu_measurements(), imuParams, T_WB, tempV_WS, iem,
       cpc.get_meas_end_time(), cpc.get_meas_begin_time());
   p_WS_W = T_WB.r();
@@ -302,7 +308,7 @@ TEST_F(BackwardIntegrationTest, BackwardEuler) {
 void IMUOdometryTrapezoidRule(
     const Eigen::Vector3d& p_WS_W0, const Eigen::Quaterniond& q_WS0,
     const okvis::SpeedAndBiases& sb0,
-    const Eigen::Matrix<double, 27, 1>& vTgTsTa,
+    const Eigen::Matrix<double, kImuAugmentedParamsDim, 1>& vTgTsTa,
     const okvis::ImuMeasurementDeque& imuMeasurements,
     const okvis::ImuParameters& imuParams, Eigen::Vector3d* p_WS_W2,
     Eigen::Quaterniond* q_WS2, okvis::SpeedAndBiases* sb2,
@@ -313,32 +319,21 @@ void IMUOdometryTrapezoidRule(
   okvis::SpeedAndBiases sb = sb0;
   okvis::timing::Timer okvisTimer("okvis", false);
 
-  Eigen::Matrix<double, 42, 42> P2;
-  P2.setIdentity();
-  if (!bVarianceForShapeMatrices) P2.bottomRightCorner<27, 27>().setZero();
-  Eigen::Matrix<double, okvis::ceres::ode::OdoErrorStateDim,
-                okvis::ceres::ode::OdoErrorStateDim>
-      F_tot;
-  F_tot.setIdentity();
+  Eigen::MatrixXd P2 = Eigen::MatrixXd::Identity(kNavAndImuParamsDim, kNavAndImuParamsDim);
+  if (!bVarianceForShapeMatrices) P2.bottomRightCorner<kImuAugmentedParamsDim, kImuAugmentedParamsDim>().setZero();
+  Eigen::MatrixXd F_tot = Eigen::MatrixXd::Identity(kNavAndImuParamsDim, kNavAndImuParamsDim);
 
   int numUsedImuMeasurements = 0;
-  if (0) {  // this is the same as the first case in effect which uses
-            // integrateOneStep_RungeKutta
-    numUsedImuMeasurements = okvis::IMUOdometry::propagation_RungeKutta(
-        imuMeasurements, imuParams, T_WS, sb, vTgTsTa,
-        imuMeasurements.begin()->timeStamp, imuMeasurements.rbegin()->timeStamp,
-        &P2, &F_tot);
-  } else {
-    Eigen::Vector3d tempV_WS = sb.head<3>();
-    IMUErrorModel<double> tempIEM(sb.tail<6>(), vTgTsTa);
-    Eigen::Matrix<double, 6, 1> lP;
-    lP << T_WS.r(), tempV_WS;
-    numUsedImuMeasurements = okvis::IMUOdometry::propagation(
-        imuMeasurements, imuParams, T_WS, tempV_WS, tempIEM,
-        imuMeasurements.begin()->timeStamp, imuMeasurements.rbegin()->timeStamp,
-        &P2, &F_tot, &lP);
-    sb.head<3>() = tempV_WS;
-  }
+
+  Eigen::Vector3d tempV_WS = sb.head<3>();
+  ImuErrorModel<double> tempIEM(sb.tail<6>(), vTgTsTa);
+  Eigen::Matrix<double, 6, 1> lP;
+  lP << T_WS.r(), tempV_WS;
+  numUsedImuMeasurements = okvis::ImuOdometry::propagation(
+      imuMeasurements, imuParams, T_WS, tempV_WS, tempIEM,
+      imuMeasurements.begin()->timeStamp, imuMeasurements.rbegin()->timeStamp,
+      &P2, &F_tot, &lP);
+  sb.head<3>() = tempV_WS;
 
   double timeElapsed = okvisTimer.stop();
 
@@ -370,7 +365,7 @@ void IMUOdometryTrapezoidRule(
 
 /// test and compare the propagation for both states and covariance by both the
 /// classic RK4 and okvis's state transition method
-TEST(IMUOdometry, IMUCovariancePropagation) {
+TEST(ImuOdometry, IMUCovariancePropagation) {
   bool bVarianceForShapeMatrices =
       false;             // use positive variance for elements in Tg Ts Ta?
   bool bVerbose = true;  // print the covariance and jacobian results
@@ -383,15 +378,9 @@ TEST(IMUOdometry, IMUCovariancePropagation) {
   Eigen::Quaterniond q_WS = cpc.get_q_WS0();
   okvis::SpeedAndBiases sb = cpc.get_sb0();
 
-  Eigen::Matrix<double, okvis::ceres::ode::OdoErrorStateDim,
-                okvis::ceres::ode::OdoErrorStateDim>
-      P1;
-  P1.setIdentity();
-  if (!bVarianceForShapeMatrices) P1.bottomRightCorner<27, 27>().setZero();
-  Eigen::Matrix<double, okvis::ceres::ode::OdoErrorStateDim,
-                okvis::ceres::ode::OdoErrorStateDim>
-      F_tot;
-  F_tot.setIdentity();
+  Eigen::MatrixXd P1 = Eigen::MatrixXd::Identity(kNavAndImuParamsDim, kNavAndImuParamsDim);
+  if (!bVarianceForShapeMatrices) P1.bottomRightCorner<kImuAugmentedParamsDim, kImuAugmentedParamsDim>().setZero();
+  Eigen::MatrixXd F_tot = Eigen::MatrixXd::Identity(kNavAndImuParamsDim, kNavAndImuParamsDim);
 
   okvis::timing::Timer RK4Timer("RK4", false);
   okvis::ImuMeasurementDeque imuMeasurements = cpc.get_imu_measurements();
@@ -399,12 +388,13 @@ TEST(IMUOdometry, IMUCovariancePropagation) {
   for (auto iter = imuMeasurements.begin(); iter != imuMeasurements.end();
        ++iter) {
     if (iter == imuMeasurements.begin()) continue;
+    ImuErrorModel<double> iem(sb.tail<6>(), cpc.get_vTgTsTa());
     okvis::ceres::ode::integrateOneStep_RungeKutta(
         iterLast->measurement.gyroscopes, iterLast->measurement.accelerometers,
         iter->measurement.gyroscopes, iter->measurement.accelerometers,
         cpc.get_g(), cpc.get_sigma_g_c(), cpc.get_sigma_a_c(),
         cpc.get_sigma_gw_c(), cpc.get_sigma_aw_c(), cpc.get_dt(), p_WS_W, q_WS,
-        sb, cpc.get_vTgTsTa(), &P1, &F_tot);
+        sb, iem, &P1, &F_tot);
     iterLast = iter;
   }
   double timeElapsed = RK4Timer.stop();
@@ -498,7 +488,7 @@ TEST(IMUOdometry, IMUCovariancePropagation) {
   leutenF2.setIdentity();
 
   numUsedImuMeasurements =
-      okvis::IMUOdometry::propagation_leutenegger_corrected(
+      okvis::ImuOdometry::propagation_leutenegger_corrected(
           cpc.get_imu_measurements(), cpc.get_imu_params(), T_WS, sb,
           cpc.get_meas_begin_time(), cpc.get_meas_end_time(), &leutenP2,
           &leutenF2);
@@ -651,7 +641,7 @@ TEST(IMUOdometry, IMUCovariancePropagation) {
             1e-6);
 }
 
-TEST(IMUOdometry, InitPoseFromImu) {
+TEST(ImuOdometry, InitPoseFromImu) {
   using namespace okvis;
   Eigen::Vector3d acc_B(2, -1, 3);
   Eigen::Vector3d e_acc = acc_B.normalized();

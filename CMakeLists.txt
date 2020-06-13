@@ -275,6 +275,7 @@ list(APPEND TEST_SRC_FILES
     test/eigen/TestEigen2CV.cpp
     test/eigen/TestEigenMatrixInitialization.cpp
     test/eigen/TestEigenQR.cpp
+    test/eigen/TestEigenQuaternion.cpp
 
     test/io_wrap/TestVioDatasetPlayer.cpp
     test/loop_closure/TestGtsamBetweenFactor.cpp

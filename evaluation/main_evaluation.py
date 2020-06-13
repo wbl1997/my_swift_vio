@@ -206,17 +206,17 @@ init(autoreset=True)
 
 
 def find_all_bags_with_gt(euroc_dir="", uzh_fpv_dir="", tum_vi_dir="", advio_dir=""):
-    euroc_bags = dir_utility_functions.find_bags(euroc_dir, '.bag', discount_key='calibration')
-    euroc_gt_list = dir_utility_functions.get_converted_euroc_gt_files(euroc_bags)
+    euroc_bag_list = dir_utility_functions.find_bags(euroc_dir, '.bag', discount_key='calibration')
+    euroc_gt_list = dir_utility_functions.get_converted_euroc_gt_files(euroc_bag_list)
 
-    uzh_fpv_bags = dir_utility_functions.find_bags_with_gt(uzh_fpv_dir, 'snapdragon_with_gt.bag')
-    uzh_fpv_gt_list = dir_utility_functions.get_gt_file_for_bags(uzh_fpv_bags)
+    uzh_fpv_bag_list = dir_utility_functions.find_bags_with_gt(uzh_fpv_dir, 'snapdragon_with_gt.bag')
+    uzh_fpv_gt_list = dir_utility_functions.get_gt_file_for_bags(uzh_fpv_bag_list)
 
-    tumvi_bags = dir_utility_functions.find_bags(tum_vi_dir, "dataset-", "dataset-calib")
-    tumvi_gt_list = dir_utility_functions.get_gt_file_for_bags(tumvi_bags)
+    tumvi_bag_list = dir_utility_functions.find_bags(tum_vi_dir, "dataset-", "dataset-calib")
+    tumvi_gt_list = dir_utility_functions.get_gt_file_for_bags(tumvi_bag_list)
 
-    advio_bags = dir_utility_functions.find_bags(advio_dir, "advio-")
-    advio_gt_list = dir_utility_functions.get_gt_file_for_bags(advio_bags)
+    advio_bag_list = dir_utility_functions.find_bags(advio_dir, "advio-")
+    advio_gt_list = dir_utility_functions.get_gt_file_for_bags(advio_bag_list)
 
     all_gt_list = euroc_gt_list
     all_gt_list.extend(uzh_fpv_gt_list)
@@ -230,14 +230,17 @@ def find_all_bags_with_gt(euroc_dir="", uzh_fpv_dir="", tum_vi_dir="", advio_dir
                            "forget to convert data.csv to data.txt or "
                            "extract ground truth from rosbags?".format(gt_file))
 
-    # bag_list = uzh_fpv_bags
+    # bag_list = uzh_fpv_bag_list
     # gt_list = uzh_fpv_gt_list
 
     # bag_list.extend(euroc_bags)
     # gt_list.extend(euroc_gt_list)
 
-    bag_list = tumvi_bags
+    bag_list = tumvi_bag_list
     gt_list = tumvi_gt_list
+
+    # bag_list = advio_bag_list
+    # gt_list = advio_gt_list
     return bag_list, gt_list
 
 
@@ -254,113 +257,356 @@ if __name__ == '__main__':
     # python3.7 will remember insertion order of items, see
     # https://stackoverflow.com/questions/39980323/are-dictionaries-ordered-in-python-3-6
     algoname_to_options = {
-        'MSCKF_n_part_fix': {"algo_code": "MSCKF",
-                             "extra_gflags": "",
-                             "numKeyframes": 5,
-                             "numImuFrames": 5,
-                             "monocular_input": 0,
-                             "landmarkModelId": 1,
-                             "anchorAtObservationTime": 0,
-                             "extrinsic_opt_mode_main_camera": "P_CB",
-                             "extrinsic_opt_mode_other_camera": "P_BC_Q_BC",
-                             "sigma_absolute_translation": 0.02,
-                             "sigma_absolute_orientation": 0.01,
-                             "sigma_tr": 0.0,
-                             "sigma_focal_length": 0.0,
-                             "sigma_principal_point": 0.0,
-                             "sigma_distortion": "[0.00, 0.0, 0.0, 0.0]",
-                             "maxOdometryConstraintForAKeyframe": 2,
-                             "sigma_g_c": 0.05,
-                             "g_max": 31.4,  # 0.9 x 2000 DPS
-                             "a_max": 176.0,  # 1.1 x 16g
-                             "g: 9": 9.807,  # zurich https://units.fandom.com/wiki/Gravity_of_Earth
-                             "loop_closure_method": 0
-                             },
-        # 'MSCKF_aidp': {"algo_code": "MSCKF",
-        #                "extra_gflags": "",
-        #                "numKeyframes": 10,
-        #                "numImuFrames": 5,
-        #                "monocular_input": 1,
-        #                "landmarkModelId": 1,
-        #                "anchorAtObservationTime": 0,
-        #                "extrinsic_opt_mode_main_camera": "p_CB",
-        #                "extrinsic_opt_mode_other_camera": "p_BC_q_BC",
-        #                "sigma_absolute_translation": "0.02",
-        #                "sigma_absolute_orientation": "0.01"
-        #                },
-        'OKVIS_nframe': {"algo_code": "OKVIS",
+        'KSF_02_025': {"algo_code": "MSCKF",
+                       "extra_gflags": "--publish_via_ros=false",
+                       "numKeyframes": 5,
+                       "numImuFrames": 5,
+                       "monocular_input": 1,
+                       "landmarkModelId": 1,
+                       "anchorAtObservationTime": 0,
+                       "model_type": "BG_BA",
+                       "extrinsic_opt_mode_main_camera": "P_BC_Q_BC",
+                       "extrinsic_opt_mode_other_camera": "P_BC_Q_BC",
+                       'sigma_TGElement': 0.0,
+                       'sigma_TSElement': 0.0,
+                       'sigma_TAElement': 0.0,
+                       'sigma_g_c': 0.004 * 0.2,
+                       'sigma_a_c': 0.07 * 0.2,
+                       "sigma_gw_c": 4.4e-5 * 0.25,
+                       "sigma_aw_c": 1.72e-3 * 0.25,
+                       "sigma_absolute_translation": 0.02,
+                       "sigma_absolute_orientation": 0.01,
+                       "sigma_tr": 0.0,
+                       "sigma_focal_length": 0.0,
+                       "sigma_principal_point": 0.0,
+                       "sigma_distortion": "[0.00, 0.0, 0.0, 0.0]",
+                       "stereoMatchWithEpipolarCheck": 1,
+                       "epipolarDistanceThreshold": 2.5,
+                       "maxOdometryConstraintForAKeyframe": 2,
+                       "loop_closure_method": 0},
+        'KSF_01_025': {"algo_code": "MSCKF",
+                       "extra_gflags": "--publish_via_ros=false",
+                       "numKeyframes": 5,
+                       "numImuFrames": 5,
+                       "monocular_input": 1,
+                       "landmarkModelId": 1,
+                       "anchorAtObservationTime": 0,
+                       "model_type": "BG_BA",
+                       "extrinsic_opt_mode_main_camera": "P_BC_Q_BC",
+                       "extrinsic_opt_mode_other_camera": "P_BC_Q_BC",
+                       'sigma_TGElement': 0.0,
+                       'sigma_TSElement': 0.0,
+                       'sigma_TAElement': 0.0,
+                       'sigma_g_c': 0.004 * 0.1,
+                       'sigma_a_c': 0.07 * 0.1,
+                       "sigma_gw_c": 4.4e-5 * 0.25,
+                       "sigma_aw_c": 1.72e-3 * 0.25,
+                       "sigma_absolute_translation": 0.02,
+                       "sigma_absolute_orientation": 0.01,
+                       "sigma_tr": 0.0,
+                       "sigma_focal_length": 0.0,
+                       "sigma_principal_point": 0.0,
+                       "sigma_distortion": "[0.00, 0.0, 0.0, 0.0]",
+                       "stereoMatchWithEpipolarCheck": 1,
+                       "epipolarDistanceThreshold": 2.5,
+                       "maxOdometryConstraintForAKeyframe": 2,
+                       "loop_closure_method": 0},
+        'KSF_01_01': {"algo_code": "MSCKF",
+                      "extra_gflags": "--publish_via_ros=false",
+                      "numKeyframes": 5,
+                      "numImuFrames": 5,
+                      "monocular_input": 1,
+                      "landmarkModelId": 1,
+                      "anchorAtObservationTime": 0,
+                      "model_type": "BG_BA",
+                      "extrinsic_opt_mode_main_camera": "P_BC_Q_BC",
+                      "extrinsic_opt_mode_other_camera": "P_BC_Q_BC",
+                      'sigma_TGElement': 0.0,
+                      'sigma_TSElement': 0.0,
+                      'sigma_TAElement': 0.0,
+                      'sigma_g_c': 0.004 * 0.1,
+                      'sigma_a_c': 0.07 * 0.1,
+                      "sigma_gw_c": 4.4e-5 * 0.1,
+                      "sigma_aw_c": 1.72e-3 * 0.1,
+                      "sigma_absolute_translation": 0.02,
+                      "sigma_absolute_orientation": 0.01,
+                      "sigma_tr": 0.0,
+                      "sigma_focal_length": 0.0,
+                      "sigma_principal_point": 0.0,
+                      "sigma_distortion": "[0.00, 0.0, 0.0, 0.0]",
+                      "stereoMatchWithEpipolarCheck": 1,
+                      "epipolarDistanceThreshold": 2.5,
+                      "maxOdometryConstraintForAKeyframe": 2,
+                      "loop_closure_method": 0},
+        'KSF_005_01': {"algo_code": "MSCKF",
+                       "extra_gflags": "--publish_via_ros=false",
+                       "numKeyframes": 5,
+                       "numImuFrames": 5,
+                       "monocular_input": 1,
+                       "landmarkModelId": 1,
+                       "anchorAtObservationTime": 0,
+                       "model_type": "BG_BA",
+                       "extrinsic_opt_mode_main_camera": "P_BC_Q_BC",
+                       "extrinsic_opt_mode_other_camera": "P_BC_Q_BC",
+                       'sigma_TGElement': 0.0,
+                       'sigma_TSElement': 0.0,
+                       'sigma_TAElement': 0.0,
+                       'sigma_g_c': 0.004 * 0.05,
+                       'sigma_a_c': 0.07 * 0.05,
+                       "sigma_gw_c": 4.4e-5 * 0.1,
+                       "sigma_aw_c": 1.72e-3 * 0.1,
+                       "sigma_absolute_translation": 0.02,
+                       "sigma_absolute_orientation": 0.01,
+                       "sigma_tr": 0.0,
+                       "sigma_focal_length": 0.0,
+                       "sigma_principal_point": 0.0,
+                       "sigma_distortion": "[0.00, 0.0, 0.0, 0.0]",
+                       "stereoMatchWithEpipolarCheck": 1,
+                       "epipolarDistanceThreshold": 2.5,
+                       "maxOdometryConstraintForAKeyframe": 2,
+                       "loop_closure_method": 0},
+        'KSF_n_02_025': {"algo_code": "MSCKF",
                          "extra_gflags": "--publish_via_ros=false",
                          "numKeyframes": 5,
-                         "numImuFrames": 3,
+                         "numImuFrames": 5,
                          "monocular_input": 0,
-                         "landmarkModelId": 0,
+                         "landmarkModelId": 1,
                          "anchorAtObservationTime": 0,
-                         "extrinsic_opt_mode_main_camera": "p_BC_q_BC",
-                         "extrinsic_opt_mode_other_camera": "p_BC_q_BC",
-                         "sigma_absolute_translation": "0.0",
-                         "sigma_absolute_orientation": "0.0",
+                         "model_type": "BG_BA",
+                         "extrinsic_opt_mode_main_camera": "P_BC_Q_BC",
+                         "extrinsic_opt_mode_other_camera": "P_BC_Q_BC",
+                         'sigma_TGElement': 0.0,
+                         'sigma_TSElement': 0.0,
+                         'sigma_TAElement': 0.0,
+                         'sigma_g_c': 0.004 * 0.2,
+                         'sigma_a_c': 0.07 * 0.2,
+                         "sigma_gw_c": 4.4e-5 * 0.25,
+                         "sigma_aw_c": 1.72e-3 * 0.25,
+                         "sigma_absolute_translation": 0.02,
+                         "sigma_absolute_orientation": 0.01,
+                         "sigma_tr": 0.0,
+                         "sigma_focal_length": 0.0,
+                         "sigma_principal_point": 0.0,
+                         "sigma_distortion": "[0.00, 0.0, 0.0, 0.0]",
+                         "stereoMatchWithEpipolarCheck": 1,
+                         "epipolarDistanceThreshold": 2.5,
+                         "maxOdometryConstraintForAKeyframe": 2,
                          "loop_closure_method": 0},
+        'KSF_n_01_01': {"algo_code": "MSCKF",
+                        "extra_gflags": "--publish_via_ros=false",
+                        "numKeyframes": 5,
+                        "numImuFrames": 5,
+                        "monocular_input": 0,
+                        "landmarkModelId": 1,
+                        "anchorAtObservationTime": 0,
+                        "model_type": "BG_BA",
+                        "extrinsic_opt_mode_main_camera": "P_BC_Q_BC",
+                        "extrinsic_opt_mode_other_camera": "P_BC_Q_BC",
+                        'sigma_TGElement': 0.0,
+                        'sigma_TSElement': 0.0,
+                        'sigma_TAElement': 0.0,
+                        'sigma_g_c': 0.004 * 0.1,
+                        'sigma_a_c': 0.07 * 0.1,
+                        "sigma_gw_c": 4.4e-5 * 0.1,
+                        "sigma_aw_c": 1.72e-3 * 0.1,
+                        "sigma_absolute_translation": 0.02,
+                        "sigma_absolute_orientation": 0.01,
+                        "sigma_tr": 0.0,
+                        "sigma_focal_length": 0.0,
+                        "sigma_principal_point": 0.0,
+                        "sigma_distortion": "[0.00, 0.0, 0.0, 0.0]",
+                        "stereoMatchWithEpipolarCheck": 1,
+                        "epipolarDistanceThreshold": 2.5,
+                        "maxOdometryConstraintForAKeyframe": 2,
+                        "loop_closure_method": 0},
+        'KSF_n_005_01': {"algo_code": "MSCKF",
+                         "extra_gflags": "--publish_via_ros=false",
+                         "numKeyframes": 5,
+                         "numImuFrames": 5,
+                         "monocular_input": 0,
+                         "landmarkModelId": 1,
+                         "anchorAtObservationTime": 0,
+                         "model_type": "BG_BA",
+                         "extrinsic_opt_mode_main_camera": "P_BC_Q_BC",
+                         "extrinsic_opt_mode_other_camera": "P_BC_Q_BC",
+                         'sigma_TGElement': 0.0,
+                         'sigma_TSElement': 0.0,
+                         'sigma_TAElement': 0.0,
+                         'sigma_g_c': 0.004 * 0.05,
+                         'sigma_a_c': 0.07 * 0.05,
+                         "sigma_gw_c": 4.4e-5 * 0.1,
+                         "sigma_aw_c": 1.72e-3 * 0.1,
+                         "sigma_absolute_translation": 0.02,
+                         "sigma_absolute_orientation": 0.01,
+                         "sigma_tr": 0.0,
+                         "sigma_focal_length": 0.0,
+                         "sigma_principal_point": 0.0,
+                         "sigma_distortion": "[0.00, 0.0, 0.0, 0.0]",
+                         "stereoMatchWithEpipolarCheck": 1,
+                         "epipolarDistanceThreshold": 2.5,
+                         "maxOdometryConstraintForAKeyframe": 2,
+                         "loop_closure_method": 0},
+        'KSF_n_005_005': {"algo_code": "MSCKF",
+                          "extra_gflags": "--publish_via_ros=false",
+                          "numKeyframes": 5,
+                          "numImuFrames": 5,
+                          "monocular_input": 0,
+                          "landmarkModelId": 1,
+                          "anchorAtObservationTime": 0,
+                          "model_type": "BG_BA",
+                          "extrinsic_opt_mode_main_camera": "P_BC_Q_BC",
+                          "extrinsic_opt_mode_other_camera": "P_BC_Q_BC",
+                          'sigma_TGElement': 0.0,
+                          'sigma_TSElement': 0.0,
+                          'sigma_TAElement': 0.0,
+                          'sigma_g_c': 0.004 * 0.05,
+                          'sigma_a_c': 0.07 * 0.05,
+                          "sigma_gw_c": 4.4e-5 * 0.05,
+                          "sigma_aw_c": 1.72e-3 * 0.05,
+                          "sigma_absolute_translation": 0.02,
+                          "sigma_absolute_orientation": 0.01,
+                          "sigma_tr": 0.0,
+                          "sigma_focal_length": 0.0,
+                          "sigma_principal_point": 0.0,
+                          "sigma_distortion": "[0.00, 0.0, 0.0, 0.0]",
+                          "stereoMatchWithEpipolarCheck": 1,
+                          "epipolarDistanceThreshold": 2.5,
+                          "maxOdometryConstraintForAKeyframe": 2,
+                          "loop_closure_method": 0},
+        'KSF_n_0025_005': {"algo_code": "MSCKF",
+                           "extra_gflags": "--publish_via_ros=false",
+                           "numKeyframes": 5,
+                           "numImuFrames": 5,
+                           "monocular_input": 0,
+                           "landmarkModelId": 1,
+                           "anchorAtObservationTime": 0,
+                           "model_type": "BG_BA",
+                           "extrinsic_opt_mode_main_camera": "P_BC_Q_BC",
+                           "extrinsic_opt_mode_other_camera": "P_BC_Q_BC",
+                           'sigma_TGElement': 0.0,
+                           'sigma_TSElement': 0.0,
+                           'sigma_TAElement': 0.0,
+                           'sigma_g_c': 0.004 * 0.025,
+                           'sigma_a_c': 0.07 * 0.025,
+                           "sigma_gw_c": 4.4e-5 * 0.05,
+                           "sigma_aw_c": 1.72e-3 * 0.05,
+                           "sigma_absolute_translation": 0.02,
+                           "sigma_absolute_orientation": 0.01,
+                           "sigma_tr": 0.0,
+                           "sigma_focal_length": 0.0,
+                           "sigma_principal_point": 0.0,
+                           "sigma_distortion": "[0.00, 0.0, 0.0, 0.0]",
+                           "stereoMatchWithEpipolarCheck": 1,
+                           "epipolarDistanceThreshold": 2.5,
+                           "maxOdometryConstraintForAKeyframe": 2,
+                           "loop_closure_method": 0},
+        'OKVIS': {"algo_code": "OKVIS",
+                  "extra_gflags": "--publish_via_ros=false",
+                  "numKeyframes": 5,
+                  "numImuFrames": 3,
+                  "monocular_input": 1,
+                  "landmarkModelId": 1,
+                  "anchorAtObservationTime": 0,
+                  "model_type": "BG_BA",
+                  "extrinsic_opt_mode_main_camera": "P_BC_Q_BC",
+                  "extrinsic_opt_mode_other_camera": "P_BC_Q_BC",
+                  'sigma_TGElement': 0.0,
+                  'sigma_TSElement': 0.0,
+                  'sigma_TAElement': 0.0,
+                  "sigma_absolute_translation": 0.0,
+                  "sigma_absolute_orientation": 0.0,
+                  "sigma_tr": 0.0,
+                  "sigma_focal_length": 0.0,
+                  "sigma_principal_point": 0.0,
+                  "sigma_distortion": "[0.00, 0.0, 0.0, 0.0]",
+                  "stereoMatchWithEpipolarCheck": 1,
+                  "epipolarDistanceThreshold": 2.5,
+                  "maxOdometryConstraintForAKeyframe": 2,
+                  "loop_closure_method": 0},
+        'OKVIS_n': {"algo_code": "OKVIS",
+                    "extra_gflags": "--publish_via_ros=false",
+                    "numKeyframes": 5,
+                    "numImuFrames": 3,
+                    "monocular_input": 0,
+                    "landmarkModelId": 1,
+                    "anchorAtObservationTime": 0,
+                    "model_type": "BG_BA",
+                    "extrinsic_opt_mode_main_camera": "P_BC_Q_BC",
+                    "extrinsic_opt_mode_other_camera": "P_BC_Q_BC",
+                    'sigma_TGElement': 0.0,
+                    'sigma_TSElement': 0.0,
+                    'sigma_TAElement': 0.0,
+                    "sigma_absolute_translation": 0.0,
+                    "sigma_absolute_orientation": 0.0,
+                    "sigma_tr": 0.0,
+                    "sigma_focal_length": 0.0,
+                    "sigma_principal_point": 0.0,
+                    "sigma_distortion": "[0.00, 0.0, 0.0, 0.0]",
+                    "stereoMatchWithEpipolarCheck": 1,
+                    "epipolarDistanceThreshold": 2.5,
+                    "maxOdometryConstraintForAKeyframe": 2,
+                    "loop_closure_method": 0},
     }
-
-    # 'MSCKF_i': AlgoConfig.create_algo_config(['MSCKF', '--use_IEKF=true', 10, 3]),
-    # 'MSCKF_brisk_b2b': AlgoConfig.create_algo_config(['MSCKF', '--feature_tracking_method=2', 10, 3]),
-    # 'MSCKF_klt': AlgoConfig.create_algo_config(['MSCKF', '--feature_tracking_method=1', 10, 3]),
-    # 'MSCKF_async': AlgoConfig.create_algo_config(['MSCKF', '', 10, 3])}
 
     # rpg eval tool supports evaluating 6 algorithms at the same time, see len(PALLETE)
     MAX_ALGORITHMS_TO_EVALUATE = 6
-    algoname_to_options = utility_functions.resize_dict(algoname_to_options,
-                                                        MAX_ALGORITHMS_TO_EVALUATE)
+    algoname_to_option_chunks = utility_functions.chunks(algoname_to_options,
+                                                         MAX_ALGORITHMS_TO_EVALUATE)
 
-    algo_name_list = list(algoname_to_options.keys())
+    for index, minibatch in enumerate(algoname_to_option_chunks):
+        algo_name_list = list(minibatch.keys())
+        output_dir_suffix = ""
+        if len(algoname_to_options) > MAX_ALGORITHMS_TO_EVALUATE:
+            output_dir_suffix = "{}".format(index)
+        minibatch_output_dir = args.output_dir + output_dir_suffix
+        results_dir = os.path.join(minibatch_output_dir, "vio")
+        eval_output_dir = os.path.join(minibatch_output_dir, "vio_eval")
 
-    results_dir = os.path.join(args.output_dir, "vio")
-    eval_output_dir = os.path.join(args.output_dir, "vio_eval")
-
-    results_dir_manager = ResultsDirManager.ResultsDirManager(
-        results_dir, bag_list, algo_name_list)
-    results_dir_manager.create_results_dir()
-    results_dir_manager.create_eval_config_yaml()
-    results_dir_manager.create_eval_output_dir(eval_output_dir)
-    returncode = 0
-    for name, options in algoname_to_options.items():
-        runner = RunOneVioMethod.RunOneVioMethod(
-            args.catkin_ws, args.vio_config_yaml,
-            options,
-            args.num_trials, bag_list, gt_list,
-            results_dir_manager.get_all_result_dirs(name),
-            args.extra_lib_path, args.lcd_config_yaml,
-            args.voc_file)
-        rc = runner.run_method(name, args.pose_conversion_script, True)
-        if rc != 0:
-            returncode = rc
-    # evaluate all VIO methods.
-    rc, streamdata = rpg_eval_tool_wrap.run_rpg_evaluation(
-        args.rpg_eval_tool_dir, results_dir_manager.get_eval_config_yaml(),
-        args.num_trials, results_dir, eval_output_dir)
-    if rc != 0:
-        print(Fore.RED + "Error code {} in run_rpg_evaluation: {}".format(rc, streamdata))
-        sys.exit(1)
-
-    rpg_eval_tool_wrap.check_eval_result(eval_output_dir, args.cmp_eval_output_dir)
-
-    # also evaluate PGO results for every VIO method.
-    for method_name, options in algoname_to_options.items():
-        if options["loop_closure_method"] == 0:
-            continue
-        method_results_dir = os.path.join(args.output_dir, method_name + "_pgo")
-        method_eval_output_dir = os.path.join(args.output_dir, method_name + "_pgo_eval")
-
-        gpr = GroupPgoResults.GroupPgoResults(
-            results_dir, method_results_dir, method_eval_output_dir, method_name)
-        gpr.copy_subdirs_for_pgo()
-
+        results_dir_manager = ResultsDirManager.ResultsDirManager(
+            results_dir, bag_list, algo_name_list)
+        results_dir_manager.create_results_dir()
+        results_dir_manager.create_eval_config_yaml()
+        results_dir_manager.create_eval_output_dir(eval_output_dir)
+        results_dir_manager.save_config(minibatch, minibatch_output_dir)
+        returncode = 0
+        for name, options in minibatch.items():
+            runner = RunOneVioMethod.RunOneVioMethod(
+                args.catkin_ws, args.vio_config_yaml,
+                options,
+                args.num_trials, bag_list, gt_list,
+                results_dir_manager.get_all_result_dirs(name),
+                args.extra_lib_path, args.lcd_config_yaml,
+                args.voc_file)
+            rc = runner.run_method(name, args.pose_conversion_script, args.align_type, True)
+            if rc != 0:
+                returncode = rc
+        # evaluate all VIO methods.
         rc, streamdata = rpg_eval_tool_wrap.run_rpg_evaluation(
-            args.rpg_eval_tool_dir, gpr.get_eval_config_yaml(),
-            args.num_trials, method_results_dir, method_eval_output_dir)
+            args.rpg_eval_tool_dir, results_dir_manager.get_eval_config_yaml(),
+            args.num_trials, results_dir, eval_output_dir)
         if rc != 0:
-            print(Fore.RED + "Error code {} in run_rpg_evaluation for method {}: {}".format(
-                rc, method_name, streamdata))
+            print(Fore.RED + "Error code {} in run_rpg_evaluation: {}".format(rc, streamdata))
+            sys.exit(1)
+
+        rpg_eval_tool_wrap.check_eval_result(eval_output_dir, args.cmp_eval_output_dir)
+
+        # also evaluate PGO results for every VIO method.
+        for method_name, options in minibatch.items():
+            if options["loop_closure_method"] == 0:
+                continue
+            method_results_dir = os.path.join(minibatch_output_dir, method_name + "_pgo")
+            method_eval_output_dir = os.path.join(minibatch_output_dir, method_name + "_pgo_eval")
+
+            gpr = GroupPgoResults.GroupPgoResults(
+                results_dir, method_results_dir, method_eval_output_dir, method_name)
+            gpr.copy_subdirs_for_pgo()
+
+            rc, streamdata = rpg_eval_tool_wrap.run_rpg_evaluation(
+                args.rpg_eval_tool_dir, gpr.get_eval_config_yaml(),
+                args.num_trials, method_results_dir, method_eval_output_dir)
+            if rc != 0:
+                print(Fore.RED + "Error code {} in run_rpg_evaluation for method {}: {}".format(
+                    rc, method_name, streamdata))
 
     print('Successfully finished testing methods in msckf project!')
     sys.exit(0)

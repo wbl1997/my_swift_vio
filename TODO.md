@@ -154,7 +154,7 @@ Also consider the extrinsic and intrinsic parameters for the extra cameras.
 
 47. Refactor IMU error model in propagation() to support at least 3 types of IMU models, i.e.,
 develop compatibility with multiple IMU models
-Examine OdoErrorStateDim, ShapeMatrixParamBlock etc.
+Examine ShapeMatrixParamBlock etc.
 
 48. Simulation for the rolling shutter effect. 
 Refer to Kerl rolling shutter RGBD and Lovegrove spline fusion.

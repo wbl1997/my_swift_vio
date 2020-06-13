@@ -17,9 +17,7 @@ public:
   void createVioSystem(const okvis::TestSetting& testSetting,
                        SimulatedTrajectoryType trajectoryId,
                        std::string projOptModelName, std::string extrinsicModelName,
-                       int cameraModelId,
-                       CameraOrientation cameraOrientationId, double td, double tr,
-                       double landmarkRadius,
+                       double td, double tr,
                        std::string imuLogFile, std::string pointFile);
 
 public:

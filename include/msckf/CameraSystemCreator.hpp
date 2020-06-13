@@ -23,6 +23,11 @@ enum class CameraOrientation {
   Right,
 };
 
+enum class SimCameraModelType {
+  EUROC = 0,
+  VGA,
+};
+
 /**
  * @brief create_T_BC
  * The body frame is forward-left-up. Relative to the camera,
@@ -35,7 +40,8 @@ Eigen::Matrix<double, 4, 4> create_T_BC(CameraOrientation orientationId,
 
 class CameraSystemCreator {
  public:
-  CameraSystemCreator(int cameraModelId, CameraOrientation cameraOrientationId,
+  CameraSystemCreator(SimCameraModelType cameraModelId,
+                      CameraOrientation cameraOrientationId,
                       const std::string projIntrinsicRep,
                       const std::string extrinsicRep, double td, double tr)
       : cameraModelId_(cameraModelId),
@@ -128,19 +134,17 @@ class CameraSystemCreator {
  private:
 
   std::shared_ptr<okvis::cameras::CameraBase> createCameraGeometry(
-      int cameraModelId) {
+      SimCameraModelType cameraModelId) {
     std::shared_ptr<okvis::cameras::CameraBase> cameraGeometry;
-
     switch (cameraModelId) {
-      case 1:
+      case SimCameraModelType::VGA:
         cameraGeometry.reset(new okvis::cameras::PinholeCamera<
                              okvis::cameras::RadialTangentialDistortion>(
             640, 480, 350, 350, 322, 238,
             okvis::cameras::RadialTangentialDistortion(0, 0, 0, 0),
                                timeOffset_, readoutTime_));
         break;
-
-      case 0:
+      case SimCameraModelType::EUROC:
       default:
         cameraGeometry.reset(new okvis::cameras::PinholeCamera<
                              okvis::cameras::RadialTangentialDistortion>(
@@ -157,7 +161,7 @@ class CameraSystemCreator {
   static const std::string distortName_;
   static const int camIdx_ = 0;
 
-  const int cameraModelId_;
+  const SimCameraModelType cameraModelId_;
   const CameraOrientation cameraOrientationId_;
   const std::string projIntrinsicRep_;
   const std::string extrinsicRep_;

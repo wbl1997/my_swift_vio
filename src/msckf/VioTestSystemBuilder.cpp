@@ -10,22 +10,19 @@
 
 DEFINE_bool(zero_camera_intrinsic_param_noise, true,
             "Set the variance of the camera intrinsic parameters zero."
-            " Otherwise, these parameters will be estimated by the filter."
-            "If addSystemNoise is true, this parameter will have no effect.");
+            " Otherwise, these parameters will be estimated by the filter.");
 
 DEFINE_bool(zero_imu_intrinsic_param_noise, true,
             "Set the variance of the IMU augmented intrinsic parameters zero."
-            " Otherwise, these parameters will be estimated by the filter."
-            "If addSystemNoise is true, this parameter will have no effect.");
+            " Otherwise, these parameters will be estimated by the filter.");
 
 namespace simul {
 void VioTestSystemBuilder::createVioSystem(
     const okvis::TestSetting& testSetting,
     SimulatedTrajectoryType trajectoryType,
-    std::string projOptModelName, std::string extrinsicModelName,
-    int cameraModelId,
-    CameraOrientation cameraOrientationId, double td, double tr,
-    double landmarkRadius,
+    std::string projOptModelName,
+    std::string extrinsicModelName,
+    double td, double tr,
     std::string imuLogFile,
     std::string pointFile) {
   const double DURATION = 300.0;  // length of motion in seconds
@@ -37,17 +34,14 @@ void VioTestSystemBuilder::createVioSystem(
   double Ta_std = 5e-3;
   bool zeroCameraIntrinsicParamNoise = FLAGS_zero_camera_intrinsic_param_noise;
   bool zeroImuIntrinsicParamNoise = FLAGS_zero_imu_intrinsic_param_noise;
-  if (testSetting.addSystemError) {
-    zeroCameraIntrinsicParamNoise = false;
-    zeroImuIntrinsicParamNoise = false;
-  }
+
   okvis::ExtrinsicsEstimationParameters extrinsicsEstimationParameters;
   initCameraNoiseParams(&extrinsicsEstimationParameters, pCB_std,
                         zeroCameraIntrinsicParamNoise);
 
   okvis::ImuParameters imuParameters;
-  simul::initImuNoiseParams(&imuParameters, testSetting.addPriorNoise,
-                          testSetting.addSystemError, bg_std, ba_std,
+  simul::initImuNoiseParams(&imuParameters, testSetting.noisyInitialSpeedAndBiases,
+                          testSetting.noisyInitialSensorParams, bg_std, ba_std,
                           Tg_std, Ts_std, Ta_std,
                           zeroImuIntrinsicParamNoise);
   imuModelType_ = imuParameters.model_type;
@@ -87,9 +81,14 @@ void VioTestSystemBuilder::createVioSystem(
       circularSinusoidalTrajectory.reset(new simul::Motionless(
           imuParameters.rate, Eigen::Vector3d(0, 0, -imuParameters.g)));
       break;
-    case SimulatedTrajectoryType::Ball:
+    case SimulatedTrajectoryType::Torus2:
       circularSinusoidalTrajectory.reset(new simul::SphereTrajectory(
           imuParameters.rate, Eigen::Vector3d(0, 0, -imuParameters.g)));
+      break;
+    case SimulatedTrajectoryType::Ball:
+      circularSinusoidalTrajectory.reset(new simul::SphereTrajectory(
+          imuParameters.rate, Eigen::Vector3d(0, 0, -imuParameters.g), 1.0,
+          0.4 * M_PI));
       break;
     default:
       LOG(ERROR) << "Unknown trajectory id " << static_cast<int>(trajectoryType);
@@ -112,7 +111,7 @@ void VioTestSystemBuilder::createVioSystem(
       circularSinusoidalTrajectory->computeGlobalPose(startEpoch);
   Eigen::Vector3d p_WS = truePose.r();
   Eigen::Vector3d v_WS = circularSinusoidalTrajectory->computeGlobalLinearVelocity(startEpoch);
-  if (testSetting.addPriorNoise) {
+  if (testSetting.noisyInitialSpeedAndBiases) {
     v_WS += vio::Sample::gaussian(1, 3).cwiseProduct(initialNavState_.std_v_WS);
   }
 
@@ -149,16 +148,13 @@ void VioTestSystemBuilder::createVioSystem(
   CHECK_EQ(tempIter != trueBiases_.end(), true) << "No imu reading close to motion start epoch by 1e-8";
   trueBiases_.erase(trueBiases_.begin(), tempIter);
 
-  // create the map
-  // TODO(jhuai): when the evaluationCallback is given to the map,
-  // OKVIS estimator crashes at problem solve().
   evaluationCallback_.reset(new msckf::VioEvaluationCallback());
   std::shared_ptr<okvis::ceres::Map> mapPtr(new okvis::ceres::Map(evaluationCallback_.get()));
-
   // std::shared_ptr<okvis::ceres::Map> mapPtr(new okvis::ceres::Map());
 
-  simul::CameraSystemCreator csc(cameraModelId, cameraOrientationId, projOptModelName,
-                                 extrinsicModelName, td, tr);
+  simul::CameraSystemCreator csc(testSetting.cameraModelId,
+                                 testSetting.cameraOrientationId,
+                                 projOptModelName, extrinsicModelName, td, tr);
   // reference camera system
   std::shared_ptr<okvis::cameras::CameraBase> cameraGeometry0;
   csc.createNominalCameraSystem(&cameraGeometry0, &trueCameraSystem_);
@@ -171,7 +167,7 @@ void VioTestSystemBuilder::createVioSystem(
   // camera system used for initilizing the estimator
   std::shared_ptr<okvis::cameras::CameraBase> cameraGeometry2;
   std::shared_ptr<okvis::cameras::NCameraSystem> cameraSystem2;
-  if (testSetting.addSystemError) {
+  if (testSetting.noisyInitialSensorParams) {
     csc.createNoisyCameraSystem(&cameraGeometry2, &cameraSystem2,
                                 extrinsicsEstimationParameters);
   } else {
@@ -215,8 +211,10 @@ void VioTestSystemBuilder::createVioSystem(
 
   frontend.reset(new okvis::SimulationFrontend(trueCameraSystem_->numCameras(),
                                                testSetting.addImageNoise, 60,
-                                               landmarkRadius,
-                                               constraintScheme, pointFile));
+                                               constraintScheme,
+                                               testSetting.gridType,
+                                               testSetting.landmarkRadius,
+                                               pointFile));
 
   estimator->addImu(imuParameters);
   estimator->addCameraSystem(

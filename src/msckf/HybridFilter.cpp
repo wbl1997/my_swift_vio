@@ -140,27 +140,39 @@ void HybridFilter::addImuAugmentedStates(const okvis::Time stateTime,
     imuInfo->at(ImuSensorStates::TA).startIndexInCov =
         prevImuInfo.at(ImuSensorStates::TA).startIndexInCov;
   } else {
-    Eigen::Matrix<double, 27, 1> vTgTsTa = imu_rig_.getImuAugmentedEuclideanParams();
-    Eigen::Matrix<double, 9, 1> TG = vTgTsTa.head<9>();
-    uint64_t id = IdProvider::instance().newId();
-    std::shared_ptr<ceres::ShapeMatrixParamBlock> tgBlockPtr(
-        new ceres::ShapeMatrixParamBlock(TG, id, stateTime));
-    mapPtr_->addParameterBlock(tgBlockPtr, ceres::Map::Trivial);
-    imuInfo->at(ImuSensorStates::TG).id = id;
+    Eigen::VectorXd imuAugmentedParams =
+        imu_rig_.getImuAugmentedEuclideanParams();
+    int imuModelId = imu_rig_.getModelId(0);
+    switch (imuModelId) {
+      case Imu_BG_BA_TG_TS_TA::kModelId: {
+        Eigen::Matrix<double, 9, 1> TG = imuAugmentedParams.head<9>();
+        uint64_t id = IdProvider::instance().newId();
+        std::shared_ptr<ceres::ShapeMatrixParamBlock> tgBlockPtr(
+            new ceres::ShapeMatrixParamBlock(TG, id, stateTime));
+        mapPtr_->addParameterBlock(tgBlockPtr, ceres::Map::Trivial);
+        imuInfo->at(ImuSensorStates::TG).id = id;
 
-    const Eigen::Matrix<double, 9, 1> TS = vTgTsTa.segment<9>(9);
-    id = IdProvider::instance().newId();
-    std::shared_ptr<okvis::ceres::ShapeMatrixParamBlock> tsBlockPtr(
-        new okvis::ceres::ShapeMatrixParamBlock(TS, id, stateTime));
-    mapPtr_->addParameterBlock(tsBlockPtr, ceres::Map::Trivial);
-    imuInfo->at(ImuSensorStates::TS).id = id;
+        const Eigen::Matrix<double, 9, 1> TS = imuAugmentedParams.segment<9>(9);
+        id = IdProvider::instance().newId();
+        std::shared_ptr<okvis::ceres::ShapeMatrixParamBlock> tsBlockPtr(
+            new okvis::ceres::ShapeMatrixParamBlock(TS, id, stateTime));
+        mapPtr_->addParameterBlock(tsBlockPtr, ceres::Map::Trivial);
+        imuInfo->at(ImuSensorStates::TS).id = id;
 
-    Eigen::Matrix<double, 9, 1> TA = vTgTsTa.tail<9>();
-    id = IdProvider::instance().newId();
-    std::shared_ptr<okvis::ceres::ShapeMatrixParamBlock> taBlockPtr(
-        new okvis::ceres::ShapeMatrixParamBlock(TA, id, stateTime));
-    mapPtr_->addParameterBlock(taBlockPtr, ceres::Map::Trivial);
-    imuInfo->at(ImuSensorStates::TA).id = id;
+        Eigen::Matrix<double, 9, 1> TA = imuAugmentedParams.tail<9>();
+        id = IdProvider::instance().newId();
+        std::shared_ptr<okvis::ceres::ShapeMatrixParamBlock> taBlockPtr(
+            new okvis::ceres::ShapeMatrixParamBlock(TA, id, stateTime));
+        mapPtr_->addParameterBlock(taBlockPtr, ceres::Map::Trivial);
+        imuInfo->at(ImuSensorStates::TA).id = id;
+      } break;
+      case Imu_BG_BA::kModelId:
+        break;
+      default:
+        LOG(WARNING) << "Adding parameter block not implemented for IMU model "
+                     << imuModelId;
+        break;
+    }
     // The startIndex in covariance will be initialized along with covariance.
   }
 }
@@ -335,18 +347,15 @@ bool HybridFilter::addStates(okvis::MultiFramePtr multiFrame,
                             ->estimate());
     correctedStateTime = multiFrame->timestamp() + tdEstimate;
 
-    Eigen::Matrix<double, 27, 1> vTgTsTa = imu_rig_.getImuAugmentedEuclideanParams(0);
+    Eigen::VectorXd imuAugmentedParams =
+        imu_rig_.getImuAugmentedEuclideanParams(0);
 
     // propagate pose, speedAndBias, and covariance
     okvis::Time startTime = statesMap_.rbegin()->second.timestamp;
-    Eigen::Matrix<double, ceres::ode::OdoErrorStateDim,
-                  ceres::ode::OdoErrorStateDim>
-        Pkm1 = covariance_.topLeftCorner<ceres::ode::OdoErrorStateDim,
-                                         ceres::ode::OdoErrorStateDim>();
-    Eigen::Matrix<double, ceres::ode::OdoErrorStateDim,
-                  ceres::ode::OdoErrorStateDim>
-        F_tot;
-    F_tot.setIdentity();
+    size_t navAndImuParamsDim = navStateAndImuParamsMinimalDim();
+    Eigen::MatrixXd Pkm1 =
+        covariance_.topLeftCorner(navAndImuParamsDim, navAndImuParamsDim);
+    Eigen::MatrixXd F_tot = Eigen::MatrixXd::Identity(navAndImuParamsDim, navAndImuParamsDim);
     int numUsedImuMeasurements = -1;
     okvis::Time latestImuEpoch = imuMeasurements.back().timeStamp;
     okvis::Time propagationTargetTime = correctedStateTime;
@@ -355,33 +364,32 @@ bool HybridFilter::addStates(okvis::MultiFramePtr multiFrame,
       LOG(WARNING) << "Latest IMU readings does not extend to corrected state "
                       "time. Is temporal_imu_data_overlap too small?";
     }
+    ImuErrorModel<double> iem(speedAndBias.tail<6>(), imuAugmentedParams);
     if (FLAGS_use_first_estimate) {
       /// use latest estimate to propagate pose, speed and bias, and first
       /// estimate to propagate covariance and Jacobian
       std::shared_ptr<const Eigen::Matrix<double, 6, 1>> lP =
           statesMap_.rbegin()->second.linearizationPoint;
-      Eigen::Vector3d tempV_WS = speedAndBias.head<3>();
-      IMUErrorModel<double> tempIEM(speedAndBias.tail<6>(), vTgTsTa);
-      numUsedImuMeasurements = IMUOdometry::propagation(
-          imuMeasurements, imuParametersVec_.at(0), T_WS, tempV_WS, tempIEM,
-          startTime, propagationTargetTime, &Pkm1, &F_tot, lP.get());
-      speedAndBias.head<3>() = tempV_WS;
+      Eigen::Vector3d v_WS = speedAndBias.head<3>();
+      numUsedImuMeasurements = ImuOdometry::propagation(
+          imuMeasurements, imuParametersVec_.at(0), T_WS, v_WS, iem, startTime,
+          propagationTargetTime, &Pkm1, &F_tot, lP.get());
+      speedAndBias.head<3>() = v_WS;
     } else {
       /// use latest estimate to propagate pose, speed and bias, and covariance
       if (FLAGS_use_RK4) {
         // method 1 RK4 a little bit more accurate but 4 times slower
-        numUsedImuMeasurements = IMUOdometry::propagation_RungeKutta(
-            imuMeasurements, imuParametersVec_.at(0), T_WS, speedAndBias,
-            vTgTsTa, startTime, propagationTargetTime, &Pkm1, &F_tot);
+        numUsedImuMeasurements = ImuOdometry::propagation_RungeKutta(
+            imuMeasurements, imuParametersVec_.at(0), T_WS, speedAndBias, iem,
+            startTime, propagationTargetTime, &Pkm1, &F_tot);
       } else {
         // method 2, i.e., adapt the imuError::propagation function of okvis by
         // the msckf derivation in Michael Andrew Shelley
-        Eigen::Vector3d tempV_WS = speedAndBias.head<3>();
-        IMUErrorModel<double> tempIEM(speedAndBias.tail<6>(), vTgTsTa);
-        numUsedImuMeasurements = IMUOdometry::propagation(
-            imuMeasurements, imuParametersVec_.at(0), T_WS, tempV_WS, tempIEM,
+        Eigen::Vector3d v_WS = speedAndBias.head<3>();
+        numUsedImuMeasurements = ImuOdometry::propagation(
+            imuMeasurements, imuParametersVec_.at(0), T_WS, v_WS, iem,
             startTime, propagationTargetTime, &Pkm1, &F_tot);
-        speedAndBias.head<3>() = tempV_WS;
+        speedAndBias.head<3>() = v_WS;
       }
     }
     if (numUsedImuMeasurements < 2) {
@@ -391,25 +399,24 @@ bool HybridFilter::addStates(okvis::MultiFramePtr multiFrame,
                    << tdEstimate << std::endl;
     }
     okvis::Time secondLatestStateTime = statesMap_.rbegin()->second.timestamp;
-    auto imuMeasCoverSecond = inertialMeasForStates_.findWindow(secondLatestStateTime, half_window_);
-    statesMap_.rbegin()->second.imuReadingWindow.reset(new okvis::ImuMeasurementDeque(imuMeasCoverSecond));
+    auto imuMeasCoverSecond =
+        inertialMeasForStates_.findWindow(secondLatestStateTime, half_window_);
+    statesMap_.rbegin()->second.imuReadingWindow.reset(
+        new okvis::ImuMeasurementDeque(imuMeasCoverSecond));
 
     int covDim = covariance_.rows();
-    covariance_.topLeftCorner(ceres::ode::OdoErrorStateDim,
-                              ceres::ode::OdoErrorStateDim) = Pkm1;
-    covariance_.block(0, ceres::ode::OdoErrorStateDim,
-                      ceres::ode::OdoErrorStateDim,
-                      covDim - ceres::ode::OdoErrorStateDim) =
-        F_tot * covariance_.block(0, ceres::ode::OdoErrorStateDim,
-                                  ceres::ode::OdoErrorStateDim,
-                                  covDim - ceres::ode::OdoErrorStateDim);
-    covariance_.block(ceres::ode::OdoErrorStateDim, 0,
-                      covDim - ceres::ode::OdoErrorStateDim,
-                      ceres::ode::OdoErrorStateDim) =
-        covariance_.block(ceres::ode::OdoErrorStateDim, 0,
-                          covDim - ceres::ode::OdoErrorStateDim,
-                          ceres::ode::OdoErrorStateDim) *
-        F_tot.transpose();
+    covariance_.topLeftCorner(navAndImuParamsDim, navAndImuParamsDim) = Pkm1;
+    covariance_.block(0, navAndImuParamsDim, navAndImuParamsDim,
+                      covDim - navAndImuParamsDim) =
+        F_tot * covariance_.block(0, navAndImuParamsDim, navAndImuParamsDim,
+                                  covDim - navAndImuParamsDim);
+    covariance_
+        .block(navAndImuParamsDim, 0, covDim - navAndImuParamsDim,
+               navAndImuParamsDim)
+        .noalias() = covariance_
+                         .block(0, navAndImuParamsDim, navAndImuParamsDim,
+                                covDim - navAndImuParamsDim)
+                         .transpose();
   }
 
   // create a states object:
@@ -509,8 +516,7 @@ void HybridFilter::initCovariance() {
 
   Eigen::Matrix<double, 9, 9> covSB =
       Eigen::Matrix<double, 9, 9>::Zero();  // $v_B^G, b_g, b_a$
-  Eigen::Matrix<double, 27, 27> covTGTSTA =
-      Eigen::Matrix<double, 27, 27>::Zero();
+
   for (size_t i = 0; i < imuParametersVec_.size(); ++i) {
     // get these from parameter file
     const double sigma_bg = imuParametersVec_.at(0).sigma_bg;
@@ -522,28 +528,44 @@ void HybridFilter::initCovariance() {
     covSB.block<3, 3>(3, 3) = Eigen::Matrix3d::Identity() * gyrBiasVariance;
     covSB.bottomRightCorner<3, 3>() =
         Eigen::Matrix3d::Identity() * accBiasVariance;
-    const double sigmaTGElement = imuParametersVec_.at(0).sigma_TGElement;
-    const double sigmaTSElement = imuParametersVec_.at(0).sigma_TSElement;
-    const double sigmaTAElement = imuParametersVec_.at(0).sigma_TAElement;
-    covTGTSTA.topLeftCorner<9, 9>() =
-        Eigen::Matrix<double, 9, 9>::Identity() * std::pow(sigmaTGElement, 2);
-    covTGTSTA.block<9, 9>(9, 9) =
-        Eigen::Matrix<double, 9, 9>::Identity() * std::pow(sigmaTSElement, 2);
-    covTGTSTA.block<9, 9>(18, 18) =
-        Eigen::Matrix<double, 9, 9>::Identity() * std::pow(sigmaTAElement, 2);
   }
+
   SpecificSensorStatesContainer& imuInfo =
       statesMap_.rbegin()->second.sensors.at(SensorStates::Imu).at(0u);
 
   covariance_ = Eigen::MatrixXd::Zero(covDim, covDim);
-
   covariance_.topLeftCorner<6, 6>() = covPQ;
   covariance_.block<9, 9>(6, 6) = covSB;
   imuInfo.at(ImuSensorStates::SpeedAndBias).startIndexInCov = 6u;
-  covariance_.block<27, 27>(15, 15) = covTGTSTA;
-  imuInfo.at(ImuSensorStates::TG).startIndexInCov = 15u;
-  imuInfo.at(ImuSensorStates::TS).startIndexInCov = 24u;
-  imuInfo.at(ImuSensorStates::TA).startIndexInCov = 33u;
+  int imuModelId = imu_rig_.getModelId(0);
+
+  switch (imuModelId) {
+    case Imu_BG_BA_TG_TS_TA::kModelId: {
+      Eigen::Matrix<double, 27, 27> covTGTSTA =
+          Eigen::Matrix<double, 27, 27>::Zero();
+      const double sigmaTGElement = imuParametersVec_.at(0).sigma_TGElement;
+      const double sigmaTSElement = imuParametersVec_.at(0).sigma_TSElement;
+      const double sigmaTAElement = imuParametersVec_.at(0).sigma_TAElement;
+      covTGTSTA.topLeftCorner<9, 9>() =
+          Eigen::Matrix<double, 9, 9>::Identity() * std::pow(sigmaTGElement, 2);
+      covTGTSTA.block<9, 9>(9, 9) =
+          Eigen::Matrix<double, 9, 9>::Identity() * std::pow(sigmaTSElement, 2);
+      covTGTSTA.block<9, 9>(18, 18) =
+          Eigen::Matrix<double, 9, 9>::Identity() * std::pow(sigmaTAElement, 2);
+      covariance_.block<27, 27>(15, 15) = covTGTSTA;
+      imuInfo.at(ImuSensorStates::TG).startIndexInCov = 15u;
+      imuInfo.at(ImuSensorStates::TS).startIndexInCov = 24u;
+      imuInfo.at(ImuSensorStates::TA).startIndexInCov = 33u;
+    } break;
+    case Imu_BG_BA::kModelId:
+      imuInfo.at(ImuSensorStates::TG).startIndexInCov = 15u;
+      imuInfo.at(ImuSensorStates::TS).startIndexInCov = 15u;
+      imuInfo.at(ImuSensorStates::TA).startIndexInCov = 15u;
+      break;
+    default:
+      LOG(WARNING) << "Not implemented IMU model " << imuModelId;
+      break;
+  }
 
   for (size_t j = 0u; j < camera_rig_.numberCameras(); ++j) {
     initCameraParamCovariance(j);
@@ -673,11 +695,11 @@ void HybridFilter::addCovForClonedStates() {
 //            mapPtr_->parameterBlockPtr(SBId));
 //    SpeedAndBiases sb = sbParamBlockPtr->estimate();
 
-//    Eigen::Matrix<double, 27, 1> vTgTsTa =
+//    Eigen::VectorXd imuAugmentedParams =
 //        imu_rig_.getImuAugmentedEuclideanParams();
-//    IMUErrorModel<double> iem(sb.tail<6>(), vTgTsTa, true);
+//    ImuErrorModel<double> iem(sb.tail<6>(), imuAugmentedParams, true);
 //    okvis::ImuMeasurement interpolatedInertialData;
-//    IMUOdometry::interpolateInertialData(*stateInQuestion.imuReadingWindow, iem,
+//    ImuOdometry::interpolateInertialData(*stateInQuestion.imuReadingWindow, iem,
 //                                         stateInQuestion.timestamp,
 //                                         interpolatedInertialData);
 
@@ -1144,10 +1166,10 @@ bool HybridFilter::slamFeatureJacobian(
   SpeedAndBiases sb = sbj;
   ImuMeasurement
       interpolatedInertialData;  // inertial data at the feature capture epoch
-  Eigen::Matrix<double, 27, 1> vTGTSTA = imu_rig_.getImuAugmentedEuclideanParams();
-  poseAndVelocityAtObservation(
-      imuMeas, vTGTSTA.data(), imuParametersVec_.at(0), stateEpoch, featureTime,
-      &T_WB, &sb, &interpolatedInertialData, FLAGS_use_RK4);
+  Eigen::VectorXd imuAugmentedParams = imu_rig_.getImuAugmentedEuclideanParams();
+  poseAndVelocityAtObservation(imuMeas, imuAugmentedParams, imuParametersVec_.at(0),
+                               stateEpoch, featureTime, &T_WB, &sb,
+                               &interpolatedInertialData, FLAGS_use_RK4);
 
   okvis::kinematics::Transformation T_WBa;
   get_T_WS(anchorId, T_WBa);
@@ -1189,7 +1211,7 @@ bool HybridFilter::slamFeatureJacobian(
         kinematics::Transformation(posVelFirstEstimatePtr->head<3>(), lP_T_WB.q());
     lP_sb.head<3>() = posVelFirstEstimatePtr->tail<3>();
     poseAndLinearVelocityAtObservation(
-        imuMeas, vTGTSTA.data(), imuParametersVec_.at(0), stateEpoch,
+        imuMeas, imuAugmentedParams, imuParametersVec_.at(0), stateEpoch,
         featureTime, &lP_T_WB, &lP_sb);
   }
   double rho = ab1rho[3];
@@ -1547,35 +1569,46 @@ bool HybridFilter::featureJacobian(
 void HybridFilter::updateImuAugmentedStates(
     const States& stateInQuestion, const Eigen::VectorXd deltaAugmentedParams) {
   const int imuIdx = 0;
-  uint64_t TGId = stateInQuestion.sensors.at(SensorStates::Imu)
-                      .at(imuIdx)
-                      .at(ImuSensorStates::TG)
-                      .id;
-  std::shared_ptr<ceres::ShapeMatrixParamBlock> tgParamBlockPtr =
-      std::static_pointer_cast<ceres::ShapeMatrixParamBlock>(
-          mapPtr_->parameterBlockPtr(TGId));
-  Eigen::Matrix<double, 9, 1> sm = tgParamBlockPtr->estimate();
-  tgParamBlockPtr->setEstimate(sm + deltaAugmentedParams.head<9>());
+  int imuModelId = imu_rig_.getModelId(imuIdx);
+  switch (imuModelId) {
+    case Imu_BG_BA::kModelId:
+      return;
+    case Imu_BG_BA_TG_TS_TA::kModelId: {
+      uint64_t TGId = stateInQuestion.sensors.at(SensorStates::Imu)
+                          .at(imuIdx)
+                          .at(ImuSensorStates::TG)
+                          .id;
+      std::shared_ptr<ceres::ShapeMatrixParamBlock> tgParamBlockPtr =
+          std::static_pointer_cast<ceres::ShapeMatrixParamBlock>(
+              mapPtr_->parameterBlockPtr(TGId));
+      Eigen::Matrix<double, 9, 1> sm = tgParamBlockPtr->estimate();
+      tgParamBlockPtr->setEstimate(sm + deltaAugmentedParams.head<9>());
 
-  uint64_t TSId = stateInQuestion.sensors.at(SensorStates::Imu)
-                      .at(imuIdx)
-                      .at(ImuSensorStates::TS)
-                      .id;
-  std::shared_ptr<ceres::ShapeMatrixParamBlock> tsParamBlockPtr =
-      std::static_pointer_cast<ceres::ShapeMatrixParamBlock>(
-          mapPtr_->parameterBlockPtr(TSId));
-  sm = tsParamBlockPtr->estimate();
-  tsParamBlockPtr->setEstimate(sm + deltaAugmentedParams.segment<9>(9));
+      uint64_t TSId = stateInQuestion.sensors.at(SensorStates::Imu)
+                          .at(imuIdx)
+                          .at(ImuSensorStates::TS)
+                          .id;
+      std::shared_ptr<ceres::ShapeMatrixParamBlock> tsParamBlockPtr =
+          std::static_pointer_cast<ceres::ShapeMatrixParamBlock>(
+              mapPtr_->parameterBlockPtr(TSId));
+      sm = tsParamBlockPtr->estimate();
+      tsParamBlockPtr->setEstimate(sm + deltaAugmentedParams.segment<9>(9));
 
-  uint64_t TAId = stateInQuestion.sensors.at(SensorStates::Imu)
-                      .at(imuIdx)
-                      .at(ImuSensorStates::TA)
-                      .id;
-  std::shared_ptr<ceres::ShapeMatrixParamBlock> taParamBlockPtr =
-      std::static_pointer_cast<ceres::ShapeMatrixParamBlock>(
-          mapPtr_->parameterBlockPtr(TAId));
-  sm = taParamBlockPtr->estimate();
-  taParamBlockPtr->setEstimate(sm + deltaAugmentedParams.segment<9>(18));
+      uint64_t TAId = stateInQuestion.sensors.at(SensorStates::Imu)
+                          .at(imuIdx)
+                          .at(ImuSensorStates::TA)
+                          .id;
+      std::shared_ptr<ceres::ShapeMatrixParamBlock> taParamBlockPtr =
+          std::static_pointer_cast<ceres::ShapeMatrixParamBlock>(
+              mapPtr_->parameterBlockPtr(TAId));
+      sm = taParamBlockPtr->estimate();
+      taParamBlockPtr->setEstimate(sm + deltaAugmentedParams.segment<9>(18));
+    } break;
+    default:
+      LOG(WARNING) << "UpdateState for IMU model " << imuModelId
+                   << " not implemented!";
+      break;
+  }
 }
 
 void HybridFilter::cloneImuAugmentedStates(
@@ -2048,12 +2081,13 @@ void HybridFilter::optimize(size_t /*numIter*/, size_t /*numThreads*/,
   size_t nToAddFeatures =
       0;  // features tracked long enough and to be included in states
 
+  size_t navAndImuParamsDim = navStateAndImuParamsMinimalDim();
   Eigen::MatrixXd variableCov = covariance_.block(
-      okvis::ceres::ode::OdoErrorStateDim, okvis::ceres::ode::OdoErrorStateDim,
+      navAndImuParamsDim, navAndImuParamsDim,
       dimH_o[1],
       dimH_o[1]);  // covariance of camera and pose copy states
   Eigen::MatrixXd variableCov2 = covariance_.block(
-      okvis::ceres::ode::OdoErrorStateDim, okvis::ceres::ode::OdoErrorStateDim,
+      navAndImuParamsDim, navAndImuParamsDim,
       dimH_o[1] + 9,
       dimH_o[1] + 9);  // covariance of camera and pose copy states
 
@@ -2235,7 +2269,7 @@ void HybridFilter::optimize(size_t /*numIter*/, size_t /*numThreads*/,
     updateCovarianceTimer.start();
 #if 0  // Joseph form
         Eigen::MatrixXd tempMat = Eigen::MatrixXd::Identity(covDim, covDim);
-        tempMat.block(0, okvis::ceres::ode::OdoErrorStateDim, covDim, numCamPosePointStates) -= K*H_all;
+        tempMat.block(0, navAndImuParamsDim, covDim, numCamPosePointStates) -= K*H_all;
         covariance_ = tempMat * (covariance_ * tempMat.transpose()).eval() + K * R_all * K.transpose();
 #else  // Li Mingyang RSS 12 optimization based..., positive semi-definiteness
        // not necessarily maintained
@@ -2310,8 +2344,8 @@ void HybridFilter::optimize(size_t /*numIter*/, size_t /*numThreads*/,
     const size_t numCamPoseStates =
         numCamPosePointStates - 3 * mInCovLmIds.size();
     Eigen::MatrixXd variableCov = covariance_.block(
-        okvis::ceres::ode::OdoErrorStateDim,
-        okvis::ceres::ode::OdoErrorStateDim, numCamPoseStates,
+        navAndImuParamsDim,
+        navAndImuParamsDim, numCamPoseStates,
         numCamPoseStates);  // covariance of camera and pose copy states
 
     std::vector<uint64_t> toAddLmIds;  // id of landmarks to add to the states
@@ -2414,14 +2448,14 @@ void HybridFilter::optimize(size_t /*numIter*/, size_t /*numThreads*/,
 
       Eigen::MatrixXd S =
           H_o *
-              covariance_.block(okvis::ceres::ode::OdoErrorStateDim,
-                                okvis::ceres::ode::OdoErrorStateDim,
+              covariance_.block(navAndImuParamsDim,
+                                navAndImuParamsDim,
                                 numCamPoseStates, numCamPoseStates) *
               H_o.transpose() +
           R_o;
 
       Eigen::MatrixXd K =
-          (covariance_.block(0, okvis::ceres::ode::OdoErrorStateDim, covDim,
+          (covariance_.block(0, navAndImuParamsDim, covDim,
                              numCamPoseStates) *
            H_o.transpose()) *
           S.inverse();
@@ -2431,7 +2465,7 @@ void HybridFilter::optimize(size_t /*numIter*/, size_t /*numThreads*/,
                            covDim + nNewFeatures * 3);
 #if 0  // Joseph form
             Eigen::MatrixXd tempMat = Eigen::MatrixXd::Identity(covDim, covDim);
-            tempMat.block(0, okvis::ceres::ode::OdoErrorStateDim, covDim, numCamPoseStates) -= K*H_o;
+            tempMat.block(0, navAndImuParamsDim, covDim, numCamPoseStates) -= K*H_o;
             Paug.topLeftCorner(covDim, covDim) = tempMat * (covariance_ * tempMat.transpose()).eval() + K * R_o * K.transpose();
 #else  // Li Mingyang RSS 12 optimization based
       Paug.topLeftCorner(covDim, covDim) =
@@ -2439,12 +2473,12 @@ void HybridFilter::optimize(size_t /*numIter*/, size_t /*numThreads*/,
 #endif
       Eigen::MatrixXd invH2H1 = invH_2 * H_1;
       Paug.block(covDim, 0, 3 * nNewFeatures, covDim) =
-          -invH2H1 * Paug.block(okvis::ceres::ode::OdoErrorStateDim, 0,
+          -invH2H1 * Paug.block(navAndImuParamsDim, 0,
                                 numCamPoseStates, covDim);
       Paug.block(0, covDim, covDim, 3 * nNewFeatures) =
           Paug.block(covDim, 0, 3 * nNewFeatures, covDim).transpose();
       Paug.bottomRightCorner(3 * nNewFeatures, 3 * nNewFeatures) =
-          -Paug.block(covDim, okvis::ceres::ode::OdoErrorStateDim,
+          -Paug.block(covDim, navAndImuParamsDim,
                       3 * nNewFeatures, numCamPoseStates) *
               invH2H1.transpose() +
           invH_2 * R_1 * invH_2.transpose();
@@ -2481,7 +2515,7 @@ void HybridFilter::optimize(size_t /*numIter*/, size_t /*numThreads*/,
       Eigen::Matrix<double, Eigen::Dynamic, 1> deltaX(covDim, 1);
       deltaX.head(covDim - 3 * nNewFeatures) = deltaXo;
       deltaX.tail(3 * nNewFeatures) =
-          -invH2H1 * deltaXo.segment(okvis::ceres::ode::OdoErrorStateDim,
+          -invH2H1 * deltaXo.segment(navAndImuParamsDim,
                                      numCamPoseStates) +
           invH_2 * z_1;
       OKVIS_ASSERT_FALSE(Exception,
@@ -2899,27 +2933,39 @@ void HybridFilter::getCameraTimeParameterPtrs(
 
 std::vector<std::shared_ptr<const okvis::ceres::ParameterBlock>>
 HybridFilter::getImuAugmentedParameterPtrs() const {
+  const int imuIdx = 0;
+  int imuModelId = imu_rig_.getModelId(imuIdx);
   std::vector<std::shared_ptr<const okvis::ceres::ParameterBlock>>
       imuParameterPtrs;
-  imuParameterPtrs.reserve(3);
-  const int imuIdx = 0;
   const States stateInQuestion = statesMap_.rbegin()->second;
-  uint64_t TGId = stateInQuestion.sensors.at(SensorStates::Imu)
-                      .at(imuIdx)
-                      .at(ImuSensorStates::TG)
-                      .id;
-  imuParameterPtrs.push_back(mapPtr_->parameterBlockPtr(TGId));
-  uint64_t TSId = stateInQuestion.sensors.at(SensorStates::Imu)
-                      .at(imuIdx)
-                      .at(ImuSensorStates::TS)
-                      .id;
-  imuParameterPtrs.push_back(mapPtr_->parameterBlockPtr(TSId));
+  switch (imuModelId) {
+    case Imu_BG_BA::kModelId:
+      break;
+    case Imu_BG_BA_TG_TS_TA::kModelId: {
+      imuParameterPtrs.reserve(3);
 
-  uint64_t TAId = stateInQuestion.sensors.at(SensorStates::Imu)
-                      .at(imuIdx)
-                      .at(ImuSensorStates::TA)
-                      .id;
-  imuParameterPtrs.push_back(mapPtr_->parameterBlockPtr(TAId));
+      uint64_t TGId = stateInQuestion.sensors.at(SensorStates::Imu)
+                          .at(imuIdx)
+                          .at(ImuSensorStates::TG)
+                          .id;
+      imuParameterPtrs.push_back(mapPtr_->parameterBlockPtr(TGId));
+      uint64_t TSId = stateInQuestion.sensors.at(SensorStates::Imu)
+                          .at(imuIdx)
+                          .at(ImuSensorStates::TS)
+                          .id;
+      imuParameterPtrs.push_back(mapPtr_->parameterBlockPtr(TSId));
+
+      uint64_t TAId = stateInQuestion.sensors.at(SensorStates::Imu)
+                          .at(imuIdx)
+                          .at(ImuSensorStates::TA)
+                          .id;
+      imuParameterPtrs.push_back(mapPtr_->parameterBlockPtr(TAId));
+    } break;
+    default:
+      LOG(WARNING) << "Imu Augmented parameter ptrs not implemented for model "
+                   << imuModelId;
+      break;
+  }
   return imuParameterPtrs;
 }
 

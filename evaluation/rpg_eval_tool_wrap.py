@@ -1,5 +1,6 @@
 import os
 import textwrap
+import yaml
 
 import utility_functions
 from colorama import init, Fore
@@ -80,3 +81,20 @@ def check_eval_result(eval_result_dir, cmp_eval_output_dir):
                     returncode = 1
 
     return returncode
+
+
+def change_eval_cfg(eval_cfg_fn, align_type, align_n=-1):
+    """
+    apply configuration to a eval_cfg.yaml
+    :param eval_cfg_fn: the cfg yaml on which the changes will be applied.
+    :param align_type: one of sim3 se3 posyaw none
+    :param align_n align first number of frames
+    adapted from /media/jhuai/docker/msckf_ws/src/rpg_trajectory_evaluation/scripts/change_eval_cfg_recursive.py
+    :return:
+    """
+    with open(eval_cfg_fn, 'r') as f:
+        eval_cfg = yaml.load(f, Loader=yaml.FullLoader)
+        eval_cfg['align_type'] = align_type
+        eval_cfg['align_num_frames'] = align_n
+    with open(eval_cfg_fn, 'w') as f:
+        f.write(yaml.dump(eval_cfg, default_flow_style=False))

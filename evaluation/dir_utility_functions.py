@@ -87,6 +87,16 @@ def mkdir_p(dirname):
             raise
         pass
 
+
+def makedirs_p(dirname):
+    try:
+        os.makedirs(dirname)
+    except OSError as exc:
+        if exc.errno != errno.EEXIST:
+            raise
+        pass
+
+
 def make_or_empty_dir(dirname):
     if os.path.isdir(dirname):
         empty_dir(dirname)

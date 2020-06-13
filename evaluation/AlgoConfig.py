@@ -86,6 +86,7 @@ def apply_config_to_yaml(config_dict, vio_yaml, debug_output_dir):
     sed_cmd += sed_line_with_parameter(config_dict, "sigma_principal_point", padding, vio_yaml)
     sed_cmd += sed_line_with_parameter(config_dict, "sigma_distortion", padding, vio_yaml)
 
+    sed_cmd += sed_line_with_parameter(config_dict, "model_type", padding, vio_yaml)
     sed_cmd += sed_line_with_parameter(config_dict, "sigma_TGElement", padding, vio_yaml)
     sed_cmd += sed_line_with_parameter(config_dict, "sigma_TSElement", padding, vio_yaml)
     sed_cmd += sed_line_with_parameter(config_dict, "sigma_TAElement", padding, vio_yaml)
@@ -107,6 +108,11 @@ def apply_config_to_yaml(config_dict, vio_yaml, debug_output_dir):
     sed_cmd += sed_gravity
 
     sed_cmd += sed_line_with_parameter(config_dict, "maxOdometryConstraintForAKeyframe", padding, vio_yaml)
+
+    sed_cmd += sed_line_with_parameter(config_dict, "initializeWithoutEnoughParallax", padding, vio_yaml)
+    sed_cmd += sed_line_with_parameter(config_dict, "stereoMatchWithEpipolarCheck", padding, vio_yaml)
+    sed_cmd += sed_line_with_parameter(config_dict, "epipolarDistanceThreshold", padding, vio_yaml)
+    sed_cmd += sed_line_with_parameter(config_dict, "featureTrackingMethod", padding, vio_yaml)
 
     out_stream = open(os.path.join(debug_output_dir, "sed_out.log"), 'w')
     err_stream = open(os.path.join(debug_output_dir, "sed_err.log"), 'w')

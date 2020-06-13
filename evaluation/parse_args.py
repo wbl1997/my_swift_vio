@@ -67,9 +67,13 @@ def parse_args():
     parser.add_argument(
         '--cmp_eval_output_dir', help='base folder with the evaluation output to compare',
         default='')
+
     parser.add_argument(
         '--num_trials', type=int,
         help='number of trials for each mission each algorithm', default=1)
+
+    parser.add_argument('--align_type', type=str,
+                        default='posyaw', help='alignment type out of sim3 se3 posyaw none')
 
     pose_conversion_script_default = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                                                   '../../vio_common/python/convert_pose_format.py')

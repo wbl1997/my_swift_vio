@@ -238,20 +238,21 @@ void predictStates(
                       // initial covariance is updated to $t_k$
 
   assert(dt >= Scalar(0) && dt <= Scalar(1 + 1e-8));
-  IMUErrorModel<Scalar> iem(speed_bias_k.template block<6, 1>(3, 0),
+  ImuErrorModel<Scalar> iem(speed_bias_k.template block<6, 1>(3, 0),
                             shape_matrices);
+  Eigen::Vector3d w_est, a_est;
   iem.estimate(measurements[0].template block<3, 1>(1, 0),
-               measurements[0].template block<3, 1>(4, 0));
+               measurements[0].template block<3, 1>(4, 0), &w_est, &a_est);
 
   const Eigen::Matrix<Scalar, 3, 1> qna = q_n_aw_babw.template head<3>(),
                                     qnw = q_n_aw_babw.template segment<3>(3),
                                     qnba = q_n_aw_babw.template segment<3>(6),
                                     qnbw = q_n_aw_babw.template tail<3>();
-  strapdown_local_quat_bias(r_old, v_old, q_old, iem.a_est, iem.w_est, dt,
+  strapdown_local_quat_bias(r_old, v_old, q_old, a_est, w_est, dt,
                             gwomegaw, &r_new, &v_new, &q_new);
 
   if (predict_cov) {
-    sys_local_dcm_bias(r_old, v_old, q_old, iem.a_est, iem.w_est,
+    sys_local_dcm_bias(r_old, v_old, q_old, a_est, w_est,
                        measurements[1][0] - covupt_time, qna, qnw, qnba, qnbw,
                        P);
     // for more precise covariance update, we can use average estimated accel
@@ -264,12 +265,14 @@ void predictStates(
   int unsigned i = 1;
   for (; i < measurements.size() - 1; ++i) {
     dt = measurements[i + 1][0] - measurements[i][0];
+
     iem.estimate(measurements[i].template block<3, 1>(1, 0),
-                 measurements[i].template block<3, 1>(4, 0));
-    strapdown_local_quat_bias(r_old, v_old, q_old, iem.a_est, iem.w_est, dt,
+                 measurements[i].template block<3, 1>(4, 0),
+                 &w_est, &a_est);
+    strapdown_local_quat_bias(r_old, v_old, q_old, a_est, w_est, dt,
                               gwomegaw, &r_new, &v_new, &q_new);
     if (predict_cov && (i % every_n_reading == 0)) {
-      sys_local_dcm_bias(r_old, v_old, q_old, iem.a_est, iem.w_est,
+      sys_local_dcm_bias(r_old, v_old, q_old, a_est, w_est,
                          measurements[i + 1][0] - covupt_time, qna, qnw, qnba,
                          qnbw, P);
       covupt_time = measurements[i + 1][0];
@@ -282,11 +285,12 @@ void predictStates(
   dt = time_pair[1] - measurements[i][0];  // the last measurement
   assert(dt >= Scalar(0) && dt < Scalar(0.01));
   iem.estimate(measurements[i].template block<3, 1>(1, 0),
-               measurements[i].template block<3, 1>(4, 0));
-  strapdown_local_quat_bias(r_old, v_old, q_old, iem.a_est, iem.w_est, dt,
+               measurements[i].template block<3, 1>(4, 0),
+               &w_est, &a_est);
+  strapdown_local_quat_bias(r_old, v_old, q_old, a_est, w_est, dt,
                             gwomegaw, &r_new, &v_new, &q_new);
   if (predict_cov) {
-    sys_local_dcm_bias(r_old, v_old, q_old, iem.a_est, iem.w_est,
+    sys_local_dcm_bias(r_old, v_old, q_old, a_est, w_est,
                        time_pair[1] - covupt_time, qna, qnw, qnba, qnbw, P);
     covupt_time = time_pair[1];
   }
