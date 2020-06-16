@@ -48,7 +48,7 @@ if __name__ == '__main__':
         # We disable online extrinsic calibration for OKVIS by zeroing
         # sigma_absolute_translation and sigma_absolute_orientation.
         'MSCKF_BgBa': {"algo_code": "MSCKF",
-                       "extra_gflags": "--publish_via_ros=false",
+                       "extra_gflags": "--publish_via_ros=true",
                        "numKeyframes": 5,
                        "numImuFrames": 5,
                        "monocular_input": 1,

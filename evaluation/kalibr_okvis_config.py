@@ -94,15 +94,15 @@ ADVIO_PARAMETERS = {
          "projection_opt_mode": "FX_CXY",
          "extrinsic_opt_mode": "P_CB",
          "image_delay": 0.0,
-         "image_readout_time": 0.00},
+         "image_readout_time": 0.015},
     "imu_params": {
         "imu_rate": 100,
         'g_max': 7.8,
         'sigma_g_c': 2.4e-3,
-        'sigma_a_c': 4.8e-3,
+        'sigma_a_c': 4.8e-2,  # 4.8e-3 is the value provided by advio.
         'sigma_gw_c': 5.1e-5,
         'sigma_aw_c': 2.1e-4,
-        'g': 9.819, # at Helsinki according to https://units.fandom.com/wiki/Gravity_of_Earth
+        'g': 9.819,  # at Helsinki according to https://units.fandom.com/wiki/Gravity_of_Earth
         'sigma_TGElement': 5e-3,
         'sigma_TSElement': 1e-3,
         'sigma_TAElement': 5e-3, },
