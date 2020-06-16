@@ -69,7 +69,8 @@ for j = 1:length(msckf_traj_list)
     for i=1:size(data,1)
         qs2w = gt(assocIndex(i), [gt_index.q(4), gt_index.q(1:3)]);
         qs2w_hat = data(i, [msckf_index_server.q(4), msckf_index_server.q(1:3)]);
-        alpha(i,:) = unskew(rotqr2ro(qs2w')*rotqr2ro(qs2w_hat')'-eye(3))';
+        alpha(i,:) = unskew(rotmat(quaternion(qs2w), 'point')* ...
+            rotmat(quaternion(qs2w_hat), 'point')'-eye(3))';
     end
     data_diff(:, msckf_index_server.q(1:3)) = alpha;
     if size(gt, 2) >= gt_index.v(3)

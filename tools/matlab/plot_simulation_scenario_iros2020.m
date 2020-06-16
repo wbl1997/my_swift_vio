@@ -5,8 +5,6 @@ function plot_simulation_scenario_iros2020(data_dir, scene)
 % plot_simulation_scenario('/RSS-2020/results/msckf_simulation', 'Squircle')
 % plot_simulation_scenario('/RSS-2020/results/msckf_simulation', 'WavyCircle')
 export_fig_path = '/media/jhuai/Seagate/jhuai/tools/export_fig/';
-voicebox_path = '/media/jhuai/Seagate/jhuai/tools/voicebox/';
-addpath(voicebox_path);
 addpath(export_fig_path);
 landmark_txt = [data_dir, '/', scene, '_Points.txt'];
 landmarks = readmatrix(landmark_txt, 'NumHeaderLines', 1);
@@ -22,8 +20,8 @@ T_BC = [0, 0, 1, 0;
 T_WB = eye(4);
 anchorIndex = 37;
 T_WB(1:3, 4) = trajectory(anchorIndex, r)';
-T_WB(1:3, 1:3) = rotqr2ro([trajectory(anchorIndex, q(4)), ...
-    trajectory(anchorIndex, q(1:3))]');
+T_WB(1:3, 1:3) = rotmat(quaternion([trajectory(anchorIndex, q(4)), ...
+    trajectory(anchorIndex, q(1:3))], 'point');
 T_WC = T_WB * T_BC;
 t_WC = T_WC(1:3, 4);
 R_WC = T_WC(1:3, 1:3);

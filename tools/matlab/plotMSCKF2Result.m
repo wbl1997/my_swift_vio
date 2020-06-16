@@ -1,4 +1,4 @@
-function plotMSCKF2Result(msckf_csv, export_fig_path, voicebox_path, ...
+function plotMSCKF2Result(msckf_csv, export_fig_path, ...
     gt_file, output_dir, avg_since_start, avg_trim_end, ...
     misalignment_dim, extrinsic_dim, project_intrinsic_dim, ...
     distort_intrinsic_dim, fix_extrinsic, fix_intrinsic)
@@ -21,14 +21,8 @@ end
 if isempty(export_fig_path)
     export_fig_path = '/media/jhuai/Seagate/jhuai/tools/export_fig/';
 end
-if ~exist('voicebox_path','var')
-    voicebox_path = input('path of voicebox:', 's');
-end
-if isempty(voicebox_path)
-    voicebox_path = '/media/jhuai/Seagate/jhuai/tools/voicebox/';
-end
+
 addpath(export_fig_path);
-addpath(voicebox_path);
 
 if ~exist('output_dir','var')
     output_dir = input('output_dir, if empty, set to dir of the csv:', 's');
@@ -129,10 +123,11 @@ if (gt_file)
         data(:,msckf_index_server.r) = (R_res*data(:, msckf_index_server.r)'+ ...
             repmat(t_res, 1, size(data,1)))';
 
-        q_res= rotro2qr(R_res);
+        q_res= quaternion(R_res, 'rotmat', 'point');    
         for i=1:size(data,1)
-            res4 = qrmult(q_res, [data(i,msckf_index_server.q(4)), ...
-                data(i, msckf_index_server.q(1:3))]');
+            res4 = compact(q_res * quaternion(...
+                [data(i,msckf_index_server.q(4)), ...
+                data(i, msckf_index_server.q(1:3))]));
             data(i,msckf_index_server.q(1:3)) = res4(2:4);
             data(i,msckf_index_server.q(4)) = res4(1);
         end
@@ -146,7 +141,8 @@ if (gt_file)
     for i=1:size(data,1)
         qs2w= gt(assocIndex(i), [gt_index.q(4), gt_index.q(1:3)]);
         qs2w_hat = data(i, [msckf_index_server.q(4), msckf_index_server.q(1:3)]);
-        alpha(i,:)= unskew(rotqr2ro(qs2w')*rotqr2ro(qs2w_hat')'-eye(3))';
+        alpha(i,:)= unskew(rotmat(quaternion(qs2w), 'point') * ...
+            rotmat(quaternion(qs2w_hat), 'point')'-eye(3))';
     end
     data_diff(:, msckf_index_server.q(1:3)) = alpha;
     if size(gt, 2) >= gt_index.v(3)
