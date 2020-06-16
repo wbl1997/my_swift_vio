@@ -195,6 +195,7 @@ LIST(APPEND SOURCEFILES
     src/io_wrap/StreamHelper.cpp
     src/io_wrap/Subscriber.cpp
 
+    src/loop_closure/LcdThirdPartyWrapper.cpp
     src/loop_closure/LoopClosureDetectorParams.cpp
 
     src/msckf/CameraSystemCreator.cpp
@@ -224,7 +225,6 @@ if(GTSAM_FOUND)
 list(APPEND SOURCEFILES
     src/loop_closure/GtsamWrap.cpp
     src/loop_closure/LoopClosureDetector.cpp
-    src/loop_closure/LcdThirdPartyWrapper.cpp
 )
 endif(GTSAM_FOUND)
 
@@ -304,11 +304,8 @@ list(APPEND TEST_SRC_FILES
     test/eigen/TestEigenQuaternion.cpp
 
     test/io_wrap/TestVioDatasetPlayer.cpp
-    test/loop_closure/TestGtsamBetweenFactor.cpp
+   
     test/loop_closure/TestLcdThirdPartyWrapper.cpp
-    test/loop_closure/TestLoopClosureMethod.cpp
-    test/loop_closure/TestRPGO.cpp
-    test/loop_closure/TestSimpleProjectionFactor.cpp
 
     test/msckf/TestBoundedImuDeque.cpp
     test/msckf/TestCovarianceEstimation.cpp
@@ -354,6 +351,10 @@ list(APPEND TEST_SRC_FILES
 if(GTSAM_FOUND)
 list(APPEND TEST_SRC_FILES
     test/gtsam/testIncrementalFixedLagSmoother.cpp
+    test/loop_closure/TestGtsamBetweenFactor.cpp
+    test/loop_closure/TestLoopClosureMethod.cpp
+    test/loop_closure/TestRPGO.cpp
+    test/loop_closure/TestSimpleProjectionFactor.cpp
 )
 endif(GTSAM_FOUND)
 
