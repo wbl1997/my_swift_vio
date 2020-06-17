@@ -4,11 +4,13 @@ import sys
 
 def check_common_args(args):
     assert os.path.isfile(args.vio_config_yaml)
-    euroc_exist = os.path.exists(args.euroc_dir)
-    uzh_fpv_exist = os.path.exists(args.uzh_fpv_dir)
-    homebrew_exist = os.path.exists(args.homebrew_data_dir)
-    assert euroc_exist or uzh_fpv_exist or homebrew_exist, \
-        "Data dirs for euroc, uzh-fpv, and homebrew do not exist"
+    dataset_dir_list = [args.euroc_dir, args.uzh_fpv_dir, args.tumvi_dir,
+                        args.advio_dir, args.homebrew_data_dir]
+    dataset_status = list()
+    for dataset_dir in dataset_dir_list:
+        dataset_status.append(os.path.exists(dataset_dir))
+
+    assert True in dataset_status, "None dataset dir exists"
 
     assert os.path.exists(args.rpg_eval_tool_dir), \
         'rpg_trajectory_evaluation does not exist'

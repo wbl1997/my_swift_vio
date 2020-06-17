@@ -299,7 +299,7 @@ Remark: set sigma_{param} to zero to disable estimating "param" in filtering met
 | sigma_focal_length | For MSCKF and TF_VIO only, set to say 5.0 to estimate focal lengths, set to 0 to fix them | 0.0 |
 | sigma_principal_point | For MSCKF and TF_VIO only, set to say 5.0 to estimate cx, cy, set to 0 to fix them | 0.0 |
 | sigma_distortion | For MSCKF and TF_VIO only, set to nonzeros to estimate distortion parameters, set to 0s to fix them. Adapt to distortion types, e.g., [0.01, 0.003, 0.0, 0.0] for "radialtangential", e.g., [0.01] for "fov" | [0.0] * k |
-| imageDelay | Only used for loading data from a video and an IMU csv, image frame time in the video clock - imageDelay = frame time in the IMU clock | 0.0 |
+| imageDelay | Used e.g., when loading data from a video and an IMU csv, image frame time in the video clock - imageDelay = frame time in the IMU clock | 0.0 |
 | sigma_td | For MSCKF and TF_VIO only, set to say 5e-3 sec to estimate time delay between the camera and IMU, set to 0 to fix the delay as imageDelay | 0.0 |
 | sigma_tr | For MSCKF and TF_VIO only, set to say 5e-3 sec to estimate the rolling shutter readout time, set to 0 to fix the readout time as image_readout_time | 0.0 |
 | sigma_TGElement | For MSCKF and TF_VIO only, set to say 5e-3 to estimate the Tg matrix for gyros, set to 0 to fix the matrix as Identity | 0 |

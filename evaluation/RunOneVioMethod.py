@@ -214,6 +214,9 @@ class RunOneVioMethod(object):
                 else:
                     rc, msg = utility_functions.subprocess_cmd(cmd, None, None, time_out)
                 if rc != 0:
+                    err_msg = "Return error code {} and msg {} in running vio method with cmd:\n{}".\
+                        format(rc, msg, cmd)
+                    warnings.warn(textwrap.fill(err_msg, 120))
                     return_code = rc
                 vio_estimate_csv = os.path.join(output_dir_trial, 'msckf_estimates.csv')
                 converted_vio_file = os.path.join(

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 
 """
 The evaluation procedure will run synchronously if publish_via_ros is true
@@ -191,8 +192,6 @@ defined according to the used IMU model.
 import copy
 import os
 import sys
-
-import numpy as np
 
 import dir_utility_functions
 import parse_args

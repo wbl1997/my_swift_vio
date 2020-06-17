@@ -1,24 +1,9 @@
-1, double checks : 
-Is it necessary to update the camera intrinsic parameters and IMU-camera relative
-position after state update? The cameraGeometry embedded in vioparameter structure
-is used in ThreadedKFVio and framesynchronizer. If it is desired to use IMU data to help
-feature matching, and to possibly improve feature tracking between frames,
-these calibration parameters can be refreshed after filtering update.
-But for feature matching, this may not contribute much.
-
-c, imageDelay in config.yaml of okvis has the opposite sign of T_d in msckf2
-
-2, assumptions: hybridFilter currently only support one camera + one IMU, because 
-a, FrameSynchronizer::addNewFrame() called in ThreadedKFVio.cpp, line 309, may average timestamps for multiple frames in a multiframe.
-b, places commented with //one camera assumption
-hybridFilter assumes that t_d and t_r are constant variables at least in a short span of time,
-therefore, for a world point observed in several frames, the t_d used in computing Jacobians for the image features are the same.
-
 4. use akaze features instead of brisk for feature detection, description, and matching. But it may require opencv 3.0 and later.
 This may cause conflict with current opencv library used by msckf.
 
 8. There may be negative diagonal elements in the covariance matrix. Are these elements all are very small and
-such occurrences are very rare, e.g. for the beginning of a test? ---Solved by enforcing symmetry.
+such occurrences are very rare, e.g. for the beginning of a test?
+This has been solved by enforcing symmetry.
 
 9. if too many observations exist in one image (>height/2), then it is desirable to create a lookup table of [p_WS, q_WS, v_WS] for every few rows. 
 
@@ -63,11 +48,6 @@ if not fixed, we need to modify slamFeatureJacobian (primarily) and other places
 25. compare the performance of msckf2 against Kalibr with multiple IMUs and multiple cameras for a publication.
 Does Kalibr output the trajectory of the camera-IMU system? If so, this serves for better comparison.
 
-28. Implement another version of MSCKF: Fix Tg Ts Ta p_b^c, fx fy cx cy k1 k2 p1 p2 td tr, only estimate
-p_b^g, v_b^g, R_b^g, b_g, b_a.
-Answer: This can be achieved by set the noise of the fixed parameters to zero,
-and set the noise of variable parameters nonzero.
-
 29. implement observability constrained EKF for calibration, this is similar in spirit to first estimate
 Jacobians in that it modifies the computed Jacobians only.
 Answer: This requires deriving the observability constraint from scratch.
@@ -80,11 +60,6 @@ if some parameters are fixed. Take a look at OKVIS camera IMU extrinsics for how
 
 32. referring to msckf_mono implemented by daniliidis group, 
 a, use all feature tracks to update states at the last frame
-
-6. how to deal with static motion, standstill like the beginning of MH_01_easy?
-limit the number of states, and hence the size of the covariance matrix.
-Also, what will triangulateAmapPoint return when given two identical observations?
-It is not imperative to add point states into the state vector.
 
 33. Use the IMU model defined in Rheder ICRA 2016 extending Kalibr
 % In msckf2 implementation
@@ -147,18 +122,6 @@ examples [here](https://github.com/ganlumomo/VisualInertialOdometry)
 
 44. The timing entries for waitForOptimization and waitForMatching are often unusually large.
 
-45. Solved: Put covariance index in the state to ease state management. see OpenVINS.
-
-46. Solved: Extend MSCKF to work with multi camera observations.
-Also consider the extrinsic and intrinsic parameters for the extra cameras.
-
-47. Refactor IMU error model in propagation() to support at least 3 types of IMU models, i.e.,
-develop compatibility with multiple IMU models
-Examine ShapeMatrixParamBlock etc.
-
-48. Simulation for the rolling shutter effect. 
-Refer to Kerl rolling shutter RGBD and Lovegrove spline fusion.
-
 49. Write a global bundle adjustment module with existing factors. Remember removing outliers during optimization steps, see Maplab.
 
 50. OKVIS leniently add triangulated landmarks to the estimator.
@@ -198,6 +161,49 @@ I0506 00:09:33.704480 13717 LoopClosureDetector.cpp:493] knnmatch 3d landmarks 3
 terminate called after throwing an instance of 'std::out_of_range'
   what():  vector::_M_range_check: __n (which is 5) >= this->size() (which is 5)
 Aborted (core dumped)
+
+I believe this issue has been resolved but not rememebering what is the exact solution.
+
+55. *** Error in `/home/jhuai/Documents/docker/msckf_ws/devel/lib/msckf/okvis_node_synchronous': malloc(): smallbin double linked list corrupted: 0x0000000002028420 ***
+======= Backtrace: =========
+/lib/x86_64-linux-gnu/libc.so.6(+0x777e5)[0x7ff5ecf407e5]
+/lib/x86_64-linux-gnu/libc.so.6(+0x82651)[0x7ff5ecf4b651]
+/lib/x86_64-linux-gnu/libc.so.6(__libc_malloc+0x54)[0x7ff5ecf4d184]
+/usr/lib/nvidia-396/tls/libnvidia-tls.so.396.37(+0x24c0)[0x7ff5d9a1d4c0]
+======= Memory map: ========
+00400000-017ab000 r-xp 00000000 08:06 1587543                            /home/jhuai/Documents/docker/msckf_ws/devel/lib/msckf/okvis_node_synchronous
+019aa000-019d5000 r--p 013aa000 08:06 1587543                            /home/jhuai/Documents/docker/msckf_ws/devel/lib/msckf/okvis_node_synchronous
+019d5000-019d6000 rw-p 013d5000 08:06 1587543                            /home/jhuai/Documents/docker/msckf_ws/devel/lib/msckf/okvis_node_synchronous
+019d6000-019d8000 rw-p 00000000 00:00 0 
+01f6a000-030f0000 rw-p 00000000 00:00 0                                  [heap]
+
+"The library is telling you that the memory metadata is corrupt. That won't happen by mere memory leak, 
+you had to write to invalid pointer. Either you wrote to index out of bounds or you wrote to pointer after it was freed."
+
+This error occasionally occurred on Ubuntu 16 with Eigen 3.3.4 built from source 
+when the pose estimates drifted so much that there was almost no tracked features.
+
+The same core dumped error (seg fault or aborted) occurred twice at about 34% of the TUM VI room3 sequence.
+
+The command to reproduce the problem:
+/home/jhuai/Documents/docker/msckf_ws/devel/lib/msckf/okvis_node_synchronous /home/
+jhuai/Desktop/msckf_tumvi_calib0/vio/laptop/KSF_n_calibrated/laptop_KSF_n_calibrated_room3/config_fpga_p2_euroc.yaml
+/home/jhuai/Desktop/msckf_tumvi_calib0/vio/laptop/KSF_n_calibrated/laptop_KSF_n_calibrated_room3/LcdParams.yaml
+--output_dir=/home/jhuai/Desktop/msckf_tumvi_calib0/vio/laptop/KSF_n_calibrated/laptop_KSF_n_calibrated_room3/MSCKF2
+--skip_first_seconds=0 --max_inc_tol=30.0 --dump_output_option=3 --bagname=/media/jhuai/viola/jhuai/data/TUM-
+VI/raw/room/dataset-room3_512_16.bag
+--vocabulary_path=/home/jhuai/Documents/docker/msckf_ws/src/msckf/evaluation/../vocabulary/ORBvoc.yml
+--camera_topics="/cam0/image_raw,/cam1/image_raw" --imu_topic=/imu0 --publish_via_ros=false
+
+Or,
+/home/jhuai/Documents/docker/msckf_ws/devel/lib/msckf/okvis_node_synchronous /home/
+jhuai/Desktop/msckf_tumvi_calib0/vio/laptop/KSF_n_fix_TgTsTa/laptop_KSF_n_fix_TgTsTa_room3/config_fpga_p2_euroc.yaml
+/home/jhuai/Desktop/msckf_tumvi_calib0/vio/laptop/KSF_n_fix_TgTsTa/laptop_KSF_n_fix_TgTsTa_room3/LcdParams.yaml
+--output_dir=/home/jhuai/Desktop/msckf_tumvi_calib0/vio/laptop/KSF_n_fix_TgTsTa/laptop_KSF_n_fix_TgTsTa_room3/MSCKF0
+--skip_first_seconds=0 --max_inc_tol=30.0 --dump_output_option=3 --bagname=/media/jhuai/viola/jhuai/data/TUM-
+VI/raw/room/dataset-room3_512_16.bag
+--vocabulary_path=/home/jhuai/Documents/docker/msckf_ws/src/msckf/evaluation/../vocabulary/ORBvoc.yml
+--camera_topics="/cam0/image_raw,/cam1/image_raw" --imu_topic=/imu0 --publish_via_ros=false
 
 
 
