@@ -42,16 +42,14 @@
 
 #include <gtsam/inference/Symbol.h>
 
-DEFINE_string(vocabulary_path,
-              "vocabulary/ORBvoc.yml",
-              "Path to BoW vocabulary file for LoopClosureDetector module.");
-
 /** Verbosity settings: (cumulative with every increase in level)
       0: Runtime errors and warnings, spin start and frequency are reported.
       1: Loop closure detections are reported as warnings.
       2: Loop closure failures are reported as errors.
       3: Statistics are reported at relevant steps.
 **/
+
+DECLARE_string(vocabulary_path);
 
 namespace VIO {
 

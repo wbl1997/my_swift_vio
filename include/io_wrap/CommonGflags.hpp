@@ -26,6 +26,8 @@ DECLARE_string(camera_topics);
 
 DECLARE_string(imu_topic);
 
+DECLARE_string(vocabulary_path);
+
 namespace okvis {
 
 bool setInputParameters(okvis::InputData *input);

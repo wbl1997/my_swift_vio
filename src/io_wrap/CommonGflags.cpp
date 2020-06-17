@@ -42,6 +42,10 @@ DEFINE_string(camera_topics, "/cam0/image_raw,/cam1/image_raw",
 
 DEFINE_string(imu_topic, "/imu0", "Imu topic inside the bag");
 
+DEFINE_string(vocabulary_path,
+              "vocabulary/ORBvoc.yml",
+              "Path to BoW vocabulary file for LoopClosureDetector module.");
+
 namespace okvis {
 bool setInputParameters(okvis::InputData *input) {
   input->videoFile = FLAGS_video_file;
