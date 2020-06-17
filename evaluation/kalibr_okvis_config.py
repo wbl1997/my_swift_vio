@@ -17,10 +17,10 @@ OKVIS_EUROC_IMU_PARAMETERS = {"sigma_g_c": 12.0e-4,
                               "sigma_gw_c": 4.0e-6,
                               "sigma_aw_c": 4.0e-5}
 
-MSCKF_TUMVI_IMU_PARAMETERS = {"sigma_g_c": 2e-3,
-                              "sigma_a_c": 1.75e-2,
-                              "sigma_gw_c": 4.4e-5,
-                              "sigma_aw_c": 1.72e-3}
+MSCKF_TUMVI_IMU_PARAMETERS = {"sigma_g_c": 0.004 * 0.1,
+                              "sigma_a_c": 0.07 * 0.1,
+                              "sigma_gw_c": 4.4e-5 * 0.1,
+                              "sigma_aw_c": 1.72e-3 * 0.1}
 
 TUMVI_PARAMETERS = {
     "cameras": [
@@ -73,11 +73,64 @@ TUMVI_PARAMETERS = {
         'publishLandmarks': "false", }
 }
 
+TUMVI_NOMINAL_PARAMETERS = {
+    "cameras": [
+        {"T_SC": [-1, 0.0, 0.0, 0.0,
+                  0.0, 0.0, -1.0, 0.0,
+                  0.0, -1.0, 0.0, 0.0,
+                  0.0, 0.0, 0.0, 1.0],
+         "image_dimension": [512, 512],
+         "distortion_coefficients": [0.0, 0.0, 0.0, 0.0],
+         "distortion_type": "equidistant",
+         "focal_length": [190.0, 190.0],
+         "principal_point": [256.0, 256.0],
+         "projection_opt_mode": "FX_CXY",
+         "extrinsic_opt_mode": "P_CB",
+         "image_delay": 0.0,
+         "image_readout_time": 0.00},
+        {"T_SC":
+             [-1.0, 0.0, 0.0, 0.0,
+              0.0, 0.0, -1.0, 0.0,
+              0.0, -1.0, 0.0, 0.0,
+              0., 0., 0., 1.],
+         "image_dimension": [512, 512],
+         "distortion_coefficients": [0.0, 0.0, 0.0, 0.0],
+         "distortion_type": "equidistant",
+         "focal_length": [190.0, 190.0],
+         "principal_point": [256.0, 256.0],
+         "projection_opt_mode": "FX_CXY",
+         "extrinsic_opt_mode": "P_BC_Q_BC",
+         "image_delay": 0.0,
+         "image_readout_time": 0.00
+         }],
+    "imu_params": {
+        'imu_rate': 200,
+        'g_max': 7.8,
+        'sigma_g_c': 0.004,
+        'sigma_a_c': 0.07,
+        'sigma_gw_c': 4.4e-5,
+        'sigma_aw_c': 1.72e-3,
+        'g': 9.80766,
+        'sigma_TGElement': 5e-3,
+        'sigma_TSElement': 1e-3,
+        'sigma_TAElement': 5e-3, },
+    'ceres_options': {
+        'timeLimit': -1,
+    },
+    "displayImages": "false",
+    "publishing_options": {
+        'publishLandmarks': "false", }
+}
+
 ADVIO_CAMERA_INTRINSIC_PARAMETERS = {
     range(1, 13): [1077.2, 1079.3, 362.14, 636.39, 0.0478, 0.0339, -0.0003, -0.0009],
     range(13, 18): [1082.4, 1084.4, 364.68, 643.31, 0.0366, 0.0803, 0.0007, -0.0002],
     range(18, 20): [1076.9, 1078.5, 360.96, 639.31, 0.0510, -0.0354, -0.0054, 0.0473],
     range(20, 24): [1081.1, 1082.1, 359.59, 640.79, 0.0556, -0.0454, 0.0009, -0.0018],
+}
+
+ADVIO_NOMINAL_CAMERA_INTRINSIC_PARAMETERS = {
+    range(1, 24): [1080.0, 1080.0, 360.0, 640.0, 0.0, 0.0, 0.0, 0.0],
 }
 
 ADVIO_PARAMETERS = {
@@ -114,7 +167,41 @@ ADVIO_PARAMETERS = {
         'publishLandmarks': "false", }
 }
 
-def advio_transform_C_Cp_and_halve():
+ADVIO_NOMINAL_PARAMETERS = {
+    "cameras":
+        {"T_CpS": [1.0, 0.0, 0.0, 0.0,
+                   0.0, -1.0, 0.0, 0.0,
+                   0.0, 0.0, -1.0, 0.0,
+                  0.0, 0.0, 0.0, 1.0],
+         "image_dimension": [720, 1280],
+         "distortion_coefficients": [],
+         "distortion_type": "radial-tangential",
+         "focal_length": [],
+         "principal_point": [],
+         "projection_opt_mode": "FX_CXY",
+         "extrinsic_opt_mode": "P_CB",
+         "image_delay": 0.0,
+         "image_readout_time": 0.015},
+    "imu_params": {
+        "imu_rate": 100,
+        'g_max': 7.8,
+        'sigma_g_c': 2.4e-3,
+        'sigma_a_c': 4.8e-2,  # 4.8e-3 is the value provided by advio.
+        'sigma_gw_c': 5.1e-5,
+        'sigma_aw_c': 2.1e-4,
+        'g': 9.819,  # at Helsinki according to https://units.fandom.com/wiki/Gravity_of_Earth
+        'sigma_TGElement': 5e-3,
+        'sigma_TSElement': 1e-3,
+        'sigma_TAElement': 5e-3, },
+    'ceres_options': {
+        'timeLimit': -1,
+    },
+    "displayImages": "false",
+    "publishing_options": {
+        'publishLandmarks': "false", }
+}
+
+def advio_transform_C_Cp_and_halve(use_nominal_value):
     """
     The given advio params are in Cp frame, this function applies
      T_CCp = [R_CCp, 0; 0, 1] on relevant quantities, and halve the camera size.
@@ -122,7 +209,13 @@ def advio_transform_C_Cp_and_halve():
     :return:
     """
     coeff = 0.5
-    swapped_intrinsics = copy.deepcopy(ADVIO_CAMERA_INTRINSIC_PARAMETERS)
+    if use_nominal_value:
+        swapped_intrinsics = copy.deepcopy(ADVIO_NOMINAL_CAMERA_INTRINSIC_PARAMETERS)
+        swapped_parameters = copy.deepcopy(ADVIO_NOMINAL_PARAMETERS)
+    else:
+        swapped_intrinsics = copy.deepcopy(ADVIO_CAMERA_INTRINSIC_PARAMETERS)
+        swapped_parameters = copy.deepcopy(ADVIO_PARAMETERS)
+
     for key in swapped_intrinsics.keys():
         oldvalue = swapped_intrinsics[key]
         swapped_intrinsics[key] =\
@@ -130,7 +223,6 @@ def advio_transform_C_Cp_and_halve():
              oldvalue[3] * coeff, oldvalue[2] * coeff,
              oldvalue[4], oldvalue[5], oldvalue[7], oldvalue[6]]
 
-    swapped_parameters = copy.deepcopy(ADVIO_PARAMETERS)
     T_CpS = np.array(swapped_parameters["cameras"]["T_CpS"]).reshape([4, 4])
     T_CCp = np.array([[0, 1, 0, 0],
                       [-1, 0, 0, 0],
@@ -174,11 +266,17 @@ def parse_args():
                              " IMU noise parameters in TUM VI config yaml.",
                         default="",
                         required=False)
+
     parser.add_argument("--rosbag",
                         help="Name of the rosbag for which the config will be used. "
                              "Only needed for advio to extract sequence number.",
                         default="",
                         required=False)
+
+    parser.add_argument("--use_nominal_value",
+                        help='Use nominal values to fill the config yaml?',
+                        action='store_true')
+
     args = parser.parse_args()
     return args
 
@@ -237,7 +335,7 @@ def printCameraBlock(camConfig):
 def create_okvis_config_yaml(okvis_config_template, calib_format,
                              output_okvis_config, camera_config_yamls=None,
                              imu_config_yaml="",
-                             algo_code="", bagname=""):
+                             algo_code="", bagname="", use_nominal_value=False):
     """
 
     :param okvis_config_template:
@@ -321,18 +419,21 @@ def create_okvis_config_yaml(okvis_config_template, calib_format,
         template_data['imu_params']['sigma_g_c'] = OKVIS_EUROC_IMU_PARAMETERS['sigma_g_c']
         template_data['imu_params']['sigma_gw_c'] = OKVIS_EUROC_IMU_PARAMETERS['sigma_gw_c']
     elif calib_format == "tum-vi":
+        used_TUMVI_parameters = TUMVI_PARAMETERS
+        if use_nominal_value:
+            used_TUMVI_parameters = TUMVI_NOMINAL_PARAMETERS
         for cameraid in range(0, 2):
-            for key in TUMVI_PARAMETERS['cameras'][cameraid].keys():
-                template_data['cameras'][cameraid][key] = TUMVI_PARAMETERS['cameras'][cameraid][key]
+            for key in used_TUMVI_parameters['cameras'][cameraid].keys():
+                template_data['cameras'][cameraid][key] = used_TUMVI_parameters['cameras'][cameraid][key]
         for group in ["imu_params", "ceres_options", "publishing_options"]:
-            for key in TUMVI_PARAMETERS[group].keys():
-                template_data[group][key] = TUMVI_PARAMETERS[group][key]
-        template_data["displayImages"] = TUMVI_PARAMETERS["displayImages"]
+            for key in used_TUMVI_parameters[group].keys():
+                template_data[group][key] = used_TUMVI_parameters[group][key]
+        template_data["displayImages"] = used_TUMVI_parameters["displayImages"]
         if algo_code == "MSCKF":
             for key in MSCKF_TUMVI_IMU_PARAMETERS.keys():
                 template_data["imu_params"][key] = MSCKF_TUMVI_IMU_PARAMETERS[key]
     elif calib_format == 'advio':
-        swapped_parameters, swapped_intrinsics = advio_transform_C_Cp_and_halve()
+        swapped_parameters, swapped_intrinsics = advio_transform_C_Cp_and_halve(use_nominal_value)
         cameraid = 0
         template_data['cameras'][cameraid]['T_SC'] = \
             swapped_parameters["cameras"]['T_SC']
@@ -366,7 +467,7 @@ def create_okvis_config_yaml(okvis_config_template, calib_format,
         for group in ["imu_params", "ceres_options", "publishing_options"]:
             for key in swapped_parameters[group].keys():
                 template_data[group][key] = swapped_parameters[group][key]
-        template_data["displayImages"] = TUMVI_PARAMETERS["displayImages"]
+        template_data["displayImages"] = ADVIO_PARAMETERS["displayImages"]
 
     # camera_config_str = printCameraBlock(template_data["cameras"][0])
     # camera_config_str += printCameraBlock(template_data["cameras"][1])

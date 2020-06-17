@@ -90,8 +90,9 @@ def parse_args():
     parser.add_argument(
         '--extra_lib_path',
         help='Export extra library path to LD_LIBRARY_PATH'
-             ' so that locally installed libs can be loaded',
-        default="$HOME/Documents/slam_devel/lib")
+             ' so that locally installed gtsam libs can be loaded.\n'
+             'It is not needed if gtsam is not used or gtsam is in /usr/local/lib',
+        default="")
 
     lcd_config_default = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                                       '../config/LcdParams.yaml')

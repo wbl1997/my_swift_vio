@@ -52,7 +52,6 @@ class RunOneVioMethod(object):
             os.path.dirname(os.path.abspath(__file__)), "config/eval_cfg.yaml")
         self.extra_lib_path = extra_library_path
 
-
     def get_sync_exe(self):
         return os.path.join(self.catkin_ws, "devel/lib/msckf/okvis_node_synchronous")
 
@@ -70,7 +69,13 @@ class RunOneVioMethod(object):
                 self.vio_config_template, bag_fullname, vio_yaml_mission)
 
             # apply sensor calibration parameters
-            config_composer.create_config_for_mission(self.algo_code_flags["algo_code"])
+            if "use_nominal_calib_value" in self.algo_code_flags:
+                config_composer.create_config_for_mission(
+                    self.algo_code_flags["algo_code"], 
+                    self.algo_code_flags["use_nominal_calib_value"])
+            else:
+                config_composer.create_config_for_mission(
+                    self.algo_code_flags["algo_code"], False)
 
             # apply algorithm parameters
             AlgoConfig.apply_config_to_yaml(

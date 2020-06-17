@@ -46,7 +46,7 @@ class OkvisConfigComposer(object):
                 break
         return imu_calib_file, camera_calib_files
 
-    def create_config_for_mission(self, algo_code):
+    def create_config_for_mission(self, algo_code, use_nominal_value):
         dataset_type = dataset_parameters.dataset_code(self.bag_fullname)
         imu_calib_file, camera_calib_files = self.get_calib_files()
         calib_format = dataset_parameters.calibration_format(dataset_type)
@@ -54,4 +54,4 @@ class OkvisConfigComposer(object):
         kalibr_okvis_config.create_okvis_config_yaml(
             self.vio_config_template, calib_format,
             self.vio_yaml_mission, camera_calib_files,
-            imu_calib_file, algo_code, self.bag_fullname)
+            imu_calib_file, algo_code, self.bag_fullname, use_nominal_value)

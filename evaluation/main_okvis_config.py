@@ -8,4 +8,4 @@ if __name__ == "__main__":
         args.okvis_config_template, args.format,
         args.output_okvis_config,
         args.camera_config_yamls, args.imu_config_yaml,
-        args.algo_code, args.rosbag)
+        args.algo_code, args.rosbag, args.use_nominal_value)

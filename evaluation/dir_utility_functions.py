@@ -1,8 +1,6 @@
 import errno
 import os
 import shutil
-from colorama import init, Fore
-init(autoreset=True)
 
 
 def find_bags_with_gt(uzh_fpv_dir, bagname_key, discount_key='.orig.bag'):
