@@ -241,6 +241,13 @@ def find_all_bags_with_gt(euroc_dir="", uzh_fpv_dir="", tum_vi_dir="", advio_dir
         print("tumvi")
         bag_list = tumvi_bags
         gt_list = tumvi_gt_list
+    elif advio_bags!=[]:
+        dataset = "advio"
+        print("advio")
+        bag_list = advio_bags
+        gt_list = advio_gt_list
+
+
     # bag_list = uzh_fpv_bags
     # gt_list = uzh_fpv_gt_list
 

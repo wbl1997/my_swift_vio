@@ -148,6 +148,10 @@ The folder structure layout for UZH-FPV dataset:
 ├── outdoor_forward_9_snapdragon.bag
 |
 
+
+
+
+
 The bags are downloaded from uzh fpv dataset webpage and the corresponding txt
  files are extracted from the rosbags with ground truth using
  extract_uzh_fpv_gt.py which wraps bag_to_pose.py of the rpg evaluation tool.
@@ -188,6 +192,38 @@ The output of msckf/OKVIS are lists of T_WB where B is the IMU sensor frame
 defined according to the used IMU model.
 
 """
+imuthreshold={
+    "dataset-room1_512_16": "0.75",
+    "dataset-room2_512_16": "0.75",
+    "dataset-room3_512_16": "0.75",
+    "dataset-room4_512_16": "0.75",
+    "dataset-room5_512_16": "0.75",
+    "dataset-room6_512_16": "0.50",
+    "dataset-corridor1_512_16": "0.70",
+    "dataset-corridor2_512_16": "0.50",
+    "dataset-corridor3_512_16": "0.70",
+    "dataset-corridor4_512_16": "1.00",
+    "dataset-corridor5_512_16": "0.70",
+    "dataset-magistrale1_512_16": "0.50",
+    "dataset-magistrale2_512_16": "0.70",
+    "dataset-magistrale3_512_16": "0.70",
+    "dataset-magistrale4_512_16": "0.50",
+    "dataset-magistrale5_512_16": "1.00",
+    "dataset-magistrale6_512_16": "0.70",
+    "dataset-slides1_512_16": "0.50",
+    "dataset-slides2_512_16": "0.50",
+    "dataset-slides3_512_16": "0.70",
+    "dataset-outdoors1_512_16": "0.50",
+    "dataset-outdoors2_512_16": "0.70",
+    "dataset-outdoors3_512_16": "0.75",
+    "dataset-outdoors4_512_16": "0.70",
+    "dataset-outdoors5_512_16": "0.75",
+    "dataset-outdoors6_512_16": "0.75",
+    "dataset-outdoors7_512_16": "0.75",
+    "dataset-outdoors8_512_16": "0.50"
+}
+
+
 
 import os
 import sys
@@ -260,120 +296,110 @@ if __name__ == '__main__':
     # python3.7 will remember insertion order of items, see
     # https://stackoverflow.com/questions/39980323/are-dictionaries-ordered-in-python-3-6
     algoname_to_options = {
-        'openvins-mono-x1': {"algo_code": "openvins-mono",
+        # 'openvins-mono-imu-adapt': {"algo_code": "openvins-mono",
+        #                   "sigma_a_c": 0.07,
+        #                   "sigma_aw_c": 0.00172,
+        #                   "sigma_g_c": 0.004,
+        #                   "sigma_gw_c": 0.000044,
+        #                   "coeff_c": 1,
+        #                   "coeff_wc": 1
+        #                      },
+        'openvins-stereo-imu-adapt': {"algo_code": "openvins-stereo",
                           "sigma_a_c": 0.07,
                           "sigma_aw_c": 0.00172,
                           "sigma_g_c": 0.004,
                           "sigma_gw_c": 0.000044,
-                          "coeff_c": 0.4,
-                          "coeff_wc": 0.25
-                             },
-
-        'openvins-mono-x2': {"algo_code": "openvins-mono",
-                          "sigma_a_c": 0.07,
-                          "sigma_aw_c": 0.00172,
-                          "sigma_g_c": 0.004,
-                          "sigma_gw_c": 0.000044,
-                          "coeff_c": 0.4,
-                          "coeff_wc": 0.5
-                             },
-        'openvins-mono-x3': {"algo_code": "openvins-mono",
-                          "sigma_a_c": 0.07,
-                          "sigma_aw_c": 0.00172,
-                          "sigma_g_c": 0.004,
-                          "sigma_gw_c": 0.000044,
-                          "coeff_c": 0.6,
-                          "coeff_wc": 0.25
-                             },
-        'openvins-mono-x4': {"algo_code": "openvins-mono",
-                          "sigma_a_c": 0.07,
-                          "sigma_aw_c": 0.00172,
-                          "sigma_g_c": 0.004,
-                          "sigma_gw_c": 0.000044,
-                          "coeff_c": 0.6,
-                          "coeff_wc": 0.5
-                             },
-        'openvins-mono-x5': {"algo_code": "openvins-mono",
-                          "sigma_a_c": 0.07,
-                          "sigma_aw_c": 0.00172,
-                          "sigma_g_c": 0.004,
-                          "sigma_gw_c": 0.000044,
-                          "coeff_c": 0.8,
-                          "coeff_wc": 0.25
-                             },
-        'openvins-mono-x6': {"algo_code": "openvins-mono",
-                          "sigma_a_c": 0.07,
-                          "sigma_aw_c": 0.00172,
-                          "sigma_g_c": 0.004,
-                          "sigma_gw_c": 0.000044,
-                          "coeff_c": 0.8,
-                          "coeff_wc": 0.5
-                             },
-        'openvins-stereo-x1': {"algo_code": "openvins-mono",
-                          "sigma_a_c": 0.07,
-                          "sigma_aw_c": 0.00172,
-                          "sigma_g_c": 0.004,
-                          "sigma_gw_c": 0.000044,
-                          "coeff_c": 0.4,
-                          "coeff_wc": 0.5
-                             },
-
-        'openvins-stereo-x2': {"algo_code": "openvins-mono",
-                          "sigma_a_c": 0.07,
-                          "sigma_aw_c": 0.00172,
-                          "sigma_g_c": 0.004,
-                          "sigma_gw_c": 0.000044,
-                          "coeff_c": 0.4,
-                          "coeff_wc": 0.25
-                             },
-        'openvins-stereo-x3': {"algo_code": "openvins-mono",
-                          "sigma_a_c": 0.07,
-                          "sigma_aw_c": 0.00172,
-                          "sigma_g_c": 0.004,
-                          "sigma_gw_c": 0.000044,
-                          "coeff_c": 0.2,
-                          "coeff_wc": 0.25
-                             },
-        'openvins-stereo-x4': {"algo_code": "openvins-mono",
-                          "sigma_a_c": 0.07,
-                          "sigma_aw_c": 0.00172,
-                          "sigma_g_c": 0.004,
-                          "sigma_gw_c": 0.000044,
-                          "coeff_c": 0.2,
-                          "coeff_wc": 0.1
-                             },
-        'openvins-stereo-x5': {"algo_code": "openvins-mono",
-                          "sigma_a_c": 0.07,
-                          "sigma_aw_c": 0.00172,
-                          "sigma_g_c": 0.004,
-                          "sigma_gw_c": 0.000044,
-                          "coeff_c": 0.1,
-                          "coeff_wc": 0.1
-                             },
-        'openvins-stereo-x6': {"algo_code": "openvins-mono",
-                          "sigma_a_c": 0.07,
-                          "sigma_aw_c": 0.00172,
-                          "sigma_g_c": 0.004,
-                          "sigma_gw_c": 0.000044,
-                          "coeff_c": 0.1,
-                          "coeff_wc": 0.05
-                             },
-        'openvins-stereo-x7': {"algo_code": "openvins-mono",
-                          "sigma_a_c": 0.07,
-                          "sigma_aw_c": 0.00172,
-                          "sigma_g_c": 0.004,
-                          "sigma_gw_c": 0.000044,
-                          "coeff_c": 0.05,
-                          "coeff_wc": 0.05
-                             },
-        'openvins-stereo-x8': {"algo_code": "openvins-mono",
-                          "sigma_a_c": 0.07,
-                          "sigma_aw_c": 0.00172,
-                          "sigma_g_c": 0.004,
-                          "sigma_gw_c": 0.000044,
-                          "coeff_c": 0.02,
-                          "coeff_wc": 0.05
-                             },
+                          "coeff_c": 1,
+                          "coeff_wc": 1
+                             },                             
+        # 'openvins-mono-0.5-0.5': {"algo_code": "openvins-mono",
+        #                   "sigma_a_c": 0.07,
+        #                   "sigma_aw_c": 0.00172,
+        #                   "sigma_g_c": 0.004,
+        #                   "sigma_gw_c": 0.000044,
+        #                   "coeff_c": 0.5,
+        #                   "coeff_wc": 0.5
+        #                      },
+        # 'openvins-mono-0.2-0.2': {"algo_code": "openvins-mono",
+        #                   "sigma_a_c": 0.07,
+        #                   "sigma_aw_c": 0.00172,
+        #                   "sigma_g_c": 0.004,
+        #                   "sigma_gw_c": 0.000044,
+        #                   "coeff_c": 0.2,
+        #                   "coeff_wc": 0.2
+        #                      },
+        # 'openvins-mono-0.1-0.1': {"algo_code": "openvins-mono",
+        #                   "sigma_a_c": 0.07,
+        #                   "sigma_aw_c": 0.00172,
+        #                   "sigma_g_c": 0.004,
+        #                   "sigma_gw_c": 0.000044,
+        #                   "coeff_c": 0.1,
+        #                   "coeff_wc": 0.1
+        #                      },
+        # 'openvins-mono-0.05-0.05': {"algo_code": "openvins-mono",
+        #                   "sigma_a_c": 0.07,
+        #                   "sigma_aw_c": 0.00172,
+        #                   "sigma_g_c": 0.004,
+        #                   "sigma_gw_c": 0.000044,
+        #                   "coeff_c": 0.05,
+        #                   "coeff_wc": 0.05
+        #                      },                             
+        # 'openvins-stereo-0.2-0.005': {"algo_code": "openvins-stereo",
+        #                   "sigma_a_c": 0.07,
+        #                   "sigma_aw_c": 0.00172,
+        #                   "sigma_g_c": 0.004,
+        #                   "sigma_gw_c": 0.000044,
+        #                   "coeff_c": 0.2,
+        #                   "coeff_wc": 0.005
+        #                      },
+        # 'openvins-stereo-0.2-0.01': {"algo_code": "openvins-stereo",
+        #                   "sigma_a_c": 0.07,
+        #                   "sigma_aw_c": 0.00172,
+        #                   "sigma_g_c": 0.004,
+        #                   "sigma_gw_c": 0.000044,
+        #                   "coeff_c": 0.2,
+        #                   "coeff_wc": 0.01
+        #                      },
+        # 'openvins-stereo-0.2-0.02': {"algo_code": "openvins-stereo",
+        #                   "sigma_a_c": 0.07,
+        #                   "sigma_aw_c": 0.00172,
+        #                   "sigma_g_c": 0.004,
+        #                   "sigma_gw_c": 0.000044,
+        #                   "coeff_c": 0.2,
+        #                   "coeff_wc": 0.02
+        #                      },
+        # 'openvins-stereo-x5': {"algo_code": "openvins-mono",
+        #                   "sigma_a_c": 0.07,
+        #                   "sigma_aw_c": 0.00172,
+        #                   "sigma_g_c": 0.004,
+        #                   "sigma_gw_c": 0.000044,
+        #                   "coeff_c": 0.1,
+        #                   "coeff_wc": 0.1
+        #                      },
+        # 'openvins-stereo-x6': {"algo_code": "openvins-mono",
+        #                   "sigma_a_c": 0.07,
+        #                   "sigma_aw_c": 0.00172,
+        #                   "sigma_g_c": 0.004,
+        #                   "sigma_gw_c": 0.000044,
+        #                   "coeff_c": 0.1,
+        #                   "coeff_wc": 0.05
+        #                      },
+        # 'openvins-stereo-x7': {"algo_code": "openvins-mono",
+        #                   "sigma_a_c": 0.07,
+        #                   "sigma_aw_c": 0.00172,
+        #                   "sigma_g_c": 0.004,
+        #                   "sigma_gw_c": 0.000044,
+        #                   "coeff_c": 0.05,
+        #                   "coeff_wc": 0.05
+        #                      },
+        # 'openvins-stereo-x8': {"algo_code": "openvins-mono",
+        #                   "sigma_a_c": 0.07,
+        #                   "sigma_aw_c": 0.00172,
+        #                   "sigma_g_c": 0.004,
+        #                   "sigma_gw_c": 0.000044,
+        #                   "coeff_c": 0.02,
+        #                   "coeff_wc": 0.05
+        #                      },
 
 
 
@@ -387,121 +413,128 @@ if __name__ == '__main__':
         #                      },
     }
 
-    # 'MSCKF_i': AlgoConfig.create_algo_config(['MSCKF', '--use_IEKF=true', 10, 3]),
-    # 'MSCKF_brisk_b2b': AlgoConfig.create_algo_config(['MSCKF', '--feature_tracking_method=2', 10, 3]),
-    # 'MSCKF_klt': AlgoConfig.create_algo_config(['MSCKF', '--feature_tracking_method=1', 10, 3]),
-    # 'MSCKF_async': AlgoConfig.create_algo_config(['MSCKF', '', 10, 3])}
-
     # rpg eval tool supports evaluating 6 algorithms at the same time, see len(PALLETE)
     MAX_ALGORITHMS_TO_EVALUATE = 6
-    algoname_to_options = utility_functions.resize_dict(algoname_to_options,
-                                                        MAX_ALGORITHMS_TO_EVALUATE)
+    algoname_to_option_chunks = utility_functions.chunks(algoname_to_options,
+                                                         MAX_ALGORITHMS_TO_EVALUATE)
 
-    algo_name_list = list(algoname_to_options.keys())
+    for index, minibatch in enumerate(algoname_to_option_chunks):
+        algo_name_list = list(minibatch.keys())
+        output_dir_suffix = ""
+        if len(algoname_to_options) > MAX_ALGORITHMS_TO_EVALUATE:
+            output_dir_suffix = "{}".format(index)
+        minibatch_output_dir = args.output_dir + output_dir_suffix
 
-    results_dir = os.path.join(args.output_dir, "vio")
-    eval_output_dir = os.path.join(args.output_dir, "vio_eval")
+        results_dir = os.path.join(args.output_dir, "vio")
+        eval_output_dir = os.path.join(args.output_dir, "vio_eval")
 
-    results_dir_manager = ResultsDirManager.ResultsDirManager(
-        results_dir, bag_list, algo_name_list)
-    results_dir_manager.create_results_dir()
-    results_dir_manager.create_eval_config_yaml()
-    results_dir_manager.create_eval_output_dir(eval_output_dir)
-    returncode = 0
-
-
-    eval_cfg_template = os.path.join(args.catkin_ws, "src/msckf/evaluation/config/eval_cfg.yaml")
-
-    for name, options in algoname_to_options.items():
-        for bag_index, bag_fullname in enumerate(bag_list):
-            print(bag_fullname)
-            result_dir = results_dir_manager.get_result_dir(name, bag_fullname)
-
-            if 'mono' in name:
-                max_cameras = 1
-                use_stereo = 'false'
-            elif 'stereo' in name:
-                max_cameras = 2
-                use_stereo = 'true'
+        results_dir_manager = ResultsDirManager.ResultsDirManager(
+            results_dir, bag_list, algo_name_list)
+        results_dir_manager.create_results_dir()
+        results_dir_manager.create_eval_config_yaml()
+        results_dir_manager.create_eval_output_dir(eval_output_dir)
+        #results_dir_manager.save_config(minibatch, minibatch_output_dir)
+        returncode = 0
 
 
-            for trial_index in range(args.num_trials):
-                if args.num_trials == 1:
-                    index_str = ''
-                else:
-                    index_str = '{}'.format(trial_index)
+        eval_cfg_template = os.path.join(args.catkin_ws, "src/msckf/evaluation/config/eval_cfg.yaml")
 
-                result_file = os.path.join(result_dir, 'stamped_traj_estimate{}.txt'.format(index_str))
-                setup_bash_file = os.path.join("/home/youkely/dev/openvins_ws", "devel/setup.bash")
-                print(setup_bash_file)
-                src_cmd = "cd ~\nsource {}\n".format(setup_bash_file)
-                bag_start = 0
+        for name, options in minibatch.items():
+            for bag_index, bag_fullname in enumerate(bag_list):
+                print(bag_fullname)
+                bagname = os.path.basename(os.path.splitext(bag_fullname)[0])
+                result_dir = results_dir_manager.get_result_dir(name, bag_fullname)
 
-                if dataset == "euroc":
-                    # launch_file = "pgeneva_ros_eth.launch"
-                    launch_file = "pgeneva_serial_eth.launch"
-                    init_imu_thresh = 1.5
-                    if "MH_01" in bag_fullname:
-                        bag_start = 40
-                    elif "MH_02" in bag_fullname:
-                        bag_start = 35
-                    elif "MH_03" in bag_fullname:
-                        bag_start = 15
-                    elif "MH_04" in bag_fullname:
-                        bag_start = 20
-                    elif "MH_05" in bag_fullname:
-                        bag_start = 20
-                    eval_cfg_template = os.path.join(args.catkin_ws, "src/msckf/evaluation/config/eval_cfg.yaml")
-
-                    launch_cmd = "roslaunch ov_msckf {} max_cameras:={} use_stereo:={} " \
-                                 "bag:={} bag_start:={} init_imu_thresh:={} dosave:=true path_est:={}".format(
-                        launch_file, max_cameras, use_stereo,
-                        bag_fullname, bag_start, init_imu_thresh, result_file)
-
-                elif dataset == "tumvi":
-                    # launch_file = "pgeneva_ros_tum.launch"
-                    launch_file = "pgeneva_serial_tum.launch"
-                    init_imu_thresh = 0.7
-                    eval_cfg_template = os.path.join(args.catkin_ws, "src/msckf/evaluation/config/eval_cfg_se3.yaml")
-
-                    launch_cmd = "roslaunch ov_msckf {} max_cameras:={} use_stereo:={} " \
-                                 "bag:={} bag_start:={} init_imu_thresh:={} dosave:=true path_est:={} " \
-                                 "gyroscope_noise_density:={} gyroscope_random_walk:={} " \
-                                 "accelerometer_noise_density:={} accelerometer_random_walk:={} ".format(
-                        launch_file, max_cameras, use_stereo,
-                        bag_fullname, bag_start, init_imu_thresh, result_file,
-                        options["sigma_g_c"]*options["coeff_c"], options["sigma_gw_c"]*options["coeff_wc"], 
-                        options["sigma_a_c"]*options["coeff_c"], options["sigma_aw_c"]*options["coeff_wc"])
+                if 'mono' in name:
+                    max_cameras = 1
+                    use_stereo = 'false'
+                elif 'stereo' in name:
+                    max_cameras = 2
+                    use_stereo = 'true'
 
 
-                cmd = src_cmd + launch_cmd
-                src_wrap = os.path.join(result_dir, "source_wrap.sh")
-                with open(src_wrap, 'w') as stream:
-                    stream.write('#!/bin/bash\n')
-                    stream.write('{}\n'.format(cmd))
-                cmd = "chmod +x {wrap};{wrap}".format(wrap=src_wrap)
+                for trial_index in range(args.num_trials):
+                    if args.num_trials == 1:
+                        index_str = ''
+                    else:
+                        index_str = '{}'.format(trial_index)
 
-                print(cmd)
-                rc, msg = utility_functions.subprocess_cmd(cmd)
-                if rc != 0:
-                    err_msg = "Error code {} and msg {} in running vio method with cmd:\n{}".\
-                        format(rc, msg, cmd)
-                    print(err_msg)
-            gt_file = os.path.join(result_dir, 'stamped_groundtruth.txt')
-            shutil.copy2(gt_list[bag_index], gt_file)
-            eval_cfg_file = os.path.join(result_dir, 'eval_cfg.yaml')
-            shutil.copy2(eval_cfg_template, eval_cfg_file)
+                    result_file = os.path.join(result_dir, 'stamped_traj_estimate{}.txt'.format(index_str))
+                    setup_bash_file = os.path.join("/home/youkely/dev/openvins_ws", "devel/setup.bash")
+                    print(setup_bash_file)
+                    src_cmd = "cd ~\nsource {}\n".format(setup_bash_file)
+                    bag_start = 0
+
+                    if dataset == "euroc":
+                        # launch_file = "pgeneva_ros_eth.launch"
+                        launch_file = "pgeneva_serial_eth.launch"
+                        init_imu_thresh = 1.5
+                        if "MH_01" in bag_fullname:
+                            bag_start = 40
+                        elif "MH_02" in bag_fullname:
+                            bag_start = 35
+                        elif "MH_03" in bag_fullname:
+                            bag_start = 15
+                        elif "MH_04" in bag_fullname:
+                            bag_start = 20
+                        elif "MH_05" in bag_fullname:
+                            bag_start = 20
+                        eval_cfg_template = os.path.join(args.catkin_ws, "src/msckf/evaluation/config/eval_cfg.yaml")
+
+                        launch_cmd = "roslaunch ov_msckf {} max_cameras:={} use_stereo:={} " \
+                                     "bag:={} bag_start:={} init_imu_thresh:={} dosave:=true path_est:={}".format(
+                            launch_file, max_cameras, use_stereo,
+                            bag_fullname, bag_start, init_imu_thresh, result_file)
+
+                    elif dataset == "tumvi":
+                        # launch_file = "pgeneva_ros_tum.launch"
+                        launch_file = "pgeneva_serial_tum.launch"
+                        init_imu_thresh = imuthreshold[bagname]
+                        eval_cfg_template = os.path.join(args.catkin_ws, "src/msckf/evaluation/config/eval_cfg_se3.yaml")
+
+                        # launch_cmd = "roslaunch ov_msckf {} max_cameras:={} use_stereo:={} " \
+                        #              "bag:={} bag_start:={} init_imu_thresh:={} dosave:=true path_est:={} " \
+                        #              "gyroscope_noise_density:={} gyroscope_random_walk:={} " \
+                        #              "accelerometer_noise_density:={} accelerometer_random_walk:={} ".format(
+                        #     launch_file, max_cameras, use_stereo,
+                        #     bag_fullname, bag_start, init_imu_thresh, result_file,
+                        #     options["sigma_g_c"]*options["coeff_c"], options["sigma_gw_c"]*options["coeff_wc"], 
+                        #     options["sigma_a_c"]*options["coeff_c"], options["sigma_aw_c"]*options["coeff_wc"])
+
+                        launch_cmd = "roslaunch ov_msckf {} max_cameras:={} use_stereo:={} " \
+                                     "bag:={} bag_start:={} init_imu_thresh:={} dosave:=true path_est:={}".format(
+                            launch_file, max_cameras, use_stereo,
+                            bag_fullname, bag_start, init_imu_thresh, result_file)
+
+
+                    cmd = src_cmd + launch_cmd
+                    src_wrap = os.path.join(result_dir, "source_wrap.sh")
+                    with open(src_wrap, 'w') as stream:
+                        stream.write('#!/bin/bash\n')
+                        stream.write('{}\n'.format(cmd))
+                    cmd = "chmod +x {wrap};{wrap}".format(wrap=src_wrap)
+
+                    print(cmd)
+                    rc, msg = utility_functions.subprocess_cmd(cmd)
+                    if rc != 0:
+                        err_msg = "Error code {} and msg {} in running vio method with cmd:\n{}".\
+                            format(rc, msg, cmd)
+                        print(err_msg)
+                gt_file = os.path.join(result_dir, 'stamped_groundtruth.txt')
+                shutil.copy2(gt_list[bag_index], gt_file)
+                eval_cfg_file = os.path.join(result_dir, 'eval_cfg.yaml')
+                shutil.copy2(eval_cfg_template, eval_cfg_file)
 
         #args.num_trials,
-    # evaluate all VIO methods.
-    rc, streamdata = rpg_eval_tool_wrap.run_rpg_evaluation(
-        args.rpg_eval_tool_dir, results_dir_manager.get_eval_config_yaml(),
-        args.num_trials, results_dir, eval_output_dir)
-    if rc != 0:
-        print(Fore.RED + "Error code {} in run_rpg_evaluation: {}".format(rc, streamdata))
-        sys.exit(1)
+        # evaluate all VIO methods.
+        rc, streamdata = rpg_eval_tool_wrap.run_rpg_evaluation(
+            args.rpg_eval_tool_dir, results_dir_manager.get_eval_config_yaml(),
+            args.num_trials, results_dir, eval_output_dir)
+        if rc != 0:
+            print(Fore.RED + "Error code {} in run_rpg_evaluation: {}".format(rc, streamdata))
+            sys.exit(1)
 
-    rpg_eval_tool_wrap.check_eval_result(eval_output_dir, args.cmp_eval_output_dir)
+        rpg_eval_tool_wrap.check_eval_result(eval_output_dir, args.cmp_eval_output_dir)
 
     print('Successfully finished testing methods in msckf project!')
     sys.exit(0)
