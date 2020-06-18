@@ -2,6 +2,8 @@ import errno
 import os
 import shutil
 
+from colorama import init, Fore
+init(autoreset=True)
 
 def find_bags_with_gt(uzh_fpv_dir, bagname_key, discount_key='.orig.bag'):
     """This function finds ros bags named like 'xxx_with_gt.bag',
@@ -46,6 +48,12 @@ def get_gt_file_for_bags(bag_list):
     gt_list = []
     for bag in bag_list:
         gt_list.append(os.path.splitext(bag)[0] + ".txt")
+    for gt_file in gt_list:
+        if not os.path.isfile(gt_file):
+            raise Exception(
+                Fore.RED + "Ground truth file {} does not exist. Do you "
+                           "forget to convert data.csv to data.txt or "
+                           "extract ground truth from rosbags?".format(gt_file))
     return gt_list
 
 
@@ -60,7 +68,13 @@ def get_converted_euroc_gt_files(euroc_bag_list):
     gt_list = []
     for bag in euroc_bag_list:
         gt_list.append(os.path.join(os.path.dirname(bag), 'data.txt'))
+    for gt_file in gt_list:
+        if not os.path.isfile(gt_file):
+            raise Exception(
+                Fore.RED + "Ground truth file {} does not exist. Do you "
+                           "forget to convert data.csv to data.txt".format(gt_file))
     return gt_list
+
 
 def empty_dir(folder):
     for the_file in os.listdir(folder):
@@ -72,6 +86,7 @@ def empty_dir(folder):
                 shutil.rmtree(file_path)
         except Exception as e:
             print(e)
+
 
 def mkdir_p(dirname):
     try:
@@ -97,6 +112,7 @@ def make_or_empty_dir(dirname):
     else:
         mkdir_p(dirname)
 
+
 def find_rpg_est_gt_pairs(results_dir):
     """
     Find all pairs of (stamped_groundtruth.txt, stamped_traj_estimateX.txt) under results_dir
@@ -111,6 +127,7 @@ def find_rpg_est_gt_pairs(results_dir):
                 assert os.path.isfile(gt_file), "gt file {} not found!".format(gt_file)
                 est_gt_list.append((os.path.join(dir_name, fname), gt_file))
     return est_gt_list
+
 
 def get_rpg_est_file_suffix(est_file):
     """

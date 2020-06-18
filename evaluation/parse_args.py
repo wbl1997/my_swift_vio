@@ -1,3 +1,195 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+
+"""
+Parse arguments for smoke_test, main_evaluation etc.
+
+Input Data Structure
+
+The folder structure layout for EUROC data:
+.
+├── machine_hall
+│   ├── MH_01_easy
+│   │   ├── data.csv
+│   │   ├── data.txt
+│   │   ├── MH_01_easy.bag
+│   │   └── MH_01_easy.zip
+│   ├── MH_02_easy
+│   │   ├── data.csv
+│   │   ├── data.txt
+│   │   ├── MH_02_easy.bag
+│   │   └── MH_02_easy.zip
+│   ├── MH_03_medium
+│   │   ├── data.csv
+│   │   ├── data.txt
+│   │   ├── MH_03_medium.bag
+│   │   └── MH_03_medium.zip
+│   ├── MH_04_difficult
+│   │   ├── data.csv
+│   │   ├── data.txt
+│   │   ├── MH_04_difficult.bag
+│   │   └── MH_04_difficult.zip
+│   └── MH_05_difficult
+│       ├── data.csv
+│       ├── data.txt
+│       ├── MH_05_difficult.bag
+│       └── MH_05_difficult.zip
+├── vicon_room1
+│   ├── V1_01_easy
+│   │   ├── data.csv
+│   │   ├── data.txt
+│   │   ├── V1_01_easy.bag
+│   │   └── V1_01_easy.zip
+│   ├── V1_02_medium
+│   │   ├── data.csv
+│   │   ├── data.txt
+│   │   ├── V1_02_medium.bag
+│   │   └── V1_02_medium.zip
+│   └── V1_03_difficult
+│       ├── data.csv
+│       ├── data.txt
+│       ├── V1_03_difficult.bag
+│       └── V1_03_difficult.zip
+└── vicon_room2
+    ├── V2_01_easy
+    │   ├── data.csv
+    │   ├── data.txt
+    │   ├── V2_01_easy.bag
+    │   └── V2_01_easy.zip
+    ├── V2_02_medium
+    │   ├── data.csv
+    │   ├── data.txt
+    │   ├── V2_02_medium.bag
+    │   └── V2_02_medium.zip
+    └── V2_03_difficult
+        ├── data.csv
+        ├── data.txt
+        ├── V2_03_difficult.bag
+        └── V2_03_difficult.zip
+
+
+In each subfolder for each mission, data.csv is extracted from folder
+state_groundtruth_estimate0 insider the zip file.
+And data.txt is converted in format from data.csv by convert_euroc_gt_csv.py.
+
+The folder structure layout for UZH-FPV dataset:
+.
+├── indoor_45_12_snapdragon_with_gt.bag
+├── indoor_45_12_snapdragon_with_gt.txt
+├── indoor_45_13_davis_with_gt.bag
+├── indoor_45_13_snapdragon_with_gt.bag
+├── indoor_45_13_snapdragon_with_gt.txt
+├── indoor_45_14_davis_with_gt.bag
+├── indoor_45_14_snapdragon_with_gt.bag
+├── indoor_45_14_snapdragon_with_gt.txt
+├── indoor_45_16_davis.bag
+├── indoor_45_16_snapdragon.bag
+├── indoor_45_1_davis.bag
+├── indoor_45_1_snapdragon.bag
+├── indoor_45_2_davis_with_gt.bag
+├── indoor_45_2_snapdragon_with_gt.bag
+├── indoor_45_2_snapdragon_with_gt.txt
+├── indoor_45_3_davis.bag
+├── indoor_45_3_snapdragon.bag
+├── indoor_45_4_davis_with_gt.bag
+├── indoor_45_4_snapdragon_with_gt.bag
+├── indoor_45_4_snapdragon_with_gt.txt
+├── indoor_45_9_davis_with_gt.bag
+├── indoor_45_9_snapdragon_with_gt.bag
+├── indoor_45_9_snapdragon_with_gt.txt
+├── indoor_forward_10_davis_with_gt.bag
+├── indoor_forward_10_snapdragon_with_gt.bag
+├── indoor_forward_10_snapdragon_with_gt.txt
+├── indoor_forward_11_davis.bag
+├── indoor_forward_11_snapdragon.bag
+├── indoor_forward_12_davis.bag
+├── indoor_forward_12_snapdragon.bag
+├── indoor_forward_3_davis_with_gt.bag
+├── indoor_forward_3_davis_with_gt.zip
+├── indoor_forward_3_snapdragon_with_gt.bag
+├── indoor_forward_3_snapdragon_with_gt.txt
+├── indoor_forward_5_davis_with_gt.bag
+├── indoor_forward_5_snapdragon_with_gt.bag
+├── indoor_forward_5_snapdragon_with_gt.txt
+├── indoor_forward_6_davis_with_gt.bag
+├── indoor_forward_6_snapdragon_with_gt.bag
+├── indoor_forward_6_snapdragon_with_gt.txt
+├── indoor_forward_6_snapdragon_with_gt.zip
+├── indoor_forward_7_davis_with_gt.bag
+├── indoor_forward_7_snapdragon_with_gt.bag
+├── indoor_forward_7_snapdragon_with_gt.txt
+├── indoor_forward_8_davis.bag
+├── indoor_forward_8_snapdragon.bag
+├── indoor_forward_8_snapdragon.orig.bag
+├── indoor_forward_9_davis_with_gt.bag
+├── indoor_forward_9_snapdragon_with_gt.bag
+├── indoor_forward_9_snapdragon_with_gt.txt
+├── outdoor_45_1_davis_with_gt.bag
+├── outdoor_45_1_snapdragon_with_gt.bag
+├── outdoor_45_1_snapdragon_with_gt.txt
+├── outdoor_45_2_davis.bag
+├── outdoor_45_2_snapdragon.bag
+├── outdoor_forward_10_davis.bag
+├── outdoor_forward_10_snapdragon.bag
+├── outdoor_forward_1_davis_with_gt.bag
+├── outdoor_forward_1_snapdragon_with_gt.bag
+├── outdoor_forward_1_snapdragon_with_gt.txt
+├── outdoor_forward_2_davis.bag
+├── outdoor_forward_2_snapdragon.bag
+├── outdoor_forward_3_davis_with_gt.bag
+├── outdoor_forward_3_snapdragon_with_gt.bag
+├── outdoor_forward_3_snapdragon_with_gt.txt
+├── outdoor_forward_5_davis_with_gt.bag
+├── outdoor_forward_5_snapdragon_with_gt.bag
+├── outdoor_forward_5_snapdragon_with_gt.txt
+├── outdoor_forward_6_davis.bag
+├── outdoor_forward_6_snapdragon.bag
+├── outdoor_forward_9_davis.bag
+├── outdoor_forward_9_snapdragon.bag
+|
+
+The bags are downloaded from uzh fpv dataset webpage and the corresponding txt
+ files are extracted from the rosbags with ground truth using
+ extract_uzh_fpv_gt.py which wraps bag_to_pose.py of the rpg evaluation tool.
+
+Metrics
+
+Statistics for relatiive pose errors are saved in files like relative_error_statistics_16_0.yaml.
+The statistics "trans_per: mean" with a unit of percentage and "rot_deg_per_m: mean"
+ with a unit of deg/m are the metrics used by KITTI and UZH-FPV.
+The relative pose errors are also box plotted in figures.
+Note the middle line for these boxes corresponds to medians rather than means.
+To save the translation ATE rmse table, turn on rmse_table.
+To save overall relative pose errors in terms of translation percentage and
+rotation angle per meter, turn on overall_odometry_error
+
+"The relative pose errors at the sub-trajectory of lengths {40, 60, 80, 100, 120}
+meters are computed. The average translation and rotation error over all
+sequences are used for ranking." [UZH-FPV](http://rpg.ifi.uzh.ch/uzh-fpv.html)
+
+"From all test sequences, our evaluation computes translational and rotational
+errors for all possible subsequences of length (100,...,800) meters.
+The evaluation table below ranks methods according to the average of those
+values, where errors are measured in percent (for translation) and in degrees
+per meter (for rotation)." [KITTI](http://www.cvlibs.net/datasets/kitti/eval_odometry.php)
+
+Coordinate Frames
+
+For EUROC dataset, the ground truth is provided within the zip files under
+state_groundtruth_estimate0 in terms of T_WB where W is a quasi inertial frame,
+ and B is the body frame defined to be the IMU sensor frame.
+
+For UZH-FPV dataset, the ground truth is provided within the bag files under topic
+in terms of T_WB where W is a quasi inertial frame, and B is the body frame
+defined to be the IMU sensor frame. Note the Snapdragon flight and mDavis sensor
+unit have different IMUs, and thus different ground truth.
+
+The output of msckf/OKVIS are lists of T_WB where B is the IMU sensor frame
+defined according to the used IMU model.
+
+"""
+
 import argparse
 import os
 import sys
