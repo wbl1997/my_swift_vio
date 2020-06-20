@@ -415,7 +415,7 @@ def create_okvis_config_yaml(okvis_config_template, calib_format,
         template_data['imu_params']['T_BS'] = imu_data['T_BS']['data']
         template_data['imu_params']['imu_rate'] = int(imu_data['rate_hz'])
         template_data['imu_params']['sigma_a_c'] = OKVIS_EUROC_IMU_PARAMETERS['sigma_a_c']
-        template_data['imu_params']['sigma_aw_c'] =OKVIS_EUROC_IMU_PARAMETERS['sigma_aw_c']
+        template_data['imu_params']['sigma_aw_c'] = OKVIS_EUROC_IMU_PARAMETERS['sigma_aw_c']
         template_data['imu_params']['sigma_g_c'] = OKVIS_EUROC_IMU_PARAMETERS['sigma_g_c']
         template_data['imu_params']['sigma_gw_c'] = OKVIS_EUROC_IMU_PARAMETERS['sigma_gw_c']
     elif calib_format == "tum-vi":
