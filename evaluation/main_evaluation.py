@@ -24,20 +24,27 @@ init(autoreset=True)
 
 
 def find_all_bags_with_gt(euroc_dir="", uzh_fpv_dir="", tum_vi_dir="", advio_dir=""):
-    # euroc_bag_list = dir_utility_functions.find_bags(euroc_dir, '.bag', discount_key='calibration')
-    # euroc_gt_list = dir_utility_functions.get_converted_euroc_gt_files(euroc_bag_list)
-    #
+    euroc_bag_list = dir_utility_functions.find_bags(euroc_dir, '.bag', discount_key='calibration')
+    euroc_gt_list = dir_utility_functions.get_converted_euroc_gt_files(euroc_bag_list)
+
     # uzh_fpv_bag_list = dir_utility_functions.find_bags_with_gt(uzh_fpv_dir, 'snapdragon_with_gt.bag')
     # uzh_fpv_gt_list = dir_utility_functions.get_gt_file_for_bags(uzh_fpv_bag_list)
 
-    tumvi_bag_list = dir_utility_functions.find_bags(tum_vi_dir, "_512_16.bag", "dataset-calib")
-    tumvi_gt_list = dir_utility_functions.get_gt_file_for_bags(tumvi_bag_list)
+    # tumvi_bag_list = dir_utility_functions.find_bags(tum_vi_dir, "_512_16.bag", "dataset-calib")
+    # tumvi_gt_list = dir_utility_functions.get_gt_file_for_bags(tumvi_bag_list)
 
     # advio_bag_list = dir_utility_functions.find_bags(advio_dir, "advio-")
     # advio_gt_list = dir_utility_functions.get_gt_file_for_bags(advio_bag_list)
 
-    bag_list = tumvi_bag_list
-    gt_list = tumvi_gt_list
+    # exclude V2_03
+    bag_list = []
+    gt_list = []
+    for index, bagname in enumerate(euroc_bag_list):
+        if 'V2_03_difficult' in bagname:
+            continue
+        else:
+            bag_list.append(bagname)
+            gt_list.append(euroc_gt_list[index])
 
     print('For evaluation, #bags {} #gtlist {}'.format(len(bag_list), len(gt_list)))
     for index, gt in enumerate(gt_list):
@@ -54,129 +61,61 @@ if __name__ == '__main__':
     # python3.7 will remember insertion order of items, see
     # https://stackoverflow.com/questions/39980323/are-dictionaries-ordered-in-python-3-6
     algo_option_templates = {
-        'KSF_n': {"algo_code": "MSCKF",
+        'OKVIS': {"algo_code": "OKVIS",
                   "extra_gflags": "--publish_via_ros=false",
                   "numKeyframes": 5,
-                  "numImuFrames": 5,
-                  "monocular_input": 0,
+                  "numImuFrames": 3,
+                  "monocular_input": 1,
                   "landmarkModelId": 1,
                   "anchorAtObservationTime": 0,
-                  "model_type": "BG_BA_TG_TS_TA",
+                  "model_type": "BG_BA",
                   'projection_opt_mode': 'FXY_CXY',
-                  # This should cause failure in msckf
-                  "extrinsic_opt_mode_main_camera": "P_CB",
+                  "extrinsic_opt_mode_main_camera": "P_BC_Q_BC",
                   "extrinsic_opt_mode_other_camera": "P_BC_Q_BC",
-                  'sigma_TGElement': 5e-3,
-                  'sigma_TSElement': 1e-3,
-                  'sigma_TAElement': 5e-3,
-                  "sigma_g_c": 0.004 * 0.1,
-                  "sigma_a_c": 0.07 * 0.1,
-                  "sigma_gw_c": 4.4e-5 * 0.1,
-                  "sigma_aw_c": 1.72e-3 * 0.1,
-                  "sigma_absolute_translation": 0.02,
-                  "sigma_absolute_orientation": 0.01,
+                  'sigma_TGElement': 0e-3,
+                  'sigma_TSElement': 0e-3,
+                  'sigma_TAElement': 0e-3,
+                  "sigma_g_c": 12.0e-4,
+                  "sigma_a_c": 8.0e-3,
+                  "sigma_gw_c": 4.0e-6,
+                  "sigma_aw_c": 4.0e-5,
+                  "sigma_absolute_translation": 0.0,
+                  "sigma_absolute_orientation": 0.0,
                   "sigma_td": 5e-3,
                   "sigma_tr": 0.0,
-                  "sigma_focal_length": 5.0,
-                  "sigma_principal_point": 5.0,
-                  "sigma_distortion": "[0.05, 0.01, 0.001, 0.001]",
+                  "sigma_focal_length": 0.0,
+                  "sigma_principal_point": 0.0,
+                  "sigma_distortion": "[0.0, 0.0, 0.0, 0.0]",
                   "stereoMatchWithEpipolarCheck": 1,
                   "epipolarDistanceThreshold": 2.5,
                   "maxOdometryConstraintForAKeyframe": 2,
                   "loop_closure_method": 0,
-                  'use_nominal_calib_value': True},
+                  'use_nominal_calib_value': False},
     }
 
     config_name_to_diffs = {
-        ('KSF_n', 'KSF_n'): {"sigma_tr": 0.0},
-        ('KSF_n_calibrated', 'KSF_n'): {
-            'sigma_TGElement': 0e-3,
-            'sigma_TSElement': 0e-3,
-            'sigma_TAElement': 0e-3,
+        ('KSF', 'OKVIS'): {
+            "algo_code": 'MSCKF',
+            "numImuFrames": 5,
             "sigma_absolute_translation": 0.02,
             "sigma_absolute_orientation": 0.01,
-            "sigma_focal_length": 0.0,
-            "sigma_principal_point": 0.0,
-            "sigma_distortion": "[0.0, 0.0, 0.0, 0.0]",
-            "sigma_td": 5e-3,
-            "sigma_tr": 0.0,
-            "use_nominal_calib_value": False,
         },
-        ('KSF_n_fix_TgTsTa', 'KSF_n'): {
-            'sigma_TGElement': 0e-3,
-            'sigma_TSElement': 0e-3,
-            'sigma_TAElement': 0e-3,
-            "sigma_tr": 0.0,
-        },
-        ('KSF_n_fix_intrinsics', 'KSF_n'): {
-            "sigma_focal_length": 0.0,
-            "sigma_principal_point": 0.0,
-            "sigma_distortion": "[0.0, 0.0, 0.0, 0.0]",
-            "sigma_tr": 0.0
-        },
-        ('KSF_n_fix_extrinsics', 'KSF_n'): {
-            "sigma_absolute_translation": 0.0,
-            "sigma_absolute_orientation": 0.0,
-            "sigma_tr": 0.0
-        },
-        ('KSF_n_fix_td', 'KSF_n'): {
-            "sigma_td": 0e-3,
-            "sigma_tr": 0.0},
-        ('KSF_n_fix_all', 'KSF_n'): {
-            'sigma_TGElement': 0e-3,
-            'sigma_TSElement': 0e-3,
-            'sigma_TAElement': 0e-3,
-            "sigma_absolute_translation": 0.0,
-            "sigma_absolute_orientation": 0.0,
-            "sigma_focal_length": 0.0,
-            "sigma_principal_point": 0.0,
-            "sigma_distortion": "[0.0, 0.0, 0.0, 0.0]",
-            "sigma_td": 0e-3,
-            "sigma_tr": 0.0, },
-        ('KSF_n_loose_TgTsTa', 'KSF_n'): {
-            "sigma_absolute_translation": 0.0,
-            "sigma_absolute_orientation": 0.0,
-            "sigma_focal_length": 0.0,
-            "sigma_principal_point": 0.0,
-            "sigma_distortion": "[0.0, 0.0, 0.0, 0.0]",
-            "sigma_td": 0e-3,
-            "sigma_tr": 0.0,
-        },
-        ('KSF_n_loose_intrinsics', 'KSF_n'): {
-            'sigma_TGElement': 0e-3,
-            'sigma_TSElement': 0e-3,
-            'sigma_TAElement': 0e-3,
-            "sigma_absolute_translation": 0.0,
-            "sigma_absolute_orientation": 0.0,
-            "sigma_focal_length": 5.0,
-            "sigma_principal_point": 5.0,
-            "sigma_distortion": "[0.05, 0.01, 0.001, 0.001]",
-            "sigma_td": 0e-3,
-            "sigma_tr": 0.0,
-        },
-        ('KSF_n_loose_extrinsics', 'KSF_n'): {
-            'sigma_TGElement': 0e-3,
-            'sigma_TSElement': 0e-3,
-            'sigma_TAElement': 0e-3,
+        ('KSF_n', 'OKVIS'): {
+            "algo_code": 'MSCKF',
+            "numImuFrames": 5,
+            "monocular_input": 0,
             "sigma_absolute_translation": 0.02,
             "sigma_absolute_orientation": 0.01,
-            "sigma_focal_length": 0.0,
-            "sigma_principal_point": 0.0,
-            "sigma_distortion": "[0.0, 0.0, 0.0, 0.0]",
-            "sigma_td": 0e-3,
-            "sigma_tr": 0.0,
         },
-        ('KSF_n_loose_td', 'KSF_n'): {
-            'sigma_TGElement': 0e-3,
-            'sigma_TSElement': 0e-3,
-            'sigma_TAElement': 0e-3,
-            "sigma_absolute_translation": 0.0,
-            "sigma_absolute_orientation": 0.0,
-            "sigma_focal_length": 0.0,
-            "sigma_principal_point": 0.0,
-            "sigma_distortion": "[0.0, 0.0, 0.0, 0.0]",
-            "sigma_td": 5e-3,
-            "sigma_tr": 0.0,
+        ('OKVIS_4_4', 'OKVIS'): {
+            # we found that inflating IMU noise 4 times gives goog results for monocular OKVIS on EuRoC dataset.
+            "sigma_g_c": 12.0e-4 * 4,
+            "sigma_a_c": 8.0e-3 * 4,
+            "sigma_gw_c": 4.0e-6 * 4,
+            "sigma_aw_c": 4.0e-5 * 4,
+        },
+        ('OKVIS_n', 'OKVIS'): {
+            "monocular_input": 0,
         },
     }
 
