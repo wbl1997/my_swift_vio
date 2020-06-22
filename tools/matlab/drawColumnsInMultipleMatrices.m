@@ -36,8 +36,8 @@ for i = 1:length(matrices)
     matrices{i}(:, 1) = matrices{i}(:, 1) - startTime;
 
     est_line_style = matrixColumnStyles{i};
-    drawColumnsInMatrix(matrices{i}, columnIndices, dataMultiplier, ...
-        false, est_line_style); hold on;
+    drawColumnsInMatrix(matrices{i}, columnIndices, false, ...
+        dataMultiplier, est_line_style); hold on;
     for j = 1: length(columnLabels)
         legend_list((i - 1) * length(columnLabels) + j) = ...
             {[est_label, '-', columnLabels{j}]};

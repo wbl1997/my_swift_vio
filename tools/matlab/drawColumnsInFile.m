@@ -1,4 +1,5 @@
-function drawColumnsInFile(data_file, indices, plot3d, line_styles)
+function lineHandles = drawColumnsInFile(data_file, indices, plot3d, ...
+    scale, lineStyles)
 % draw columns of data loaded from data_file
 % the first row of the data file will be removed as a header
 % the first column serves as the x axis
@@ -6,8 +7,11 @@ function drawColumnsInFile(data_file, indices, plot3d, line_styles)
 % plot3d if 1, plot3 will be used for the first 3 dim of indices,
 % default 0
 % line_styles line styles for each dim.
+if nargin < 5
+    lineStyles = {'-r', '-g', '-b', '-k', '.k', '.b', '-c', '-m', '-y'};
+end
 if nargin < 4
-    line_styles = {'-r', '-g', '-b', '-k', '.k', '.b', '-c', '-m', '-y'};
+    scale = 1.0;
 end
 if nargin < 3
     plot3d = 0;
@@ -18,7 +22,7 @@ if data(1, 1) > 1e9
 end
 data(:, 1) = data(:, 1) - data(1, 1);
 dimen = length(indices);
-drawColumnsInMatrix(data, indices, 1.0, plot3d, line_styles);
+lineHandles = drawColumnsInMatrix(data, indices, plot3d, scale, lineStyles);
 if plot3d
     legend('xyz');
 else

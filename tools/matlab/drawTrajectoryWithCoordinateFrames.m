@@ -22,7 +22,7 @@ lineHandles = zeros(1, count);
 
 for j = 1:count
     lineHandles(j) = drawColumnsInMatrix(matrixList{j}, txyzIndices, 1, ...
-        1, {colors{j}});
+        1, colors(j));
     hold on;
     increment = floor(size(matrixList{j}, 1) / maxCoordinateFrames);
     for i = 1:increment:size(matrixList{j}, 1)

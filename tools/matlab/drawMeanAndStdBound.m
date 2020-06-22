@@ -22,7 +22,7 @@ end
 dimen = length(meanIndex);
 line_handles = zeros(1, dimen * 3);
 line_handles(1:dimen) = drawColumnsInMatrix(...
-    data, meanIndex, scale, 0, meanLineStyles);
+    data, meanIndex, 0, scale, meanLineStyles);
 
 if isError
     for i=1:dimen

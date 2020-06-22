@@ -27,7 +27,7 @@ for i = 1:length(est_files)
     end
     est_data(:, 1) = est_data(:, 1) - startTime;
     
-    drawColumnsInMatrix(est_data, indices, 1.0, false, line_styles{i});
+    drawColumnsInMatrix(est_data, indices, false, 1.0, line_styles{i});
    
     % find average of last 10 secs.
     avgPeriod = 10;
