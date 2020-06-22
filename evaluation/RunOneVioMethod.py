@@ -99,10 +99,13 @@ class RunOneVioMethod(object):
     def create_sync_command(self, custom_vio_config, custom_lcd_config,
                             vio_trial_output_dir, bag_fullname):
         data_type = dataset_parameters.dataset_code(bag_fullname)
-        arg_topics = r'--camera_topics="{},{}" --imu_topic={}'.format(
-            dataset_parameters.ROS_TOPICS[data_type][0],
-            dataset_parameters.ROS_TOPICS[data_type][1],
-            dataset_parameters.ROS_TOPICS[data_type][2])
+        if data_type in  dataset_parameters.ROS_TOPICS.keys():
+            arg_topics = r'--camera_topics="{},{}" --imu_topic={}'.format(
+                dataset_parameters.ROS_TOPICS[data_type][0],
+                dataset_parameters.ROS_TOPICS[data_type][1],
+                dataset_parameters.ROS_TOPICS[data_type][2])
+        else:
+            arg_topics = r'--camera_topics="/cam0/image_raw" --imu_topic=/imu0'
 
         export_lib_cmd = ""
         if self.extra_lib_path:

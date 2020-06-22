@@ -73,7 +73,8 @@ BAGNAME_DATANAME_LABEL = {
     'dataset-slides1_512_16': ('slides1', 'sl1'),
     'dataset-slides2_512_16': ('slides2', 'sl2'),
     'dataset-slides3_512_16': ('slides3', 'sl3'),
-
+    # among the datasets, 07 and 18 are captured through glass elevators,
+    # 14 is captured through steel elevator thus having 100% outliers.
     'advio-01': ('advio01', 'ad1'),
     'advio-02': ('advio02', 'ad2'),
     'advio-03': ('advio03', 'ad3'),
@@ -109,6 +110,8 @@ def dataset_code(bagname):
         return "tum-vi"
     if "ADVIO" in bagname or "advio" in bagname:
         return "advio"
+    else:
+        return "homebrew"
 
 
 def calibration_format(dataset_type):

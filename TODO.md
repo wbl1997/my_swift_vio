@@ -176,6 +176,7 @@ To reproduce,
 --vocabulary_path=/media/jhuai/docker/msckf_ws/src/msckf/vocabulary/ORBvoc.yml 
 --camera_topics="/cam0/image_raw," --imu_topic=/imu0 --publish_via_ros=false
 ```
+Also check the impact of initWithoutEnoughParallax.
 
 55. *** Error in `/home/jhuai/Documents/docker/msckf_ws/devel/lib/msckf/okvis_node_synchronous': malloc(): smallbin double linked list corrupted: 0x0000000002028420 ***
 ======= Backtrace: =========

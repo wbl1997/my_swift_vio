@@ -58,7 +58,11 @@ class ResultsDirManager(object):
             stream.write('Datasets:\n')
             for bag_fullname in self.bag_list:
                 bagname = os.path.basename(os.path.splitext(bag_fullname)[0])
-                dir_data_name, plot_label = dataset_parameters.BAGNAME_DATANAME_LABEL[bagname]
+                if bagname in dataset_parameters.BAGNAME_DATANAME_LABEL.keys():
+                    dir_data_name, plot_label = dataset_parameters.BAGNAME_DATANAME_LABEL[bagname]
+                else:
+                    dir_data_name = bagname
+                    plot_label = bagname
                 stream.write('{}{}:\n'.format(tab_indent, dir_data_name))
                 stream.write('{}{}label: {}\n'.format(tab_indent, tab_indent, plot_label))
             stream.write('Algorithms:\n')
@@ -70,7 +74,10 @@ class ResultsDirManager(object):
 
     def get_result_dir(self, algo_name, bag_fullpath):
         bagname = os.path.basename(os.path.splitext(bag_fullpath)[0])
-        dir_data_name, _ = dataset_parameters.BAGNAME_DATANAME_LABEL[bagname]
+        if bagname in dataset_parameters.BAGNAME_DATANAME_LABEL.keys():
+            dir_data_name, _ = dataset_parameters.BAGNAME_DATANAME_LABEL[bagname]
+        else:
+            dir_data_name = bagname
         return os.path.join(self.results_dir, self.platform, algo_name,
                             self.platform + "_" + algo_name + "_" + dir_data_name)
 

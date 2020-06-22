@@ -539,6 +539,8 @@ def create_okvis_config_yaml(okvis_config_template, calib_format,
             for key in swapped_parameters[group].keys():
                 template_data[group][key] = swapped_parameters[group][key]
         template_data["displayImages"] = ADVIO_PARAMETERS["displayImages"]
+    elif calib_format == "homebrew":
+        pass
 
     # camera_config_str = printCameraBlock(template_data["cameras"][0])
     # camera_config_str += printCameraBlock(template_data["cameras"][1])
