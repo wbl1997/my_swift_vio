@@ -11,16 +11,51 @@ from ruamel.yaml import YAML
 
 import numpy as np
 
+# The suitable IMU parameters for stereo OKVIS, monocular MSCKF, and stereo MSCKF.
+# We did not tune for these methods with a grid search.
 # https://github.com/ethz-asl/okvis/blob/master/config/config_fpga_p2_euroc.yaml
 OKVIS_EUROC_IMU_PARAMETERS = {"sigma_g_c": 12.0e-4,
                               "sigma_a_c": 8.0e-3,
                               "sigma_gw_c": 4.0e-6,
                               "sigma_aw_c": 4.0e-5}
 
+# The best IMU parameters for monocular OKVIS on EUROC are found by a search.
+#       &      Translation (\%) &  Rotation (deg/meter)
+# OKVIS_1_1 &     135.089 &  0.138
+# OKVIS_2_2 &     33.327 &  0.175
+# OKVIS_2_4 &     6.651 &  0.054
+# OKVIS_4_4 &     0.656 &  0.024
+OKVIS_MONO_EUROC_IMU_PARAMETERS = {
+    "sigma_g_c": 12.0e-4 * 4,
+    "sigma_a_c": 8.0e-3 * 4,
+    "sigma_gw_c": 4.0e-6 * 4,
+    "sigma_aw_c": 4.0e-5 * 4,
+}
+
+# The best IMU parameters for stereo MSCKF on TUM VI are found by a search.
+#       &      Translation (\%) &  Rotation (deg/meter)
+# KSF_n_01_01 &     31.934 &  0.135
+# KSF_n_02_025 &     41.982 &  0.120
+# KSF_n_0025_005 &     84470.155 &  0.313
+# KSF_n_005_005 &     786.133 &  0.260
+# KSF_n_005_01 &     42.373 &  0.151
 MSCKF_TUMVI_IMU_PARAMETERS = {"sigma_g_c": 0.004 * 0.1,
                               "sigma_a_c": 0.07 * 0.1,
                               "sigma_gw_c": 4.4e-5 * 0.1,
                               "sigma_aw_c": 1.72e-3 * 0.1}
+
+# The best IMU parameters for monocular MSCKF on TUM VI are found by a search.
+#       &      Translation (\%) &  Rotation (deg/meter)
+# KSF_005_01 &     37578.149 &  0.258
+# KSF_01_01 &     70.471 &  0.186
+# KSF_01_025 &     47.796 &  0.117
+# KSF_02_025 &     42.107 &  0.118
+MSCKF_TUMVI_MONO_IMU_PARAMETERS = {
+    "sigma_g_c": 0.004 * 0.2,
+    "sigma_a_c": 0.07 * 0.2,
+    "sigma_gw_c": 4.4e-5 * 0.25,
+    "sigma_aw_c": 1.72e-3 * 0.25
+}
 
 TUMVI_PARAMETERS = {
     "cameras": [
@@ -120,6 +155,42 @@ TUMVI_NOMINAL_PARAMETERS = {
     "displayImages": "false",
     "publishing_options": {
         'publishLandmarks': "false", }
+}
+
+# The best IMU parameters for monocular MSCKF on ADVIO are found a search and visual check.
+#       &      Translation (\%) &  Rotation (deg/meter)
+# KSF_0.1_0.1 &     15.113 &  0.129
+# KSF_0.2_0.1 &     14.167 &  0.125
+# KSF_0.2_0.2 &     13.792 &  0.124
+# KSF_0.5_0.2 &     13.795 &  0.126
+# KSF_0.5_0.5 &     13.753 &  0.125
+# KSF_1.0_0.5 &     15.405 &  0.127
+# KSF_1.0_1.0 &     17.616 &  0.129
+# KSF_2.0_1.0 &     21.493 &  0.134
+# KSF_2.0_2.0 &     20.310 &  0.136
+MSCKF_ADVIO_IMU_PARAMETERS = {
+    'sigma_g_c': 2.4e-3 * 0.5,
+    'sigma_a_c': 4.8e-2 * 0.5,
+    'sigma_gw_c': 5.1e-5 * 0.2,
+    'sigma_aw_c': 2.1e-4 * 0.2,
+}
+
+# The best IMU parameters for monocular OKVIS on ADVIO are found a search and visual check.
+#       &      Translation (\%) &  Rotation (deg/meter)
+# OKVIS_0.5_0.5 &     206955.716 &  0.863
+# OKVIS_0.5_1.0 &     152459.404 &  0.814
+# OKVIS_1.0_1.0 &     518639.908 &  0.874
+# OKVIS_1.0_2.0 &     820545.006 &  0.858
+# OKVIS_2.0_2.0 &     900615.497 &  0.892
+# OKVIS_2.0_5.0 &     3500755.814 &  0.912
+# OKVIS_5.0_10.0 &     2106334.534 &  0.860
+# OKVIS_5.0_5.0 &     2591059.557 &  0.799
+# OKVIS_10.0_10.0 &     1372010.014 &  0.474
+OKVIS_ADVIO_IMU_PARAMETERS = {
+    'sigma_g_c': 2.4e-3 * 2,
+    'sigma_a_c': 4.8e-2 * 2,  # 4.8e-3 is the value provided by advio.
+    'sigma_gw_c': 5.1e-5 * 2,
+    'sigma_aw_c': 2.1e-4 * 2,
 }
 
 ADVIO_CAMERA_INTRINSIC_PARAMETERS = {

@@ -108,7 +108,6 @@ if __name__ == '__main__':
             "sigma_absolute_orientation": 0.01,
         },
         ('OKVIS_4_4', 'OKVIS'): {
-            # we found that inflating IMU noise 4 times gives goog results for monocular OKVIS on EuRoC dataset.
             "sigma_g_c": 12.0e-4 * 4,
             "sigma_a_c": 8.0e-3 * 4,
             "sigma_gw_c": 4.0e-6 * 4,
