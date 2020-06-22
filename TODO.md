@@ -164,6 +164,19 @@ Aborted (core dumped)
 
 I believe this issue has been resolved but not rememebering what is the exact solution.
 
+55. MSCKF jumps forth and then back at the beginning
+To reproduce,
+```
+/media/jhuai/Seagate/jhuai/temp/msckf_ws_rel/devel/lib/msckf/okvis_node_synchronous 
+/home/jhuai/Desktop/temp/msckf_advio_noise0/vio/laptop/KSF_0.5_0.2/laptop_KSF_0.5_0.2_advio15/config_fpga_p2_euroc.yaml 
+/home/jhuai/Desktop/temp/msckf_advio_noise0/vio/laptop/KSF_0.5_0.2/laptop_KSF_0.5_0.2_advio15/LcdParams.yaml 
+--output_dir=/home/jhuai/Desktop/temp/msckf_advio_noise0/vio/laptop/KSF_0.5_0.2/laptop_KSF_0.5_0.2_advio15/MSCKF0 
+--skip_first_seconds=0 --max_inc_tol=30.0 --dump_output_option=3 
+--bagname=/media/jhuai/OldWin8OS/jhuai/data/advio/rosbag/iphone/advio-15.bag 
+--vocabulary_path=/media/jhuai/docker/msckf_ws/src/msckf/vocabulary/ORBvoc.yml 
+--camera_topics="/cam0/image_raw," --imu_topic=/imu0 --publish_via_ros=false
+```
+
 55. *** Error in `/home/jhuai/Documents/docker/msckf_ws/devel/lib/msckf/okvis_node_synchronous': malloc(): smallbin double linked list corrupted: 0x0000000002028420 ***
 ======= Backtrace: =========
 /lib/x86_64-linux-gnu/libc.so.6(+0x777e5)[0x7ff5ecf407e5]
@@ -204,7 +217,5 @@ jhuai/Desktop/msckf_tumvi_calib0/vio/laptop/KSF_n_fix_TgTsTa/laptop_KSF_n_fix_Tg
 VI/raw/room/dataset-room3_512_16.bag
 --vocabulary_path=/home/jhuai/Documents/docker/msckf_ws/src/msckf/evaluation/../vocabulary/ORBvoc.yml
 --camera_topics="/cam0/image_raw,/cam1/image_raw" --imu_topic=/imu0 --publish_via_ros=false
-
-
 
 

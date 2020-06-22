@@ -127,7 +127,7 @@ catkin config --cmake-args -DUSE_ROS=ON -DBUILD_TESTS=ON \
 
 catkin build vio_common msckf -DUSE_ROS=ON -DBUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Release -j$USE_PROC
 # -DCMAKE_PREFIX_PATH=/opt/ros/$ROS_VERSION
-# -DDO_TIMING
+# -DDO_TIMING=ON
 # -DUSE_SANITIZER=Address
 
 ```
