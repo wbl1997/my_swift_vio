@@ -8,7 +8,7 @@
  Currently this module works only with TUM VI to compare estimated parameters
   by KSF vs provided values from TUM VI.
  """
-
+import argparse
 import copy
 import math
 import os
@@ -281,7 +281,14 @@ def boxplot_block_and_save(data_array, column_indices, xlabels, out_file,
 
 
 if __name__ == '__main__':
-    _, output_dir = sys.argv
+    parser = argparse.ArgumentParser(
+        description="Extract the state vectors at the end of each output file of KSF, then"
+                    "compute mean and std dev of estimated sensor parameters \nand compare"
+                    " to the values provided by TUM VI.")
+    parser.add_argument("output_dir",
+                        help="Output dir of KSF inside which the output csv files will be searched for.")
+    args = parser.parse_args()
+    output_dir = args.output_dir
     estimate_file_list = []
     for dir_name, subdir_list, file_list in os.walk(output_dir):
         for fname in file_list:
