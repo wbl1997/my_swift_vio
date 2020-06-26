@@ -192,6 +192,8 @@ The output of msckf/OKVIS are lists of T_WB where B is the IMU sensor frame
 defined according to the used IMU model.
 
 """
+
+# openvins v2.0 woth commit 930fb925f80f7bbfad517cccedc7315af1379235
 imuthreshold={
     "dataset-room1_512_16": "0.75",
     "dataset-room2_512_16": "0.75",
