@@ -219,4 +219,17 @@ VI/raw/room/dataset-room3_512_16.bag
 --vocabulary_path=/home/jhuai/Documents/docker/msckf_ws/src/msckf/evaluation/../vocabulary/ORBvoc.yml
 --camera_topics="/cam0/image_raw,/cam1/image_raw" --imu_topic=/imu0 --publish_via_ros=false
 
+Several errors possibly of the same origin can be found with the below command
+```
+RES_DIR=/keyframe_based_filter_2020/results
+grep error $RES_DIR/tumvi-calibration/msckf_tumvi_calib0/log.txt -B 3 -A 10
+```
+The failure cases have the below configurations:
+KSF_n_fix_TgTsTa_room3
+KSF_n_fix_all_room1
+KSF_n_fix_all_room3
+KSF_n_loose_intrinsics_room3
+KSF_n_loose_extrinsics_room3
+They all fixed Tg Ts Ta and had a huge drift and possibly tracking failures.
+
 
