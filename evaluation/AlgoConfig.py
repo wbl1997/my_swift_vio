@@ -80,6 +80,8 @@ def apply_config_to_yaml(config_dict, vio_yaml, debug_output_dir):
 
     sed_cmd += sed_line_with_parameter(config_dict, "sigma_absolute_translation", padding, vio_yaml)
     sed_cmd += sed_line_with_parameter(config_dict, "sigma_absolute_orientation", padding, vio_yaml)
+    sed_cmd += sed_line_with_parameter(config_dict, "sigma_c_relative_translation", padding, vio_yaml)
+    sed_cmd += sed_line_with_parameter(config_dict, "sigma_c_relative_orientation", padding, vio_yaml)
     sed_cmd += sed_line_with_parameter(config_dict, "sigma_tr", padding, vio_yaml)
     sed_cmd += sed_line_with_parameter(config_dict, "sigma_td", padding, vio_yaml)
     sed_cmd += sed_line_with_parameter(config_dict, "sigma_focal_length", padding, vio_yaml)

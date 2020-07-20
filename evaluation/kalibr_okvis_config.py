@@ -101,7 +101,7 @@ TUMVI_PARAMETERS = {
         'sigma_TSElement': 1e-3,
         'sigma_TAElement': 5e-3, },
     'ceres_options': {
-        'timeLimit': -1,
+        'timeLimit': 1,  # in units of seconds, -1 means no limit.
     },
     "displayImages": "false",
     "publishing_options": {
@@ -150,7 +150,7 @@ TUMVI_NOMINAL_PARAMETERS = {
         'sigma_TSElement': 1e-3,
         'sigma_TAElement': 5e-3, },
     'ceres_options': {
-        'timeLimit': -1,
+        'timeLimit': 1,
     },
     "displayImages": "false",
     "publishing_options": {
@@ -231,7 +231,7 @@ ADVIO_PARAMETERS = {
         'sigma_TSElement': 1e-3,
         'sigma_TAElement': 5e-3, },
     'ceres_options': {
-        'timeLimit': -1,
+        'timeLimit': 1,
     },
     "displayImages": "false",
     "publishing_options": {
@@ -265,7 +265,7 @@ ADVIO_NOMINAL_PARAMETERS = {
         'sigma_TSElement': 1e-3,
         'sigma_TAElement': 5e-3, },
     'ceres_options': {
-        'timeLimit': -1,
+        'timeLimit': 1,
     },
     "displayImages": "false",
     "publishing_options": {
