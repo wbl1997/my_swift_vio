@@ -47,13 +47,18 @@ class MockVioInterface : public VioInterface {
                 const cv::Mat& image,
                 const std::vector<cv::KeyPoint>* keypoints,
                 int frameIdInSource, bool* asKeyframe) {
+    return true;
   }
   bool addKeypoints(const okvis::Time& stamp, size_t cameraIndex,
                     const std::vector<cv::KeyPoint>& keypoints,
                     const std::vector<uint64_t>& landmarkIds,
-                    const cv::Mat& descriptors, bool* asKeyframe) {}
+                    const cv::Mat& descriptors, bool* asKeyframe) {
+    return true;
+  }
   bool addImuMeasurement(const okvis::Time& stamp, const Eigen::Vector3d& alpha,
-                         const Eigen::Vector3d& omega) {}
+                         const Eigen::Vector3d& omega) {
+    return true;
+  }
 };
 
 }  // namespace okvis

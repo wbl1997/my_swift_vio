@@ -22,6 +22,8 @@ class DefaultEkfUpdater {
   DefaultEkfUpdater(const Eigen::MatrixXd &cov, int obsVarStartIndex,
                     int variable_dim);
 
+  virtual ~DefaultEkfUpdater();
+
   /**
    * @brief computeCorrection
    * @param T_H
@@ -47,6 +49,8 @@ class PreconditionedEkfUpdater : public DefaultEkfUpdater {
 
   PreconditionedEkfUpdater(const Eigen::MatrixXd &cov, int obsVarStartIndex,
                            int variable_dim);
+
+  virtual ~PreconditionedEkfUpdater();
 
   Eigen::Matrix<double, Eigen::Dynamic, 1> computeCorrection(
       const Eigen::MatrixXd &T_H,

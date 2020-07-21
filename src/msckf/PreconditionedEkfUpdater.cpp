@@ -19,6 +19,8 @@ PreconditionedEkfUpdater::PreconditionedEkfUpdater(const Eigen::MatrixXd &cov,
                                                    int variable_dim)
     : DefaultEkfUpdater(cov, obsVarStartIndex, variable_dim) {}
 
+PreconditionedEkfUpdater::~PreconditionedEkfUpdater() {}
+
 Eigen::Matrix<double, Eigen::Dynamic, 1>
 PreconditionedEkfUpdater::computeCorrection(
     const Eigen::MatrixXd &T_H,
@@ -132,6 +134,8 @@ DefaultEkfUpdater::DefaultEkfUpdater(const Eigen::MatrixXd &cov,
     std::cout << "Input cov not finite\n";
   }
 }
+
+DefaultEkfUpdater::~DefaultEkfUpdater() {}
 
 Eigen::Matrix<double, Eigen::Dynamic, 1> DefaultEkfUpdater::computeCorrection(
     const Eigen::MatrixXd &T_H,
