@@ -2976,10 +2976,10 @@ void HybridFilter::getImuAugmentedStatesEstimate(
   okvis::getImuAugmentedStatesEstimate(TgTsTaPtr, extraParams, imu_rig_.getModelId(0));
 }
 
-bool HybridFilter::getStateVariance(
-    Eigen::Matrix<double, Eigen::Dynamic, 1>* variances) const {
+bool HybridFilter::getStateStd(
+    Eigen::Matrix<double, Eigen::Dynamic, 1>* stateStd) const {
   const int dim = startIndexOfClonedStatesFast();
-  *variances = covariance_.topLeftCorner(dim, dim).diagonal();
+  *stateStd = covariance_.topLeftCorner(dim, dim).diagonal().cwiseSqrt();
   return true;
 }
 

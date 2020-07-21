@@ -765,7 +765,7 @@ void Publisher::csvSaveFullStateWithAllCalibrationAsCallback(
         Eigen::aligned_allocator<Eigen::VectorXd>>& extrinsics,
     const Eigen::Matrix<double, Eigen::Dynamic, 1> &imuAugmentedParams,
     const Eigen::Matrix<double, Eigen::Dynamic, 1> &cameraParams,
-    const Eigen::Matrix<double, Eigen::Dynamic, 1> &stateVarianceDiagonal,
+    const Eigen::Matrix<double, Eigen::Dynamic, 1> &stateStd,
     const std::vector<okvis::kinematics::Transformation,
           Eigen::aligned_allocator<okvis::kinematics::Transformation> >& T_BC_list) {
   setTime(t);
@@ -774,7 +774,7 @@ void Publisher::csvSaveFullStateWithAllCalibrationAsCallback(
   setFrustum(T_WS, T_BC_list[0]);
   StreamPublisher::csvSaveFullStateWithAllCalibrationAsCallback(
       t, T_WS, speedAndBiases, omega_S, frameIdInSource, extrinsics,
-      imuAugmentedParams, cameraParams, stateVarianceDiagonal, T_BC_list);
+      imuAugmentedParams, cameraParams, stateStd, T_BC_list);
 }
 
 void StreamPublisher::csvSaveFullStateWithAllCalibrationAsCallback(
@@ -785,7 +785,7 @@ void StreamPublisher::csvSaveFullStateWithAllCalibrationAsCallback(
                       Eigen::aligned_allocator<Eigen::VectorXd>> &extrinsics,
     const Eigen::Matrix<double, Eigen::Dynamic, 1> &imuAugmentedParams,
     const Eigen::Matrix<double, Eigen::Dynamic, 1> &cameraParams,
-    const Eigen::Matrix<double, Eigen::Dynamic, 1> &stateVarianceDiagonal,
+    const Eigen::Matrix<double, Eigen::Dynamic, 1> &stateStd,
     const std::vector<
         okvis::kinematics::Transformation,
         Eigen::aligned_allocator<okvis::kinematics::Transformation>>
@@ -826,9 +826,9 @@ void StreamPublisher::csvSaveFullStateWithAllCalibrationAsCallback(
       for (int jack = 0; jack < cameraParams.size(); ++jack)
         *csvFile_ << FLAGS_datafile_separator << cameraParams[jack];
 
-      for (int jack = 0; jack < stateVarianceDiagonal.size(); ++jack)
+      for (int jack = 0; jack < stateStd.size(); ++jack)
         *csvFile_ << FLAGS_datafile_separator
-                  << std::sqrt(stateVarianceDiagonal[jack]);
+                  << std::sqrt(stateStd[jack]);
 
       *csvFile_ << std::endl;
     }

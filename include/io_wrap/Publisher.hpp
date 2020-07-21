@@ -184,7 +184,7 @@ public:
    * @param extrinsics Camera extrinsic parameters in terms of T_BC's optimized coeffs.
    * @param vTgsa Augmented imu parameters except for biases.
    * @param cameraParams projection intrinsics, distortion, time offset and frame readout time.
-   * @param variance variance of the states including nav states, imu parameters,
+   * @param stateStd std. dev. of the states including nav states, imu parameters,
    *     camera extrinsic parameters, and camera intrinsic parameters and
    *     time offset and frame readout time.
    * @param T_BC_list Camera extrinsic in terms of T_BC.
@@ -199,7 +199,7 @@ public:
           Eigen::aligned_allocator<Eigen::VectorXd>> & extrinsics,
       const Eigen::Matrix<double, Eigen::Dynamic, 1>& vTgsa,
       const Eigen::Matrix<double, Eigen::Dynamic, 1>& cameraParams,
-      const Eigen::Matrix<double, Eigen::Dynamic, 1>& variance,
+      const Eigen::Matrix<double, Eigen::Dynamic, 1>& stateStd,
       const std::vector<okvis::kinematics::Transformation,
           Eigen::aligned_allocator<okvis::kinematics::Transformation> > & T_BC_list);
 
@@ -386,7 +386,7 @@ class Publisher : public StreamPublisher
    * @param extrinsics Camera extrinsic parameters in terms of T_BC's optimized coeffs.
    * @param vTgsa Augmented imu parameters except for biases.
    * @param cameraParams projection intrinsics, distortion, time offset and frame readout time.
-   * @param variance variance of the states including nav states, imu parameters, 
+   * @param stateStd std. dev. of the states including nav states, imu parameters,
    *     camera extrinsic parameters, and camera intrinsic parameters and 
    *     time offset and frame readout time.
    * @param T_BC_list Camera extrinsic in terms of T_BC.
@@ -401,7 +401,7 @@ class Publisher : public StreamPublisher
           Eigen::aligned_allocator<Eigen::VectorXd>> & extrinsics,
       const Eigen::Matrix<double, Eigen::Dynamic, 1>& vTgsa,
       const Eigen::Matrix<double, Eigen::Dynamic, 1>& cameraParams,
-      const Eigen::Matrix<double, Eigen::Dynamic, 1>& variance,
+      const Eigen::Matrix<double, Eigen::Dynamic, 1>& stateStd,
       const std::vector<okvis::kinematics::Transformation,
           Eigen::aligned_allocator<okvis::kinematics::Transformation> > & T_BC_list) final;
   /**
