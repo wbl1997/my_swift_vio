@@ -170,6 +170,8 @@ void Publisher::setNodeHandle(ros::NodeHandle& nh)
   pubPath_ = nh_->advertise<nav_msgs::Path>("okvis_path", 1);
   pubTransform_ = nh_->advertise<geometry_msgs::TransformStamped>(
       "okvis_transform", 1);
+  pubPoseStd_ = nh_->advertise<geometry_msgs::TwistStamped>(
+        "ksf_pose_std", 1);
   pubMesh_ = nh_->advertise<visualization_msgs::Marker>( "okvis_mesh", 0 );
   // where to get the mesh from
   std::string mesh_file;
@@ -322,6 +324,19 @@ void Publisher::setPose(const okvis::kinematics::Transformation& T_WS)
 
   // embedded material / colour
   //meshMsg_.mesh_use_embedded_materials = true;
+}
+
+void Publisher::setPoseStd(const Eigen::Matrix<double, -1, 1> &stateStd) {
+  poseStdMsg_.header.frame_id = "world";
+  poseStdMsg_.header.stamp = _t;
+  if ((ros::Time::now() - _t).toSec() > 10.0)
+    poseStdMsg_.header.stamp = ros::Time::now();
+  poseStdMsg_.twist.linear.x = stateStd[0];
+  poseStdMsg_.twist.linear.y = stateStd[1];
+  poseStdMsg_.twist.linear.z = stateStd[2];
+  poseStdMsg_.twist.angular.x = stateStd[3];
+  poseStdMsg_.twist.angular.y = stateStd[4];
+  poseStdMsg_.twist.angular.z = stateStd[5];
 }
 
 // Set the odometry message that is published next.
@@ -627,6 +642,14 @@ void Publisher::publishTransform()
   lastTransfromTime_ = _t;  // remember
 }
 
+void Publisher::publishPoseStd()
+{
+  if ((_t - lastStdTime_).toSec() < 1.0 / parameters_.publishing.publishRate)
+    return;  // control the publish rate
+  pubPoseStd_.publish(poseStdMsg_);  //publish stamped pose std for MSF
+  lastStdTime_ = _t;
+}
+
 // Set and publish pose.
 void Publisher::publishStateAsCallback(
     const okvis::Time & t, const okvis::kinematics::Transformation & T_WS)
@@ -772,6 +795,8 @@ void Publisher::csvSaveFullStateWithAllCalibrationAsCallback(
   setOdometry(T_WS, speedAndBiases,
               omega_S);  // TODO(sleuten): provide setters for this hack
   setFrustum(T_WS, T_BC_list[0]);
+  setPoseStd(stateStd);
+  publishPoseStd();
   StreamPublisher::csvSaveFullStateWithAllCalibrationAsCallback(
       t, T_WS, speedAndBiases, omega_S, frameIdInSource, extrinsics,
       imuAugmentedParams, cameraParams, stateStd, T_BC_list);
@@ -827,8 +852,7 @@ void StreamPublisher::csvSaveFullStateWithAllCalibrationAsCallback(
         *csvFile_ << FLAGS_datafile_separator << cameraParams[jack];
 
       for (int jack = 0; jack < stateStd.size(); ++jack)
-        *csvFile_ << FLAGS_datafile_separator
-                  << std::sqrt(stateStd[jack]);
+        *csvFile_ << FLAGS_datafile_separator << stateStd[jack];
 
       *csvFile_ << std::endl;
     }

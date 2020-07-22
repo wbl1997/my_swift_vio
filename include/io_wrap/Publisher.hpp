@@ -262,6 +262,8 @@ class Publisher : public StreamPublisher
    */
   void setPose(const okvis::kinematics::Transformation& T_WS);
 
+  void setPoseStd(const Eigen::Matrix<double, -1, 1>& stateStd);
+
   /**
    * @brief Set the odometry message that is published next.
    * @param T_WS The pose.
@@ -310,6 +312,8 @@ class Publisher : public StreamPublisher
   void publishPose();
   /// \brief Publish the T_WS transform.
   void publishTransform();
+
+  void publishPoseStd();
 
   /**
    * @brief Set and publish pose.
@@ -439,6 +443,7 @@ class Publisher : public StreamPublisher
   ros::Publisher pubObometry_;  ///< The publisher for the odometry.
   ros::Publisher pubPath_;  ///< The publisher for the path.
   ros::Publisher pubTransform_; ///< The publisher for the transform.
+  ros::Publisher pubPoseStd_;
   ros::Publisher pubMesh_; ///< The publisher for a robot / camera mesh.
   std::vector<image_transport::Publisher> pubImagesVector_; ///< The publisher for the images.
   std::vector<image_transport::ImageTransport> imageTransportVector_; ///< The image transporters.
@@ -450,6 +455,7 @@ class Publisher : public StreamPublisher
 
   ros::Time _t; ///< Header timestamp.
   geometry_msgs::TransformStamped poseMsg_; ///< Pose message.
+  geometry_msgs::TwistStamped poseStdMsg_; ///< std dev of pose message.
   nav_msgs::Odometry odometryMsg_;  ///< Odometry message.
 #ifdef HAVE_PCL
   pcl::PointCloud<pcl::PointXYZRGB> pointsMatched_; ///< Point cloud for matched points.
@@ -468,6 +474,7 @@ class Publisher : public StreamPublisher
   ros::Time lastOdometryTime_;  ///< Timestamp of the last broadcasted transform. (publishPose())
   ros::Time lastOdometryTime2_; ///< Timestamp of the last published odometry message. (publishOdometry())
   ros::Time lastTransfromTime_; ///< Timestamp of the last published transform. (publishTransform())
+  ros::Time lastStdTime_; ///< Timestamp of the last published pose std dev. (publishPoseStd())
 
   uint32_t ctr2_; ///< The counter for the amount of transferred points. Used for the seq parameter in the header.
 
