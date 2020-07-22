@@ -128,12 +128,7 @@ class RunOneVioMethod(object):
                              vio_trial_output_dir, bag_fullname):
         launch_file = "okvis_node_rosbag.launch"
         setup_bash_file = os.path.join(self.catkin_ws, "devel/setup.bash")
-        arg_val_str = utility_functions.get_arg_value_from_gflags(
-            self.algo_code_flags["extra_gflags"], "feature_tracking_method")
-        if arg_val_str is None:
-            arg_feature_method = ''
-        else:
-            arg_feature_method = "feature_tracking_method:={}".format(arg_val_str)
+
         data_type = dataset_parameters.dataset_code(bag_fullname)
         arg_topics = "image_topic:={} image_topic1:={} imu_topic:={}".format(
             dataset_parameters.ROS_TOPICS[data_type][0],
@@ -144,16 +139,14 @@ class RunOneVioMethod(object):
         export_lib_cmd = "export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:{}\n".\
             format(self.extra_lib_path)
         launch_cmd = "roslaunch msckf {} config_filename:={} lcd_config_filename:={} " \
-                     "output_dir:={} {} {} bag_file:={} start_into_bag:=0 play_rate:=1.0".format(
+                     "output_dir:={} {} bag_file:={} start_into_bag:=3 play_rate:=1.0".format(
             launch_file, custom_vio_config, custom_lcd_config, vio_trial_output_dir,
-            arg_topics, arg_feature_method, bag_fullname)
+            arg_topics, bag_fullname)
         return src_cmd + export_lib_cmd + launch_cmd
 
     def timeout(self, bag_fullname):
         bag_duration = rosbag_utility_functions.get_rosbag_duration(bag_fullname)
         time_out = bag_duration * 4
-        if "OKVIS" in self.algo_code_flags["algo_code"]:
-            time_out = bag_duration * 8
         time_out = max(60 * 5, time_out)
         return time_out
 

@@ -130,8 +130,6 @@ if __name__ == '__main__':
     }
 
     # 'MSCKF_i': AlgoConfig.create_algo_config(['MSCKF', '--use_IEKF=true', 10, 3]),
-    # 'MSCKF_brisk_b2b': AlgoConfig.create_algo_config(['MSCKF', '--feature_tracking_method=2', 10, 3]),
-    # 'MSCKF_klt': AlgoConfig.create_algo_config(['MSCKF', '--feature_tracking_method=1', 10, 3]),
     # 'MSCKF_async': AlgoConfig.create_algo_config(['MSCKF', '', 10, 3])}
 
     # rpg eval tool supports evaluating 6 algorithms at the same time, see len(PALLETE)

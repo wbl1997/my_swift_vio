@@ -10,7 +10,6 @@
   <arg name="lcd_config_filename" default="$(find msckf)/config/LcdParams.yaml" />
   <arg name="start_into_bag" default="0"/>
   <arg name="image_noise_cov_multiplier" default="5.0"/>
-  <arg name="feature_tracking_method" default="0"/>
   <arg name="play_rate" default="1.0"/>
   <node name="okvis_node" pkg="msckf" type="okvis_node" output="screen" 
       args="$(arg config_filename) $(arg lcd_config_filename) 
@@ -18,7 +17,6 @@
       --load_input_option=$(arg load_input_option)
       --image_noise_cov_multiplier=$(arg image_noise_cov_multiplier)
       --output_dir=$(arg output_dir)
-      --feature_tracking_method=$(arg feature_tracking_method)
       --max_inc_tol=10.0">
     <remap from="/camera0" to="$(arg image_topic)" />
     <remap from="/camera1" to="$(arg image_topic1)" />
