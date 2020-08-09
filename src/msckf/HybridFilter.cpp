@@ -2996,26 +2996,6 @@ void HybridFilter::setKeyframeRedundancyThresholds(double dist, double angle,
   numImuFrames_ = numImuFrames;
 }
 
-okvis::Time HybridFilter::removeState(uint64_t stateId) {
-  std::map<uint64_t, States>::iterator it = statesMap_.find(stateId);
-  okvis::Time removedStateTime = it->second.timestamp;
-  it->second.global[GlobalStates::T_WS].exists = false;  // remember we removed
-  it->second.sensors.at(SensorStates::Imu)
-      .at(0)
-      .at(ImuSensorStates::SpeedAndBias)
-      .exists = false;  // remember we removed
-  mapPtr_->removeParameterBlock(it->second.global[GlobalStates::T_WS].id);
-  mapPtr_->removeParameterBlock(it->second.sensors.at(SensorStates::Imu)
-                                    .at(0)
-                                    .at(ImuSensorStates::SpeedAndBias)
-                                    .id);
-
-
-  multiFramePtrMap_.erase(stateId);
-  statesMap_.erase(it);
-  return removedStateTime;
-}
-
 HybridFilter::EpipolarMeasurement::EpipolarMeasurement(
     const HybridFilter& filter,
     const uint32_t imageHeight,

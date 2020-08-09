@@ -299,8 +299,6 @@ class HybridFilter : public Estimator {
                                                size_t numKeyframes,
                                                size_t numImuFrames);
 
-  // will remove state parameter blocks and all of their related residuals
-  okvis::Time removeState(uint64_t stateId);
 
   void initCovariance();
 
