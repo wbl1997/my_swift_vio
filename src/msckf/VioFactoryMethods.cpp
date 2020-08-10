@@ -3,7 +3,7 @@
 #include <msckf/HybridFrontend.hpp>
 #include <msckf/MSCKF2.hpp>
 #include <msckf/InvariantEKF.hpp>
-#include <msckf/SlidingWindowSmoother.hpp>
+#include <gtsam/SlidingWindowSmoother.hpp>
 #include <msckf/TFVIO.hpp>
 #include <msckf/GeneralEstimator.hpp>
 #include <msckf/PriorlessEstimator.hpp>
@@ -27,7 +27,8 @@ std::shared_ptr<okvis::Frontend> createFrontend(
       new okvis::HybridFrontend(numCameras, frontendOptions));
 }
 
-std::shared_ptr<okvis::Estimator> createBackend(okvis::EstimatorAlgorithm algorithm) {
+std::shared_ptr<okvis::Estimator> createBackend(okvis::EstimatorAlgorithm algorithm,
+                                                const okvis::BackendParams& backendParams) {
   switch (algorithm) {
     // http://eigen.tuxfamily.org/bz/show_bug.cgi?id=1049
     case okvis::EstimatorAlgorithm::General:
@@ -49,7 +50,7 @@ std::shared_ptr<okvis::Estimator> createBackend(okvis::EstimatorAlgorithm algori
       return std::shared_ptr<okvis::Estimator>(new okvis::InvariantEKF());
 
     case okvis::EstimatorAlgorithm::SlidingWindowSmoother:
-      return std::shared_ptr<okvis::Estimator>(new okvis::SlidingWindowSmoother());
+      return std::shared_ptr<okvis::Estimator>(new okvis::SlidingWindowSmoother(backendParams));
 
     default:
       LOG(ERROR) << "Unknown Estimator type!";

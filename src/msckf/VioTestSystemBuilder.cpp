@@ -2,7 +2,7 @@
 #include <msckf/CameraSystemCreator.hpp>
 #include <msckf/GeneralEstimator.hpp>
 #include <msckf/InvariantEKF.hpp>
-#include <msckf/SlidingWindowSmoother.hpp>
+#include <gtsam/SlidingWindowSmoother.hpp>
 #include <msckf/TFVIO.hpp>
 #include <msckf/VioEvaluationCallback.hpp>
 
@@ -174,7 +174,7 @@ void VioTestSystemBuilder::createVioSystem(
     csc.createNominalCameraSystem(&cameraGeometry2, &cameraSystem2);
   }
   distortionType_ = cameraSystem2->cameraGeometry(0)->distortionType();
-
+  okvis::BackendParams backendParams;
   okvis::VisualConstraints constraintScheme(okvis::OnlyReprojectionErrors);
   switch (testSetting.estimator_algorithm) {
     case okvis::EstimatorAlgorithm::OKVIS:
@@ -191,7 +191,7 @@ void VioTestSystemBuilder::createVioSystem(
       estimator.reset(new okvis::InvariantEKF(mapPtr));
       break;
     case okvis::EstimatorAlgorithm::SlidingWindowSmoother:
-      estimator.reset(new okvis::SlidingWindowSmoother(mapPtr));
+      estimator.reset(new okvis::SlidingWindowSmoother(backendParams, mapPtr));
       break;
     case okvis::EstimatorAlgorithm::MSCKF:
     default:

@@ -23,7 +23,6 @@
 
 #include "loop_closure/LoopClosureDetector-definitions.h"
 
-#include "loop_closure/YamlParser.h"
 #include <okvis/LoopClosureParameters.hpp>
 
 
@@ -74,14 +73,14 @@ class LoopClosureDetectorParams : public okvis::LoopClosureParameters {
 
   // NOTE: we cannot parse width, height principe pt and focal length from here.
   // Those are done via setIntrinsics() in real time in the first StereoFrame.
-  bool parseYAML(const std::string& filepath);
+  bool parseYAML(const std::string& filepath) override;
 
-  void print() const;
+  void print() const override;
 
-  bool equals(const LoopClosureDetectorParams& obj) const {
-    const auto& rhs = obj;
+  bool equals(const PipelineParams& obj) const override {
+    const auto& rhs = static_cast<const LoopClosureDetectorParams&>(obj);
     return
-      loop_closure_method_ == loop_closure_method_ &&
+      loop_closure_method_ == rhs.loop_closure_method_ &&
       use_nss_ == rhs.use_nss_ &&
       alpha_== rhs.alpha_ &&
       min_temporal_matches_== rhs.min_temporal_matches_ &&

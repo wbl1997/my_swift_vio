@@ -13,6 +13,7 @@
  */
 
 #include "loop_closure/LoopClosureDetectorParams.h"
+#include "io_wrap/YamlParser.h"
 
 namespace VIO {
 
@@ -96,7 +97,7 @@ LoopClosureDetectorParams::LoopClosureDetectorParams(
 }
 
 bool LoopClosureDetectorParams::parseYAML(const std::string& filepath) {
-  YamlParser yaml_parser(filepath);
+  okvis::YamlParser yaml_parser(filepath);
 
   int lc_method_id;
   yaml_parser.getYamlParam("loop_closure_method", &lc_method_id);
