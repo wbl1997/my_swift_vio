@@ -26,7 +26,7 @@
 
 #include "okvis/class_macros.hpp"
 
-namespace VIO {
+namespace okvis {
 
 class YamlParser {
  public:
@@ -90,4 +90,4 @@ class YamlParser {
   std::string filepath_;
 };
 
-}  // namespace VIO
+}  // namespace okvis

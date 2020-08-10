@@ -180,8 +180,9 @@ int main(int argc, char **argv) {
   publisher->setParameters(parameters);
   okvis::PgoPublisher pgoPublisher;
 
+  okvis::BackendParams backendParams;
   std::shared_ptr<okvis::Estimator> estimator =
-      msckf::createBackend(parameters.optimization.algorithm);
+      msckf::createBackend(parameters.optimization.algorithm, backendParams);
   std::shared_ptr<okvis::Frontend> frontend = msckf::createFrontend(
       parameters.nCameraSystem.numCameras(),
       parameters.frontendOptions,
