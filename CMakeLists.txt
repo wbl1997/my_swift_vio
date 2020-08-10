@@ -211,7 +211,7 @@ LIST(APPEND SOURCEFILES
     src/msckf/PointLandmarkSimulationRS.cpp
     src/msckf/PreconditionedEkfUpdater.cpp
     src/msckf/SimulationFrontend.cpp
-    src/msckf/SlidingWindowSmoother.cpp
+
     src/msckf/TFVIO.cpp
     src/msckf/TwoViewPair.cpp
     src/msckf/VioEvaluationCallback.cpp
@@ -225,6 +225,11 @@ if(GTSAM_FOUND)
 list(APPEND SOURCEFILES
     src/loop_closure/GtsamWrap.cpp
     src/loop_closure/LoopClosureDetector.cpp
+
+    src/gtsam/ImuFrontEnd.cpp
+    src/gtsam/ImuFrontEndParams.cpp
+    src/gtsam/VioBackEndParams.cpp
+    src/gtsam/SlidingWindowSmoother.cpp
 )
 endif(GTSAM_FOUND)
 
@@ -350,7 +355,9 @@ list(APPEND TEST_SRC_FILES
 
 if(GTSAM_FOUND)
 list(APPEND TEST_SRC_FILES
-    test/gtsam/testIncrementalFixedLagSmoother.cpp
+    test/gtsam/TestGtsamImuFactor.cpp
+    test/gtsam/TestImuFrontEnd.cpp
+    test/gtsam/TestIncrementalFixedLagSmoother.cpp
     test/loop_closure/TestGtsamBetweenFactor.cpp
     test/loop_closure/TestLoopClosureMethod.cpp
     test/loop_closure/TestRPGO.cpp
