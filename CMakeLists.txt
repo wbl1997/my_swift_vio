@@ -218,7 +218,6 @@ LIST(APPEND SOURCEFILES
     src/msckf/VioTestSystemBuilder.cpp
     src/msckf/numeric_ceres_residual_Jacobian.cpp
     src/msckf/triangulate.cpp
-    src/msckf/triangulateFast.cpp
 )
 
 if(GTSAM_FOUND)
