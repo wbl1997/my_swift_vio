@@ -176,6 +176,7 @@ void VioTestSystemBuilder::createVioSystem(
   }
   distortionType_ = cameraSystem2->cameraGeometry(0)->distortionType();
   okvis::BackendParams backendParams;
+  backendParams.horizon_ = 3.0;
   okvis::VisualConstraints constraintScheme(okvis::OnlyReprojectionErrors);
   switch (testSetting.estimator_algorithm) {
     case okvis::EstimatorAlgorithm::OKVIS:

@@ -472,14 +472,10 @@ bool SlidingWindowSmoother::addStates(
   return true;
 }
 
-// following implementation of gtsam::FixedLagSmoother::findKeysBefore()
 uint64_t SlidingWindowSmoother::getMinValidStateId() const {
-  okvis::Time currentFrameTime = statesMap_.rbegin()->second.timestamp;
-  okvis::Time horizonTime = currentFrameTime - okvis::Duration(backendParams_.horizon_);
-
   std::map<uint64_t, States>::const_reverse_iterator rit = statesMap_.rbegin();
   while (rit != statesMap_.rend()) {
-    if (rit->second.timestamp < horizonTime) {
+    if (state_.find(rit->first) == state_.end()) {
       break;
     }
     ++rit;
@@ -637,13 +633,10 @@ void SlidingWindowSmoother::addLandmarkToGraph(uint64_t lmkId, const Eigen::Vect
 //  old_smart_factors_.insert(
 //      std::make_pair(lmk_id, std::make_pair(new_factor, -1)));
 
-  const okvis::MapPoint& mp = landmarksMap_.at(lmkId);
-  Eigen::Matrix<double, 4, 1> hpW = mp.pointHomog;
-  gtsam::Point3 pW = hpW.head<3>() / hpW[3];
-  LOG(INFO) << "OKVIS pW " << pW.transpose() << " gtsam " << externalPointW.transpose();
   new_values_.insert(gtsam::symbol('l', lmkId), gtsam::Point3(externalPointW));
 
   uint64_t minValidStateId = statesMap_.begin()->first;
+  const okvis::MapPoint& mp = landmarksMap_.at(lmkId);
   for (auto obsIter = mp.observations.begin(); obsIter != mp.observations.end();
        ++obsIter) {
     if (obsIter->first.frameId < minValidStateId) {
@@ -752,10 +745,16 @@ void SlidingWindowSmoother::updateStates() {
     uint64_t stateId = iter->first;
     auto xval = estimates.find(gtsam::Symbol('x', iter->first));
     if (xval == estimates.end()) {
-      std::string msg =
-          "The oldest nav state variables may just have been marginalized from "
-          "iSAM2 in the preceding update step, but others should not.";
-      OKVIS_ASSERT_EQ(Exception, iter->first, statesMap_.begin()->first, msg);
+      if (iter->first != statesMap_.begin()->first) {
+        std::string msg =
+            "The oldest nav state variables may just have been marginalized "
+            "from "
+            "iSAM2 in the preceding update step, but others should not.";
+        LOG(WARNING) << "State of id " << iter->first
+                     << " not found in smoother estimates when the first nav "
+                        "state id is "
+                     << statesMap_.begin()->first;
+      }
       continue;
     }
 
@@ -1057,6 +1056,8 @@ void SlidingWindowSmoother::optimize(size_t /*numIter*/, size_t /*numThreads*/,
     if (landmarkStatus == NotInState_NotTrackedNow) {
       // The landmark has not been added to the graph.
       if (observedInCurrentFrame) {
+        // TODO(jhuai): we need to tune the triangulation parameters.
+        // Currently very few landmarks are triangulated successfully.
         gtsam::TriangulationResult result = triangulateSafe(it->first);
         if (result.valid()) {
           Eigen::Vector3d pW(*result);
@@ -1104,10 +1105,8 @@ void SlidingWindowSmoother::optimize(size_t /*numIter*/, size_t /*numThreads*/,
            << ", " << new_values_.size() << " new values "
            << ", and " << delete_slots.size() << " deleted factors.";
   Smoother::Result result;
-  LOG(INFO) << "Starting first update.";
   bool is_smoother_ok = updateSmoother(&result, new_factors_tmp, new_values_,
                                        timestamps, delete_slots);
-  LOG(INFO) << "Finished first update.";
 
   if (is_smoother_ok) {
     // Reset everything for next round.
@@ -1133,21 +1132,31 @@ void SlidingWindowSmoother::optimize(size_t /*numIter*/, size_t /*numThreads*/,
   isam2UpdateTimer.stop();
 
   computeCovarianceTimer.start();
-  Eigen::MatrixXd cov;
-  computeCovariance(&cov);
+  computeCovariance(&covariance_);
   computeCovarianceTimer.stop();
 }
 
 bool SlidingWindowSmoother::computeCovariance(Eigen::MatrixXd* cov) const {
-  *cov = Eigen::Matrix<double, 15, 15>::Identity();
   uint64_t T_WS_id = statesMap_.rbegin()->second.id;
+  *cov = Eigen::Matrix<double, 15, 15>::Identity();
+  Eigen::Matrix<double, 6, 6> swapBaBg = Eigen::Matrix<double, 6, 6>::Zero();
+  swapBaBg.topRightCorner<3, 3>().setIdentity();
+  swapBaBg.bottomLeftCorner<3, 3>().setIdentity();
+
+  okvis::kinematics::Transformation T_WB;
+  get_T_WS(statesMap_.rbegin()->first, T_WB);
+  // okvis pW = \hat pW + \delta pW, R_WB = \hat R_WB exp(\delta \theta_W);
+  // gtsam pW = \hat pW + R_WB \delta pB, R_WB = exp(\delta \theta B) \hat R_WB.
+  Eigen::Matrix<double, 6, 6> swapRT = Eigen::Matrix<double, 6, 6>::Zero();
+  swapRT.topRightCorner<3, 3>() = T_WB.C();
+  swapRT.bottomLeftCorner<3, 3>() = T_WB.C();
 
   cov->topLeftCorner<6, 6>() =
-      smoother_->marginalCovariance(gtsam::Symbol('x', T_WS_id));
+      swapRT * smoother_->marginalCovariance(gtsam::Symbol('x', T_WS_id)) * swapRT.transpose();
   cov->block<3, 3>(6, 6) =
       smoother_->marginalCovariance(gtsam::Symbol('v', T_WS_id));
   cov->block<6, 6>(9, 9) =
-      smoother_->marginalCovariance(gtsam::Symbol('b', T_WS_id));
+      swapBaBg * smoother_->marginalCovariance(gtsam::Symbol('b', T_WS_id)) * swapBaBg.transpose();
   return true;
 }
 
@@ -1443,6 +1452,16 @@ void SlidingWindowSmoother::findSlotsOfFactorsWithKey(
     }
     slot++;
   }
+}
+
+bool SlidingWindowSmoother::print(std::ostream& stream) const {
+  Estimator::print(stream);
+  Eigen::IOFormat spaceInitFmt(Eigen::StreamPrecision, Eigen::DontAlignCols,
+                               " ", " ", "", "", "", "");
+
+  Eigen::Matrix<double, Eigen::Dynamic, 1> variances = covariance_.diagonal();
+  stream << " " << variances.cwiseSqrt().transpose().format(spaceInitFmt);
+  return true;
 }
 
 }  // namespace okvis

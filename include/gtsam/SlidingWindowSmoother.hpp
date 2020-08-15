@@ -120,6 +120,8 @@ class SlidingWindowSmoother : public Estimator {
    */
   virtual bool computeCovariance(Eigen::MatrixXd* cov) const;
 
+  bool print(std::ostream& stream) const override;
+
  private:
   uint64_t getMinValidStateId() const;
 
@@ -218,6 +220,8 @@ class SlidingWindowSmoother : public Estimator {
   // State.
   //!< current state of the system.
   gtsam::Values state_;
+
+  Eigen::MatrixXd covariance_;
 
   // ISAM2 smoother
   std::shared_ptr<Smoother> smoother_;
