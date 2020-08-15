@@ -115,7 +115,7 @@ class BackendParams : public PipelineParams {
   double relinearizeThreshold_ = 1.0e-2;
   double relinearizeSkip_ = 1.0;
   double horizon_ = 6.0;
-  int numOptimize_ = 2;
+  int numOptimize_ = 1;
   double wildfire_threshold_ = 0.001;
   bool useDogLeg_ = false;
 

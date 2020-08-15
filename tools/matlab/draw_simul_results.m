@@ -84,7 +84,7 @@ end
 
 function algo_name = find_algo_name(name_est)
 algo_name = '';
-algo = {'OKVIS', 'MSCKFEpi', 'MSCKF', 'TFVIO', 'General'};
+algo = {'OKVIS', 'MSCKFEpi', 'MSCKF', 'TFVIO', 'General', 'SlidingWindowSmoother'};
 for i = 1 : size(algo, 2)
   if contains(name_est, algo{i})
       algo_name = algo{i};

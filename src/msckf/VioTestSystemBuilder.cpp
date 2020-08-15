@@ -25,7 +25,8 @@ void VioTestSystemBuilder::createVioSystem(
     double td, double tr,
     std::string imuLogFile,
     std::string pointFile) {
-  const double DURATION = 300.0;  // length of motion in seconds
+  const double kDuration = 300.0;  // length of motion in seconds
+
   double pCB_std = 2e-2;
   double bg_std = 5e-3;
   double ba_std = 2e-2;
@@ -46,8 +47,8 @@ void VioTestSystemBuilder::createVioSystem(
                           zeroImuIntrinsicParamNoise);
   imuModelType_ = imuParameters.model_type;
 
-  const okvis::Time tStart(20);
-  const okvis::Time tEnd(20 + DURATION);
+  const okvis::Time tStart(kDuration + 100);
+  const okvis::Time tEnd = tStart + okvis::Duration(kDuration);
 
   switch (trajectoryType) {
     case SimulatedTrajectoryType::Sinusoid:

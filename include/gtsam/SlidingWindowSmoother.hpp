@@ -18,6 +18,8 @@
 #include <gtsam_unstable/nonlinear/IncrementalFixedLagSmoother.h>
 #include <gtsam_unstable/slam/SmartStereoProjectionPoseFactor.h>
 
+#include <gtsam/geometry/Cal3DS2.h>
+
 #include "gtsam/VioBackEndParams.h"
 #include "gtsam/ImuFrontEnd.h"
 
@@ -25,6 +27,7 @@
 namespace okvis {
 #ifdef INCREMENTAL_SMOOTHER
 typedef gtsam::IncrementalFixedLagSmoother Smoother;
+// typedef gtsam::ISAM2 Smoother;
 #else
 typedef gtsam::BatchFixedLagSmoother Smoother;
 #endif
@@ -79,18 +82,16 @@ class SlidingWindowSmoother : public Estimator {
 
   void addCameraExtrinsicFactor();
 
+  void addCameraSystem(const okvis::cameras::NCameraSystem& cameras) override;
   /**
-   * @brief add a state to the state map
+   * @brief add  nav states, biases to the factor graph and record their ids
+   * in statesMap_.
    * @param multiFrame Matched multiFrame.
    * @param imuMeasurements IMU measurements from last state to new one.
    * imuMeasurements covers at least the current state and the last state in
    * time, with an extension on both sides.
    * @param asKeyframe Is this new frame a keyframe?
    * @return True if successful.
-   * If it is the first state, initialize it and the covariance matrix. In
-   * initialization, please make sure the world frame has z axis in negative
-   * gravity direction which is assumed in the IMU propagation Only one IMU
-   * is supported for now
    */
   virtual bool addStates(okvis::MultiFramePtr multiFrame,
                          const okvis::ImuMeasurementDeque& imuMeasurements,
@@ -122,9 +123,79 @@ class SlidingWindowSmoother : public Estimator {
  private:
   uint64_t getMinValidStateId() const;
 
-  void addLandmarkToGraph(uint64_t landmarkId);
+  /**
+   * @brief addLandmarkToGraph add a new landmark to the graph.
+   * @param landmarkId
+   */
+  void addLandmarkToGraph(uint64_t landmarkId, const Eigen::Vector3d& pW);
 
+  /**
+   * @brief updateLandmarkInGraph add observations for an existing landmark.
+   * @param landmarkId
+   */
   void updateLandmarkInGraph(uint64_t landmarkId);
+
+  void updateStates();
+
+  /**
+   * @brief updateSmoother
+   * @param result
+   * @param new_factors_tmp
+   * @param new_values
+   * @param timestamps
+   * @param delete_slots
+   * @return False if the update failed, true otw.
+   */
+  bool updateSmoother(
+      gtsam::FixedLagSmoother::Result* result,
+      const gtsam::NonlinearFactorGraph& new_factors_tmp =
+          gtsam::NonlinearFactorGraph(),
+      const gtsam::Values& new_values = gtsam::Values(),
+      const std::map<gtsam::Key, double>& timestamps =
+          gtsam::FixedLagSmoother::KeyTimestampMap(),
+      const gtsam::FactorIndices& delete_slots = gtsam::FactorIndices());
+
+  void printSmootherInfo(const gtsam::NonlinearFactorGraph& new_factors_tmp,
+                         const gtsam::FactorIndices& delete_slots,
+                         const std::string& message = "CATCHING EXCEPTION",
+                         const bool& showDetails = false) const;
+
+  void cleanCheiralityLmk(
+      const gtsam::Symbol& lmk_symbol,
+      gtsam::NonlinearFactorGraph* new_factors_tmp_cheirality,
+      gtsam::Values* new_values_cheirality,
+      std::map<gtsam::Key, double>* timestamps_cheirality,
+      gtsam::FactorIndices* delete_slots_cheirality,
+      const gtsam::NonlinearFactorGraph& graph,
+      const gtsam::NonlinearFactorGraph& new_factors_tmp,
+      const gtsam::Values& new_values,
+      const std::map<gtsam::Key, double>& timestamps,
+      const gtsam::FactorIndices& delete_slots);
+
+  void deleteAllFactorsWithKeyFromFactorGraph(
+      const gtsam::Key& key,
+      const gtsam::NonlinearFactorGraph& new_factors_tmp,
+      gtsam::NonlinearFactorGraph* factor_graph_output);
+
+  // Returns if the key in timestamps could be removed or not.
+  bool deleteKeyFromTimestamps(const gtsam::Key& key,
+                               const std::map<gtsam::Key, double>& timestamps,
+                               std::map<gtsam::Key, double>* timestamps_output);
+
+  // Returns if the key in timestamps could be removed or not.
+  bool deleteKeyFromValues(const gtsam::Key& key,
+                           const gtsam::Values& values,
+                           gtsam::Values* values_output);
+
+  // Find all slots of factors that have the given key in the list of keys.
+  void findSlotsOfFactorsWithKey(
+      const gtsam::Key& key,
+      const gtsam::NonlinearFactorGraph& graph,
+      std::vector<size_t>* slots_of_factors_with_key);
+
+  bool deleteLmkFromFeatureTracks(const uint64_t& /*lmk_id*/);
+
+  gtsam::TriangulationResult triangulateSafe(uint64_t lmkId) const;
 
  protected:
   okvis::BackendParams backendParams_;
@@ -151,6 +222,9 @@ class SlidingWindowSmoother : public Estimator {
   // ISAM2 smoother
   std::shared_ptr<Smoother> smoother_;
 
+  boost::shared_ptr<gtsam::Cal3DS2> cal0_;
+  gtsam::Pose3 body_P_cam0_;
+
   // Values
   //!< new states to be added
   gtsam::Values new_values_;
@@ -158,6 +232,9 @@ class SlidingWindowSmoother : public Estimator {
   // Factors.
   //!< New factors to be added
   gtsam::NonlinearFactorGraph new_imu_prior_and_other_factors_;
+
+  gtsam::NonlinearFactorGraph new_reprojection_factors_;
+
   //!< landmarkId -> {SmartFactorPtr}
 //  LandmarkIdSmartFactorMap new_smart_factors_;
   //!< landmarkId -> {SmartFactorPtr, SlotIndex}
@@ -170,6 +247,9 @@ class SlidingWindowSmoother : public Estimator {
   okvis::timing::Timer computeCovarianceTimer;
   okvis::timing::Timer marginalizeTimer;
   okvis::timing::Timer updateLandmarksTimer;
+
+  //! Number of Cheirality exceptions
+  size_t counter_of_exceptions_ = 0;
 
   std::vector<size_t>
       mTrackLengthAccumulator;  // histogram of the track lengths, start from
