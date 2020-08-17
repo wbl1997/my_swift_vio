@@ -104,6 +104,8 @@ class BackendParams : public PipelineParams {
   //! max acceptable reprojection error // before tuning: 3
   double outlierRejection_ = 8.0;
   double retriangulationThreshold_ = 1.0e-3;
+  //! below how many sigmas do we consider rays have low disparity?
+  double raySigmaScalar_ = 6.0;
 
   bool addBetweenStereoFactors_ = true;
 

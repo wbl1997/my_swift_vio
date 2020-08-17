@@ -2,36 +2,31 @@
 
 #include <glog/logging.h>
 
-#include <okvis/ceres/ImuError.hpp>
-#include <okvis/IdProvider.hpp>
+#include <gtsam/nonlinear/LinearContainerFactor.h>
+#include <gtsam/slam/ProjectionFactor.h>
 
 #include <loop_closure/GtsamWrap.hpp>
 
-#include <gtsam/base/ThreadsafeException.h>
+#include <okvis/ceres/ImuError.hpp>
+#include <okvis/IdProvider.hpp>
 
-#include <gtsam/geometry/Pose3.h>
-#include <gtsam/geometry/StereoCamera.h>
-#include <gtsam/geometry/Cal3DS2.h>
+// Warning: Running iSAM2 for inertial odometry with priors on pose, velocity
+// and biases, throws indeterminant linear system exception after ~70 secs with
+// about 200 m drift.
 
-#include <gtsam/inference/Factor.h>
+// Kimera-VIO simply removes old smart factors out of the time horizon, see
+// https://github.com/MIT-SPARK/Kimera-VIO/blob/master/src/backend/VioBackEnd.cpp#L926-L929.
 
-#include <gtsam/navigation/NavState.h>
-#include <gtsam/nonlinear/LinearContainerFactor.h>
-#include <gtsam/nonlinear/Values.h>
-
-#include <gtsam/slam/ProjectionFactor.h>
-
-#include <gtsam/ImuFrontEnd.h>
-
-#include "loop_closure/GtsamWrap.hpp"
-
-// TODO(jhuai): Theoretically, running iSAM2 for inertial odometry with priors on pose, velocity and biases should work.
-// But after 70 secs, gtsam throws indeterminant linear system exception with about 200 m drift.
+// Following Kimera-VIO, we use world Euclidean coordinates instead of anchored
+// inverse depth coordinates. In Kimera-VIO, the landmarks are expressed in
+// world Euclidean coordinates because smart factors depends on camera poses
+// that are expressed in the world frame.
 
 DEFINE_bool(process_cheirality,
             false,
             "Handle cheirality exception by removing problematic landmarks and "
             "re-running optimization.");
+
 DEFINE_int32(max_number_of_cheirality_exceptions,
              5,
              "Sets the maximum number of times we process a cheirality "
@@ -98,7 +93,6 @@ SlidingWindowSmoother::SlidingWindowSmoother(
   setupSmoother(vioParams);
 }
 
-// The default constructor.
 SlidingWindowSmoother::SlidingWindowSmoother(const okvis::BackendParams& vioParams)
     : Estimator(),
       addLandmarkFactorsTimer("3.1 addLandmarkFactors", true),
@@ -182,6 +176,7 @@ void SlidingWindowSmoother::addImuValues() {
   Eigen::Vector3d ba = vel_bias.tail<3>();
   gtsam::imuBias::ConstantBias imuBias(ba, bg);
   new_values_.insert(gtsam::Symbol('b', cur_id), imuBias);
+  navStateToLandmarks_.insert({cur_id, std::vector<uint64_t>()});
 }
 
 void SlidingWindowSmoother::addImuFactor() {
@@ -308,7 +303,10 @@ void SlidingWindowSmoother::addCameraSystem(const okvis::cameras::NCameraSystem&
   Estimator::addCameraSystem(cameras);
   Eigen::VectorXd intrinsics;
   camera_rig_.getCameraGeometry(0u)->getIntrinsics(intrinsics);
-  OKVIS_ASSERT_EQ(Exception, intrinsics.size(), 8, "Sliding window smoother currently only work radial tangential distortion!");
+  std::string distortionName = camera_rig_.getCameraGeometry(0u)->distortionType();
+  OKVIS_ASSERT_EQ(Exception, distortionName, "RadialTangentialDistortion",
+                  "Sliding window smoother currently only work radial "
+                  "tangential distortion!");
   cal0_.reset(new gtsam::Cal3DS2(intrinsics[0], intrinsics[1], 0, intrinsics[2], intrinsics[3],
       intrinsics[4], intrinsics[5], intrinsics[6], intrinsics[7]));
   body_P_cam0_ = VIO::GtsamWrap::toPose3(camera_rig_.getCameraExtrinsic(0u));
@@ -322,7 +320,7 @@ bool SlidingWindowSmoother::addStates(
   inertialMeasForStates_.push_back(imuMeasurements);
   okvis::kinematics::Transformation T_WS;
   Eigen::Matrix<double, 9, 1> speedAndBias;
-  okvis:Time newStateTime = multiFrame->timestamp();
+  Time newStateTime = multiFrame->timestamp();
   if (statesMap_.empty()) {
     // in case this is the first frame ever, let's initialize the pose:
     if (pvstd_.initWithExternalSource)
@@ -475,7 +473,7 @@ bool SlidingWindowSmoother::addStates(
 uint64_t SlidingWindowSmoother::getMinValidStateId() const {
   std::map<uint64_t, States>::const_reverse_iterator rit = statesMap_.rbegin();
   while (rit != statesMap_.rend()) {
-    if (state_.find(rit->first) == state_.end()) {
+    if (state_.find(gtsam::Symbol('x', rit->first)) == state_.end()) {
       break;
     }
     ++rit;
@@ -506,13 +504,22 @@ bool SlidingWindowSmoother::applyMarginalizationStrategy(
     ++it;
   }
 
-  // remove feature tracks that do not overlap the sliding window.
-  // Kimera-VIO simply removes old smart factors out of the time horizon, see
-  // https://github.com/MIT-SPARK/Kimera-VIO/blob/master/src/backend/VioBackEnd.cpp#L926-L929.
-  // Does Kimera-VIO use anchored inverse depth coordinates or world Euclidean coordinates?
-  // World Euclidean coordinates because smart factors depends on camera poses which
-  // are expressed in the world frame.
+  // The smoother has also marginalized the landmarks added to the graph along with
+  // these nav state variables. So we reset the status of such a landmark's
+  // observations to avoid adding further reprojection factors for the landmark.
+  for (auto frameId : removeFrames) {
+    auto itemPtr = navStateToLandmarks_.find(frameId);
+    if (itemPtr == navStateToLandmarks_.end()) continue;
+    for (auto lmkId : itemPtr->second) {
+      // This landmark is still in landmarksMap_ because its feature track still
+      // overlaps the sliding window.
+      landmarksMap_.at(lmkId).residualizeCase =
+          NotInState_NotTrackedNow;  // set to not in state.
+    }
+    navStateToLandmarks_.erase(itemPtr);
+  }
 
+  // remove feature tracks that do not overlap the sliding window.
   for (PointMap::iterator pit = landmarksMap_.begin();
        pit != landmarksMap_.end();) {
     const MapPoint& mapPoint = pit->second;
@@ -520,22 +527,11 @@ bool SlidingWindowSmoother::applyMarginalizationStrategy(
     uint64_t lastFrameId = mapPoint.observations.rbegin()->first.frameId;
     if (lastFrameId < minValidStateId) {
       ++mTrackLengthAccumulator[mapPoint.observations.size()];
-// It is not necessary to remove residual blocks or uncheck keypoints in
-// multiframes because these residual blocks and multiframes have been or
-// will soon be removed as the associated nav state slides out of the optimization window.
+      // It is not necessary to remove residual blocks or uncheck keypoints in
+      // multiframes because these residual blocks and multiframes have been or
+      // will soon be removed as the associated nav state slides out of the
+      // optimization window. see the removeState line.
 
-//      for (std::map<okvis::KeypointIdentifier, uint64_t>::const_iterator it =
-//               mapPoint.observations.begin();
-//           it != mapPoint.observations.end(); ++it) {
-//        if (it->second) {
-//          mapPtr_->removeResidualBlock(
-//              reinterpret_cast<::ceres::ResidualBlockId>(it->second));
-//        }
-//        const KeypointIdentifier& kpi = it->first;
-//        auto mfp = multiFramePtrMap_.find(kpi.frameId);
-//        OKVIS_ASSERT_TRUE(Exception, mfp != multiFramePtrMap_.end(), "frame id not found in frame map!");
-//        mfp->second->setLandmarkId(kpi.cameraIndex, kpi.keypointIndex, 0);
-//      }
       mapPtr_->removeParameterBlock(pit->first);
       removedLandmarks.push_back(pit->second);
       pit = landmarksMap_.erase(pit);
@@ -577,7 +573,6 @@ bool SlidingWindowSmoother::applyMarginalizationStrategy(
       ++nextIter;
     }
   }
-
   return true;
 }
 
@@ -635,12 +630,14 @@ void SlidingWindowSmoother::addLandmarkToGraph(uint64_t lmkId, const Eigen::Vect
 
   new_values_.insert(gtsam::symbol('l', lmkId), gtsam::Point3(externalPointW));
 
+  navStateToLandmarks_.at(statesMap_.rbegin()->first).push_back(lmkId);
+
   uint64_t minValidStateId = statesMap_.begin()->first;
   const okvis::MapPoint& mp = landmarksMap_.at(lmkId);
   for (auto obsIter = mp.observations.begin(); obsIter != mp.observations.end();
        ++obsIter) {
     if (obsIter->first.frameId < minValidStateId) {
-      // caution: some observations may be outside the horizon.
+      // Some observations may be outside the horizon.
       continue;
     }
 
@@ -704,7 +701,6 @@ void SlidingWindowSmoother::updateLandmarkInGraph(uint64_t lmkId) {
 //  }
 //  old_smart_factors_it->second.first = new_factor;
 //  VLOG(10) << "updateLandmarkInGraph: added observation to point: " << lmk_id;
-
 
   const okvis::MapPoint& mp = landmarksMap_.at(lmkId);
   auto obsIter = mp.observations.rbegin();
@@ -791,7 +787,7 @@ void SlidingWindowSmoother::updateStates() {
     sbParamBlockPtr->setEstimate(sb);
   }
 
-  // update camera extrinsic parameters from isam2 estimates.
+  // TODO(jhuai): update camera extrinsic parameters from isam2 estimates.
 
   // update landmark positions from isam2 estimates.
   {
@@ -973,7 +969,7 @@ bool SlidingWindowSmoother::updateSmoother(gtsam::FixedLagSmoother::Result* resu
   return true;
 }
 
-gtsam::TriangulationResult SlidingWindowSmoother::triangulateSafe(uint64_t lmkId) const {
+bool SlidingWindowSmoother::triangulateSafe(uint64_t lmkId, Eigen::Matrix<double, 3, 1>* pW) const {
   const MapPoint& mp = landmarksMap_.at(lmkId);
   uint64_t minValidStateId = statesMap_.begin()->first;
 
@@ -1015,7 +1011,111 @@ gtsam::TriangulationResult SlidingWindowSmoother::triangulateSafe(uint64_t lmkId
     measurements.push_back(gtsam::Point2(backProjectionDirection.head<2>()));
   }
 
-  return gtsam::triangulateSafe(cameras, measurements, params);
+  gtsam::TriangulationResult result = gtsam::triangulateSafe(cameras, measurements, params);
+  if (result.valid()) {
+    *pW = Eigen::Vector3d(*result);
+    return true;
+  } else {
+    return false;
+  }
+}
+
+size_t SlidingWindowSmoother::gatherMapPointObservations(
+    const MapPoint& mp, AlignedVector<Eigen::Vector3d>* obsDirections,
+    AlignedVector<okvis::kinematics::Transformation>* T_CWs,
+    std::vector<double>* imageNoiseStd) const {
+  T_CWs->clear();
+  obsDirections->clear();
+  imageNoiseStd->clear();
+
+  const std::map<okvis::KeypointIdentifier, uint64_t>& observations =
+      mp.observations;
+  size_t numPotentialObs = mp.observations.size();
+  T_CWs->reserve(numPotentialObs);
+  obsDirections->reserve(numPotentialObs);
+  imageNoiseStd->reserve(numPotentialObs);
+
+  uint64_t minValidStateId = statesMap_.begin()->first;
+  for (auto itObs = observations.begin(), iteObs = observations.end();
+       itObs != iteObs; ++itObs) {
+    uint64_t poseId = itObs->first.frameId;
+
+    if (poseId < minValidStateId) {
+      continue;
+    }
+    Eigen::Vector2d measurement;
+    auto multiFrameIter = multiFramePtrMap_.find(poseId);
+    //    OKVIS_ASSERT_TRUE(Exception, multiFrameIter !=
+    //    multiFramePtrMap_.end(), "multiframe not found");
+    okvis::MultiFramePtr multiFramePtr = multiFrameIter->second;
+    multiFramePtr->getKeypoint(itObs->first.cameraIndex,
+                               itObs->first.keypointIndex, measurement);
+
+    // use the latest estimates for camera intrinsic parameters
+    Eigen::Vector3d backProjectionDirection;
+    std::shared_ptr<const cameras::CameraBase> cameraGeometry =
+        camera_rig_.getCameraGeometry(itObs->first.cameraIndex);
+    bool validDirection =
+        cameraGeometry->backProject(measurement, &backProjectionDirection);
+    if (!validDirection) {
+      continue;
+    }
+    obsDirections->push_back(backProjectionDirection);
+
+    okvis::kinematics::Transformation T_WB;
+    get_T_WS(poseId, T_WB);
+    okvis::kinematics::Transformation T_BC =
+        camera_rig_.getCameraExtrinsic(itObs->first.cameraIndex);
+    T_CWs->emplace_back((T_WB * T_BC).inverse());
+
+    double kpSize = 1.0;
+    multiFramePtr->getKeypointSize(itObs->first.cameraIndex,
+                                   itObs->first.keypointIndex, kpSize);
+    imageNoiseStd->push_back(kpSize / 8);
+    imageNoiseStd->push_back(kpSize / 8);
+  }
+  return obsDirections->size();
+}
+
+bool SlidingWindowSmoother::hasLowDisparity(
+    const AlignedVector<Eigen::Vector3d>& obsDirections,
+    const AlignedVector<okvis::kinematics::Transformation>& T_CWs,
+    const std::vector<double>& imageNoiseStd) const {
+  Eigen::VectorXd intrinsics;
+  camera_rig_.getCameraGeometry(0)->getIntrinsics(intrinsics);
+  double focalLength = intrinsics[0];
+  double keypointAStdDev = (imageNoiseStd.front() + imageNoiseStd.back()) * 0.5;
+  const double fourthRoot2 = 1.1892071150;
+  double raySigma = fourthRoot2 * keypointAStdDev / focalLength;
+
+  double raySigmaScalar = backendParams_.raySigmaScalar_;
+
+  Eigen::Vector3d rayA_inA = obsDirections.front().normalized();
+  Eigen::Vector3d rayB_inB = obsDirections.back().normalized();
+  Eigen::Vector3d rayB_inA =
+      T_CWs.front().C() * T_CWs.back().C().transpose() * rayB_inB;
+  if ((rayA_inA.cross(rayB_inB)).norm() < raySigmaScalar * raySigma ||
+      (rayA_inA.cross(rayB_inA)).norm() < raySigmaScalar * raySigma) {
+    return true;
+  } else {
+    return false;
+  }
+}
+
+bool SlidingWindowSmoother::triangulateWithDisparityCheck(uint64_t lmkId, Eigen::Matrix<double, 3, 1>* pW) const {
+  const MapPoint& mp = landmarksMap_.at(lmkId);
+  AlignedVector<Eigen::Vector3d> obsDirections;
+  AlignedVector<okvis::kinematics::Transformation> T_CWs;
+  std::vector<double> imageNoiseStd;
+  size_t numObs = gatherMapPointObservations(mp, &obsDirections, &T_CWs, &imageNoiseStd);
+  if (numObs < minTrackLength_) {
+    return false;
+  }
+  if (hasLowDisparity(obsDirections, T_CWs, imageNoiseStd))
+    return false;
+  Eigen::Matrix<double, 4, 1> hpW = triangulateHomogeneousDLT(obsDirections, T_CWs);
+  *pW = hpW.head<3>() / hpW[3];
+  return true;
 }
 
 void SlidingWindowSmoother::optimize(size_t /*numIter*/, size_t /*numThreads*/,
@@ -1041,8 +1141,6 @@ void SlidingWindowSmoother::optimize(size_t /*numIter*/, size_t /*numThreads*/,
   for (okvis::PointMap::iterator it = landmarksMap_.begin();
        it != landmarksMap_.end(); ++it) {
     bool observedInCurrentFrame = false;
-    if (it->second.observations.size() < minTrackLength_)
-      continue;
     for (auto itObs = it->second.observations.rbegin(),
               iteObs = it->second.observations.rend();
          itObs != iteObs; ++itObs) {
@@ -1056,14 +1154,11 @@ void SlidingWindowSmoother::optimize(size_t /*numIter*/, size_t /*numThreads*/,
     if (landmarkStatus == NotInState_NotTrackedNow) {
       // The landmark has not been added to the graph.
       if (observedInCurrentFrame) {
-        // TODO(jhuai): we need to tune the triangulation parameters.
-        // Currently very few landmarks are triangulated successfully.
-        gtsam::TriangulationResult result = triangulateSafe(it->first);
-        if (result.valid()) {
-          Eigen::Vector3d pW(*result);
-//        double quality = landmarkQuality(mapPtr_, it->first);
-//        if (quality > 1e-3) {
-//          Eigen::Vector3d pW = it->second.pointHomog.head<3>() / it->second.pointHomog[3];
+        Eigen::Vector3d pW;
+        // The below methods differ little.
+//        bool triangulateOk = triangulateSafe(it->first, &pW);
+        bool triangulateOk = triangulateWithDisparityCheck(it->first, &pW);
+        if (triangulateOk) {
           addLandmarkToGraph(it->first, pW);
           it->second.residualizeCase = InState_TrackedNow;
         }  // else do nothing
@@ -1259,12 +1354,12 @@ void SlidingWindowSmoother::printSmootherInfo(
 //  // Print only new values.
   LOG(INFO) << "Nr values in new_values_ : " << new_values_.size()
             << ", with keys:";
-  std::cout << "[\n\t";
+  std::stringstream ss("[\t");
   for (const gtsam::Values::ConstKeyValuePair& key_value : new_values_) {
-    std::cout << " " << gtsam::DefaultKeyFormatter(key_value.key) << " ";
+    ss << " " << gtsam::DefaultKeyFormatter(key_value.key) << " ";
   }
-  std::cout << std::endl;
-  LOG(INFO) << " ]";
+  ss << "]";
+  LOG(INFO) << ss.str();
 
 //  if (showDetails) {
 //    graph->print("isam2 graph:\n");
