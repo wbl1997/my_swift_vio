@@ -7,6 +7,7 @@
 
 #include <okvis/Estimator.hpp>
 #include <okvis/timing/Timer.hpp>
+#include <msckf/memory.h>
 
 #ifdef HAVE_GTSAM
 #define INCREMENTAL_SMOOTHER
@@ -269,4 +270,18 @@ namespace okvis {
 }  // namespace okvis
 
 #endif // # ifdef HAVE_GTSAM
+
+namespace okvis {
+
+/**
+ * @brief triangulateDLT
+ * @param obsDirections each undistorted observation is at imaging plane z=1, [x, y, 1].
+ * @warning normalized coordinates does not work.
+ * @param T_CWs T_CW takes a point expressed in W to a point in C.
+ * @return
+ */
+Eigen::Vector4d triangulateHomogeneousDLT(
+    const AlignedVector<Eigen::Vector3d>& obsDirections,
+    const AlignedVector<okvis::kinematics::Transformation>& T_CWs);
+}
 #endif /* INCLUDE_OKVIS_SLIDING_WINDOW_SMOOTHER_HPP_ */

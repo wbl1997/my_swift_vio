@@ -354,6 +354,7 @@ list(APPEND TEST_SRC_FILES
 
 if(GTSAM_FOUND)
 list(APPEND TEST_SRC_FILES
+    test/gtsam/TestTriangulate.cpp
     test/gtsam/TestGtsamImuFactor.cpp
     test/gtsam/TestImuFrontEnd.cpp
     test/gtsam/TestIncrementalFixedLagSmoother.cpp

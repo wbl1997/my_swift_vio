@@ -1464,5 +1464,29 @@ bool SlidingWindowSmoother::print(std::ostream& stream) const {
   return true;
 }
 
+Eigen::Vector4d triangulateHomogeneousDLT(
+    const AlignedVector<Eigen::Vector3d>& obsDirections,
+    const AlignedVector<okvis::kinematics::Transformation>& T_CWs) {
+  size_t K = obsDirections.size();
+  Eigen::MatrixXd A(2 * K, 4);
+  for (size_t k = 0; k < K; ++k) {
+    A.row(2 * k).head<3>() =
+        obsDirections[k][0] * T_CWs[k].C().row(2) - T_CWs[k].C().row(0);
+    A(2 * k, 3) = obsDirections[k][0] * T_CWs[k].r()[2] - T_CWs[k].r()[0];
+    A.row(2 * k + 1).head<3>() =
+        obsDirections[k][1] * T_CWs[k].C().row(2) - T_CWs[k].C().row(1);
+    A(2 * k + 1, 3) = obsDirections[k][1] * T_CWs[k].r()[2] - T_CWs[k].r()[1];
+  }
+  Eigen::JacobiSVD<Eigen::MatrixXd> svdM(A, Eigen::ComputeThinV);
+  Eigen::Matrix<double, 4, 1> singularValues = svdM.singularValues();
+  if (singularValues[2] < 1e-4) {
+    LOG(WARNING)
+        << "DLT result is invalid as the third singular value is too small.";
+    return svdM.matrixV().col(2);
+  } else {
+    return svdM.matrixV().col(3);
+  }
+}
+
 }  // namespace okvis
 
