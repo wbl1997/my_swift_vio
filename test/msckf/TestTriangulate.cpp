@@ -32,6 +32,8 @@ struct Powell {
   }
 };
 
+// this test verifies that CostFunction operator() should only take variables
+// and residuals as arguments, excluding fixed parameters and observations.
 TEST(CeresOptimize, Powell) {
   double x[4] = {3.0, -1.0, 0.0, 1.0};
 
@@ -58,6 +60,11 @@ TEST(CeresOptimize, Powell) {
   ASSERT_NEAR(x[3], 0, 3e-4);
 }
 
+// to refine triangulated results, use LM or Dogleg solver or GN as provided by
+// Ceres solver this test verified that (1) the result using autodiff and
+// analytical diff is identical for both LM and Dogleg; (2) Gauss-Newton method
+// is very competitive for structure only point optimization compared to LM and
+// Dogleg, given good initial estimate such as obtained by two view mid point.
 TEST(Triangulate, AllMethods) {
   const int num_methods = 8;
   int trials = 1e3;
@@ -82,7 +89,7 @@ TEST(Triangulate, AllMethods) {
     std::vector<Eigen::Vector3d,
            Eigen::aligned_allocator<Eigen::Matrix<double, 3, 1>>>
         res(num_methods);
-    Eigen::Vector4d v4Xhomog = Get_X_from_xP_lin(obs, vse3CFromW);
+    Eigen::Vector4d v4Xhomog = triangulateHomogeneousDLT(obs, vse3CFromW);
     if (fabs(v4Xhomog[3]) < 1e-9)
       res[0] = Eigen::Vector3d(0, 0, -1000);
     else

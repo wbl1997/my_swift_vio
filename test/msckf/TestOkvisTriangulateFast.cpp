@@ -25,7 +25,7 @@ TEST(TriangulateFast, Flip) {
 
     Eigen::Matrix<double, Eigen::Dynamic, 1> sv;
     Eigen::Vector4d v4Xhomog2 =
-        Get_X_from_xP_lin(s2v.obsDirections(), s2v.se3_T_CWs(), &sv);
+        triangulateHomogeneousDLT(s2v.obsDirections(), s2v.se3_T_CWs(), &sv);
 
     v4Xhomog2.normalize();
     EXPECT_LT((v4Xhomog - v4Xhomog2).head<3>().norm(), 0.06);
@@ -46,7 +46,7 @@ TEST(TriangulateFast, Flip) {
 
     Eigen::Matrix<double, Eigen::Dynamic, 1> sv;
     Eigen::Vector4d v4Xhomog2 =
-        Get_X_from_xP_lin(s2v.obsDirections(), s2v.se3_T_CWs(), &sv);
+        triangulateHomogeneousDLT(s2v.obsDirections(), s2v.se3_T_CWs(), &sv);
     v4Xhomog2.normalize();
 
     EXPECT_LT((v4Xhomog - v4Xhomog2).head<3>().norm(), 0.03);
@@ -66,13 +66,13 @@ TEST(TriangulateFast, Flip) {
     EXPECT_FALSE(isParallel);
     Eigen::Matrix<double, Eigen::Dynamic, 1> sv;
     Eigen::Vector4d v4Xhomog2 =
-        Get_X_from_xP_lin(s2v.obsDirections(), s2v.se3_T_CWs(), &sv);
+        triangulateHomogeneousDLT(s2v.obsDirections(), s2v.se3_T_CWs(), &sv);
     v4Xhomog2.normalize();
     EXPECT_LT((v4Xhomog - v4Xhomog2).norm(), 0.1);
   }
 }
 
-// see how okvis::triangulation::triangulateFast and Get_X_from_xP_lin deal with
+// see how okvis::triangulation::triangulateFast and triangulateHomogeneousDLT deal with
 // A, an ordinary point, B, identical observations of an ordinary point, C, an
 // infinity point
 TEST(TriangulateFastVsDlt, RealPoint) {
@@ -120,13 +120,13 @@ TEST(TriangulateFastVsDlt, RealPoint) {
   std::vector<Sophus::SE3d, Eigen::aligned_allocator<Sophus::SE3d>> se3_CWs =
       snv.se3_T_CWs();
   Eigen::Matrix<double, Eigen::Dynamic, 1> sv;
-  Eigen::Vector4d v4Xhomog = Get_X_from_xP_lin(allObs, se3_CWs, &sv);
+  Eigen::Vector4d v4Xhomog = triangulateHomogeneousDLT(allObs, se3_CWs, &sv);
   EXPECT_LT((snv.truePoint().head<3>() - v4Xhomog.head<3>() / v4Xhomog[3]).norm(), 0.15);
 
   // triangulate with 3 observations (but two are the same) by SVD DLT
   allObs[2] = allObs[0];
   se3_CWs[2] = se3_CWs[0];
-  v4Xhomog = Get_X_from_xP_lin(allObs, se3_CWs, &sv);
+  v4Xhomog = triangulateHomogeneousDLT(allObs, se3_CWs, &sv);
   EXPECT_LT((snv.truePoint().head<3>() - v4Xhomog.head<3>() / v4Xhomog[3]).norm(), 0.15);
 
   // triangulate with 3 observations (but all are the same) by SVD DLT
@@ -134,7 +134,7 @@ TEST(TriangulateFastVsDlt, RealPoint) {
   for (size_t i = 0; i < numObs; ++i) {
     se3_CWs[i] = Sophus::SE3d();
   }
-  v4Xhomog = Get_X_from_xP_lin(allObs, se3_CWs, &sv);
+  v4Xhomog = triangulateHomogeneousDLT(allObs, se3_CWs, &sv);
   EXPECT_LT((v4Xhomog.head<3>() - snv.obsDirection(0).normalized()).norm(), 1e-5);
   // triangulate with 3 observations (but all are the same) by OKVIS DLT
   v4Xhomog2 = okvis::triangulation::triangulateFast(
@@ -164,7 +164,7 @@ TEST(TriangulateFastVsDlt, FarPoints) {
           simul::SimulationNView::raySigma(960), isValid, isParallel, flipped);
 
     Eigen::Matrix<double, Eigen::Dynamic, 1> sv;
-    Eigen::Vector4d v4Xhomog = Get_X_from_xP_lin(stv.obsDirections(), stv.se3_T_CWs(), &sv);
+    Eigen::Vector4d v4Xhomog = triangulateHomogeneousDLT(stv.obsDirections(), stv.se3_T_CWs(), &sv);
 
     EXPECT_LT((v4Xhomog2 - v4Xhomog).head<3>().norm(), 2e-4);
     EXPECT_TRUE(isValid);
@@ -191,7 +191,7 @@ void testRotationOnly(int caseId) {
       simul::SimulationNView::raySigma(960), isValid, isParallel, flipped);
 
   Eigen::Matrix<double, Eigen::Dynamic, 1> sv;
-  Eigen::Vector4d v4Xhomog = Get_X_from_xP_lin(stv.obsDirections(), stv.se3_T_CWs(), &sv);
+  Eigen::Vector4d v4Xhomog = triangulateHomogeneousDLT(stv.obsDirections(), stv.se3_T_CWs(), &sv);
   EXPECT_TRUE(isParallel && isValid);
   EXPECT_LT((v4Xhomog - v4Xhomog2).head<3>().norm(), 1e-6);
 }

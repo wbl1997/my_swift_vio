@@ -11,7 +11,7 @@ using ceres::Problem;
 using ceres::Solve;
 using ceres::Solver;
 
-Eigen::Vector4d Get_X_from_xP_lin(
+Eigen::Vector4d triangulateHomogeneousDLT(
     const std::vector<Eigen::Vector3d, Eigen::aligned_allocator<Eigen::Vector3d>>&
         vV3Xn,
     const std::vector<Sophus::SE3d, Eigen::aligned_allocator<Sophus::SE3d>>& vSE3,
@@ -42,7 +42,7 @@ Eigen::Vector4d Get_X_from_xP_lin(
   }
 }
 
-Eigen::Vector4d Get_X_from_xP_lin(
+Eigen::Vector4d triangulateHomogeneousDLT(
     const std::vector<Eigen::Vector3d, Eigen::aligned_allocator<Eigen::Vector3d>>&
         vV3Xn,
     const std::vector<Sophus::SE3d, Eigen::aligned_allocator<Sophus::SE3d>>& vSE3,
