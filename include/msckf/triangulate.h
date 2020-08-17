@@ -17,8 +17,10 @@
  */
 Eigen::Vector4d triangulateHomogeneousDLT(
     const std::vector<Eigen::Vector3d,
-                Eigen::aligned_allocator<Eigen::Matrix<double, 3, 1>>>& vV2Xn,
-    const std::vector<Sophus::SE3d, Eigen::aligned_allocator<Sophus::SE3d>>& vSE3,
+                      Eigen::aligned_allocator<Eigen::Matrix<double, 3, 1>>>&
+        vV2Xn,
+    const std::vector<Sophus::SE3d, Eigen::aligned_allocator<Sophus::SE3d>>&
+        vSE3,
     Eigen::Matrix<double, Eigen::Dynamic, 1>* pSingular =
         (Eigen::Matrix<double, Eigen::Dynamic, 1>*)(NULL));
 
@@ -26,7 +28,8 @@ Eigen::Vector4d triangulateHomogeneousDLT(
  * @brief direct linear triangulation method see Hartley and Zisserman 2003,
  * implemented with Eigen and Sophus
  * @param vV3Xn, each observation is in image plane z=1, (\bar{x}, \bar{y}, 1)
- * @param vSE3,  each of the frame_poses is T_C(i)W which takes points in W to C(i).
+ * @param vSE3,  each of the frame_poses is T_C(i)W which takes points in W to
+ * C(i).
  * @param isValid, checks if the A matrix is rank deficient(<3 in this case).
  * Rank deficiency can occur with identical observations of a point, or pure
  * rotation
@@ -34,9 +37,10 @@ Eigen::Vector4d triangulateHomogeneousDLT(
  * @return
  */
 Eigen::Vector4d triangulateHomogeneousDLT(
-    const std::vector<Eigen::Vector3d, Eigen::aligned_allocator<Eigen::Vector3d>>&
-        vV3Xn,
-    const std::vector<Sophus::SE3d, Eigen::aligned_allocator<Sophus::SE3d>>& vSE3,
+    const std::vector<Eigen::Vector3d,
+                      Eigen::aligned_allocator<Eigen::Vector3d>>& vV3Xn,
+    const std::vector<Sophus::SE3d, Eigen::aligned_allocator<Sophus::SE3d>>&
+        vSE3,
     bool& isValid, bool& isParallel);
 
 // two view triangulation using mid-point method as discussed in R Hartley,
@@ -45,7 +49,8 @@ Eigen::Vector4d triangulateHomogeneousDLT(
 /**
  * @brief triangulate2View_midpoint
  * @param vV2Xn
- * @param vSE3 each of the frame_poses is T_C(i)W which takes points in W to C(i).
+ * @param vSE3 each of the frame_poses is T_C(i)W which takes points in W to
+ * C(i).
  * @return
  */
 Eigen::Vector3d triangulate2View_midpoint(
@@ -72,6 +77,7 @@ void triangulate_refine_GN(
     const std::vector<Sophus::SE3d, Eigen::aligned_allocator<Sophus::SE3d>>&
         frame_poses,
     Eigen::Vector3d& old_point, int n_iter);
+
 // autodiff Jacobian
 void triangulate_refine(
     const std::vector<Eigen::Vector3d,
@@ -79,6 +85,7 @@ void triangulate_refine(
     const std::vector<Sophus::SE3d, Eigen::aligned_allocator<Sophus::SE3d>>&
         frame_poses,
     Eigen::Vector3d& old_point, int n_iter, int algorithm = 0);
+
 // analytic Jacobian
 void triangulate_refineJ(
     const std::vector<Eigen::Vector3d,
@@ -127,6 +134,7 @@ inline static void jacobian_xyz2uv(const Eigen::Vector3d& p_in_f,
   point_jac(1, 2) = -p_in_f[1] * z_inv_sq;
   point_jac = -point_jac * R_f_w;
 }
+
 template <class Derived>
 inline typename Derived::Scalar norm_max(const Eigen::MatrixBase<Derived>& v) {
   typename Derived::Scalar max = typename Derived::Scalar(-1);
@@ -138,6 +146,7 @@ inline typename Derived::Scalar norm_max(const Eigen::MatrixBase<Derived>& v) {
   }
   return max;
 }
+
 const double EPS = 1e-8;
 
 #endif

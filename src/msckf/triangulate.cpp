@@ -12,9 +12,10 @@ using ceres::Solve;
 using ceres::Solver;
 
 Eigen::Vector4d triangulateHomogeneousDLT(
-    const std::vector<Eigen::Vector3d, Eigen::aligned_allocator<Eigen::Vector3d>>&
-        vV3Xn,
-    const std::vector<Sophus::SE3d, Eigen::aligned_allocator<Sophus::SE3d>>& vSE3,
+    const std::vector<Eigen::Vector3d,
+                      Eigen::aligned_allocator<Eigen::Vector3d>>& vV3Xn,
+    const std::vector<Sophus::SE3d, Eigen::aligned_allocator<Sophus::SE3d>>&
+        vSE3,
     Eigen::Matrix<double, Eigen::Dynamic, 1>* pSingular) {
   assert(vV3Xn.size() == vSE3.size());
   int K = vV3Xn.size();
@@ -43,9 +44,10 @@ Eigen::Vector4d triangulateHomogeneousDLT(
 }
 
 Eigen::Vector4d triangulateHomogeneousDLT(
-    const std::vector<Eigen::Vector3d, Eigen::aligned_allocator<Eigen::Vector3d>>&
-        vV3Xn,
-    const std::vector<Sophus::SE3d, Eigen::aligned_allocator<Sophus::SE3d>>& vSE3,
+    const std::vector<Eigen::Vector3d,
+                      Eigen::aligned_allocator<Eigen::Vector3d>>& vV3Xn,
+    const std::vector<Sophus::SE3d, Eigen::aligned_allocator<Sophus::SE3d>>&
+        vSE3,
     bool& isValid, bool& isParallel) {
   assert(vV3Xn.size() == vSE3.size());
   int K = vV3Xn.size();
@@ -102,6 +104,7 @@ Eigen::Vector3d triangulate2View_midpoint(
       vSE3[0].unit_quaternion().conjugate().toRotationMatrix();
   return rot * Ap * unproject2d(v3Xhomog) / 2;
 }
+
 Eigen::Matrix<double, 2, 3> householder(Eigen::Vector3d x) {
   // Compute a 2x3 matrix where the rows are orthogonal to x and orthogonal to
   // each other.
@@ -121,6 +124,7 @@ Eigen::Matrix<double, 2, 3> householder(Eigen::Vector3d x) {
   res.col(1) = v;
   return res.transpose();
 }
+
 Eigen::Vector3d triangulate_midpoint(
     std::vector<Eigen::Vector2d, Eigen::aligned_allocator<Eigen::Vector2d>>&
         vV2Xn,
@@ -241,6 +245,7 @@ struct ReprojectionError {
   Sophus::SE3Group<double> Tw2c;
   Eigen::Matrix<double, 2, 1> observed;
 };
+
 void triangulate_refine(
     const std::vector<Eigen::Vector3d,
                       Eigen::aligned_allocator<Eigen::Vector3d>>& obs,
@@ -306,6 +311,7 @@ class ReprojectionErrorJ : public ceres::SizedCostFunction<2, 3> {
   Sophus::SE3Group<double> Tw2c;
   Eigen::Matrix<double, 2, 1> observed;
 };
+
 void triangulate_refineJ(
     const std::vector<Eigen::Vector3d,
                       Eigen::aligned_allocator<Eigen::Vector3d>>& obs,

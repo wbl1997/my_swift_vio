@@ -2,8 +2,8 @@
 
 #include <Eigen/Geometry>
 
-#include "msckf/memory.h"
 #include "gtsam/SlidingWindowSmoother.hpp"
+#include "msckf/memory.h"
 
 TEST(gtsam, TriangulateHomogeneousDLT) {
   Eigen::Vector3d point = Eigen::Vector3d(1.5, 3, 25);
@@ -32,7 +32,8 @@ TEST(gtsam, TriangulateHomogeneousDLT) {
     vV3ImPlane[i] = v3Cam / v3Cam[2];
   }
 
-  Eigen::Vector4d hpW = okvis::triangulateHomogeneousDLT(vV3ImPlane, vse3CFromW);
+  Eigen::Vector4d hpW =
+      okvis::triangulateHomogeneousDLT(vV3ImPlane, vse3CFromW);
   Eigen::Vector3d pW = hpW.head<3>() / hpW[3];
   double rms = (pW - point).norm();
   EXPECT_LT(rms, 1e-3);
@@ -40,9 +41,10 @@ TEST(gtsam, TriangulateHomogeneousDLT) {
   // Show that normalized image coordinates do not work.
   AlignedVector<Eigen::Vector3d> normalRays = vV3ImPlane;
   for (size_t j = 0u; j < normalRays.size(); ++j) {
-      normalRays.at(j).normalize();
+    normalRays.at(j).normalize();
   }
-  Eigen::Vector4d hpW1 = okvis::triangulateHomogeneousDLT(normalRays, vse3CFromW);
+  Eigen::Vector4d hpW1 =
+      okvis::triangulateHomogeneousDLT(normalRays, vse3CFromW);
   Eigen::Vector3d pW1 = hpW1.head<3>() / hpW1[3];
   double diff = (pW1 - pW).norm();
   EXPECT_GT(diff, 0.2);
