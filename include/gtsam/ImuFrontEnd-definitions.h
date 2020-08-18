@@ -68,37 +68,15 @@ enum class ImuPreintegrationType {
   kPreintegratedImuMeasurements = 1
 };
 
-/* -------------------------------------------------------------------------- */
 inline const gtsam::PreintegratedImuMeasurements&
 safeCastToPreintegratedImuMeasurements(const gtsam::PreintegrationType& pim) {
-  try {
-    return dynamic_cast<const gtsam::PreintegratedImuMeasurements&>(pim);
-  } catch (const std::bad_cast& e) {
-    LOG(ERROR) << "Seems that you are casting PreintegratedType to "
-                  "PreintegratedImuMeasurements, but this object is not "
-                  "a PreintegratedImuMeasurements!";
-    LOG(FATAL) << e.what();
-  } catch (...) {
-    LOG(FATAL) << "Exception caught when casting to "
-                  "PreintegratedImuMeasurements.";
-  }
+  return dynamic_cast<const gtsam::PreintegratedImuMeasurements&>(pim);
 }
 
-/* -------------------------------------------------------------------------- */
 inline const gtsam::PreintegratedCombinedMeasurements&
 safeCastToPreintegratedCombinedImuMeasurements(
     const gtsam::PreintegrationType& pim) {
-  try {
-    return dynamic_cast<const gtsam::PreintegratedCombinedMeasurements&>(pim);
-  } catch (const std::bad_cast& e) {
-    LOG(ERROR) << "Seems that you are casting PreintegratedType to "
-                  "PreintegratedCombinedMeasurements, but this object is not "
-                  "a PreintegratedCombinedMeasurements!";
-    LOG(FATAL) << e.what();
-  } catch (...) {
-    LOG(FATAL) << "Exception caught when casting to "
-                  "PreintegratedCombinedMeasurements.";
-  }
+  return dynamic_cast<const gtsam::PreintegratedCombinedMeasurements&>(pim);
 }
 
 }  // namespace okvis

@@ -85,16 +85,6 @@ class BackendParams : public PipelineParams {
   void printVioBackEndParams() const;
 
  public:
-  //! Initialization params
-  int autoInitialize_ = 0;
-  double initialPositionSigma_ = 0.00001;
-  double initialRollPitchSigma_ = 10.0 / 180.0 * M_PI;
-  double initialYawSigma_ = 0.1 / 180.0 * M_PI;
-  double initialVelocitySigma_ = 1e-3;
-  double initialAccBiasSigma_ = 0.1;
-  double initialGyroBiasSigma_ = 0.01;
-
-  bool roundOnAutoInitialize_ = false;
 
   //! Smart factor params
   double smartNoiseSigma_ = 3.0;
@@ -116,7 +106,7 @@ class BackendParams : public PipelineParams {
   //! iSAM params
   double relinearizeThreshold_ = 1.0e-2;
   double relinearizeSkip_ = 1.0;
-  double horizon_ = 6.0;
+
   int numOptimize_ = 1;
   double wildfire_threshold_ = 0.001;
   bool useDogLeg_ = false;

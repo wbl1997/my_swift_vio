@@ -18,7 +18,6 @@ namespace okvis {
 
 BackendParams::BackendParams() : PipelineParams("Backend Parameters") {
   // Trivial sanity checks.
-  CHECK_GE(horizon_, 0);
   CHECK_GE(numOptimize_, 0);
 }
 
@@ -35,16 +34,6 @@ bool BackendParams::parseYAML(const std::string& filepath) {
 
 bool BackendParams::parseYAMLVioBackEndParams(
     const YamlParser& yaml_parser) {
-  // INITIALIZATION
-  yaml_parser.getYamlParam("autoInitialize", &autoInitialize_);
-  yaml_parser.getYamlParam("roundOnAutoInitialize", &roundOnAutoInitialize_);
-  yaml_parser.getYamlParam("initialPositionSigma", &initialPositionSigma_);
-  yaml_parser.getYamlParam("initialRollPitchSigma", &initialRollPitchSigma_);
-  yaml_parser.getYamlParam("initialYawSigma", &initialYawSigma_);
-  yaml_parser.getYamlParam("initialVelocitySigma", &initialVelocitySigma_);
-  yaml_parser.getYamlParam("initialAccBiasSigma", &initialAccBiasSigma_);
-  yaml_parser.getYamlParam("initialGyroBiasSigma", &initialGyroBiasSigma_);
-
   // VISION PARAMS
   yaml_parser.getYamlParam("smartNoiseSigma", &smartNoiseSigma_);
   yaml_parser.getYamlParam("rankTolerance", &rankTolerance_);
@@ -70,7 +59,6 @@ bool BackendParams::parseYAMLVioBackEndParams(
   yaml_parser.getYamlParam("noMotionRotationSigma", &noMotionRotationSigma_);
   yaml_parser.getYamlParam("constantVelSigma", &constantVelSigma_);
   yaml_parser.getYamlParam("numOptimize", &numOptimize_);
-  yaml_parser.getYamlParam("horizon", &horizon_);
   yaml_parser.getYamlParam("wildfire_threshold", &wildfire_threshold_);
   yaml_parser.getYamlParam("useDogLeg", &useDogLeg_);
 
@@ -80,15 +68,6 @@ bool BackendParams::parseYAMLVioBackEndParams(
 bool BackendParams::equalsVioBackEndParams(const BackendParams& vp2,
                                               double tol) const {
   return
-      // INITIALIZATION
-      (autoInitialize_ == vp2.autoInitialize_) &&
-      (roundOnAutoInitialize_ == vp2.roundOnAutoInitialize_) &&
-      (fabs(initialPositionSigma_ - vp2.initialPositionSigma_) <= tol) &&
-      (fabs(initialRollPitchSigma_ - vp2.initialRollPitchSigma_) <= tol) &&
-      (fabs(initialYawSigma_ - vp2.initialYawSigma_) <= tol) &&
-      (fabs(initialVelocitySigma_ - vp2.initialVelocitySigma_) <= tol) &&
-      (fabs(initialAccBiasSigma_ - vp2.initialAccBiasSigma_) <= tol) &&
-      (fabs(initialGyroBiasSigma_ - vp2.initialGyroBiasSigma_) <= tol) &&
       // VISION PARAMS
       (fabs(smartNoiseSigma_ - vp2.smartNoiseSigma_) <= tol) &&
       (fabs(rankTolerance_ - vp2.rankTolerance_) <= tol) &&
@@ -110,24 +89,13 @@ bool BackendParams::equalsVioBackEndParams(const BackendParams& vp2,
       (fabs(noMotionPositionSigma_ - vp2.noMotionPositionSigma_) <= tol) &&
       (fabs(noMotionRotationSigma_ - vp2.noMotionRotationSigma_) <= tol) &&
       (fabs(constantVelSigma_ - vp2.constantVelSigma_) <= tol) &&
-      (numOptimize_ == vp2.numOptimize_) && (horizon_ == vp2.horizon_) &&
+      (numOptimize_ == vp2.numOptimize_) &&
       (wildfire_threshold_ == vp2.wildfire_threshold_) &&
       (useDogLeg_ == vp2.useDogLeg_);
 }
 
 void BackendParams::printVioBackEndParams() const {
   LOG(INFO) << "$$$$$$$$$$$$$$$$$$$$$ VIO PARAMETERS $$$$$$$$$$$$$$$$$$$$$\n"
-            << "** INITIALIZATION parameters **\n"
-            << "autoInitialize_: " << autoInitialize_ << '\n'
-            << "initial_ground_truth_state_: ";
-  LOG(INFO) << "roundOnAutoInitialize_: " << roundOnAutoInitialize_ << '\n'
-            << "initialPositionSigma: " << initialPositionSigma_ << '\n'
-            << "initialRollPitchSigma: " << initialRollPitchSigma_ << '\n'
-            << "initialYawSigma: " << initialYawSigma_ << '\n'
-            << "initialVelocitySigma: " << initialVelocitySigma_ << '\n'
-            << "initialAccBiasSigma: " << initialAccBiasSigma_ << '\n'
-            << "initialGyroBiasSigma: " << initialGyroBiasSigma_ << '\n'
-
             << "** VISION parameters **\n"
             << "rankTolerance_: " << rankTolerance_ << '\n'
             << "landmarkDistanceThreshold_: " << landmarkDistanceThreshold_
@@ -149,7 +117,6 @@ void BackendParams::printVioBackEndParams() const {
             << "noMotionRotationSigma_: " << noMotionRotationSigma_ << '\n'
             << "constantVelSigma_: " << constantVelSigma_ << '\n'
             << "numOptimize_: " << numOptimize_ << '\n'
-            << "horizon_: " << horizon_ << '\n'
             << "wildfire_threshold_: " << wildfire_threshold_ << '\n'
             << "useDogLeg_: " << useDogLeg_;
 }

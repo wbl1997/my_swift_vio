@@ -10,6 +10,9 @@
 #include <okvis/ceres/ImuError.hpp>
 #include <okvis/IdProvider.hpp>
 
+// In general, iSAM2 requires all variables are well constrained. For visual
+// inertial SLAM/odometry, we need to add priors for a pose, a velocity, and the 6D bias.
+
 // Warning: Running iSAM2 for inertial odometry with priors on pose, velocity
 // and biases, throws indeterminant linear system exception after ~70 secs with
 // about 200 m drift.
@@ -32,6 +35,8 @@ DEFINE_int32(max_number_of_cheirality_exceptions,
              "Sets the maximum number of times we process a cheirality "
              "exception for a given optimization problem. This is to avoid too "
              "many recursive calls to update the smoother");
+
+DEFINE_double(time_horizon, 1.0, "Time horizon in secs");
 
 /// \brief okvis Main namespace of this package.
 namespace okvis {
@@ -68,14 +73,14 @@ void SlidingWindowSmoother::setupSmoother(
 #ifdef INCREMENTAL_SMOOTHER
   gtsam::ISAM2Params isam_param;
   setIsam2Params(vioParams, &isam_param);
-  smoother_.reset(new Smoother(vioParams.horizon_, isam_param));
+  smoother_.reset(new Smoother(FLAGS_time_horizon, isam_param));
 #else  // BATCH SMOOTHER
   gtsam::LevenbergMarquardtParams lmParams;
   lmParams.setlambdaInitial(0.0);     // same as GN
   lmParams.setlambdaLowerBound(0.0);  // same as GN
   lmParams.setlambdaUpperBound(0.0);  // same as GN)
   smoother_ =
-      std::shared_ptr<Smoother>(new Smoother(vioParams.horizon_, lmParams));
+      std::shared_ptr<Smoother>(new Smoother(FLAGS_time_horizon, lmParams));
 #endif
   mTrackLengthAccumulator = std::vector<size_t>(100, 0u);
 }
@@ -109,23 +114,11 @@ void SlidingWindowSmoother::addInitialPriorFactors() {
   uint64_t frameId = statesMap_.rbegin()->first;
   okvis::kinematics::Transformation T_WB;
   get_T_WS(frameId, T_WB);
-  Eigen::Matrix<double, 9, 1> vel_bias;
-  getSpeedAndBias(frameId, 0u, vel_bias);
   Eigen::Matrix3d B_Rot_W = T_WB.C().transpose();
 
   Eigen::Matrix<double, 6, 6> pose_prior_covariance = Eigen::Matrix<double, 6, 6>::Zero();
-  pose_prior_covariance.diagonal()[0] = backendParams_.initialRollPitchSigma_ *
-                                        backendParams_.initialRollPitchSigma_;
-  pose_prior_covariance.diagonal()[1] = backendParams_.initialRollPitchSigma_ *
-                                        backendParams_.initialRollPitchSigma_;
-  pose_prior_covariance.diagonal()[2] =
-      backendParams_.initialYawSigma_ * backendParams_.initialYawSigma_;
-  pose_prior_covariance.diagonal()[3] = backendParams_.initialPositionSigma_ *
-                                        backendParams_.initialPositionSigma_;
-  pose_prior_covariance.diagonal()[4] = backendParams_.initialPositionSigma_ *
-                                        backendParams_.initialPositionSigma_;
-  pose_prior_covariance.diagonal()[5] = backendParams_.initialPositionSigma_ *
-                                        backendParams_.initialPositionSigma_;
+  pose_prior_covariance.diagonal().head<3>() = pvstd_.std_q_WS.cwiseAbs2();
+  pose_prior_covariance.diagonal().tail<3>() = pvstd_.std_p_WS.cwiseAbs2();
 
   // Rotate initial uncertainty into local frame, where the uncertainty is
   // specified.
@@ -139,10 +132,11 @@ void SlidingWindowSmoother::addInitialPriorFactors() {
       boost::make_shared<gtsam::PriorFactor<gtsam::Pose3>>(
           gtsam::Symbol('x', frameId), VIO::GtsamWrap::toPose3(T_WB), noise_init_pose));
 
+  Eigen::Matrix<double, 9, 1> vel_bias;
+  getSpeedAndBias(frameId, 0u, vel_bias);
   // Add initial velocity priors.
   gtsam::SharedNoiseModel noise_init_vel_prior =
-      gtsam::noiseModel::Isotropic::Sigma(
-          3, backendParams_.initialVelocitySigma_);
+      gtsam::noiseModel::Diagonal::Sigmas(pvstd_.std_v_WS);
   Eigen::Vector3d vel = vel_bias.head<3>();
   new_imu_prior_and_other_factors_.push_back(
       boost::make_shared<gtsam::PriorFactor<gtsam::Vector3>>(
@@ -150,8 +144,8 @@ void SlidingWindowSmoother::addInitialPriorFactors() {
 
   // Add initial bias priors:
   Eigen::Matrix<double, 6, 1> prior_biasSigmas;
-  prior_biasSigmas.head<3>().setConstant(backendParams_.initialAccBiasSigma_);
-  prior_biasSigmas.tail<3>().setConstant(backendParams_.initialGyroBiasSigma_);
+  prior_biasSigmas.head<3>().setConstant(imuParametersVec_.at(0).sigma_ba);
+  prior_biasSigmas.tail<3>().setConstant(imuParametersVec_.at(0).sigma_bg);
   gtsam::SharedNoiseModel imu_bias_prior_noise =
       gtsam::noiseModel::Diagonal::Sigmas(prior_biasSigmas);
   Eigen::Vector3d bg = vel_bias.segment<3>(3);
@@ -763,14 +757,6 @@ void SlidingWindowSmoother::updateStates() {
     kinematics::Transformation T_WB = VIO::GtsamWrap::toTransform(W_T_B);
     poseParamBlockPtr->setEstimate(T_WB);
 
-    auto vval = estimates.find(gtsam::Symbol('v', iter->first));
-    gtsam::Vector3 W_v_B =
-        estimates.at<gtsam::Vector3>(gtsam::Symbol('v', iter->first));
-    auto bval = estimates.find(gtsam::Symbol('b', iter->first));
-    gtsam::imuBias::ConstantBias imuBias =
-        estimates.at<gtsam::imuBias::ConstantBias>(
-            gtsam::Symbol('b', iter->first));
-
     // update imu sensor states
     const int imuIdx = 0;
     uint64_t SBId = iter->second.sensors.at(SensorStates::Imu)
@@ -781,9 +767,19 @@ void SlidingWindowSmoother::updateStates() {
         std::static_pointer_cast<ceres::SpeedAndBiasParameterBlock>(
             mapPtr_->parameterBlockPtr(SBId));
     SpeedAndBiases sb = sbParamBlockPtr->estimate();
+
+    auto vval = estimates.find(gtsam::Symbol('v', iter->first));
+    gtsam::Vector3 W_v_B =
+        estimates.at<gtsam::Vector3>(gtsam::Symbol('v', iter->first));
     sb.head<3>() = W_v_B;
+
+    auto bval = estimates.find(gtsam::Symbol('b', iter->first));
+    gtsam::imuBias::ConstantBias imuBias =
+        estimates.at<gtsam::imuBias::ConstantBias>(
+            gtsam::Symbol('b', iter->first));
     sb.segment<3>(3) = imuBias.gyroscope();
     sb.tail<3>(3) = imuBias.accelerometer();
+
     sbParamBlockPtr->setEstimate(sb);
   }
 
@@ -1088,14 +1084,12 @@ bool SlidingWindowSmoother::hasLowDisparity(
   const double fourthRoot2 = 1.1892071150;
   double raySigma = fourthRoot2 * keypointAStdDev / focalLength;
 
-  double raySigmaScalar = backendParams_.raySigmaScalar_;
-
   Eigen::Vector3d rayA_inA = obsDirections.front().normalized();
   Eigen::Vector3d rayB_inB = obsDirections.back().normalized();
   Eigen::Vector3d rayB_inA =
       T_CWs.front().C() * T_CWs.back().C().transpose() * rayB_inB;
-  if ((rayA_inA.cross(rayB_inB)).norm() < raySigmaScalar * raySigma ||
-      (rayA_inA.cross(rayB_inA)).norm() < raySigmaScalar * raySigma) {
+  if ((rayA_inA.cross(rayB_inB)).norm() <  backendParams_.raySigmaScalar_ * raySigma ||
+      (rayA_inA.cross(rayB_inA)).norm() <  backendParams_.raySigmaScalar_ * raySigma) {
     return true;
   } else {
     return false;
@@ -1121,7 +1115,6 @@ bool SlidingWindowSmoother::triangulateWithDisparityCheck(uint64_t lmkId, Eigen:
 void SlidingWindowSmoother::optimize(size_t /*numIter*/, size_t /*numThreads*/,
                                      bool /*verbose*/) {
   uint64_t currFrameId = currentFrameId();
-  LOG(INFO) << "Optimizing for current frame id " << currFrameId;
   if (loopFrameAndMatchesList_.size() > 0) {
     LOG(INFO) << "Smoother receives #loop frames "
               << loopFrameAndMatchesList_.size()
@@ -1234,6 +1227,7 @@ void SlidingWindowSmoother::optimize(size_t /*numIter*/, size_t /*numThreads*/,
 bool SlidingWindowSmoother::computeCovariance(Eigen::MatrixXd* cov) const {
   uint64_t T_WS_id = statesMap_.rbegin()->second.id;
   *cov = Eigen::Matrix<double, 15, 15>::Identity();
+  // OKVIS Bg Ba, GTSAM Ba Bg.
   Eigen::Matrix<double, 6, 6> swapBaBg = Eigen::Matrix<double, 6, 6>::Zero();
   swapBaBg.topRightCorner<3, 3>().setIdentity();
   swapBaBg.bottomLeftCorner<3, 3>().setIdentity();
@@ -1251,7 +1245,8 @@ bool SlidingWindowSmoother::computeCovariance(Eigen::MatrixXd* cov) const {
   cov->block<3, 3>(6, 6) =
       smoother_->marginalCovariance(gtsam::Symbol('v', T_WS_id));
   cov->block<6, 6>(9, 9) =
-      swapBaBg * smoother_->marginalCovariance(gtsam::Symbol('b', T_WS_id)) * swapBaBg.transpose();
+      swapBaBg * smoother_->marginalCovariance(gtsam::Symbol('b', T_WS_id)) *
+      swapBaBg.transpose();
   return true;
 }
 
