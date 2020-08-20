@@ -36,8 +36,8 @@ for i = 1:length(est_files)
     disp(['average of position, ori., pose, in the last 10 secs: ', num2str(avg)]);
 end
 
-xlim([-10, est_data(end, 1) + 10]);
-ylim([0, 20]);
+% xlim([-10, est_data(end, 1) + 10]);
+% ylim([0, 20]);
 xlabel('time (sec)');
 ylabel('NEES (1)');
 
@@ -48,7 +48,7 @@ for i = 1:length(est_files)
 end
 leg = legend(label_list);
 set(leg,'Interpreter', 'none');
-set(gcf, 'Color', 'None');
+% set(gcf, 'Color', 'None');
 grid on;
 outputfig = [result_dir, '/', 'nees.eps'];
 if exist(outputfig, 'file')==2
