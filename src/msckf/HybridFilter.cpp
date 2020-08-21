@@ -2827,13 +2827,11 @@ msckf::TriangulationStatus HybridFilter::triangulateAMapPoint(
 }
 
 bool HybridFilter::print(std::ostream& stream) const {
-  Estimator::print(stream);
-  Eigen::IOFormat spaceInitFmt(Eigen::StreamPrecision, Eigen::DontAlignCols,
-                               " ", " ", "", "", "", "");
+  printNavStateAndBiases(stream, statesMap_.rbegin()->first);
   const States stateInQuestion = statesMap_.rbegin()->second;
   Eigen::Matrix<double, Eigen::Dynamic, 1> extraParams;
   getImuAugmentedStatesEstimate(&extraParams);
-  stream << " " << extraParams.transpose().format(spaceInitFmt);
+  stream << " " << extraParams.transpose().format(kSpaceInitFmt);
 
   // camera extrinsic parameters.
   size_t numCameras = camera_rig_.numberCameras();
@@ -2853,13 +2851,13 @@ bool HybridFilter::print(std::ostream& stream) const {
   }
   Eigen::VectorXd cameraParams;
   getCameraCalibrationEstimate(&cameraParams);
-  stream << " " << cameraParams.transpose().format(spaceInitFmt);
+  stream << " " << cameraParams.transpose().format(kSpaceInitFmt);
 
   // stds
   const int stateDim = startIndexOfClonedStatesFast();
   Eigen::Matrix<double, Eigen::Dynamic, 1> variances =
       covariance_.topLeftCorner(stateDim, stateDim).diagonal();
-  stream << " " << variances.cwiseSqrt().transpose().format(spaceInitFmt);
+  stream << " " << variances.cwiseSqrt().transpose().format(kSpaceInitFmt);
   return true;
 }
 

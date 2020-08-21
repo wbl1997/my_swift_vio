@@ -1545,12 +1545,9 @@ void SlidingWindowSmoother::findSlotsOfFactorsWithKey(
 }
 
 bool SlidingWindowSmoother::print(std::ostream& stream) const {
-  Estimator::print(stream);
-  Eigen::IOFormat spaceInitFmt(Eigen::StreamPrecision, Eigen::DontAlignCols,
-                               " ", " ", "", "", "", "");
-
+  printNavStateAndBiases(stream, statesMap_.rbegin()->first);
   Eigen::Matrix<double, Eigen::Dynamic, 1> variances = covariance_.diagonal();
-  stream << " " << variances.cwiseSqrt().transpose().format(spaceInitFmt);
+  stream << " " << variances.cwiseSqrt().transpose().format(kSpaceInitFmt);
   return true;
 }
 

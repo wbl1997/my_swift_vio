@@ -536,19 +536,17 @@ void testHybridFilterSinusoid(const okvis::TestSetting& testSetting,
           cameraGeometry0->getIntrinsics(allIntrinsics);
           std::shared_ptr<const okvis::kinematics::Transformation> T_SC_0
               = cameraSystem0->T_SC(0);
-          Eigen::IOFormat spaceInitFmt(Eigen::StreamPrecision,
-                                       Eigen::DontAlignCols, " ", " ", "", "",
-                                       "", "");
+
           truthStream << *iter << " " << id << " " << std::setfill(' ')
-                      << T_WS.parameters().transpose().format(spaceInitFmt)
-                      << " " << v_WS_true.transpose().format(spaceInitFmt)
-                      << " " << trueBiasIter->measurement.gyroscopes.transpose().format(spaceInitFmt)
-                      << " " << trueBiasIter->measurement.accelerometers.transpose().format(spaceInitFmt)
+                      << T_WS.parameters().transpose().format(okvis::kSpaceInitFmt)
+                      << " " << v_WS_true.transpose().format(okvis::kSpaceInitFmt)
+                      << " " << trueBiasIter->measurement.gyroscopes.transpose().format(okvis::kSpaceInitFmt)
+                      << " " << trueBiasIter->measurement.accelerometers.transpose().format(okvis::kSpaceInitFmt)
                       << "1 0 0 0 1 0 0 0 1 "
                       << "0 0 0 0 0 0 0 0 0 "
                       << "1 0 0 0 1 0 0 0 1 "
-                      << T_SC_0->inverse().r().transpose().format(spaceInitFmt)
-                      << " " << allIntrinsics.transpose().format(spaceInitFmt)
+                      << T_SC_0->inverse().r().transpose().format(okvis::kSpaceInitFmt)
+                      << " " << allIntrinsics.transpose().format(okvis::kSpaceInitFmt)
                       << " " << cameraGeometry0->imageDelay()
                       << " " << cameraGeometry0->readoutTime() << std::endl;
         }
