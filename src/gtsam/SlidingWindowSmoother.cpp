@@ -38,6 +38,9 @@ DEFINE_int32(max_number_of_cheirality_exceptions,
 
 DEFINE_double(time_horizon, 1.0, "Time horizon in secs");
 
+DEFINE_double(ray_sigma_scalar, 6.0,
+              "below how many sigmas do we consider rays have low disparity?");
+
 /// \brief okvis Main namespace of this package.
 namespace okvis {
 void setIsam2Params(const okvis::BackendParams& vio_params,
@@ -213,9 +216,8 @@ void SlidingWindowSmoother::addImuFactor() {
       CHECK_NE(imuParams_.nominal_rate_, 0.0)
           << "Nominal IMU rate param cannot be 0.";
       // 1/sqrt(nominalImuRate_) to discretize, then
-      // sqrt(pim_->deltaTij()/nominalImuRate_) to count the nr of measurements.
-      const double d =
-          std::sqrt(resultPim->deltaTij()) / imuParams_.nominal_rate_;
+      // sqrt(pim_->deltaTij() * nominalImuRate_) to count the nr of measurements.
+      const double d = std::sqrt(resultPim->deltaTij());
       Eigen::Matrix<double, 6, 1> biasSigmas;
       biasSigmas.head<3>().setConstant(d * imuParams_.acc_walk_);
       biasSigmas.tail<3>().setConstant(d * imuParams_.gyro_walk_);
@@ -490,6 +492,7 @@ bool SlidingWindowSmoother::applyMarginalizationStrategy(
   std::vector<uint64_t> removeFrames;
   std::map<uint64_t, States>::iterator it = statesMap_.begin();
   while (it != statesMap_.end()) {
+    // TODO(jhuai): keep at least one keyframe for visualization.
     if (it->first < minValidStateId) {
       removeFrames.push_back(it->second.id);
     } else {
@@ -520,7 +523,11 @@ bool SlidingWindowSmoother::applyMarginalizationStrategy(
     // Remove a landmark whose last observation is out of the horizon.
     uint64_t lastFrameId = mapPoint.observations.rbegin()->first.frameId;
     if (lastFrameId < minValidStateId) {
-      ++mTrackLengthAccumulator[mapPoint.observations.size()];
+      size_t numberObservations = mapPoint.observations.size();
+      if (numberObservations + 1u > mTrackLengthAccumulator.size()) {
+          numberObservations = mTrackLengthAccumulator.size() - 1u;
+      }
+      ++mTrackLengthAccumulator[numberObservations];
       // It is not necessary to remove residual blocks or uncheck keypoints in
       // multiframes because these residual blocks and multiframes have been or
       // will soon be removed as the associated nav state slides out of the
@@ -843,7 +850,12 @@ bool SlidingWindowSmoother::updateSmoother(gtsam::FixedLagSmoother::Result* resu
     state_.print("State values\n[\n\t");
     LOG(INFO) << " ]";
     printSmootherInfo(new_factors, delete_slots);
-    return false;
+    if (symb.chr() == 'l') {
+      got_cheirality_exception = true;
+      lmk_symbol_cheirality = symb;
+    } else {
+      return false;
+    }
   } catch (const gtsam::InvalidNoiseModel& e) {
     LOG(ERROR) << e.what();
     printSmootherInfo(new_factors, delete_slots);
@@ -895,6 +907,11 @@ bool SlidingWindowSmoother::updateSmoother(gtsam::FixedLagSmoother::Result* resu
     printSmootherInfo(new_factors, delete_slots);
     return false;
   } catch (const std::out_of_range& e) {
+    // jhuai: When a landmark in the NonlinearFactorGraph is indetermined, and
+    // we delete all factors for the landmark from the graph, an instance of
+    // 'std::out_of_range' map::at may be thrown here. I suspect
+    // IncrementalFixedLagSmoother has problems erasing values not associated to
+    // any factors.
     LOG(ERROR) << e.what();
     printSmootherInfo(new_factors, delete_slots);
     return false;
@@ -1088,8 +1105,8 @@ bool SlidingWindowSmoother::hasLowDisparity(
   Eigen::Vector3d rayB_inB = obsDirections.back().normalized();
   Eigen::Vector3d rayB_inA =
       T_CWs.front().C() * T_CWs.back().C().transpose() * rayB_inB;
-  if ((rayA_inA.cross(rayB_inB)).norm() <  backendParams_.raySigmaScalar_ * raySigma ||
-      (rayA_inA.cross(rayB_inA)).norm() <  backendParams_.raySigmaScalar_ * raySigma) {
+  if ((rayA_inA.cross(rayB_inB)).norm() < FLAGS_ray_sigma_scalar * raySigma ||
+      (rayA_inA.cross(rayB_inA)).norm() < FLAGS_ray_sigma_scalar * raySigma) {
     return true;
   } else {
     return false;
@@ -1250,6 +1267,101 @@ bool SlidingWindowSmoother::computeCovariance(Eigen::MatrixXd* cov) const {
   return true;
 }
 
+
+void printSmartFactor(
+    boost::shared_ptr<SmartStereoFactor> gsf) {
+  CHECK(gsf);
+  std::cout << "Smart Factor (valid: " << (gsf->isValid() ? "yes" : "NO!")
+            << ", deg: " << (gsf->isDegenerate() ? "YES!" : "no")
+            << " isCheir: " << (gsf->isPointBehindCamera() ? "YES!" : "no")
+            << "): \t";
+  gsf->printKeys();
+}
+
+void printReprojectionFactor(boost::shared_ptr<gtsam::GenericProjectionFactor<
+                             gtsam::Pose3, gtsam::Point3, gtsam::Cal3DS2>> gpf) {
+  CHECK(gpf);
+  std::cout << "Reprojection Factor: keys \t";
+  gpf->printKeys();
+}
+
+void printPointPrior(
+    boost::shared_ptr<gtsam::PriorFactor<gtsam::Point3>> ppp) {
+  CHECK(ppp);
+  std::cout << "Point Prior: point key \t";
+  ppp->printKeys();
+}
+
+void printLinearContainerFactor(
+    boost::shared_ptr<gtsam::LinearContainerFactor> lcf) {
+  CHECK(lcf);
+  std::cout << "Linear Container Factor: \t";
+  lcf->printKeys();
+}
+
+void printSelectedFactors(
+    const boost::shared_ptr<gtsam::NonlinearFactor> g,
+    const size_t slot,
+    const bool print_reprojection_factors,
+    const bool print_smart_factors,
+    const bool print_point_priors,
+    const bool print_linear_container_factors) {
+  if (print_reprojection_factors) {
+    const auto& gpf =
+        boost::dynamic_pointer_cast<gtsam::GenericProjectionFactor<
+            gtsam::Pose3, gtsam::Point3, gtsam::Cal3DS2>>(g);
+    if (gpf) {
+      std::cout << "\tSlot # " << slot << ": ";
+      printReprojectionFactor(gpf);
+    }
+  }
+
+  if (print_smart_factors) {
+    const auto& gsf = boost::dynamic_pointer_cast<SmartStereoFactor>(g);
+    if (gsf) {
+      std::cout << "\tSlot # " << slot << ": ";
+      printSmartFactor(gsf);
+    }
+  }
+
+  if (print_point_priors) {
+    const auto& ppp =
+        boost::dynamic_pointer_cast<gtsam::PriorFactor<gtsam::Point3>>(g);
+    if (ppp) {
+      std::cout << "\tSlot # " << slot << ": ";
+      printPointPrior(ppp);
+    }
+  }
+
+  if (print_linear_container_factors) {
+    const auto& lcf =
+        boost::dynamic_pointer_cast<gtsam::LinearContainerFactor>(g);
+    if (lcf) {
+      std::cout << "\tSlot # " << slot << ": ";
+      printLinearContainerFactor(lcf);
+    }
+  }
+}
+
+void printSelectedGraph(
+    const gtsam::NonlinearFactorGraph& graph,
+    const bool print_reprojection_factors,
+    const bool print_smart_factors,
+    const bool print_point_priors,
+    const bool print_linear_container_factors) {
+  size_t slot = 0;
+  for (const auto& g : graph) {
+    printSelectedFactors(g,
+                         slot,
+                         print_reprojection_factors,
+                         print_smart_factors,
+                         print_point_priors,
+                         print_linear_container_factors);
+    slot++;
+  }
+  std::cout << std::endl;
+}
+
 void SlidingWindowSmoother::printSmootherInfo(
     const gtsam::NonlinearFactorGraph& new_factors_tmp,
     const gtsam::FactorIndices& delete_slots,
@@ -1275,11 +1387,10 @@ void SlidingWindowSmoother::printSmootherInfo(
 //  CHECK_NOTNULL(which_graph);
 //  CHECK_NOTNULL(graph);
 
-//  static constexpr bool print_smart_factors = true;  // There a lot of these!
-//  static constexpr bool print_point_plane_factors = true;
-//  static constexpr bool print_plane_priors = true;
-//  static constexpr bool print_point_priors = true;
-//  static constexpr bool print_linear_container_factors = true;
+  static constexpr bool print_reprojection_factors = true;
+  static constexpr bool print_smart_factors = true;  // There a lot of these!
+  static constexpr bool print_point_priors = true;
+  static constexpr bool print_linear_container_factors = true;
 //  ////////////////////// Print all factors.
 //  ///////////////////////////////////////
 //  LOG(INFO) << "Nr of factors in graph " + *which_graph << ": " << graph->size()
@@ -1296,14 +1407,13 @@ void SlidingWindowSmoother::printSmootherInfo(
 //  ///////////// Print factors that were newly added to the optimization.//////
   LOG(INFO) << "Nr of new factors to add: " << new_factors_tmp.size()
             << " with factors:" << std::endl;
-//  LOG(INFO) << "[\n (slot # wrt to new_factors_tmp graph) \t";
-//  printSelectedGraph(new_factors_tmp,
-//                     print_smart_factors,
-//                     print_point_plane_factors,
-//                     print_plane_priors,
-//                     print_point_priors,
-//                     print_linear_container_factors);
-//  LOG(INFO) << " ]" << std::endl;
+  LOG(INFO) << "[\n (slot # wrt to new_factors_tmp graph) \t";
+  printSelectedGraph(new_factors_tmp,
+                     print_reprojection_factors,
+                     print_smart_factors,
+                     print_point_priors,
+                     print_linear_container_factors);
+  LOG(INFO) << " ]" << std::endl;
 
 //  ////////////////////////////// Print deleted /// slots.///////////////////////
   LOG(INFO) << "Nr deleted slots: " << delete_slots.size()
@@ -1431,13 +1541,29 @@ void SlidingWindowSmoother::cleanCheiralityLmk(
 
 
 // Returns if the key in feature tracks could be removed or not.
-bool SlidingWindowSmoother::deleteLmkFromFeatureTracks(const uint64_t& /*lmk_id*/) {
-//  if (feature_tracks_.find(lmk_id) != feature_tracks_.end()) {
-//    VLOG(2) << "Deleting feature track for lmk with id: " << lmk_id;
-//    feature_tracks_.erase(lmk_id);
-//    return true;
-//  }
-  return false;
+bool SlidingWindowSmoother::deleteLmkFromFeatureTracks(uint64_t lmkId) {
+  auto pit = landmarksMap_.find(lmkId);
+  const MapPoint& mapPoint = pit->second;
+  VLOG(2) << "Deleting feature track for lmk with id: " << lmkId;
+  ++mTrackLengthAccumulator[mapPoint.observations.size() >=
+                                    mTrackLengthAccumulator.size()
+                                ? mTrackLengthAccumulator.size() - 1u
+                                : mapPoint.observations.size()];
+  for (std::map<okvis::KeypointIdentifier, uint64_t>::const_iterator it =
+           mapPoint.observations.begin();
+       it != mapPoint.observations.end(); ++it) {
+    if (it->second) {
+      mapPtr_->removeResidualBlock(
+          reinterpret_cast<::ceres::ResidualBlockId>(it->second));
+    }
+    const KeypointIdentifier& kpi = it->first;
+    auto mfp = multiFramePtrMap_.find(kpi.frameId);
+    OKVIS_ASSERT_TRUE(Exception, mfp != multiFramePtrMap_.end(), "frame id not found in frame map!");
+    mfp->second->setLandmarkId(kpi.cameraIndex, kpi.keypointIndex, 0);
+  }
+  mapPtr_->removeParameterBlock(pit->first);
+  pit = landmarksMap_.erase(pit);
+  return true;
 }
 
 void SlidingWindowSmoother::deleteAllFactorsWithKeyFromFactorGraph(

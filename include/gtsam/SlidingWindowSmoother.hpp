@@ -203,7 +203,7 @@ class SlidingWindowSmoother : public Estimator {
       const gtsam::NonlinearFactorGraph& graph,
       std::vector<size_t>* slots_of_factors_with_key);
 
-  bool deleteLmkFromFeatureTracks(const uint64_t& /*lmk_id*/);
+  bool deleteLmkFromFeatureTracks(uint64_t lmkId);
 
   /**
    * @brief triangulateSafe wrap of gtsam::triangulateSafe.

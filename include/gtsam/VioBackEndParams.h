@@ -95,7 +95,7 @@ class BackendParams : public PipelineParams {
   double outlierRejection_ = 8.0;
   double retriangulationThreshold_ = 1.0e-3;
   //! below how many sigmas do we consider rays have low disparity?
-  double raySigmaScalar_ = 6.0;
+//  double raySigmaScalar_ = 6.0;
 
   bool addBetweenStereoFactors_ = true;
 

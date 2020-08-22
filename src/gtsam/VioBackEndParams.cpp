@@ -42,8 +42,8 @@ bool BackendParams::parseYAMLVioBackEndParams(
   yaml_parser.getYamlParam("outlierRejection", &outlierRejection_);
   yaml_parser.getYamlParam("retriangulationThreshold",
                            &retriangulationThreshold_);
-  yaml_parser.getYamlParam("raySigmaScalar",
-                           &raySigmaScalar_);
+//  yaml_parser.getYamlParam("raySigmaScalar",
+//                           &raySigmaScalar_);
   yaml_parser.getYamlParam("addBetweenStereoFactors",
                            &addBetweenStereoFactors_);
   yaml_parser.getYamlParam("betweenRotationPrecision",
@@ -76,7 +76,7 @@ bool BackendParams::equalsVioBackEndParams(const BackendParams& vp2,
       (fabs(outlierRejection_ - vp2.outlierRejection_) <= tol) &&
       (fabs(retriangulationThreshold_ - vp2.retriangulationThreshold_) <=
        tol) &&
-      (fabs(raySigmaScalar_ - vp2.raySigmaScalar_) <= tol) &&
+//      (fabs(raySigmaScalar_ - vp2.raySigmaScalar_) <= tol) &&
       (addBetweenStereoFactors_ == vp2.addBetweenStereoFactors_) &&
       (fabs(betweenRotationPrecision_ - vp2.betweenRotationPrecision_) <=
        tol) &&
@@ -101,8 +101,8 @@ void BackendParams::printVioBackEndParams() const {
             << "landmarkDistanceThreshold_: " << landmarkDistanceThreshold_
             << '\n'
             << "outlierRejection_: " << outlierRejection_ << '\n'
-            << "retriangulationThreshold_: " << retriangulationThreshold_
-            << '\n' << "raySigmaScalar_: " << raySigmaScalar_ << '\n'
+            << "retriangulationThreshold_: " << retriangulationThreshold_ << '\n'
+//            << "raySigmaScalar_: " << raySigmaScalar_ << '\n'
             << "addBetweenStereoFactors_: " << addBetweenStereoFactors_ << '\n'
             << "betweenRotationPrecision_: " << betweenRotationPrecision_
             << '\n'
