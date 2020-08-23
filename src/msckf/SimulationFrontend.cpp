@@ -417,13 +417,13 @@ int SimulationFrontend::addMatchToEstimator(
         }
         ++trackedFeatures;
       } // else do nothing
-    } else {
+    } else { // The observations are not associated to any landmark.
       okvis::KeypointIdentifier IdA = landmarkMatch.previousKeypoint;
       okvis::KeypointIdentifier IdB = landmarkMatch.currentKeypoint;
 
       okvis::kinematics::Transformation T_WSa = T_WSp_ref;
       okvis::kinematics::Transformation T_WSb = T_WSc_ref;
-      // Use estimated values rather than reference ones.
+      // Use estimated values rather than reference ones to triangulate the landmark.
       estimator.get_T_WS(IdA.frameId, T_WSa);
       estimator.get_T_WS(IdB.frameId, T_WSb);
 

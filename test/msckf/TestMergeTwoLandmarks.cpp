@@ -33,6 +33,7 @@ TEST(StdC, swapComplex) {
   }
 }
 
+// Validate mergeTwoLandmarks by testing the verbatim function.
 class MergeTwoLandmarksTest : public testing::Test {
 public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
@@ -50,6 +51,7 @@ public:
     landmarksMap_.emplace(2, mpb);
   }
 
+  // This function is identical to mergeTwoLandmarks except for the commented lines.
   void merge(uint64_t lmIdA, uint64_t lmIdB) {
     okvis::PointMap::iterator lmItA = landmarksMap_.find(lmIdA);
     okvis::PointMap::iterator lmItB = landmarksMap_.find(lmIdB);
@@ -67,43 +69,22 @@ public:
              obsMapB.begin();
          obsIter != obsMapB.end(); ++obsIter) {
       if (obsIter->second != 0u) {
-        //      mapPtr_->removeResidualBlock(
-        //          reinterpret_cast<::ceres::ResidualBlockId>(obsIter->second));
+//        mapPtr_->removeResidualBlock(
+//            reinterpret_cast<::ceres::ResidualBlockId>(obsIter->second));
         obsIter->second = 0u;
       }
       // reset landmark ids for relevant keypoints in multiframe.
       const okvis::KeypointIdentifier& kpi = obsIter->first;
-      //    okvis::MultiFramePtr multiFramePtr =
-      //    multiFramePtrMap_.at(kpi.frameId); auto iterA =
-      //    std::find_if(obsMapA.begin(), obsMapA.end(),
-      //                              okvis::IsObservedInFrame(kpi.frameId,
-      //                              kpi.cameraIndex));
-      //    if (iterA != obsMapA.end()) {
-      //      multiFramePtr->setLandmarkId(kpi.cameraIndex, kpi.keypointIndex,
-      //      0u); continue;
-      //    }
-      //    multiFramePtr->setLandmarkId(kpi.cameraIndex, kpi.keypointIndex,
-      //    lmIdA);
+//      okvis::MultiFramePtr multiFramePtr = multiFramePtrMap_.at(kpi.frameId);
+//      auto iterA =
+//          std::find_if(obsMapA.begin(), obsMapA.end(),
+//                       okvis::IsObservedInFrame(kpi.frameId, kpi.cameraIndex));
+//      if (iterA != obsMapA.end()) {
+//        multiFramePtr->setLandmarkId(kpi.cameraIndex, kpi.keypointIndex, 0u);
+//        continue;
+//      }
+//      multiFramePtr->setLandmarkId(kpi.cameraIndex, kpi.keypointIndex, lmIdA);
 
-      //    Eigen::Vector2d measurement;
-      //    multiFramePtr->getKeypoint(kpi.cameraIndex, kpi.keypointIndex,
-      //    measurement); Eigen::Matrix2d information =
-      //    Eigen::Matrix2d::Identity(); double size = 1.0;
-      //    multiFramePtr->getKeypointSize(kpi.cameraIndex, kpi.keypointIndex,
-      //    size); information *= 64.0 / (size * size);
-
-      //    std::shared_ptr<const okvis::cameras::CameraBase> baseCameraGeometry
-      //    =
-      //        camera_rig_.getCameraGeometry(kpi.cameraIndex);
-      //    std::shared_ptr<const CAMERA_GEOMETRY_T> argCameraGeometry =
-      //        std::static_pointer_cast<const
-      //        CAMERA_GEOMETRY_T>(baseCameraGeometry);
-      //    ::ceres::ResidualBlockId retVal =
-      //        addPointFrameResidual(lmIdA, kpi.frameId, kpi.cameraIndex,
-      //        measurement,
-      //                              information, argCameraGeometry);
-      //    CHECK_NE(reinterpret_cast<uint64_t>(retVal), 0u);
-      // remember
       uint64_t retVal = 100 + rand() % 37;
       obsMapA.emplace(kpi, retVal);
     }
