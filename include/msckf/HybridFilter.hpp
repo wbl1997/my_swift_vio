@@ -624,8 +624,6 @@ class HybridFilter : public Estimator {
   static const size_t maxTrackLength_ = 12;
   // i.e., max cloned states in the cov matrix
 
-  const size_t kMainCameraIndex = 0u;
-
   std::vector<size_t>
       mTrackLengthAccumulator;  // histogram of the track lengths, start from
                                 // 0,1,2, to a fixed number

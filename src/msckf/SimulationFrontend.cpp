@@ -428,10 +428,10 @@ int SimulationFrontend::addMatchToEstimator(
       estimator.get_T_WS(IdB.frameId, T_WSb);
 
       okvis::kinematics::Transformation T_SaCa;
-      estimator.getCameraSensorStates(IdA.frameId, IdA.cameraIndex, T_SaCa);
+      estimator.getCameraSensorExtrinsics(IdA.frameId, IdA.cameraIndex, T_SaCa);
 
       okvis::kinematics::Transformation T_SbCb;
-      estimator.getCameraSensorStates(IdB.frameId, IdB.cameraIndex, T_SbCb);
+      estimator.getCameraSensorExtrinsics(IdB.frameId, IdB.cameraIndex, T_SbCb);
       okvis::kinematics::Transformation T_WCa = T_WSa * T_SaCa;
       okvis::kinematics::Transformation T_CaCb =
           T_WCa.inverse() * (T_WSb * T_SbCb);

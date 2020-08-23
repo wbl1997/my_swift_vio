@@ -16,7 +16,7 @@ void loadParameters(const std::shared_ptr<okvis::MultiFrame> multiframe,
       multiframe->geometryAs<CAMERA_GEOMETRY_T>(camId)->distortionType();
   feature_tracker->cam0_distortion_model =
       distortionName.compare("RadialTangentialDistortion") == 0 ? "radtan"
-                                                                : "cult";
+                                                                : "unknown";
 
   uint32_t width =
       multiframe->geometryAs<CAMERA_GEOMETRY_T>(camId)->imageWidth();
@@ -43,7 +43,7 @@ void loadParameters(const std::shared_ptr<okvis::MultiFrame> multiframe,
 
   uint64_t fId = multiframe->id();
   okvis::kinematics::Transformation T_SC;
-  estimator.getCameraSensorStates(fId, camId, T_SC);
+  estimator.getCameraSensorExtrinsics(fId, camId, T_SC);
   Eigen::Matrix3d R_SC = T_SC.C();
   Eigen::Vector3d t_SC = T_SC.r();
   cv::eigen2cv(R_SC, feature_tracker->R_cam0_imu);
@@ -55,7 +55,7 @@ void loadParameters(const std::shared_ptr<okvis::MultiFrame> multiframe,
         multiframe->geometryAs<CAMERA_GEOMETRY_T>(camId)->distortionType();
     feature_tracker->cam1_distortion_model =
         distortionName.compare("RadialTangentialDistortion") == 0 ? "radtan"
-                                                                  : "cult";
+                                                                  : "unknown";
     uint32_t width =
         multiframe->geometryAs<CAMERA_GEOMETRY_T>(camId)->imageWidth();
     uint32_t height =
@@ -80,7 +80,7 @@ void loadParameters(const std::shared_ptr<okvis::MultiFrame> multiframe,
         intrinsics[numProjIntrinsics + 3];
 
     okvis::kinematics::Transformation T_SC;
-    estimator.getCameraSensorStates(fId, camId, T_SC);
+    estimator.getCameraSensorExtrinsics(fId, camId, T_SC);
     Eigen::Matrix3d R_SC = T_SC.C();
     Eigen::Vector3d t_SC = T_SC.r();
     cv::eigen2cv(R_SC, feature_tracker->R_cam1_imu);
@@ -102,7 +102,7 @@ int addConstraintToEstimator(
   for (size_t im = 0; im < framesInOut->numFrames(); ++im) {
     int keypointIndex = 0;
     okvis::kinematics::Transformation T_SbCb;
-    estimator.getCameraSensorStates(fIdB, im, T_SbCb);
+    estimator.getCameraSensorExtrinsics(fIdB, im, T_SbCb);
 
     for (auto lmId : curr_ids) {
       bool added = estimator.isLandmarkAdded(lmId);
@@ -118,7 +118,7 @@ int addConstraintToEstimator(
           estimator.get_T_WS(IdA.frameId, T_WSa);
 
           okvis::kinematics::Transformation T_SaCa;
-          estimator.getCameraSensorStates(IdA.frameId, IdA.cameraIndex, T_SaCa);
+          estimator.getCameraSensorExtrinsics(IdA.frameId, IdA.cameraIndex, T_SaCa);
           okvis::kinematics::Transformation T_WCa = T_WSa * T_SaCa;
           okvis::kinematics::Transformation T_CaCb = T_WCa.inverse() * (T_WSb * T_SbCb);
 

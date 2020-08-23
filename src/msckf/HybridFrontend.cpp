@@ -343,7 +343,7 @@ int HybridFrontend::matchToLastFrameKLT(
     std::vector<cv::Matx33f> R_CkCkm1_list;
     for (size_t camId = 0; camId < framesInOut->numFrames(); ++camId) {
       okvis::kinematics::Transformation T_SC;
-      estimator.getCameraSensorStates(fIdA, camId, T_SC);
+      estimator.getCameraSensorExtrinsics(fIdA, camId, T_SC);
       Eigen::Quaterniond q_CkCkm1 =
           (T_WSb.q() * T_SC.q()).conjugate() * (T_WSa.q() * T_SC.q());
       Eigen::Matrix3f R_CkCkm1 = q_CkCkm1.toRotationMatrix().cast<float>();
@@ -499,8 +499,8 @@ int HybridFrontend::checkMotionByRansac2d2d(okvis::Estimator& estimator,
 
     // now the translation only one:
     okvis::kinematics::Transformation T_SaCa, T_SbCb;
-    estimator.getCameraSensorStates(olderFrameId, im, T_SaCa);
-    estimator.getCameraSensorStates(currentFrameId, im, T_SbCb);
+    estimator.getCameraSensorExtrinsics(olderFrameId, im, T_SaCa);
+    estimator.getCameraSensorExtrinsics(currentFrameId, im, T_SbCb);
     okvis::kinematics::Transformation T_WSa, T_WSb;
     estimator.get_T_WS(olderFrameId, T_WSa);
     estimator.get_T_WS(currentFrameId, T_WSb);
