@@ -48,17 +48,14 @@ def sed_line_with_parameter(config_dict, param_name, padding, config_yaml):
 
 def apply_config_to_yaml(config_dict, vio_yaml, debug_output_dir):
     algo_code = config_dict["algo_code"]
-    sed_algo = r'sed -i "/algorithm/c\    algorithm: {}" {};'. \
+    sed_cmd = r'sed -i "/algorithm/c\    algorithm: {}" {};'. \
         format(algo_code, vio_yaml)
-    sed_imuframes = r'sed -i "/numImuFrames:/c\numImuFrames: {}" {};'. \
-        format(config_dict["numImuFrames"], vio_yaml)
-    sed_keyframes = r'sed -i "/numKeyframes:/c\numKeyframes: {}" {};'. \
-        format(config_dict["numKeyframes"], vio_yaml)
-    sed_nframe = r'sed -i "/monocular_input:/c\monocular_input: {}" {};'. \
-        format(config_dict["monocular_input"], vio_yaml)
-    sed_display = r'sed -i "/displayImages:/c\displayImages: false" {};'. \
-        format(vio_yaml)
-    sed_cmd = sed_algo + sed_keyframes + sed_imuframes + sed_nframe + sed_display
+
+    padding = ''
+    sed_cmd += sed_line_with_parameter(config_dict, "numImuFrames", padding, vio_yaml)
+    sed_cmd += sed_line_with_parameter(config_dict, "numKeyframes", padding, vio_yaml)
+    sed_cmd += sed_line_with_parameter(config_dict, "monocular_input", padding, vio_yaml)
+    sed_cmd += sed_line_with_parameter(config_dict, "displayImages", padding, vio_yaml)
 
     padding = " " * 4
     sed_cmd += sed_line_with_parameter(config_dict, "landmarkModelId", padding, vio_yaml)
