@@ -128,7 +128,7 @@ TriangulationStatus PointLandmark::initialize(
       }
       break;
   }
-  msckf_vio::Feature feature(measurements, cam_states);
+  msckf::Feature feature(measurements, cam_states);
   feature.initializePosition();
   parameters_.reserve(4);
   parameters_.insert(parameters_.end(), feature.position.data(),

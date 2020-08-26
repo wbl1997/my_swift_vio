@@ -6,7 +6,7 @@
 #include <gtsam/SlidingWindowSmoother.hpp>
 #include <msckf/TFVIO.hpp>
 #include <msckf/GeneralEstimator.hpp>
-#include <msckf/PriorlessEstimator.hpp>
+#include <msckf/ConsistentEstimator.hpp>
 
 #include <loop_closure/LoopClosureDetector.h>
 
@@ -16,7 +16,7 @@ std::shared_ptr<okvis::Frontend> createFrontend(
     okvis::EstimatorAlgorithm algorithm) {
   switch (algorithm) {
     case okvis::EstimatorAlgorithm::General:
-    case okvis::EstimatorAlgorithm::Priorless:
+    case okvis::EstimatorAlgorithm::Consistent:
     case okvis::EstimatorAlgorithm::OKVIS:
       return std::shared_ptr<okvis::Frontend>(
           new okvis::Frontend(numCameras, frontendOptions));
@@ -34,8 +34,8 @@ std::shared_ptr<okvis::Estimator> createBackend(okvis::EstimatorAlgorithm algori
     case okvis::EstimatorAlgorithm::General:
       return std::shared_ptr<okvis::Estimator>(new okvis::GeneralEstimator());
 
-    case okvis::EstimatorAlgorithm::Priorless:
-      return std::shared_ptr<okvis::Estimator>(new okvis::PriorlessEstimator());
+    case okvis::EstimatorAlgorithm::Consistent:
+      return std::shared_ptr<okvis::Estimator>(new okvis::ConsistentEstimator());
 
     case okvis::EstimatorAlgorithm::OKVIS:
       return std::shared_ptr<okvis::Estimator>(new okvis::Estimator());

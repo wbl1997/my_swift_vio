@@ -33,7 +33,6 @@
 
 #include <opengv/sac/Ransac.hpp>
 
-msckf_vio::Feature::OptimizationConfig msckf_vio::Feature::optimization_config;
 
 /// \brief okvis Main namespace of this package.
 namespace okvis {
@@ -606,9 +605,9 @@ bool HybridFrontend::isDescriptorBasedMatching() const {
 
 void HybridFrontend::setLandmarkTriangulationParameters(double triangulationTranslationThreshold,
                                                       double triangulationMaxDepth) {
-  msckf_vio::Feature::optimization_config.translation_threshold =
+  msckf::Feature::optimization_config.translation_threshold =
       triangulationTranslationThreshold;
-  msckf_vio::Feature::optimization_config.max_depth =
+  msckf::Feature::optimization_config.max_depth =
       triangulationMaxDepth;
 }
 

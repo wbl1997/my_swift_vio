@@ -3,6 +3,8 @@
 #include <Eigen/Geometry>
 
 #include "gtsam/SlidingWindowSmoother.hpp"
+
+#include "msckf/FeatureTriangulation.hpp"
 #include "msckf/memory.h"
 
 TEST(gtsam, TriangulateHomogeneousDLT) {
@@ -33,7 +35,7 @@ TEST(gtsam, TriangulateHomogeneousDLT) {
   }
 
   Eigen::Vector4d hpW =
-      okvis::triangulateHomogeneousDLT(vV3ImPlane, vse3CFromW);
+      msckf::triangulateHomogeneousDLT(vV3ImPlane, vse3CFromW);
   Eigen::Vector3d pW = hpW.head<3>() / hpW[3];
   double rms = (pW - point).norm();
   EXPECT_LT(rms, 1e-3);
@@ -44,7 +46,7 @@ TEST(gtsam, TriangulateHomogeneousDLT) {
     normalRays.at(j).normalize();
   }
   Eigen::Vector4d hpW1 =
-      okvis::triangulateHomogeneousDLT(normalRays, vse3CFromW);
+      msckf::triangulateHomogeneousDLT(normalRays, vse3CFromW);
   Eigen::Vector3d pW1 = hpW1.head<3>() / hpW1[3];
   double diff = (pW1 - pW).norm();
   EXPECT_GT(diff, 0.2);

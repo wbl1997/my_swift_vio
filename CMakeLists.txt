@@ -199,7 +199,9 @@ LIST(APPEND SOURCEFILES
     src/loop_closure/LoopClosureDetectorParams.cpp
 
     src/msckf/CameraSystemCreator.cpp
-    src/msckf/VioFactoryMethods.cpp
+    src/msckf/ConsistentEstimator.cpp
+    src/msckf/GeneralEstimator.cpp
+    src/msckf/FeatureTriangulation.cpp
     src/msckf/FilterHelper.cpp
     src/msckf/HybridFilter.cpp
     src/msckf/HybridFrontend.cpp
@@ -215,6 +217,7 @@ LIST(APPEND SOURCEFILES
     src/msckf/TFVIO.cpp
     src/msckf/TwoViewPair.cpp
     src/msckf/VioEvaluationCallback.cpp
+    src/msckf/VioFactoryMethods.cpp
     src/msckf/VioTestSystemBuilder.cpp
     src/msckf/numeric_ceres_residual_Jacobian.cpp
     src/msckf/triangulate.cpp

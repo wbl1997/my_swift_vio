@@ -21,14 +21,13 @@
 
 using namespace std;
 using namespace Eigen;
-using namespace msckf_vio;
 
 
 TEST(TriangulateRobustLM, sphereDistribution) {
   simul::SimulationNViewSphere snvs;
 
   // Initialize a feature object.
-  Feature feature_object(snvs.obsDirectionsZ1(), snvs.camStates());
+  msckf::Feature feature_object(snvs.obsDirectionsZ1(), snvs.camStates());
   // Compute the 3d position of the feature.
   feature_object.initializePosition();
 
@@ -43,7 +42,7 @@ void testInitializeWithStationaryCamera(bool addSidewaysView,
   simul::SimulationNViewStatic snvs(addSidewaysView, addObsNoise);
 
   // Initialize a feature object.
-  Feature feature_object(snvs.obsDirectionsZ1(), snvs.camStates());
+  msckf::Feature feature_object(snvs.obsDirectionsZ1(), snvs.camStates());
   // Compute the 3d position of the feature.
   feature_object.initializePosition();
 
@@ -71,7 +70,7 @@ TEST(TriangulateRobustLM, StationaryCamera) {
 TEST(TriangulateRobustLM, TwoView) {
   {
     simul::SimulationTwoView s2v(0);
-    msckf_vio::Feature feature_object(s2v.obsDirectionsZ1(), s2v.camStates());
+    msckf::Feature feature_object(s2v.obsDirectionsZ1(), s2v.camStates());
     feature_object.initializePosition();
     Eigen::Vector4d truePoint = s2v.truePoint();
 
@@ -92,7 +91,7 @@ TEST(TriangulateRobustLM, TwoView) {
         cam_states = {cam_states_all[0], cam_states_all[numObs - 1]};
     std::vector<Eigen::Vector2d, Eigen::aligned_allocator<Eigen::Vector2d>>
         measurements{snv.obsDirectionZ1(0), snv.obsDirectionZ1(numObs - 1)};
-    msckf_vio::Feature feature_object(measurements, cam_states);
+    msckf::Feature feature_object(measurements, cam_states);
     feature_object.initializePosition();
     EXPECT_LT((feature_object.position - snv.truePoint().head<3>()).norm(),
               0.2);
@@ -105,7 +104,7 @@ TEST(TriangulateRobustLM, Initialization) {
   okvis::kinematics::Transformation T_AW(snv.T_CW(0));
   okvis::kinematics::Transformation T_BW(snv.T_CW(numObs - 1));
 
-  msckf_vio::Feature feature_dummy;
+  msckf::Feature feature_dummy;
   Eigen::Vector3d initial_position(0.0, 0.0, 0.0);
 
   okvis::kinematics::Transformation T_AB = T_AW * T_BW.inverse();
@@ -119,14 +118,14 @@ TEST(TriangulateRobustLM, Initialization) {
 TEST(TriangulateRobustLM, RotationOnly) {
   {
   simul::SimulationTwoView s2v(3);
-  msckf_vio::Feature feature_object(s2v.obsDirectionsZ1(), s2v.camStates());
+  msckf::Feature feature_object(s2v.obsDirectionsZ1(), s2v.camStates());
   feature_object.initializePosition();
   EXPECT_LT((feature_object.position.normalized() - s2v.truePoint().head<3>().normalized()).norm(),
             1e-5);
   }
   {
   simul::SimulationTwoView s2v(4);
-  msckf_vio::Feature feature_object(s2v.obsDirectionsZ1(), s2v.camStates());
+  msckf::Feature feature_object(s2v.obsDirectionsZ1(), s2v.camStates());
   feature_object.initializePosition();
   EXPECT_LT((feature_object.position.normalized() - s2v.truePoint().head<3>().normalized()).norm(),
             1e-5);
@@ -141,7 +140,7 @@ TEST(TriangulateRobustLM, FarPoints) {
     double dist = distances[jack];
     simul::SimulationTwoView stv(5, dist);
 
-    msckf_vio::Feature feature_object(stv.obsDirectionsZ1(), stv.camStates());
+    msckf::Feature feature_object(stv.obsDirectionsZ1(), stv.camStates());
     feature_object.initializePosition();
     if (dist < 1000) {
       EXPECT_LT((feature_object.position - stv.truePoint().head<3>()).norm() / dist,
