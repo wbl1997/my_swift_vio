@@ -291,7 +291,7 @@ class HybridFilter : public Estimator {
   virtual void getImuAugmentedStatesEstimate(
       Eigen::Matrix<double, Eigen::Dynamic, 1>* extraParams) const final;
 
-  virtual bool getStateStd(Eigen::Matrix<double, Eigen::Dynamic, 1>* stateStd) const final;
+  bool getStateStd(Eigen::Matrix<double, Eigen::Dynamic, 1>* stateStd) const final;
 
   virtual void setKeyframeRedundancyThresholds(double dist, double angle,
                                                double trackingRate,
