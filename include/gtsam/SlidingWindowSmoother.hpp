@@ -218,33 +218,9 @@ class SlidingWindowSmoother : public Estimator {
    * @param lmkId
    * @return
    */
-  bool triangulateWithDisparityCheck(uint64_t lmkId, Eigen::Vector3d* pW) const;
+  bool triangulateWithDisparityCheck(uint64_t lmkId, Eigen::Vector3d* pW,
+                                     double focalLength, double raySigmaScalar) const;
 
-  /**
-   * @brief gatherMapPointObservations gather all observations of a landmark
-   * @param mp
-   * @param obsDirections undistorted observation directions, [x, y, 1]
-   * @param T_WCs  T_WB * T_BC for each observation.
-   * @param obsInPixel observation in pixels
-   * @param imageNoiseStd the std dev of image noise at both x and y direction.
-   * twice as long as obsDirections.
-   * @return
-   */
-  size_t gatherMapPointObservations(
-      const MapPoint& mp, AlignedVector<Eigen::Vector3d>* obsDirections,
-      AlignedVector<okvis::kinematics::Transformation>* T_CWs,
-      std::vector<double>* imageNoiseStd) const;
-
-  /**
-   * @brief hasLowDisparity check if a feature track has low disparity at its endpoints
-   * @param obsDirections [x, y, 1]
-   * @param T_CWs T_CW takes a point from W frame to camera C frame.
-   * @return true if low disparity at its endpoints
-   */
-  bool hasLowDisparity(
-      const AlignedVector<Eigen::Vector3d>& obsDirections,
-      const AlignedVector<okvis::kinematics::Transformation>& T_CWs,
-      const std::vector<double>& imageNoiseStd) const;
 
  protected:
   okvis::BackendParams backendParams_;

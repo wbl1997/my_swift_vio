@@ -53,6 +53,20 @@ class ConsistentEstimator : public Estimator
   virtual ~ConsistentEstimator();
 
   /**
+   * @brief triangulateWithDisparityCheck custom triangulation by using DLT with disparity check
+   * @param lmkId
+   * @return
+   */
+  bool triangulateWithDisparityCheck(uint64_t lmkId, Eigen::Vector4d* hpW,
+                                     double focalLength, double raySigmaScalar) const;
+
+  /**
+   * @brief addLandmarkToGraph add all observations of a landmark as factors to the estimator.
+   * @param landmarkId
+   */
+  void addLandmarkToGraph(uint64_t landmarkId, const Eigen::Vector4d& hpW);
+
+  /**
    * @brief addReprojectionFactors see descriptions in Estimator.
    * @return
    */
@@ -66,6 +80,27 @@ class ConsistentEstimator : public Estimator
    */
   void optimize(size_t numIter, size_t numThreads = 1, bool verbose = false) override;
 
+  /**
+   * @brief Applies the dropping/marginalization strategy according to the RSS'13/IJRR'14 paper.
+   *        The new number of frames in the window will be numKeyframes+numImuFrames.
+   * @param numKeyframes Number of keyframes.
+   * @param numImuFrames Number of frames in IMU window.
+   * @param removedLandmarks Get the landmarks that were removed by this operation.
+   * @return True if successful.
+   */
+  bool applyMarginalizationStrategy(
+      size_t numKeyframes, size_t numImuFrames,
+      okvis::MapPointVector& removedLandmarks) override;
+
+  /**
+   * @brief computeCovariance the block covariance for the navigation state
+   * with an abuse of notation, i.e., diag(cov(p, q), cov(v), cov(bg),
+   * cov(ba))
+   * @param[in, out] cov pointer to the covariance matrix which will be
+   * resized in this function.
+   * @return true if covariance is successfully computed.
+   */
+  bool computeCovariance(Eigen::MatrixXd* cov) const override;
 };
 }  // namespace okvis
 

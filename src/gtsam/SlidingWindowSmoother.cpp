@@ -1035,87 +1035,9 @@ bool SlidingWindowSmoother::triangulateSafe(uint64_t lmkId, Eigen::Matrix<double
   }
 }
 
-size_t SlidingWindowSmoother::gatherMapPointObservations(
-    const MapPoint& mp, AlignedVector<Eigen::Vector3d>* obsDirections,
-    AlignedVector<okvis::kinematics::Transformation>* T_CWs,
-    std::vector<double>* imageNoiseStd) const {
-  T_CWs->clear();
-  obsDirections->clear();
-  imageNoiseStd->clear();
-
-  const std::map<okvis::KeypointIdentifier, uint64_t>& observations =
-      mp.observations;
-  size_t numPotentialObs = mp.observations.size();
-  T_CWs->reserve(numPotentialObs);
-  obsDirections->reserve(numPotentialObs);
-  imageNoiseStd->reserve(numPotentialObs);
-
-  uint64_t minValidStateId = statesMap_.begin()->first;
-  for (auto itObs = observations.begin(), iteObs = observations.end();
-       itObs != iteObs; ++itObs) {
-    uint64_t poseId = itObs->first.frameId;
-
-    if (poseId < minValidStateId) {
-      continue;
-    }
-    Eigen::Vector2d measurement;
-    auto multiFrameIter = multiFramePtrMap_.find(poseId);
-    //    OKVIS_ASSERT_TRUE(Exception, multiFrameIter !=
-    //    multiFramePtrMap_.end(), "multiframe not found");
-    okvis::MultiFramePtr multiFramePtr = multiFrameIter->second;
-    multiFramePtr->getKeypoint(itObs->first.cameraIndex,
-                               itObs->first.keypointIndex, measurement);
-
-    // use the latest estimates for camera intrinsic parameters
-    Eigen::Vector3d backProjectionDirection;
-    std::shared_ptr<const cameras::CameraBase> cameraGeometry =
-        camera_rig_.getCameraGeometry(itObs->first.cameraIndex);
-    bool validDirection =
-        cameraGeometry->backProject(measurement, &backProjectionDirection);
-    if (!validDirection) {
-      continue;
-    }
-    obsDirections->push_back(backProjectionDirection);
-
-    okvis::kinematics::Transformation T_WB;
-    get_T_WS(poseId, T_WB);
-    okvis::kinematics::Transformation T_BC =
-        camera_rig_.getCameraExtrinsic(itObs->first.cameraIndex);
-    T_CWs->emplace_back((T_WB * T_BC).inverse());
-
-    double kpSize = 1.0;
-    multiFramePtr->getKeypointSize(itObs->first.cameraIndex,
-                                   itObs->first.keypointIndex, kpSize);
-    imageNoiseStd->push_back(kpSize / 8);
-    imageNoiseStd->push_back(kpSize / 8);
-  }
-  return obsDirections->size();
-}
-
-bool SlidingWindowSmoother::hasLowDisparity(
-    const AlignedVector<Eigen::Vector3d>& obsDirections,
-    const AlignedVector<okvis::kinematics::Transformation>& T_CWs,
-    const std::vector<double>& imageNoiseStd) const {
-  Eigen::VectorXd intrinsics;
-  camera_rig_.getCameraGeometry(0)->getIntrinsics(intrinsics);
-  double focalLength = intrinsics[0];
-  double keypointAStdDev = (imageNoiseStd.front() + imageNoiseStd.back()) * 0.5;
-  const double fourthRoot2 = 1.1892071150;
-  double raySigma = fourthRoot2 * keypointAStdDev / focalLength;
-
-  Eigen::Vector3d rayA_inA = obsDirections.front().normalized();
-  Eigen::Vector3d rayB_inB = obsDirections.back().normalized();
-  Eigen::Vector3d rayB_inA =
-      T_CWs.front().C() * T_CWs.back().C().transpose() * rayB_inB;
-  if ((rayA_inA.cross(rayB_inB)).norm() < FLAGS_ray_sigma_scalar * raySigma ||
-      (rayA_inA.cross(rayB_inA)).norm() < FLAGS_ray_sigma_scalar * raySigma) {
-    return true;
-  } else {
-    return false;
-  }
-}
-
-bool SlidingWindowSmoother::triangulateWithDisparityCheck(uint64_t lmkId, Eigen::Matrix<double, 3, 1>* pW) const {
+bool SlidingWindowSmoother::triangulateWithDisparityCheck(
+    uint64_t lmkId, Eigen::Matrix<double, 3, 1>* pW,
+    double focalLength, double raySigmaScalar) const {
   const MapPoint& mp = landmarksMap_.at(lmkId);
   AlignedVector<Eigen::Vector3d> obsDirections;
   AlignedVector<okvis::kinematics::Transformation> T_CWs;
@@ -1124,7 +1046,7 @@ bool SlidingWindowSmoother::triangulateWithDisparityCheck(uint64_t lmkId, Eigen:
   if (numObs < minTrackLength_) {
     return false;
   }
-  if (hasLowDisparity(obsDirections, T_CWs, imageNoiseStd))
+  if (msckf::hasLowDisparity(obsDirections, T_CWs, imageNoiseStd, focalLength, raySigmaScalar))
     return false;
   Eigen::Matrix<double, 4, 1> hpW = msckf::triangulateHomogeneousDLT(obsDirections, T_CWs);
   *pW = hpW.head<3>() / hpW[3];
@@ -1142,6 +1064,7 @@ void SlidingWindowSmoother::optimize(size_t /*numIter*/, size_t /*numThreads*/,
   }
 
   addLandmarkFactorsTimer.start();
+
   // Mark landmarks that are added to the graph solver.
   // A landmark has only two status:
   // 1. NotInState_NotTrackedNow means that it has not been added to the graph
@@ -1149,6 +1072,9 @@ void SlidingWindowSmoother::optimize(size_t /*numIter*/, size_t /*numThreads*/,
   // 2. InState_TrackedNow means that it has been added to the graph solver.
   // To avoid confusion, do not interpret the second half of the status value.
 
+  Eigen::VectorXd intrinsics;
+  camera_rig_.getCameraGeometry(0)->getIntrinsics(intrinsics);
+  double focalLength = intrinsics[0];
   int numTracked = 0;
   for (okvis::PointMap::iterator it = landmarksMap_.begin();
        it != landmarksMap_.end(); ++it) {
@@ -1169,7 +1095,7 @@ void SlidingWindowSmoother::optimize(size_t /*numIter*/, size_t /*numThreads*/,
         Eigen::Vector3d pW;
         // The below methods differ little.
 //        bool triangulateOk = triangulateSafe(it->first, &pW);
-        bool triangulateOk = triangulateWithDisparityCheck(it->first, &pW);
+        bool triangulateOk = triangulateWithDisparityCheck(it->first, &pW, focalLength, FLAGS_ray_sigma_scalar);
         if (triangulateOk) {
           addLandmarkToGraph(it->first, pW);
           it->second.residualizeCase = InState_TrackedNow;

@@ -207,6 +207,26 @@ Eigen::Vector4d triangulateHomogeneousDLT(
     return svdM.matrixV().col(3);
   }
 }
+
+bool hasLowDisparity(
+    const AlignedVector<Eigen::Vector3d>& obsDirections,
+    const AlignedVector<okvis::kinematics::Transformation>& T_CWs,
+    const std::vector<double>& imageNoiseStd,
+    double focalLength, double raySigmaScalar) {
+  double keypointAStdDev = (imageNoiseStd.front() + imageNoiseStd.back()) * 0.5;
+  const double fourthRoot2 = 1.1892071150;
+  double raySigma = fourthRoot2 * keypointAStdDev / focalLength;
+  Eigen::Vector3d rayA_inA = obsDirections.front().normalized();
+  Eigen::Vector3d rayB_inB = obsDirections.back().normalized();
+  Eigen::Vector3d rayB_inA =
+      T_CWs.front().C() * T_CWs.back().C().transpose() * rayB_inB;
+  if ((rayA_inA.cross(rayB_inB)).norm() < raySigmaScalar * raySigma ||
+      (rayA_inA.cross(rayB_inA)).norm() < raySigmaScalar * raySigma) {
+    return true;
+  } else {
+    return false;
+  }
+}
 } // namespace msckf
 
 

@@ -330,6 +330,19 @@ void Feature::setMaxDepth(double maxDepth) {
 Eigen::Vector4d triangulateHomogeneousDLT(
     const AlignedVector<Eigen::Vector3d>& obsDirections,
     const AlignedVector<okvis::kinematics::Transformation>& T_CWs);
+
+/**
+ * @brief hasLowDisparity check if a feature track has low disparity at its endpoints
+ * @param obsDirections [x, y, 1]
+ * @param T_CWs T_CW takes a point from W frame to camera C frame.
+ * @return true if low disparity at its endpoints
+ */
+bool hasLowDisparity(
+    const AlignedVector<Eigen::Vector3d>& obsDirections,
+    const AlignedVector<okvis::kinematics::Transformation>& T_CWs,
+    const std::vector<double>& imageNoiseStd,
+    double focalLength, double raySigmaScalar);
+
 } // namespace msckf
 
 #endif // MSCKF_VIO_FEATURE_HPP_

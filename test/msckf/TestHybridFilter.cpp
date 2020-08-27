@@ -831,6 +831,25 @@ TEST(SlidingWindowSmoother, TrajectoryLabel) {
                            FLAGS_sim_trajectory_label, FLAGS_num_runs);
 }
 
+TEST(ConsistentEstimator, TrajectoryLabel) {
+  bool addImageNoise = true;
+  bool useImageObservation = true;
+  bool useEpipolarConstraint = false;
+  int cameraObservationModelId = 0;
+  int landmarkModelId = 0;
+  double landmarkRadius = 5;
+  okvis::TestSetting testSetting(
+      true, FLAGS_noisyInitialSpeedAndBiases, FLAGS_noisyInitialSensorParams,
+      addImageNoise, useImageObservation, FLAGS_sim_imu_noise_factor,
+      FLAGS_sim_imu_bias_noise_factor,
+      okvis::EstimatorAlgorithm::Consistent, useEpipolarConstraint,
+      cameraObservationModelId, landmarkModelId,
+      simul::SimCameraModelType::EUROC, simul::CameraOrientation::Forward,
+      okvis::LandmarkGridType::FourWalls, landmarkRadius);
+  testHybridFilterSinusoid(testSetting, FLAGS_log_dir, "ConsistentEstimator",
+                           FLAGS_sim_trajectory_label, FLAGS_num_runs);
+}
+
 TEST(TFVIO, TrajectoryLabel) {
   bool addImageNoise = true;
   bool useImageObservation = true;

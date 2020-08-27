@@ -1,5 +1,7 @@
 #include "msckf/VioTestSystemBuilder.hpp"
+
 #include <msckf/CameraSystemCreator.hpp>
+#include <msckf/ConsistentEstimator.hpp>
 #include <msckf/GeneralEstimator.hpp>
 #include <msckf/InvariantEKF.hpp>
 #include <gtsam/SlidingWindowSmoother.hpp>
@@ -184,6 +186,9 @@ void VioTestSystemBuilder::createVioSystem(
     case okvis::EstimatorAlgorithm::General:
       estimator.reset(new okvis::GeneralEstimator(mapPtr));
       constraintScheme = okvis::OnlyTwoViewConstraints;
+      break;
+    case okvis::EstimatorAlgorithm::Consistent:
+      estimator.reset(new okvis::ConsistentEstimator(mapPtr));
       break;
     case okvis::EstimatorAlgorithm::TFVIO:
       estimator.reset(new okvis::TFVIO(mapPtr));
