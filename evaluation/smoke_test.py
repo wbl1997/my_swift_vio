@@ -45,8 +45,10 @@ if __name__ == '__main__':
     # python3.7 will remember insertion order of items, see
     # https://stackoverflow.com/questions/39980323/are-dictionaries-ordered-in-python-3-6
     algoname_to_options = {
-        # We disable online extrinsic calibration for OKVIS by zeroing
-        # sigma_absolute_translation and sigma_absolute_orientation.
+        'FLS': {
+            "algo_code": "SlidingWindowSmoother",
+            "extra_gflags": "--publish_via_ros=true",
+            "monocular_input": 1,},
         'MSCKF_BgBa': {"algo_code": "MSCKF",
                        "extra_gflags": "--publish_via_ros=true",
                        "numKeyframes": 5,
@@ -95,6 +97,8 @@ if __name__ == '__main__':
                        "anchorAtObservationTime": 0,
                        "extrinsic_opt_mode_main_camera": "p_CB",
                        "extrinsic_opt_mode_other_camera": "p_C0C_q_C0C"},
+        # We disable online extrinsic calibration for OKVIS by zeroing
+        # sigma_absolute_translation and sigma_absolute_orientation.
         'OKVIS': {"algo_code": "OKVIS",
                          "extra_gflags": "--publish_via_ros=false",
                          "numKeyframes": 5,
