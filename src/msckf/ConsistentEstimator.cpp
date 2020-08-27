@@ -587,7 +587,6 @@ bool ConsistentEstimator::computeCovariance(Eigen::MatrixXd* cov) const {
       Eigen::aligned_allocator<Eigen::Matrix<double, -1, -1, Eigen::RowMajor>>>
       varianceList;
   bool status = false;
-  // TODO(jhuai): Severe Jacobian rank deficiency in computing covariance.
   status = mapPtr_->getParameterBlockMinimalCovariance(
       parameterBlockIdList, &varianceList);
   if (status) {

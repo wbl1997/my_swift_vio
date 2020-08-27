@@ -472,6 +472,7 @@ int SimulationFrontend::addMatchToEstimator(
         // Use estimated landmark position because true position does not
         // affect VIO results much.
         hP_W = T_WCa * hP_Ca;
+        LOG(INFO) << "Add landmark " << landmarkMatch.landmarkId;
         estimator.addLandmark(landmarkMatch.landmarkId, hP_W);
         estimator.setLandmarkInitialized(landmarkMatch.landmarkId,
                                          canBeInitialized);
