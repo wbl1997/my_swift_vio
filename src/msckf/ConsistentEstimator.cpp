@@ -67,9 +67,11 @@ void ConsistentEstimator::addLandmarkToGraph(uint64_t lmkId, const Eigen::Vector
   uint64_t minValidStateId = statesMap_.begin()->first;
   okvis::MapPoint& mp = landmarksMap_.at(lmkId);
 
-  // reset the landmark parameter block with externalPointW.
-  std::static_pointer_cast<okvis::ceres::HomogeneousPointParameterBlock>(
-      mapPtr_->parameterBlockPtr(lmkId))->setEstimate(hpW);
+  std::shared_ptr<okvis::ceres::HomogeneousPointParameterBlock> pointParameterBlock(
+      new okvis::ceres::HomogeneousPointParameterBlock(hpW, lmkId));
+  bool paramBlockedAdded = mapPtr_->addParameterBlock(pointParameterBlock,
+                                  okvis::ceres::Map::HomogeneousPoint);
+  OKVIS_ASSERT_TRUE_DBG(Exception, paramBlockedAdded, "Failed to add landmark param block!");
 
   for (std::map<okvis::KeypointIdentifier, uint64_t>::iterator obsIter = mp.observations.begin();
        obsIter != mp.observations.end(); ++obsIter) {
@@ -198,23 +200,29 @@ void ConsistentEstimator::optimize(size_t numIter, size_t /*numThreads*/,
   // update landmarks
   {
     for(auto it = landmarksMap_.begin(); it!=landmarksMap_.end(); ++it){
-      Eigen::MatrixXd H(3,3);
-      mapPtr_->getLhs(it->first,H);
-      Eigen::SelfAdjointEigenSolver< Eigen::Matrix3d > saes(H);
-      Eigen::Vector3d eigenvalues = saes.eigenvalues();
-      const double smallest = (eigenvalues[0]);
-      const double largest = (eigenvalues[2]);
-      if(smallest<1.0e-12){
-        // this means, it has a non-observable depth
-        it->second.quality = 0.0;
-      } else {
-        // OK, well constrained
-        it->second.quality = sqrt(smallest)/sqrt(largest);
-      }
+      if (it->second.residualizeCase == InState_TrackedNow) {
+        Eigen::MatrixXd H(3, 3);
+        mapPtr_->getLhs(it->first, H);
+        Eigen::SelfAdjointEigenSolver<Eigen::Matrix3d> saes(H);
+        Eigen::Vector3d eigenvalues = saes.eigenvalues();
+        const double smallest = (eigenvalues[0]);
+        const double largest = (eigenvalues[2]);
+        if (smallest < 1.0e-12) {
+          // this means, it has a non-observable depth
+          it->second.quality = 0.0;
+        } else {
+          // OK, well constrained
+          it->second.quality = sqrt(smallest) / sqrt(largest);
+        }
 
-      // update coordinates
-      it->second.pointHomog = std::static_pointer_cast<okvis::ceres::HomogeneousPointParameterBlock>(
-          mapPtr_->parameterBlockPtr(it->first))->estimate();
+        // update coordinates
+
+        it->second.pointHomog =
+            std::static_pointer_cast<
+                okvis::ceres::HomogeneousPointParameterBlock>(
+                mapPtr_->parameterBlockPtr(it->first))
+                ->estimate();
+      }
     }
   }
 
