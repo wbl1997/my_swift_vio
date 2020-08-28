@@ -425,10 +425,21 @@ bool ConsistentEstimator::applyMarginalizationStrategy(
 
     {
       for(PointMap::iterator pit = landmarksMap_.begin();
-          pit != landmarksMap_.end(); ){
+          pit != landmarksMap_.end(); ) {
         if (pit->second.residualizeCase == NotInState_NotTrackedNow) {
+          MapPoint& mp = pit->second;
+          for (std::map<okvis::KeypointIdentifier, uint64_t>::iterator oit =
+                   mp.observations.begin();
+               oit != mp.observations.end();) {
+            if (oit->first.frameId == it->second.id) {
+              oit = mp.observations.erase(oit);
+            } else {
+              ++oit;
+            }
+          }
           pit++;
-          continue; // Factors of this landmark has not been added to the graph, so keep it.
+          continue;  // Factors of this landmark has not been added to the
+                     // graph, so keep it.
         }
         ceres::Map::ResidualBlockCollection residuals = mapPtr_->residuals(pit->first);
 

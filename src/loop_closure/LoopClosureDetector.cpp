@@ -110,7 +110,7 @@ LoopClosureDetector::LoopClosureDetector(
 }
 
 LoopClosureDetector::~LoopClosureDetector() {
-  LOG(INFO) << "LoopClosureDetector desctuctor called.";
+  LOG(INFO) << "LoopClosureDetector destructor called.";
 }
 
 void LoopClosureDetector::saveFinalPgoResults() {

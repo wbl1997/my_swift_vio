@@ -1095,7 +1095,8 @@ void SlidingWindowSmoother::optimize(size_t /*numIter*/, size_t /*numThreads*/,
         Eigen::Vector3d pW;
         // The below methods differ little.
 //        bool triangulateOk = triangulateSafe(it->first, &pW);
-        bool triangulateOk = triangulateWithDisparityCheck(it->first, &pW, focalLength, FLAGS_ray_sigma_scalar);
+        bool triangulateOk = triangulateWithDisparityCheck(
+            it->first, &pW, focalLength, FLAGS_ray_sigma_scalar);
         if (triangulateOk) {
           addLandmarkToGraph(it->first, pW);
           it->second.residualizeCase = InState_TrackedNow;
