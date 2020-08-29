@@ -115,8 +115,6 @@ void computeErrors(
   Eigen::Matrix<double, 6, 1> deltaPose;
   deltaPose << delta, alpha;
   Eigen::MatrixXd covariance;
-  bool isFilter = isFilteringMethod(estimatorAlgorithm);
-
   estimator->computeCovariance(&covariance);
 
   (*normalizedSquaredError)[0] =
@@ -146,6 +144,7 @@ void computeErrors(
       (speedAndBias_est.tail<3>() - ref_measurement.accelerometers).cwiseAbs2();
   index += 3;
 
+  bool isFilter = isFilteringMethod(estimatorAlgorithm);
   if (isFilter) {
     Eigen::Matrix<double, 27, 1> extraParamDeviation =
         estimator->computeImuAugmentedParamsError();
