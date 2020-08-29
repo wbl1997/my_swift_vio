@@ -111,11 +111,20 @@ class SlidingWindowSmoother : public Estimator {
    * @brief computeCovariance the block covariance for the navigation state
    * with an abuse of notation, i.e., diag(cov(p, q), cov(v), cov(bg),
    * cov(ba))
+   * @warning only works for IncrementalFixedLagSmoother
    * @param[in, out] cov pointer to the covariance matrix which will be
    * resized in this function.
    * @return true if covariance is successfully computed.
    */
   bool computeCovariance(Eigen::MatrixXd* cov) const override;
+
+  /**
+   * @brief computeJointMarginalCovariance works for both Incremental and BatchFixedLagSmoother.
+   * @warning slow
+   * @param cov
+   * @return
+   */
+  bool computeJointMarginalCovariance(Eigen::MatrixXd* cov) const;
 
   bool print(std::ostream& stream) const override;
 
@@ -164,6 +173,39 @@ class SlidingWindowSmoother : public Estimator {
       const std::map<gtsam::Key, double>& timestamps =
           gtsam::FixedLagSmoother::KeyTimestampMap(),
       const gtsam::FactorIndices& delete_slots = gtsam::FactorIndices());
+
+  // Here are 3 approaches to compute covariance blocks for the lastest pose,
+  // velocity, and biases. Preliminary tests show that they have similar time
+  // consumption but iSAM2 is a bit faster than gtsam::Marginals. And their
+  // results are almost identical, iSAM2 difference from the other two methods
+  // grows over time, reaching the the order of magnitude 1e-3 in position after
+  // 300s.
+  /**
+   * @brief iSAM2MarginalCovariance compute marginal covariance blocks for the
+   * latest nav state and biases with iSAM2.
+   * @warning only works with IncrementalFixedLagSmoother.
+   * @param[in, out] cov
+   * @return
+   */
+  bool iSAM2MarginalCovariance(Eigen::MatrixXd* cov) const;
+
+  /**
+   * @brief gtsamMarginalCovariance compute marginal covariance blocks for the
+   * lastest nav state and biases with gtsam::Marginals. It works with
+   * Incremental and BatchFixedLagSmoother.
+   * @param[in, out] cov
+   * @return
+   */
+  bool gtsamMarginalCovariance(Eigen::MatrixXd* cov) const;
+
+  /**
+   * @brief gtsamJointMarginalCovariance compute the joint marginal covariance
+   * for the lastest nav state and biases with gtsam::Marginals. It works with
+   * Incremental and BatchFixedLagSmoother.
+   * @param[in, out] cov
+   * @return
+   */
+  bool gtsamJointMarginalCovariance(Eigen::MatrixXd* cov) const;
 
   void printSmootherInfo(const gtsam::NonlinearFactorGraph& new_factors_tmp,
                          const gtsam::FactorIndices& delete_slots,

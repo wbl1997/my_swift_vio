@@ -3,6 +3,7 @@
 #include <glog/logging.h>
 
 #include <gtsam/nonlinear/LinearContainerFactor.h>
+#include <gtsam/nonlinear/Marginals.h>
 #include <gtsam/slam/ProjectionFactor.h>
 
 #include <loop_closure/GtsamWrap.hpp>
@@ -1147,6 +1148,10 @@ void SlidingWindowSmoother::optimize(size_t /*numIter*/, size_t /*numThreads*/,
 }
 
 bool SlidingWindowSmoother::computeCovariance(Eigen::MatrixXd* cov) const {
+  return gtsamMarginalCovariance(cov);
+}
+
+bool SlidingWindowSmoother::iSAM2MarginalCovariance(Eigen::MatrixXd* cov) const {
   uint64_t T_WS_id = statesMap_.rbegin()->second.id;
   *cov = Eigen::Matrix<double, 15, 15>::Identity();
   // OKVIS Bg Ba, GTSAM Ba Bg.
@@ -1172,6 +1177,63 @@ bool SlidingWindowSmoother::computeCovariance(Eigen::MatrixXd* cov) const {
   return true;
 }
 
+bool SlidingWindowSmoother::gtsamMarginalCovariance(
+    Eigen::MatrixXd* cov) const {
+  gtsam::Marginals marginals(smoother_->getFactors(), state_,
+                             gtsam::Marginals::Factorization::CHOLESKY);
+  uint64_t T_WS_id = statesMap_.rbegin()->first;
+  okvis::kinematics::Transformation T_WB;
+  get_T_WS(T_WS_id, T_WB);
+
+  // OKVIS Bg Ba, GTSAM Ba Bg.
+  Eigen::Matrix<double, 6, 6> swapBaBg = Eigen::Matrix<double, 6, 6>::Zero();
+  swapBaBg.topRightCorner<3, 3>().setIdentity();
+  swapBaBg.bottomLeftCorner<3, 3>().setIdentity();
+
+  // okvis pW = \hat pW + \delta pW, R_WB = \hat R_WB exp(\delta \theta_W);
+  // gtsam pW = \hat pW + R_WB \delta pB, R_WB = exp(\delta \theta B) \hat R_WB.
+  Eigen::Matrix<double, 6, 6> swapRT = Eigen::Matrix<double, 6, 6>::Zero();
+  swapRT.topRightCorner<3, 3>() = T_WB.C();
+  swapRT.bottomLeftCorner<3, 3>() = T_WB.C();
+  *cov = Eigen::Matrix<double, 15, 15>::Identity();
+  Eigen::MatrixXd poseMargCov =
+      marginals.marginalCovariance(gtsam::Symbol('x', T_WS_id));
+  cov->topLeftCorner<6, 6>() = swapRT * poseMargCov * swapRT.transpose();
+  cov->block<3, 3>(6, 6) =
+      marginals.marginalCovariance(gtsam::Symbol('v', T_WS_id));
+  cov->block<6, 6>(9, 9) =
+      swapBaBg * marginals.marginalCovariance(gtsam::Symbol('b', T_WS_id)) *
+      swapBaBg.transpose();
+  return true;
+}
+
+bool SlidingWindowSmoother::gtsamJointMarginalCovariance(
+    Eigen::MatrixXd* cov) const {
+  gtsam::Marginals marginals(smoother_->getFactors(), state_,
+                             gtsam::Marginals::Factorization::CHOLESKY);
+  uint64_t T_WS_id = statesMap_.rbegin()->first;
+  // Current state includes pose, velocity and imu biases.
+  gtsam::KeyVector keys;
+  keys.push_back(gtsam::Symbol('x', T_WS_id));
+  keys.push_back(gtsam::Symbol('v', T_WS_id));
+  keys.push_back(gtsam::Symbol('b', T_WS_id));
+
+  // The marginal covariance matrix [ba, bg, v_W, \delta p_B, \phi_B].
+  Eigen::MatrixXd jointCov =
+      marginals.jointMarginalCovariance(keys).fullMatrix();
+  okvis::kinematics::Transformation T_WB;
+  get_T_WS(T_WS_id, T_WB);
+  Eigen::Matrix<double, 15, 15> dokvis_dgtsam =
+      Eigen::Matrix<double, 15, 15>::Zero();
+  dokvis_dgtsam.topRightCorner<3, 3>() = T_WB.C();
+  dokvis_dgtsam.block<3, 3>(3, 9) = T_WB.C();
+  dokvis_dgtsam.block<3, 3>(6, 6).setIdentity();
+  dokvis_dgtsam.block<3, 3>(9, 3).setIdentity();
+  dokvis_dgtsam.block<3, 3>(12, 0).setIdentity();
+  // The marginal covariance matrix [\phi_W, \delta p_W, v_W, bg, ba].
+  *cov = dokvis_dgtsam * jointCov * dokvis_dgtsam.transpose();
+  return true;
+}
 
 void printSmartFactor(
     boost::shared_ptr<SmartStereoFactor> gsf) {
