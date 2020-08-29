@@ -345,3 +345,14 @@ TEST(CovarianceEstimation, Simple)
         << expectedcov << "\nCeres covariance\n" << cerescov;
 }
 
+// Test ceres covariance computation with a relative large scale visual inertial problem.
+TEST(CovarianceEstimation, MonoVisualInertial) {
+  // TODO(jhuai): Currently, OKVIS estimator constructs a ceres Problem, add
+  // parameter blocks and residual blocks incrementally, then optimize the
+  // solution, and marginalize redundant variables. But regardless of the
+  // marginalization step, the estimator always fails to compute the covariance
+  // because of rank deficient Jacobian with SPARSE_QR approach.
+
+  // refer to ceres-solver/internal/ceres/covariance_test.cc, and TestEstimator
+  // to construct a test fixture.
+}
