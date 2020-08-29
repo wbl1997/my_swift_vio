@@ -63,6 +63,10 @@ inline gtsam::SharedNoiseModel createRobustNoiseModelSqrtR(
   return noise_model_output;
 }
 
+// reorder block entries of covariance from state: [bias, vel, pose] to [pose
+// vel bias]
+gtsam::Matrix Covariance_bvx2xvb(const gtsam::Matrix& COV_bvx);
+
 /**
  * @brief compute Jacobian of the gtsam between factor unwhitened error relative
  * to the measurement error by autoDifferentiate.

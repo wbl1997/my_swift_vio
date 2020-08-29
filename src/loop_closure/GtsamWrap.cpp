@@ -92,4 +92,25 @@ void GtsamWrap::toMeasurementJacobianBetweenFactor(
   JtoCustomRetract->bottomRightCorner<3, 3>().setZero();
 }
 
+gtsam::Matrix Covariance_bvx2xvb(const gtsam::Matrix& COV_bvx) {
+  gtsam::Matrix cov_xvb = COV_bvx;
+  // fix diagonals: poses
+  cov_xvb.block<6, 6>(0, 0) = COV_bvx.block<6, 6>(9, 9);
+  // fix diagonals: velocity: already in place
+  // fix diagonals: biases
+  cov_xvb.block<6, 6>(9, 9) = COV_bvx.block<6, 6>(0, 0);
+
+  // off diagonal, pose-vel
+  cov_xvb.block<6, 3>(0, 6) = COV_bvx.block<6, 3>(9, 6);
+  cov_xvb.block<3, 6>(6, 0) = (cov_xvb.block<6, 3>(0, 6)).transpose();
+  // off diagonal, pose-bias
+  cov_xvb.block<6, 6>(0, 9) = COV_bvx.block<6, 6>(9, 0);
+  cov_xvb.block<6, 6>(9, 0) = (cov_xvb.block<6, 6>(0, 9)).transpose();
+  // off diagonal, vel-bias
+  cov_xvb.block<3, 6>(6, 9) = COV_bvx.block<3, 6>(6, 0);
+  cov_xvb.block<6, 3>(9, 6) = (cov_xvb.block<3, 6>(6, 9)).transpose();
+
+  return cov_xvb;
+}
+
 } // namespace VIO

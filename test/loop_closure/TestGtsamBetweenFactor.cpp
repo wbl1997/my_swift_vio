@@ -190,3 +190,32 @@ TEST(RobustNoiseModel, sqrtInfoR) {
   EXPECT_LT(graphWithPrior.error(initial), 1e-7) << "initial error";
   EXPECT_LT(graphWithPrior.error(result), 1e-7) << "final error";
 }
+
+TEST(GtsamUtil, covariancebvx2xvb) {
+  srand(1000000);
+
+  // Create random covariance
+  gtsam::Matrix cov_xx = gtsam::Matrix::Random(6, 6);
+  gtsam::Matrix cov_xv = gtsam::Matrix::Random(6, 3);
+  gtsam::Matrix cov_xb = gtsam::Matrix::Random(6, 6);
+  gtsam::Matrix cov_vv = gtsam::Matrix::Random(3, 3);
+  gtsam::Matrix cov_vb = gtsam::Matrix::Random(3, 6);
+  gtsam::Matrix cov_bb = gtsam::Matrix::Random(6, 6);
+
+  gtsam::Matrix cov_vx = cov_xv.transpose();
+  gtsam::Matrix cov_bx = cov_xb.transpose();
+  gtsam::Matrix cov_bv = cov_vb.transpose();
+
+  gtsam::Matrix expected_cov_xvb = gtsam::Matrix(15, 15);
+  expected_cov_xvb.block<6, 15>(0, 0) << cov_xx, cov_xv, cov_xb;
+  expected_cov_xvb.block<3, 15>(6, 0) << cov_vx, cov_vv, cov_vb;
+  expected_cov_xvb.block<6, 15>(9, 0) << cov_bx, cov_bv, cov_bb;
+
+  gtsam::Matrix cov_bvx = gtsam::Matrix(15, 15);
+  cov_bvx.block<6, 15>(0, 0) << cov_bb, cov_bv, cov_bx;
+  cov_bvx.block<3, 15>(6, 0) << cov_vb, cov_vv, cov_vx;
+  cov_bvx.block<6, 15>(9, 0) << cov_xb, cov_xv, cov_xx;
+
+  gtsam::Matrix cov_actual_xvb = VIO::Covariance_bvx2xvb(cov_bvx);
+  EXPECT_LE((expected_cov_xvb - cov_actual_xvb).lpNorm<Eigen::Infinity>(), 1e-8);
+}
