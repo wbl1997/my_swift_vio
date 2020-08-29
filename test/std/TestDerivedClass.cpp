@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <iostream>
+#include <memory>
+
 class Base {
  protected:
   std::string id;
@@ -75,4 +78,54 @@ TEST(StandardC, DerivedClass) {
   EXPECT_EQ(d.valAt(3), 9);
   EXPECT_EQ(d.valAt2(0), 10);
   EXPECT_EQ(d.valAt2(4), 14);
+}
+
+struct A {
+  explicit A(int f) : foo(f) {}
+  virtual ~A() {}
+  virtual void plus() { ++foo; }
+  virtual void print() const { std::cout << "foo " << foo << "\n"; }
+  virtual bool equals(const A& rhs) const { return rhs.foo == foo; }
+  int foo;
+};
+
+struct B : public A {
+  explicit B(int b) : A(b / 2), bar(b) {}
+  virtual ~B() {}
+  void plus() override {
+    A::plus();
+    bar += 2;
+  }
+  void print() const override {
+    A::print();
+    std::cout << "bar: " << bar << std::endl;
+  }
+
+  bool equals(const A& obj) const override {
+    const auto& rhs = static_cast<const B&>(obj);
+
+    return A::equals(obj) && bar == rhs.bar;
+  }
+  int bar;
+};
+
+TEST(StandardC, AssignToBaseClass) {
+  // This test shows that assigning to base class object causes object slicing.
+  std::shared_ptr<A> b, backup;
+  b.reset(new B(100));
+  backup.reset(new B(*std::static_pointer_cast<B>(b)));
+
+  b->plus();
+
+//  std::cout << "Before assignment\nb\n";
+//  b->print();
+//  std::cout << "backup\n";
+//  backup->print();
+  *b = *backup;
+
+//  std::cout << "After assignment\n";
+//  b->print();
+
+  bool res = b->equals(*backup);
+  EXPECT_FALSE(res);
 }
