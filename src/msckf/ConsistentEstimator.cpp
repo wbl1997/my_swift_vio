@@ -216,7 +216,6 @@ void ConsistentEstimator::optimize(size_t numIter, size_t /*numThreads*/,
         }
 
         // update coordinates
-
         it->second.pointHomog =
             std::static_pointer_cast<
                 okvis::ceres::HomogeneousPointParameterBlock>(

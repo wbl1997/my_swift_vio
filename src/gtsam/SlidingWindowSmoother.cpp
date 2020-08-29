@@ -579,25 +579,6 @@ bool SlidingWindowSmoother::applyMarginalizationStrategy(
   return true;
 }
 
-double landmarkQuality(std::shared_ptr<okvis::ceres::Map> mapPtr,
-                       uint64_t landmarkId) {
-  Eigen::MatrixXd H(3, 3);
-  mapPtr->getLhs(landmarkId, H);
-  Eigen::SelfAdjointEigenSolver<Eigen::Matrix3d> saes(H);
-  Eigen::Vector3d eigenvalues = saes.eigenvalues();
-  const double smallest = (eigenvalues[0]);
-  const double largest = (eigenvalues[2]);
-  double quality = 0.0;
-  if (smallest < 1.0e-12) {
-    // this means, it has a non-observable depth
-    quality = 0.0;
-  } else {
-    // OK, well constrained
-    quality = sqrt(smallest) / sqrt(largest);
-  }
-  return quality;
-}
-
 // Refer to InvUVFactor and process_feat_normal in CPI, closed-form preintegration repo of Eckenhoff.
 void SlidingWindowSmoother::addLandmarkToGraph(uint64_t lmkId, const Eigen::Vector3d& externalPointW) {
   // We use a unit pinhole projection camera for the smart factors to be
@@ -811,13 +792,8 @@ void SlidingWindowSmoother::updateStates() {
       Eigen::Vector4d hpW;
       hpW.head<3>() = pW;
       hpW[3] = 1.0;
-      std::shared_ptr<okvis::ceres::HomogeneousPointParameterBlock> landmarkParamBlockPtr =
-          std::static_pointer_cast<okvis::ceres::HomogeneousPointParameterBlock>(
-                                        mapPtr_->parameterBlockPtr(it->first));
-      landmarkParamBlockPtr->setEstimate(hpW);
 
-      double quality = landmarkQuality(mapPtr_, it->first);
-      it->second.quality = quality;
+      it->second.quality = 1.0;
       it->second.pointHomog = hpW;
     }
     updateLandmarksTimer.stop();

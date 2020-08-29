@@ -214,8 +214,8 @@ TEST(CovarianceEstimation, Simple)
 {
     double initx = 3;
     double inity = 5;
-    double truex = 2.0;
-    double truey = 4.0;
+//    double truex = 2.0;
+//    double truey = 4.0;
     double x = initx;
     double y = inity;
     Problem problem;
