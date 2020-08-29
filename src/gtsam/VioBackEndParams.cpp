@@ -62,6 +62,9 @@ bool BackendParams::parseYAMLVioBackEndParams(
   yaml_parser.getYamlParam("wildfire_threshold", &wildfire_threshold_);
   yaml_parser.getYamlParam("useDogLeg", &useDogLeg_);
 
+  yaml_parser.getYamlParam("initialLambda", &initialLambda_);
+  yaml_parser.getYamlParam("lowerBoundLambda", &lowerBoundLambda_);
+  yaml_parser.getYamlParam("upperBoundLambda", &upperBoundLambda_);
   return true;
 }
 
@@ -91,7 +94,10 @@ bool BackendParams::equalsVioBackEndParams(const BackendParams& vp2,
       (fabs(constantVelSigma_ - vp2.constantVelSigma_) <= tol) &&
       (numOptimize_ == vp2.numOptimize_) &&
       (wildfire_threshold_ == vp2.wildfire_threshold_) &&
-      (useDogLeg_ == vp2.useDogLeg_);
+      (useDogLeg_ == vp2.useDogLeg_) &&
+      (initialLambda_ == vp2.initialLambda_) &&
+      (lowerBoundLambda_ == vp2.lowerBoundLambda_) &&
+      (upperBoundLambda_ == vp2.upperBoundLambda_);
 }
 
 void BackendParams::printVioBackEndParams() const {
@@ -118,7 +124,10 @@ void BackendParams::printVioBackEndParams() const {
             << "constantVelSigma_: " << constantVelSigma_ << '\n'
             << "numOptimize_: " << numOptimize_ << '\n'
             << "wildfire_threshold_: " << wildfire_threshold_ << '\n'
-            << "useDogLeg_: " << useDogLeg_;
+            << "useDogLeg_: " << useDogLeg_ << '\n'
+            << "initialLambda_: " << initialLambda_ << '\n'
+            << "lowerBoundLambda_: " << lowerBoundLambda_ << '\n'
+            << "upperBoundLambda_: " << upperBoundLambda_;
 }
 
 }  // namespace okvis

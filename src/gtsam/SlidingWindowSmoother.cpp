@@ -77,17 +77,16 @@ void setIsam2Params(const okvis::BackendParams& vio_params,
 void SlidingWindowSmoother::setupSmoother(
     const okvis::BackendParams& vioParams) {
 #ifdef INCREMENTAL_SMOOTHER
-  gtsam::ISAM2Params isam_param;
-  setIsam2Params(vioParams, &isam_param);
-  smoother_.reset(new Smoother(FLAGS_time_horizon, isam_param));
+  gtsam::ISAM2Params params;
+  setIsam2Params(vioParams, &params);
 #else  // BATCH SMOOTHER
-  gtsam::LevenbergMarquardtParams lmParams;
-  lmParams.setlambdaInitial(0.0);     // same as GN
-  lmParams.setlambdaLowerBound(0.0);  // same as GN
-  lmParams.setlambdaUpperBound(0.0);  // same as GN)
-  smoother_ =
-      std::shared_ptr<Smoother>(new Smoother(FLAGS_time_horizon, lmParams));
+  gtsam::LevenbergMarquardtParams params;
+  params.setlambdaInitial(vioParams.initialLambda_);
+  params.setlambdaLowerBound(vioParams.lowerBoundLambda_);
+  params.setlambdaUpperBound(vioParams.upperBoundLambda_);
 #endif
+  smoother_.reset(new Smoother(FLAGS_time_horizon, params));
+
   mTrackLengthAccumulator = std::vector<size_t>(100, 0u);
 }
 
@@ -814,9 +813,9 @@ bool SlidingWindowSmoother::updateSmoother(gtsam::FixedLagSmoother::Result* resu
   bool got_cheirality_exception = false;
   gtsam::Symbol lmk_symbol_cheirality;
   try {
-    LOG(INFO) << "Starting update of smoother_...";
+//    LOG(INFO) << "Starting update of smoother_...";
     *result = smoother_->update(new_factors, new_values, timestamps, delete_slots);
-    LOG(INFO) << "Finished update of smoother_.";
+//    LOG(INFO) << "Finished update of smoother_.";
   } catch (const gtsam::IndeterminantLinearSystemException& e) {
     const gtsam::Key& var = e.nearbyVariable();
     gtsam::Symbol symb(var);
@@ -1112,9 +1111,9 @@ void SlidingWindowSmoother::optimize(size_t /*numIter*/, size_t /*numThreads*/,
   gtsam::FactorIndices delete_slots;
 
   isam2UpdateTimer.start();
-  LOG(INFO) << "iSAM2 update with " << new_factors_tmp.size() << " new factors "
-           << ", " << new_values_.size() << " new values "
-           << ", and " << delete_slots.size() << " deleted factors.";
+//  LOG(INFO) << "iSAM2 update with " << new_factors_tmp.size() << " new factors"
+//           << ", " << new_values_.size() << " new values"
+//           << ", and " << delete_slots.size() << " deleted factors.";
   Smoother::Result result;
   bool is_smoother_ok = updateSmoother(&result, new_factors_tmp, new_values_,
                                        timestamps, delete_slots);
@@ -1151,7 +1150,8 @@ bool SlidingWindowSmoother::computeCovariance(Eigen::MatrixXd* cov) const {
   return gtsamMarginalCovariance(cov);
 }
 
-bool SlidingWindowSmoother::iSAM2MarginalCovariance(Eigen::MatrixXd* cov) const {
+bool SlidingWindowSmoother::iSAM2MarginalCovariance(
+    Eigen::MatrixXd* cov) const {
   uint64_t T_WS_id = statesMap_.rbegin()->second.id;
   *cov = Eigen::Matrix<double, 15, 15>::Identity();
   // OKVIS Bg Ba, GTSAM Ba Bg.

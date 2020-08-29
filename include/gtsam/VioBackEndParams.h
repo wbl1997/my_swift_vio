@@ -111,6 +111,11 @@ class BackendParams : public PipelineParams {
   double wildfire_threshold_ = 0.001;
   bool useDogLeg_ = false;
 
+  //! Batch smoother params
+  double initialLambda_ = 0.0;  // same as GN
+  double lowerBoundLambda_ = 0.0;  // same as GN
+  double upperBoundLambda_ = 0.0;  // same as GN
+
   //! No Motion params
   double zeroVelocitySigma_ = 1.0e-3;
   double noMotionPositionSigma_ = 1.0e-3;
