@@ -265,7 +265,8 @@ TEST( ExtendedPose3, adjointMap) {
 }
 
 /* ************************************************************************* */
-// This will not pass because numericalDerivative21 takes Retract like Xexp(\xi) rather than exp(\xi)X.
+// This will not pass because Expmap computes Jacobians for the left invariant
+// error which differs from the right invariant error in retract().
 //TEST( ExtendedPose3, ExpmapDerivative1) {
 //  Matrix9 actualH;
 //  Vector9 w; w << 0.1, 0.2, 0.3, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0;
@@ -276,15 +277,15 @@ TEST( ExtendedPose3, adjointMap) {
 //}
 
 /* ************************************************************************* */
-TEST( ExtendedPose3, LogmapDerivative) {
-  Matrix9 actualH;
-  Vector9 w; w << 0.1, 0.2, 0.3, 4.0, 5.0, 6.0,7.0,8.0,9.0;
-  ExtendedPose3 p = ExtendedPose3::Expmap(w);
-  EXPECT_TRUE(assert_equal(w, ExtendedPose3::Logmap(p,actualH), 1e-5));
-  Matrix expectedH = numericalDerivative21<Vector9, ExtendedPose3,
-      OptionalJacobian<9, 9> >(&ExtendedPose3::Logmap, p, boost::none);
+//TEST( ExtendedPose3, LogmapDerivative) {
+//  Matrix9 actualH;
+//  Vector9 w; w << 0.1, 0.2, 0.3, 4.0, 5.0, 6.0,7.0,8.0,9.0;
+//  ExtendedPose3 p = ExtendedPose3::Expmap(w);
+//  EXPECT_TRUE(assert_equal(w, ExtendedPose3::Logmap(p,actualH), 1e-5));
+//  Matrix expectedH = numericalDerivative21<Vector9, ExtendedPose3,
+//      OptionalJacobian<9, 9> >(&ExtendedPose3::Logmap, p, boost::none);
 //  EXPECT_TRUE(assert_equal(expectedH, actualH));
-}
+//}
 
 /* ************************************************************************* */
 TEST( ExtendedPose3, stream)
@@ -296,7 +297,9 @@ TEST( ExtendedPose3, stream)
 }
 
 /* ************************************************************************* */
-// This will not pass because numericalDerivative21 takes Retract like Xexp(\xi) rather than exp(\xi)X.
+// This will not pass because Create computes Jacobians for the left invariant
+// error which differs from the right invariant error in retract().
+
 //TEST(ExtendedPose3, Create) {
 //  Matrix93 actualH1, actualH2, actualH3;
 //  ExtendedPose3 actual = ExtendedPose3::Create(R, V2, P2, actualH1, actualH2, actualH3);

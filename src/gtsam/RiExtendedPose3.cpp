@@ -131,9 +131,8 @@ ExtendedPose3 ExtendedPose3::expmap(const Vector9 &xi) const {
 }
 
 Vector9 ExtendedPose3::logmap(const ExtendedPose3 &b) const {
-    return Logmap(b * inverse());
+  return Logmap(b * inverse());
 }
-
 
 /* ************************************************************************* */
 ExtendedPose3 ExtendedPose3::Expmap(const Vector9& xi, OptionalJacobian<9, 9> Hxi) {
@@ -257,7 +256,9 @@ static Matrix63 computeQforExpmapDerivative(const Vector9& xi) {
 }
 
 /* ************************************************************************* */
+// warning This assumes left invariant error formulation.
 Matrix9 ExtendedPose3::ExpmapDerivative(const Vector9& xi) {
+  throw std::runtime_error("Implementation incompatible to right invariant error formulation.");
   const Vector3 w = xi.head<3>();
   const Matrix3 Jw = Rot3::ExpmapDerivative(w);
   const Matrix63 Q = computeQforExpmapDerivative(xi);
@@ -271,7 +272,10 @@ Matrix9 ExtendedPose3::ExpmapDerivative(const Vector9& xi) {
 }
 
 /* ************************************************************************* */
+// warning This assumes left invariant error formulation which leads to
+// Jrinv. Right invariant error formulation will leads to Jlinv.
 Matrix9 ExtendedPose3::LogmapDerivative(const ExtendedPose3& pose) {
+  throw std::runtime_error("Implementation incompatible to right invariant error formulation.");
   const Vector9 xi = Logmap(pose);
   const Vector3 w = xi.head<3>();
   const Matrix3 Jw = Rot3::LogmapDerivative(w);

@@ -183,11 +183,23 @@ namespace gtsam {
     static Vector9 adjointTranspose(const Vector9& xi, const Vector9& y,
         OptionalJacobian<9, 9> Hxi = boost::none);
 
-    /// Derivative of Expmap
+    /**
+     * @brief ExpmapDerivative Derivative of Expmap
+     * Expmap(xi).local(Expmap(xi + \delta)) \approx ExpmapDerivative(x) * \delta.
+     * @param xi
+     * @return
+     */
     static Matrix9 ExpmapDerivative(const Vector9& xi);
 
-    /// Derivative of Logmap
-    static Matrix9 LogmapDerivative(const ExtendedPose3& xi);
+    /**
+     * @brief LogmapDerivative Derivative of Logmap
+     * logmap(x.retract(\xi)) - logmap(x) \approx LogmapDerivative(x) * \xi
+     * This maps a perturbation on the manifold (x) to a perturbation in the
+     * tangent space.
+     * @param x = expmap(\phi)
+     * @return
+     */
+    static Matrix9 LogmapDerivative(const ExtendedPose3& x);
 
 
     Vector9 boxminus(const ExtendedPose3& g) const;
