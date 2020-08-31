@@ -22,7 +22,7 @@ namespace gtsam {
    * @addtogroup geometry
    * \nosubgrouping
    */
-  class GTSAM_EXPORT ExtendedPose3 {
+  class GTSAM_EXPORT RiExtendedPose3 {
   public:
 
     /** Pose Concept requirements */
@@ -46,28 +46,28 @@ namespace gtsam {
     /// @{
 
     /** Default constructor is origin */
-   ExtendedPose3() : R_(traits<Rot3>::Identity()), v_(traits<Point3>::Identity()), p_(traits<Point3>::Identity()) {}
+   RiExtendedPose3() : R_(traits<Rot3>::Identity()), v_(traits<Point3>::Identity()), p_(traits<Point3>::Identity()) {}
 
     /** Copy constructor */
-    ExtendedPose3(const ExtendedPose3& pose) :
+    RiExtendedPose3(const RiExtendedPose3& pose) :
         R_(pose.R_), v_(pose.v_), p_(pose.p_) {
     }
 
     /** Construct from R,v,p */
-    ExtendedPose3(const Rot3& R, const Point3& v, const Point3& p) :
+    RiExtendedPose3(const Rot3& R, const Point3& v, const Point3& p) :
         R_(R), v_(v), p_(p) {
     }
 
     //explicit Pose3(const Pose2& pose2);
 
     /** Constructor from 5*5 matrix */
-    ExtendedPose3(const Matrix &T) :
+    RiExtendedPose3(const Matrix &T) :
         R_(T(0, 0), T(0, 1), T(0, 2), T(1, 0), T(1, 1), T(1, 2), T(2, 0), T(2, 1),
             T(2, 2)), v_(T(0, 3), T(1, 3), T(2, 3)), p_(T(0, 4), T(1, 4), T(2, 4)) {
     }
 
     /// Named constructor with derivatives
-//    static ExtendedPose3 Create(const Rot3& R, const Point3& v, const Point3& p,
+//    static RiExtendedPose3 Create(const Rot3& R, const Point3& v, const Point3& p,
 //                        OptionalJacobian<9, 3> HR = boost::none,
 //                        OptionalJacobian<9, 3> Hv = boost::none,
 //                        OptionalJacobian<9, 3> Hp = boost::none);
@@ -81,68 +81,68 @@ namespace gtsam {
     void print(const std::string& s = "") const;
 
     /// assert equality up to a tolerance
-    bool equals(const ExtendedPose3& pose, double tol = 1e-9) const;
+    bool equals(const RiExtendedPose3& pose, double tol = 1e-9) const;
 
     /// @}
     /// @name Group
     /// @{
 
     /// identity for group operation
-    static ExtendedPose3 identity() {
-      return ExtendedPose3();
+    static RiExtendedPose3 identity() {
+      return RiExtendedPose3();
     }
 
     /// inverse transformation with derivatives
-    ExtendedPose3 inverse() const;
+    RiExtendedPose3 inverse() const;
 
     /// compose syntactic sugar
-    ExtendedPose3 operator*(const ExtendedPose3& T) const {
-      return ExtendedPose3(R_ * T.R_, v_ + R_ * T.v_, p_ + R_ * T.p_);
+    RiExtendedPose3 operator*(const RiExtendedPose3& T) const {
+      return RiExtendedPose3(R_ * T.R_, v_ + R_ * T.v_, p_ + R_ * T.p_);
     }
 
     /// @}
     /// @name Manifold
     /// @{
     /// Retract with optional derivatives (given correction, change this navstate)
-    ExtendedPose3 retract(const Vector9& xi) const;
+    RiExtendedPose3 retract(const Vector9& xi) const;
 
     /// Converting function from our overparameterization to the local representation
-    Vector9 localCoordinates(const ExtendedPose3& state) const;
+    Vector9 localCoordinates(const RiExtendedPose3& state) const;
 
     /// @}
     /// @name Lie Group
     /// @{
 
     /// Exponential map at identity - create a rotation from canonical coordinates \f$ [R_x,R_y,R_z,V_x,V_y,V_z,P_x,P_y,P_z] \f$
-    static ExtendedPose3 Expmap(const Vector9& xi, OptionalJacobian<9, 9> Hxi = boost::none);
+    static RiExtendedPose3 Expmap(const Vector9& xi, OptionalJacobian<9, 9> Hxi = boost::none);
 
     /// Log map at identity - return the canonical coordinates \f$ [R_x,R_y,R_z,V_x,V_y,V_z,P_x,P_y,P_z] \f$ of this rotation
-    static Vector9 Logmap(const ExtendedPose3& pose, OptionalJacobian<9, 9> Hpose = boost::none);
+    static Vector9 Logmap(const RiExtendedPose3& pose, OptionalJacobian<9, 9> Hpose = boost::none);
 
     /// Retract with optional derivatives (given correction, change this navstate)
-    ExtendedPose3 expmap(const Vector9& xi) const;
+    RiExtendedPose3 expmap(const Vector9& xi) const;
 
     /// Converting function from our overparameterization to the local representation
-    Vector9 logmap(const ExtendedPose3& state) const;
+    Vector9 logmap(const RiExtendedPose3& state) const;
 
-    ExtendedPose3 compose(const ExtendedPose3& g) const {
+    RiExtendedPose3 compose(const RiExtendedPose3& g) const {
       return *this * g;
     }
 
-    ExtendedPose3 between(const ExtendedPose3& g) const {
+    RiExtendedPose3 between(const RiExtendedPose3& g) const {
       return inverse() * g;
     }
 
-    ExtendedPose3 compose(const ExtendedPose3& g, ChartJacobian H1,
+    RiExtendedPose3 compose(const RiExtendedPose3& g, ChartJacobian H1,
         ChartJacobian H2 = boost::none) const {
       if (H1) *H1 = g.inverse().AdjointMap();
       if (H2) *H2 = Eigen::Matrix<double, 9, 9>::Identity();
       return *this * g;
     }
 
-    ExtendedPose3 between(const ExtendedPose3& g, ChartJacobian H1,
+    RiExtendedPose3 between(const RiExtendedPose3& g, ChartJacobian H1,
         ChartJacobian H2 = boost::none) const {
-      ExtendedPose3 result = inverse() * g;
+      RiExtendedPose3 result = inverse() * g;
       if (H1) *H1 = - result.inverse().AdjointMap();
       if (H2) *H2 = Eigen::Matrix<double, 9, 9>::Identity();
       return result;
@@ -199,13 +199,13 @@ namespace gtsam {
      * @param x = expmap(\phi)
      * @return
      */
-    static Matrix9 LogmapDerivative(const ExtendedPose3& x);
+    static Matrix9 LogmapDerivative(const RiExtendedPose3& x);
 
 
-    Vector9 boxminus(const ExtendedPose3& g) const;
+    Vector9 boxminus(const RiExtendedPose3& g) const;
 
     /**
-     * wedge for ExtendedPose3:
+     * wedge for RiExtendedPose3:
      * @param xi 9-dim twist (omega,nu,rho)
      * @return 5*5 element of Lie algebra
      */
@@ -286,7 +286,7 @@ namespace gtsam {
      *  Assuming self == wTa, takes a pose wTb in world coordinates
      * and transforms it to local coordinates aTb = inv(wTa) * wTb
      */
-    ExtendedPose3 transformPoseTo(const ExtendedPose3& wTb, OptionalJacobian<9, 9> Hself = boost::none,  OptionalJacobian<9, 9> HwTb = boost::none) const;
+    RiExtendedPose3 transformPoseTo(const RiExtendedPose3& wTb, OptionalJacobian<9, 9> Hself = boost::none,  OptionalJacobian<9, 9> HwTb = boost::none) const;
 
     /**
      * Calculate range to a landmark
@@ -301,7 +301,7 @@ namespace gtsam {
      * @param pose Other SO(3) pose
      * @return range (double)
      */
-    double range(const ExtendedPose3& pose, OptionalJacobian<1, 9> Hself = boost::none, OptionalJacobian<1, 9> Hpose = boost::none) const;
+    double range(const RiExtendedPose3& pose, OptionalJacobian<1, 9> Hself = boost::none, OptionalJacobian<1, 9> Hpose = boost::none) const;
 
     /**
      * Calculate bearing to a landmark
@@ -317,7 +317,7 @@ namespace gtsam {
      * information is ignored.
      * @return bearing (Unit3)
      */
-    Unit3 bearing(const ExtendedPose3& pose, OptionalJacobian<2, 9> Hself = boost::none,
+    Unit3 bearing(const RiExtendedPose3& pose, OptionalJacobian<2, 9> Hself = boost::none,
         OptionalJacobian<2, 9> Hpose = boost::none) const;
 
     /// @}
@@ -356,7 +356,7 @@ namespace gtsam {
 
     /// Output stream operator
     GTSAM_EXPORT
-    friend std::ostream &operator<<(std::ostream &os, const ExtendedPose3& p);
+    friend std::ostream &operator<<(std::ostream &os, const RiExtendedPose3& p);
 
 
 
@@ -377,11 +377,11 @@ namespace gtsam {
       GTSAM_MAKE_ALIGNED_OPERATOR_NEW
   #endif
   };
-  // ExtendedPose3 class
+  // RiExtendedPose3 class
 
 
     template<>
-    struct traits<ExtendedPose3> : internal::Manifold<ExtendedPose3> { };
+    struct traits<RiExtendedPose3> : internal::Manifold<RiExtendedPose3> { };
 
 } // namespace gtsam
 
