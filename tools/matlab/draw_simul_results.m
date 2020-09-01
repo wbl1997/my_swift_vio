@@ -55,7 +55,7 @@ end
 
 function traj_name = find_traj_name(name_est)
 traj_name = '';
-traj = {'Ball', 'Torus', 'WavyCircle', 'Dot', 'Squircle', 'Circle', 'Motionless'};
+traj = {'Ball', 'Torus2', 'Torus', 'WavyCircle', 'Dot', 'Squircle', 'Circle', 'Motionless'};
 for i = 1 : size(traj, 2)
     if contains(name_est, traj{i})
         traj_name = traj{i};

@@ -465,7 +465,7 @@ void testHybridFilterSinusoid(const okvis::TestSetting& testSetting,
 
         // reference ID will be and stay the first frame added.
         multiFrameIds.push_back(id);
-        LOG(INFO) << "Processing frame " << id << " of index " << frameCount;
+//        LOG(INFO) << "Processing frame " << id << " of index " << frameCount;
         okvis::Time currentKFTime = *iter;
         okvis::Time imuDataEndTime = currentKFTime + okvis::Duration(1);
         okvis::Time imuDataBeginTime = lastKFTime - okvis::Duration(1);

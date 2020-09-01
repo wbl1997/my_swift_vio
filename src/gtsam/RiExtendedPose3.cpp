@@ -1,9 +1,10 @@
-#include "gtsam/RiExtendedPose3.h"
 
 /**
  * @file  RiExtendedPose3.cpp
  * @brief right invariant ExtendedPose3
  */
+
+#include "gtsam/RiExtendedPose3.h"
 
 #include <gtsam/geometry/concepts.h>
 #include <gtsam/geometry/Rot3.h>

@@ -79,7 +79,7 @@ Its installation refers to [Kimera-VIO](https://github.com/MIT-SPARK/Kimera-VIO/
 ```
 sudo apt-get install libtbb-dev
 cd $HOME/Documents/slam_src
-git clone https://github.com/borglab/gtsam.git
+git clone https://github.com/borglab/gtsam.git --recursive
 cd gtsam
 git checkout 342f30d148fae84c92ff71705c9e50e0a3683bda
 mkdir build
