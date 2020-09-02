@@ -1,6 +1,8 @@
 
 #include <gtest/gtest.h>
 
+#include "gtsam/ImuFactorTestHelpers.h"
+
 #include "msckf/imu/ImuErrorModel.h"
 #include <msckf/imu/ImuOdometry.h>
 #include <msckf/ImuOdometryLegacy.hpp>
@@ -439,6 +441,130 @@ TEST(ImuOdometry, IMUCovariancePropagation) {
             1e-6);
   EXPECT_LT((sqrtCovDiagonalEuler.segment<3>(12) - sqrtCovDiagonalRK4.segment<3>(12)).norm(),
             1e-6);
+}
+
+TEST(ImuFactor, dokvis_dri) {
+  okvis::kinematics::Transformation T_WB;
+  T_WB.setRandom();
+  Eigen::Vector3d v_WB;
+  v_WB.setRandom();
+  Eigen::Matrix<double, 15, 15> permutator = gtsam::dokvis_drightinvariant(T_WB, v_WB);
+  Eigen::Matrix<double, 15, 15> permutator_inv =
+      gtsam::drightinvariant_dokvis(T_WB, v_WB);
+  EXPECT_LT(((permutator * permutator_inv) -
+             Eigen::Matrix<double, 15, 15>::Identity())
+                .lpNorm<Eigen::Infinity>(),
+            1e-8);
+}
+
+TEST(ImuFactor, dokvis_dforster) {
+  okvis::kinematics::Transformation T_WB;
+  T_WB.setRandom();
+  Eigen::Matrix<double, 15, 15> permutator = gtsam::dokvis_dforster(T_WB.C());
+  Eigen::Matrix<double, 15, 15> permutator_inv =
+      gtsam::dforster_dokvis(T_WB.C());
+  EXPECT_LT(((permutator * permutator_inv) -
+             Eigen::Matrix<double, 15, 15>::Identity())
+                .lpNorm<Eigen::Infinity>(),
+            1e-8);
+}
+
+TEST(ImuOdometry, RiCovariancePropagationFromZero) { 
+  bool verbose = true;
+  srand((unsigned int)time(0));
+  CovPropConfig cpc(false, true);
+  okvis::kinematics::Transformation T_WS =
+      okvis::kinematics::Transformation(cpc.get_p_WS_W0(), cpc.get_q_WS0());
+  okvis::SpeedAndBiases sb = cpc.get_sb0();
+  okvis::timing::Timer okvisTimer("OKVIS Corrected", false);
+  Eigen::Matrix<double, 15, 15> covOkvis, jacobianOkvis;
+  covOkvis.setZero();
+  jacobianOkvis.setIdentity();
+
+  int numUsedImuMeasurements =
+      okvis::ceres::ImuError::propagation(
+          cpc.get_imu_measurements(), cpc.get_imu_params(), T_WS, sb,
+          cpc.get_meas_begin_time(), cpc.get_meas_end_time(), &covOkvis,
+          &jacobianOkvis);
+  double timeElapsed = okvisTimer.stop();
+
+  Eigen::Vector3d p_WS_Okvis = T_WS.r();
+  Eigen::Quaterniond q_WS_Okvis = T_WS.q();
+  okvis::SpeedAndBiases speedAndBiasOkvis = sb;
+  Eigen::Matrix<double, 15, 1> covDiagonalOkvis = covOkvis.diagonal();
+  Eigen::Matrix<double, 15, 1> sqrtCovDiagonalOkvis = covDiagonalOkvis.cwiseSqrt();
+
+  std::cout << "time used by OKVIS Leutenegger corrected forward propagtion with "
+               "0 initial covariance: " << timeElapsed << "\n";
+  if (verbose) {
+    std::cout << "numUsedMeas " << numUsedImuMeasurements << " totalMeas "
+              << (int)cpc.get_meas_size() << std::endl;
+    std::cout << "q_WS " << q_WS_Okvis.w() << " " << q_WS_Okvis.x() << " "
+              << q_WS_Okvis.y() << " " << q_WS_Okvis.z() << std::endl;
+    std::cout << "p_WS_W " << p_WS_Okvis.transpose() << std::endl;
+    std::cout << "speed and bias " << speedAndBiasOkvis.transpose() << std::endl;
+    std::cout << "cov diagonal sqrt " << std::endl;
+    std::cout << sqrtCovDiagonalOkvis.transpose() << std::endl;
+    std::cout << "Jacobian super diagonal " << std::endl;
+    std::cout << vio::superdiagonal(jacobianOkvis).transpose() << std::endl;
+  }
+
+  // Right invariant error method.
+  Eigen::Matrix<double, 15, 15> covariance_ri = Eigen::Matrix<double, 15, 15>::Zero();
+  Eigen::Matrix<double, 15, 15> jacobian_ri;
+
+  okvis::kinematics::Transformation T_WS_ri(cpc.get_p_WS_W0(), cpc.get_q_WS0());
+  Eigen::Matrix<double, 9, 1> speedAndBias_ri = cpc.get_sb0();
+  Eigen::Vector3d v_WS_ri = speedAndBias_ri.head<3>();
+  ImuErrorModel<double> iem(speedAndBias_ri.tail<6>());
+
+  okvis::timing::Timer riTimer("right invariant error", false);
+  numUsedImuMeasurements = okvis::ImuOdometry::propagationRightInvariantError(
+      cpc.get_imu_measurements(), cpc.get_imu_params(), T_WS_ri, v_WS_ri, iem,
+      cpc.get_meas_begin_time(), cpc.get_meas_end_time(), &covariance_ri,
+      &jacobian_ri);
+  double riElapsed = riTimer.stop();
+
+  speedAndBias_ri.head<3>() = v_WS_ri;
+
+  EXPECT_LT((p_WS_Okvis - T_WS_ri.r()).norm() / p_WS_Okvis.norm(), 5e-3);
+  check_q_near(q_WS_Okvis, T_WS_ri.q(), 1e-5);
+  EXPECT_LT((speedAndBiasOkvis - speedAndBias_ri).head<3>().norm() /
+                speedAndBiasOkvis.norm(),
+            1e-3);
+  EXPECT_LT((speedAndBiasOkvis - speedAndBias_ri).tail<6>().norm(), 1e-6);
+
+  Eigen::Matrix<double, 15, 15> permutator_j =
+      gtsam::dokvis_drightinvariant(T_WS_ri, v_WS_ri);
+
+  Eigen::Matrix<double, 15, 15> permutator_i_inv = gtsam::drightinvariant_dokvis(
+      okvis::kinematics::Transformation(cpc.get_p_WS_W0(), cpc.get_q_WS0()),
+      cpc.get_sb0().head<3>());
+
+  jacobian_ri = permutator_j * jacobian_ri * permutator_i_inv;
+  covariance_ri = permutator_j * covariance_ri * permutator_j.transpose();
+
+  std::cout << "time used by right invariant error forward propagtion with "
+               "0 initial covariance: " << riElapsed << "\n";
+  if (verbose) {
+    std::cout << "cov diag sqrt\n"
+              << covariance_ri.diagonal().cwiseSqrt().transpose() << "\n";
+    std::cout << "Jacobian super diagonal\n"
+              << vio::superdiagonal(jacobian_ri).transpose() << "\n";
+  }
+
+  std::cout << "Check jacobians of okvis and right invariant error\n";
+  checkSelectiveRatio(jacobianOkvis.topLeftCorner<15, 9>(),
+                      jacobian_ri.topLeftCorner<15, 9>(), 0.09, 1e-3);
+  checkSelectiveRatio(jacobianOkvis.topRightCorner<15, 6>(),
+                      jacobian_ri.topRightCorner<15, 6>(), 0.1, 1e-3);
+
+  std::cout << "Check P, Q, V covariance of okvis and right invariant error\n";
+  checkSelectiveRatio(covOkvis.topLeftCorner<15, 9>(),
+                      covariance_ri.topLeftCorner<15, 9>(), 0.35, 3, 1);
+  std::cout << "Check Bg Ba covariance of okvis and right invariant error\n";
+  checkSelectiveRatio(covOkvis.topRightCorner<15, 6>(),
+                      covariance_ri.topRightCorner<15, 6>(), 2.5e-1, 10, 5);
 }
 
 TEST(ImuOdometry, InitPoseFromImu) {
