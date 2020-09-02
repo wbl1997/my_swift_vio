@@ -185,6 +185,8 @@ add_definitions(-fPIC -march=native -Wextra -Winit-self -Woverloaded-virtual
 LIST(APPEND SOURCEFILES
     src/feature_tracker/feature_tracker.cpp
 
+    src/gtsam/ImuFactorTestHelpers.cpp
+
     src/io_wrap/CameraPoseVisualization.cpp
     src/io_wrap/CommonGflags.cpp
     src/io_wrap/PgoPublisher.cpp
