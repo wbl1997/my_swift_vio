@@ -10,7 +10,7 @@
 #include <okvis/Measurements.hpp>
 #include <okvis/Parameters.hpp>
 
-static void check_q_near(const Eigen::Quaterniond& q_WS0,
+inline void check_q_near(const Eigen::Quaterniond& q_WS0,
                          const Eigen::Quaterniond& q_WS1, const double tol) {
   Eigen::Quaterniond dq = q_WS0.inverse() * q_WS1;
   EXPECT_LT(std::fabs(std::fabs(dq.w()) - 1), tol);
@@ -19,20 +19,20 @@ static void check_q_near(const Eigen::Quaterniond& q_WS0,
   EXPECT_LT(std::fabs(dq.z()), tol);
 }
 
-static void check_v_near(const Eigen::Matrix<double, 9, 1>& sb0,
+inline void check_v_near(const Eigen::Matrix<double, 9, 1>& sb0,
                          const Eigen::Matrix<double, 9, 1>& sb1,
                          const double tol) {
   EXPECT_LT(((sb1 - sb0).head<3>().norm()), tol);
 }
 
-static void check_p_near(const Eigen::Matrix<double, 3, 1>& p_WS_W0,
+inline void check_p_near(const Eigen::Matrix<double, 3, 1>& p_WS_W0,
                          const Eigen::Matrix<double, 3, 1>& p_WS_W1,
                          const double tol) {
   EXPECT_LT((p_WS_W1 - p_WS_W0).norm(), tol);
 }
 
 
-static void print_p_q_sb(const Eigen::Vector3d& p_WS_W,
+inline void print_p_q_sb(const Eigen::Vector3d& p_WS_W,
                          const Eigen::Quaterniond& q_WS,
                          const Eigen::Matrix<double, 9, 1>& sb) {
   std::cout << "p:" << p_WS_W.transpose() << std::endl;
@@ -42,7 +42,7 @@ static void print_p_q_sb(const Eigen::Vector3d& p_WS_W,
   std::cout << "bg ba:" << sb.tail<6>().transpose() << std::endl;
 }
 
-static void checkSelectiveRatio(Eigen::MatrixXd ref, Eigen::MatrixXd est,
+inline void checkSelectiveRatio(Eigen::MatrixXd ref, Eigen::MatrixXd est,
                                 double ratioTolForLargeValue,
                                 double tolForTinyValue, double valueThreshold = 1e-3) {
   for (int i = 0; i < ref.rows(); ++i) {
