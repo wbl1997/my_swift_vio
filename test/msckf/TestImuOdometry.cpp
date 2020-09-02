@@ -154,7 +154,7 @@ void IMUOdometryTrapezoidRule(
     Eigen::Quaterniond* q_WS1, okvis::SpeedAndBiases* sb1,
     Eigen::MatrixXd* covariance,
     Eigen::MatrixXd* jacobian,
-    bool bVarianceForShapeMatrices = false, bool bVerbose = false) {
+    bool bVarianceForShapeMatrices = false, bool verbose = false) {
   okvis::kinematics::Transformation T_WS(p_WS_W0, q_WS0);
   okvis::SpeedAndBiases sb = sb0;
   okvis::timing::Timer okvisTimer("okvis", false);
@@ -187,7 +187,7 @@ void IMUOdometryTrapezoidRule(
   std::cout
       << "time used by huai trapezoid rule forward propagtion with covariance "
       << timeElapsed << std::endl;
-  if (bVerbose) {
+  if (verbose) {
     std::cout << "numUsedMeas " << numUsedImuMeasurements << " totalMeas "
               << (int)imuMeasurements.size() << std::endl;
     std::cout << "q_WS " << q_WS1->w() << " " << q_WS1->x() << " " << q_WS1->y()
@@ -208,7 +208,7 @@ void IMUOdometryTrapezoidRule(
 TEST(ImuOdometry, IMUCovariancePropagation) {
   bool bVarianceForShapeMatrices =
       false;             // use positive variance for elements in Tg Ts Ta?
-  bool bVerbose = true;  // print the covariance and jacobian results
+  bool verbose = true;  // print the covariance and jacobian results
 
   srand((unsigned int)time(0));
   CovPropConfig cpc(false, true);
@@ -248,7 +248,7 @@ TEST(ImuOdometry, IMUCovariancePropagation) {
   std::cout << "time used by RK4 forward propagtion with covariance "
             << timeElapsed << std::endl;
 
-  if (bVerbose) {
+  if (verbose) {
     std::cout << "q_WS " << q_WS_RK4.w() << " " << q_WS_RK4.x() << " " << q_WS_RK4.y()
               << " " << q_WS_RK4.z() << std::endl;
     std::cout << "p_WS_W " << p_WS_W_RK4.transpose() << std::endl;
@@ -274,7 +274,7 @@ TEST(ImuOdometry, IMUCovariancePropagation) {
   IMUOdometryTrapezoidRule(
       cpc.get_p_WS_W0(), cpc.get_q_WS0(), cpc.get_sb0(), cpc.get_vTgTsTa(),
       cpc.get_imu_measurements(), cpc.get_imu_params(), &p_WS_Trapezoid, &q_WS_Trapezoid, &speedAndBiasTrapezoid,
-      &covTrapezoid, &jacobianTrapezoid, bVarianceForShapeMatrices, bVerbose);
+      &covTrapezoid, &jacobianTrapezoid, bVarianceForShapeMatrices, verbose);
   Eigen::Matrix<double, 42, 1> sqrtCovDiagonalTrapezoid = covTrapezoid.diagonal().cwiseSqrt();
   Eigen::Matrix<double, 42, 1> jacobianFirstRowTrapezoid = jacobianTrapezoid.row(0);
 
@@ -306,7 +306,7 @@ TEST(ImuOdometry, IMUCovariancePropagation) {
 
   std::cout << "time used by OKVIS Leutenegger forward propagtion with covariance "
             << timeElapsed << std::endl;
-  if (bVerbose) {
+  if (verbose) {
     std::cout << "numUsedMeas " << numUsedImuMeasurements << " totalMeas "
               << (int)cpc.get_meas_size() << std::endl;
     std::cout << "q_WS " << q_WS_Okvis.w() << " " << q_WS_Okvis.x() << " "
@@ -362,7 +362,7 @@ TEST(ImuOdometry, IMUCovariancePropagation) {
   sqrtCovDiagonalPermutated.segment<3>(12) = sqrtCovDiagonalEuler.segment<3>(9);
   sqrtCovDiagonalPermutated.segment<3>(9) = sqrtCovDiagonalEuler.segment<3>(12);
   sqrtCovDiagonalEuler = sqrtCovDiagonalPermutated;
-  if (bVerbose) {
+  if (verbose) {
     std::cout << "q_WS " << q_WS_Euler.w() << " " << q_WS_Euler.x() << " " << q_WS_Euler.y()
               << " " << q_WS_Euler.z() << std::endl;
     std::cout << "p_WS_W " << p_WS_Euler.transpose() << std::endl;

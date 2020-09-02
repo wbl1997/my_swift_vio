@@ -20,9 +20,6 @@
 // and biases, throws indeterminant linear system exception after ~70 secs with
 // about 200 m drift.
 
-// Kimera-VIO simply removes old smart factors out of the time horizon, see
-// https://github.com/MIT-SPARK/Kimera-VIO/blob/master/src/backend/VioBackEnd.cpp#L926-L929.
-
 // Following Kimera-VIO, we use world Euclidean coordinates instead of anchored
 // inverse depth coordinates. In Kimera-VIO, the landmarks are expressed in
 // world Euclidean coordinates because smart factors depends on camera poses
@@ -503,9 +500,16 @@ bool SlidingWindowSmoother::applyMarginalizationStrategy(
     ++it;
   }
 
-  // The smoother has also marginalized the landmarks added to the graph along with
-  // these nav state variables. So we reset the status of such a landmark's
-  // observations to avoid adding further reprojection factors for the landmark.
+  // The smoother has also marginalized landmarks which were added to the graph
+  // at the same time as these nav state variables. We reset the status of such
+  // a landmark's observations in order to avoid adding further reprojection
+  // factors for the landmark. This means new observations for a landmark moving
+  // out the time horizon have to be associated to a new landmark.
+
+  // Kimera-VIO simply removes old smart factors out of the time horizon, see
+  // https://github.com/MIT-SPARK/Kimera-VIO/blob/master/src/backend/VioBackEnd.cpp#L926-L929.
+  // It replaces the old smart factor with a new one when an observation for the
+  // landmark arrives.
   for (auto frameId : removeFrames) {
     auto itemPtr = navStateToLandmarks_.find(frameId);
     if (itemPtr == navStateToLandmarks_.end()) continue;
@@ -728,8 +732,7 @@ void SlidingWindowSmoother::updateStates() {
       if (iter->first != statesMap_.begin()->first) {
         std::string msg =
             "The oldest nav state variables may just have been marginalized "
-            "from "
-            "iSAM2 in the preceding update step, but others should not.";
+            "from iSAM2 in the preceding update step, but others should not.";
         LOG(WARNING) << "State of id " << iter->first
                      << " not found in smoother estimates when the first nav "
                         "state id is "
@@ -1069,7 +1072,8 @@ void SlidingWindowSmoother::optimize(size_t /*numIter*/, size_t /*numThreads*/,
       // The landmark has not been added to the graph.
       if (observedInCurrentFrame) {
         Eigen::Vector3d pW;
-        // The below methods differ little.
+        // Preliminary test implied that triangulateSafe may be lead to worse
+        // result than  triangulateWithDisparityCheck.
 //        bool triangulateOk = triangulateSafe(it->first, &pW);
         bool triangulateOk = triangulateWithDisparityCheck(
             it->first, &pW, focalLength, FLAGS_ray_sigma_scalar);
