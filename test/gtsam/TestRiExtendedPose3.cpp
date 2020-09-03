@@ -59,6 +59,20 @@ TEST( RiExtendedPose3, retract_expmap)
   EXPECT_TRUE(assert_equal(xi,RiExtendedPose3::Logmap(pose),1e-2));
 }
 
+TEST(RiExtendedPose3, traits_retract) {
+  typedef gtsam::traits<gtsam::RiExtendedPose3> TraitsX;
+  RiExtendedPose3 x;
+  x.setRandom();
+  Eigen::Matrix<double, 9, 1> dx;
+  dx.setRandom();
+  RiExtendedPose3 xplusTrait = TraitsX::Retract(x, dx);
+
+  RiExtendedPose3 xplus = x.retract(dx);
+  EXPECT_TRUE(assert_equal(xplusTrait.rotation(), xplus.rotation()));
+  EXPECT_TRUE(assert_equal(xplusTrait.velocity(), xplus.velocity()));
+  EXPECT_TRUE(assert_equal(xplusTrait.position(), xplus.position()));
+}
+
 /* ************************************************************************* */
 TEST( RiExtendedPose3, expmap_a_full)
 {
@@ -264,28 +278,85 @@ TEST( RiExtendedPose3, adjointMap) {
   EXPECT_TRUE(assert_equal(expected,res,1e-5));
 }
 
-/* ************************************************************************* */
-// This will not pass because Expmap computes Jacobians for the left invariant
-// error which differs from the right invariant error in retract().
-//TEST( RiExtendedPose3, ExpmapDerivative1) {
-//  Matrix9 actualH;
-//  Vector9 w; w << 0.1, 0.2, 0.3, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0;
-//  RiExtendedPose3::Expmap(w,actualH);
-//  Matrix expectedH = numericalDerivative21<RiExtendedPose3, Vector9,
-//      OptionalJacobian<9, 9> >(&RiExtendedPose3::Expmap, w, boost::none);
-//  EXPECT_TRUE(assert_equal(expectedH, actualH));
-//}
+TEST(RiExtendedPose3, ExpmapDerivative) {
+  Matrix9 actualH;
+  Vector9 w; w << 0.1, 0.2, 0.3, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0;
+  RiExtendedPose3::Expmap(w,actualH);
+  Matrix expectedH = numericalDerivative21<RiExtendedPose3, Vector9,
+      OptionalJacobian<9, 9> >(&RiExtendedPose3::Expmap, w, boost::none);
+  EXPECT_TRUE(assert_equal(expectedH, actualH));
+}
 
-/* ************************************************************************* */
-//TEST( RiExtendedPose3, LogmapDerivative) {
-//  Matrix9 actualH;
-//  Vector9 w; w << 0.1, 0.2, 0.3, 4.0, 5.0, 6.0,7.0,8.0,9.0;
-//  RiExtendedPose3 p = RiExtendedPose3::Expmap(w);
-//  EXPECT_TRUE(assert_equal(w, RiExtendedPose3::Logmap(p,actualH), 1e-5));
-//  Matrix expectedH = numericalDerivative21<Vector9, RiExtendedPose3,
-//      OptionalJacobian<9, 9> >(&RiExtendedPose3::Logmap, p, boost::none);
-//  EXPECT_TRUE(assert_equal(expectedH, actualH));
-//}
+TEST( RiExtendedPose3, LogmapDerivative) {
+  Matrix9 actualH;
+  Vector9 w; w << 0.1, 0.2, 0.3, 4.0, 5.0, 6.0,7.0,8.0,9.0;
+  RiExtendedPose3 p = RiExtendedPose3::Expmap(w);
+  EXPECT_TRUE(assert_equal(w, RiExtendedPose3::Logmap(p,actualH), 1e-5));
+  Matrix expectedH = numericalDerivative21<Vector9, RiExtendedPose3,
+      OptionalJacobian<9, 9> >(&RiExtendedPose3::Logmap, p, boost::none);
+  EXPECT_TRUE(assert_equal(expectedH, actualH));
+}
+
+TEST(LieJacobians, SO3Jr_eigen) {
+  Eigen::Vector3d v = Eigen::Vector3d::Random();
+  Eigen::Matrix3d Jr = gtsam::geometry::SO3Jr(v);
+  Eigen::Matrix3d Jr_eigen = gtsam::geometry::SO3Jr_eigen(v);
+  EXPECT_TRUE(assert_equal(Jr, Jr_eigen));
+}
+
+TEST(LieJacobians, SO3Jr_inv) {
+  Eigen::Vector3d v = Eigen::Vector3d::Random();
+  Eigen::Matrix3d Jr = gtsam::geometry::SO3Jr(v);
+  Eigen::Matrix3d Jr_inv = gtsam::geometry::SO3Jr_inv(v);
+  Eigen::Matrix3d product = Jr * Jr_inv;
+  Eigen::Matrix3d eye = Eigen::Matrix3d::Identity();
+  EXPECT_TRUE(assert_equal(product, eye));
+}
+
+TEST(LieJacobians, SE3Jr_inv) {
+  Eigen::Matrix<double, 6, 1> xi = Eigen::Matrix<double, 6, 1>::Random();
+  Eigen::Matrix<double, 6, 6> Jr = gtsam::geometry::SE3Jr(xi);
+  Eigen::Matrix<double, 6, 6> Jr_inv = gtsam::geometry::SE3Jr_inv(xi);
+  Eigen::Matrix<double, 6, 6> product = Jr * Jr_inv;
+  Eigen::Matrix<double, 6, 6> eye = Eigen::Matrix<double, 6, 6>::Identity();
+  EXPECT_TRUE(assert_equal(product, eye));
+}
+
+TEST(LieJacobians, SEK3Jr_inv) {
+  Eigen::Matrix<double, 9, 1> xi = Eigen::Matrix<double, 9, 1>::Random();
+  Eigen::Matrix<double, 9, 9> Jr = gtsam::geometry::SEK3Jr(xi);
+  Eigen::Matrix<double, 9, 9> Jr_inv = gtsam::geometry::SEK3Jr_inv(xi);
+  Eigen::Matrix<double, 9, 9> product = Jr * Jr_inv;
+  Eigen::Matrix<double, 9, 9> eye = Eigen::Matrix<double, 9, 9>::Identity();
+  EXPECT_TRUE(assert_equal(product, eye));
+}
+
+TEST(LieJacobians, SO3Jl_inv) {
+  Eigen::Vector3d v = Eigen::Vector3d::Random();
+  Eigen::Matrix3d Jl = gtsam::geometry::SO3Jl(v);
+  Eigen::Matrix3d Jl_inv = gtsam::geometry::SO3Jl_inv(v);
+  Eigen::Matrix3d product = Jl * Jl_inv;
+  Eigen::Matrix3d eye = Eigen::Matrix3d::Identity();
+  EXPECT_TRUE(assert_equal(product, eye));
+}
+
+TEST(LieJacobians, SE3Jl_inv) {
+  Eigen::Matrix<double, 6, 1> xi = Eigen::Matrix<double, 6, 1>::Random();
+  Eigen::Matrix<double, 6, 6> Jl = gtsam::geometry::SE3Jl(xi);
+  Eigen::Matrix<double, 6, 6> Jl_inv = gtsam::geometry::SE3Jl_inv(xi);
+  Eigen::Matrix<double, 6, 6> product = Jl * Jl_inv;
+  Eigen::Matrix<double, 6, 6> eye = Eigen::Matrix<double, 6, 6>::Identity();
+  EXPECT_TRUE(assert_equal(product, eye));
+}
+
+TEST(LieJacobians, SEK3Jl_inv) {
+  Eigen::Matrix<double, 9, 1> xi = Eigen::Matrix<double, 9, 1>::Random();
+  Eigen::Matrix<double, 9, 9> Jl = gtsam::geometry::SEK3Jr(xi);
+  Eigen::Matrix<double, 9, 9> Jl_inv = gtsam::geometry::SEK3Jr_inv(xi);
+  Eigen::Matrix<double, 9, 9> product = Jl * Jl_inv;
+  Eigen::Matrix<double, 9, 9> eye = Eigen::Matrix<double, 9, 9>::Identity();
+  EXPECT_TRUE(assert_equal(product, eye));
+}
 
 /* ************************************************************************* */
 TEST( RiExtendedPose3, stream)

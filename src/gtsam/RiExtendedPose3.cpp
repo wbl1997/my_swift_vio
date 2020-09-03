@@ -19,6 +19,105 @@ using namespace std;
 
 namespace gtsam {
 
+namespace geometry {
+
+Eigen::Matrix3d SO3Jr_eigen(const Eigen::Vector3d& omega) {
+  const double theta2 = omega.dot(omega);
+  double theta = std::sqrt(theta2);
+  Eigen::Matrix3d W, K, KK;
+
+  double sin_theta, one_minus_cos;  // only defined if !nearZero
+  const double wx = omega.x(), wy = omega.y(), wz = omega.z();
+  W << 0.0, -wz, +wy, +wz, 0.0, -wx, -wy, +wx, 0.0;
+  bool nearZero = (theta2 <= std::numeric_limits<double>::epsilon());
+  if (!nearZero) {
+    sin_theta = std::sin(theta);
+    const double s2 = std::sin(theta / 2.0);
+    one_minus_cos = 2.0 * s2 * s2;  // numerically better than [1 - cos(theta)]
+  }
+  if (!nearZero) {
+    K = W / theta;
+    KK = K * K;
+  }
+
+  double a, b;
+  Eigen::Matrix3d dexp;
+  if (nearZero) {
+    dexp = I_3x3 - 0.5 * W;
+  } else {
+    a = one_minus_cos / theta;
+    b = 1.0 - sin_theta / theta;
+    dexp = I_3x3 - a * K + b * KK;
+  }
+  return dexp;
+}
+
+// The closed-form formula in Barfoot14tro eq. (102)
+Eigen::Matrix3d SE3Ql(const Eigen::Vector3d& omega,
+                      const Eigen::Vector3d& rho) {
+  const Matrix3 W = skewSymmetric(omega);
+  const Matrix3 P = skewSymmetric(rho);
+  double phi = omega.norm();
+  Eigen::Matrix3d Q;
+  if (std::abs(phi) > 1e-5) {
+    const double sinPhi = sin(phi), cosPhi = cos(phi);
+    const double phi2 = phi * phi, phi3 = phi2 * phi, phi4 = phi3 * phi,
+                 phi5 = phi4 * phi;
+    Q = 0.5 * P + (phi - sinPhi) / phi3 * (W * P + P * W + W * P * W) -
+        (1 - phi2 / 2 - cosPhi) / phi4 *
+            (W * W * P + P * W * W - 3 * W * P * W) -
+        0.5 *
+            ((1 - phi2 / 2 - cosPhi) / phi4 -
+             3 * (phi - sinPhi - phi3 / 6.) / phi5) *
+            (W * P * W * W + W * W * P * W);
+  } else {
+    Q = 0.5 * P + 1. / 6. * (W * P + P * W + W * P * W) +
+        1. / 24. * (W * W * P + P * W * W - 3 * W * P * W) +
+        1. / 120. * (W * P * W * W + W * W * P * W);
+  }
+  return Q;
+}
+
+Matrix63 computeQrforExpmapDerivative(const Vector9& xi) {
+  const auto omega = xi.head<3>();
+  const auto nu = xi.segment<3>(3);
+  const auto rho = xi.tail<3>();
+
+  Matrix3 Qv, Qp;
+  Matrix63 Q;
+  Qv = SE3Qr(omega, nu);
+  Qp = SE3Qr(omega, rho);
+  Q << Qv, Qp;
+  return Q;
+}
+
+Matrix9 SEK3Jr(const Vector9& xi) {
+  const Vector3 w = xi.head<3>();
+  const Matrix3 Jw = Rot3::ExpmapDerivative(w);
+  const Matrix63 Q = computeQrforExpmapDerivative(xi);
+  const Matrix3 Qv = Q.topRows<3>();
+  const Matrix3 Qp = Q.bottomRows<3>();
+  Matrix9 J;
+  J << Jw, Z_3x3, Z_3x3, Qv, Jw, Z_3x3, Qp, Z_3x3, Jw;
+  return J;
+}
+
+Matrix9 SEK3Jr_inv(const Vector9& xi) {
+  // Teng Zhang 2018 UTS thesis eq (2.32)
+  const Vector3 w = xi.head<3>();
+  const Matrix3 Jw = Rot3::LogmapDerivative(w);
+  const Matrix63 Q = computeQrforExpmapDerivative(xi);
+  const Matrix3 Qv = Q.topRows<3>();
+  const Matrix3 Qp = Q.bottomRows<3>();
+  const Matrix3 Qv2 = -Jw * Qv * Jw;
+  const Matrix3 Qp2 = -Jw * Qp * Jw;
+  Matrix9 J;
+
+  J << Jw, Z_3x3, Z_3x3, Qv2, Jw, Z_3x3, Qp2, Z_3x3, Jw;
+  return J;
+}
+}  // namespace geometry
+
 /** instantiate concept checks */
 GTSAM_CONCEPT_POSE_INST(RiExtendedPose3);
 
@@ -179,6 +278,14 @@ Vector9 RiExtendedPose3::Logmap(const RiExtendedPose3& pose, OptionalJacobian<9,
   }
 }
 
+RiExtendedPose3 RiExtendedPose3::ChartAtOrigin::Retract(const Vector9& xi, ChartJacobian Hxi) {
+  return Expmap(xi, Hxi);
+}
+
+Vector9 RiExtendedPose3::ChartAtOrigin::Local(const RiExtendedPose3& pose, ChartJacobian Hpose) {
+  return Logmap(pose, Hpose);
+}
+
 /* ************************************************************************* */
   Vector9 RiExtendedPose3::boxminus(const RiExtendedPose3& g) const {
   // Matrix3 D_dR_R, D_dt_R, D_dv_R;
@@ -212,85 +319,18 @@ Vector9 RiExtendedPose3::Logmap(const RiExtendedPose3& pose, OptionalJacobian<9,
 }
 
 /* ************************************************************************* */
-/**
- * Compute the 6x3 bottom-left block Qs of the SE_2(3) Expmap derivative matrix
- */
-static Matrix63 computeQforExpmapDerivative(const Vector9& xi) {
-  const auto omega = xi.head<3>();
-  const auto nu = xi.segment<3>(3);
-  const auto rho = xi.tail<3>();
-  const Matrix3 V = skewSymmetric(nu);
-  const Matrix3 P = skewSymmetric(rho);
-  const Matrix3 W = skewSymmetric(omega);
-
-  Matrix3 Qv, Qp;
-  Matrix63 Q;
-
-#ifdef NUMERICAL_EXPMAP_DERIV
-
-
-#else
-  // The closed-form formula in Barfoot14tro eq. (102)
-  double phi = omega.norm();
-  if (std::abs(phi)>1e-5) {
-    const double sinPhi = sin(phi), cosPhi = cos(phi);
-    const double phi2 = phi * phi, phi3 = phi2 * phi, phi4 = phi3 * phi, phi5 = phi4 * phi;
-    // Invert the sign of odd-order terms to have the right Jacobian
-    Qv = -0.5*V + (phi-sinPhi)/phi3*(W*V + V*W - W*V*W)
-            + (1-phi2/2-cosPhi)/phi4*(W*W*V + V*W*W - 3*W*V*W)
-            - 0.5*((1-phi2/2-cosPhi)/phi4 - 3*(phi-sinPhi-phi3/6.)/phi5)*(W*V*W*W + W*W*V*W);
-    Qp = -0.5*P + (phi-sinPhi)/phi3*(W*P + P*W - W*P*W)
-            + (1-phi2/2-cosPhi)/phi4*(W*W*P + P*W*W - 3*W*P*W)
-            - 0.5*((1-phi2/2-cosPhi)/phi4 - 3*(phi-sinPhi-phi3/6.)/phi5)*(W*P*W*W + W*W*P*W);
-  }
-  else {
-    Qv = -0.5*V + 1./6.*(W*V + V*W - W*V*W)
-        + 1./24.*(W*W*V + V*W*W - 3*W*V*W)
-        - 0.5*(1./24. + 3./120.)*(W*V*W*W + W*W*V*W);
-    Qp = -0.5*P + 1./6.*(W*P + P*W - W*P*W)
-        + 1./24.*(W*W*P + P*W*W - 3*W*P*W)
-        - 0.5*(1./24. + 3./120.)*(W*P*W*W + W*W*P*W);
-  }
-#endif
-  Q << Qv, Qp;
-  return Q;
-}
-
-/* ************************************************************************* */
-// warning This assumes left invariant error formulation.
+// warning This assumes right invariant error formulation which leads to
+// Jl. Left invariant error formulation will leads to Jr.
 Matrix9 RiExtendedPose3::ExpmapDerivative(const Vector9& xi) {
-  throw std::runtime_error("Implementation incompatible to right invariant error formulation.");
-  const Vector3 w = xi.head<3>();
-  const Matrix3 Jw = Rot3::ExpmapDerivative(w);
-  const Matrix63 Q = computeQforExpmapDerivative(xi);
-  const Matrix3 Qv =  Q.topRows<3>();
-  const Matrix3 Qp =  Q.bottomRows<3>();
-  Matrix9 J;
-  J << Jw, Z_3x3, Z_3x3,
-    Qv, Jw, Z_3x3,
-    Qp, Z_3x3, Jw;
-  return J;
+  return geometry::SEK3Jl(xi);
 }
 
 /* ************************************************************************* */
-// warning This assumes left invariant error formulation which leads to
-// Jrinv. Right invariant error formulation will leads to Jlinv.
+// warning This assumes right invariant error formulation which leads to
+// Jlinv. Left invariant error formulation will leads to Jrinv.
 Matrix9 RiExtendedPose3::LogmapDerivative(const RiExtendedPose3& pose) {
-  throw std::runtime_error("Implementation incompatible to right invariant error formulation.");
   const Vector9 xi = Logmap(pose);
-  const Vector3 w = xi.head<3>();
-  const Matrix3 Jw = Rot3::LogmapDerivative(w);
-  const Matrix63 Q = computeQforExpmapDerivative(xi);
-  const Matrix3 Qv =  Q.topRows<3>();
-  const Matrix3 Qp =  Q.bottomRows<3>();
-  const Matrix3 Qv2 = -Jw*Qv*Jw;
-  const Matrix3 Qp2 = -Jw*Qp*Jw;
-  Matrix9 J;
-
-  J << Jw, Z_3x3, Z_3x3,
-    Qv2, Jw, Z_3x3,
-    Qp2, Z_3x3, Jw;
-  return J;
+  return geometry::SEK3Jl_inv(xi);
 }
 
 /* ************************************************************************* */
