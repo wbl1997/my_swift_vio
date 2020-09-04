@@ -66,7 +66,15 @@ public:
  ImuFrontEnd(const ImuParams& imu_params);
  ~ImuFrontEnd() = default;
 
- /* ------------------------------------------------------------------------ */
+ /**
+  * @brief preintegrateImuMeasurements
+  * @param imuMeasurements
+  * @param speedAndBias speed, gyro bias, and accel bias at t_start.
+  * @param t_start
+  * @param t_end
+  * @param resultPim
+  * @return
+  */
  int preintegrateImuMeasurements(
      const okvis::ImuMeasurementDeque& imuMeasurements,
      const okvis::SpeedAndBias& speedAndBias, const okvis::Time t_start,

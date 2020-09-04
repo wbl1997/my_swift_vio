@@ -80,17 +80,24 @@ void ImuOdometryGtsam(const Eigen::Vector3d& p_WS_W0,
 
   Eigen::Matrix<double, 9, 6> D_r_pose_i, D_r_pose_j, D_r_bias_i;
   Eigen::Matrix<double, 9, 3> D_r_vel_i, D_r_vel_j;
-
   Eigen::Vector3d p_ij = combinedPim->deltaPij();
   Eigen::Vector3d v_ij = combinedPim->deltaVij();
   gtsam::Rot3 gtR_ij = combinedPim->deltaRij();
-  *q_WS1 = q_WS0 * gtR_ij.toQuaternion();
 
+  *q_WS1 = q_WS0 * gtR_ij.toQuaternion();
   *p_WS_W1 = p_WS_W0 + sb0.head<3>() * combinedPim->deltaTij() +
       0.5 * n_gravity * combinedPim->deltaTij() * combinedPim->deltaTij() +
       q_WS0 * p_ij;
   Eigen::Vector3d v_WS1 =
       sb0.head<3>() + n_gravity * combinedPim->deltaTij() + q_WS0 * v_ij;
+
+  gtsam::NavState state_i(gtsam::Rot3(q_WS0), p_WS_W0, sb0.head<3>());
+  gtsam::imuBias::ConstantBias bias_i(sb0.tail<3>(), sb0.segment<3>(3));
+  gtsam::NavState predictedState_j = combinedPim->predict(state_i, bias_i);
+  EXPECT_TRUE(gtsam::assert_equal(predictedState_j.pose().rotation(), gtsam::Rot3(*q_WS1)));
+  EXPECT_TRUE(gtsam::assert_equal(predictedState_j.velocity(), v_WS1));
+  Eigen::Vector3d predictedPosition_j = predictedState_j.position();
+  EXPECT_TRUE(gtsam::assert_equal(predictedPosition_j, *p_WS_W1));
 
   Eigen::Matrix<double, 15, 15> cov_r =
       dynamic_cast<const gtsam::PreintegratedCombinedMeasurements&>(*combinedPim)
@@ -103,7 +110,6 @@ void ImuOdometryGtsam(const Eigen::Vector3d& p_WS_W0,
   Eigen::Vector3d vel_i = sb0.head<3>();
   gtsam::Pose3 pose_j(gtsam::Rot3(*q_WS1), *p_WS_W1);
   Eigen::Vector3d vel_j = v_WS1;
-  gtsam::imuBias::ConstantBias bias_i(sb0.tail<3>(), sb0.segment<3>(3));
 
   /*Eigen::Matrix<double, 9, 1> r_Rpv =*/combinedPim->computeErrorAndJacobians(
       pose_i, vel_i, pose_j, vel_j, bias_i, &D_r_pose_i, &D_r_vel_i,
