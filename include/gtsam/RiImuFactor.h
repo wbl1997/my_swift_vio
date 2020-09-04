@@ -44,7 +44,8 @@ class RiPreintegratedImuMeasurements {
       : imuMeasurements_(imuMeasurements),
         imuParams_(imuParams),
         ti_(startTime),
-        tj_(finishTime) {}
+        tj_(finishTime), covariance_(Eigen::Matrix<double, 15, 15>::Zero()),
+        jacobian_(Eigen::Matrix<double, 15, 15>::Identity()) {}
 
   RiPreintegratedImuMeasurements(const RiPreintegratedImuMeasurements& other)
       : imuMeasurements_(other.imuMeasurements()),
@@ -182,7 +183,7 @@ class RiPreintegratedImuMeasurements {
 
 public:
   RiExtendedPose3 deltaXij_; //! R_ij, v_ij, p_ij
-  Eigen::Matrix<double, 15, 15> covariance_; // covariance of \xi_{j|i} which is also the covariance of e_{ij}.
+  Eigen::Matrix<double, 15, 15> covariance_; // covariance of \xi_{j|i}.
   Eigen::Matrix<double, 15, 15> jacobian_; // jacobian of d(\xi_{j|i}) / d(\xi_i)
 
   static const double kRelinThresholdGyro;
@@ -197,18 +198,35 @@ class RiImuFactor : public NoiseModelFactor3<RiExtendedPose3, RiExtendedPose3,
       Base;
 
   mutable RiPreintegratedImuMeasurements pim_;
-  mutable bool redo_ = true;
-  mutable int redoCounter_ = 0;
+  mutable bool redo_;
+  mutable int redoCounter_;
+
+  mutable Eigen::Matrix<double, 9, 6> de_db_i_;
+  mutable bool biasJacobianReady_; // is the bias Jacobian ready?
 
  public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
   RiImuFactor() {}
 
+  /**
+   * @brief RiImuFactor e_{ij}. Its covariance is set to the covariance of pim
+   * because X_j is usually initialized with X_{j|i}, and hence
+   * de_{ij} / d\xi_{j|i} = - I_9.
+   * @param xi
+   * @param xj
+   * @param bi
+   * @param pim The preintegrated imu measurements for which redoPreintegration
+   * should have been called at least once.
+   */
   RiImuFactor(Key xi, Key xj, Key bi, const RiPreintegratedImuMeasurements& pim)
-      : NoiseModelFactor3<RiExtendedPose3, RiExtendedPose3, imuBias::ConstantBias>(
-          noiseModel::Gaussian::Covariance(pim_.covariance_), xi, xj, bi),
-        pim_(pim) {}
+      : NoiseModelFactor3<RiExtendedPose3, RiExtendedPose3,
+                          imuBias::ConstantBias>(
+            noiseModel::Gaussian::Covariance(pim_.covariance_), xi, xj, bi),
+        pim_(pim),
+        redo_(false),
+        redoCounter_(0),
+        biasJacobianReady_(false) {}
 
   RiImuFactor(const RiImuFactor& other)
       : NoiseModelFactor3<RiExtendedPose3, RiExtendedPose3,
@@ -217,7 +235,9 @@ class RiImuFactor : public NoiseModelFactor3<RiExtendedPose3, RiExtendedPose3,
             other.key1(), other.key2(), other.key3()),
         pim_(other.pim()),
         redo_(other.redo()),
-        redoCounter_(other.redoCounter()) {}
+        redoCounter_(other.redoCounter()),
+        de_db_i_(other.de_db_i_),
+        biasJacobianReady_(other.biasJacobianReady_) {}
 
   RiImuFactor& operator=(const RiImuFactor& rhs) {
     if (this != &rhs) {
@@ -225,6 +245,8 @@ class RiImuFactor : public NoiseModelFactor3<RiExtendedPose3, RiExtendedPose3,
       pim_ = rhs.pim();
       redo_ = rhs.redo();
       redoCounter_ = rhs.redoCounter();
+      de_db_i_ = rhs.de_db_i();
+      biasJacobianReady_ = rhs.isBiasJacobianReady();
     }
     return *this;
   }
@@ -238,6 +260,10 @@ class RiImuFactor : public NoiseModelFactor3<RiExtendedPose3, RiExtendedPose3,
   bool redo() const { return redo_; }
 
   int redoCounter() const { return redoCounter_; }
+
+  const Eigen::Matrix<double, 9, 6>& de_db_i() const { return de_db_i_; }
+
+  bool isBiasJacobianReady() const { return biasJacobianReady_; }
 
   // Error function. Given the current states, calculate the measurement error/residual
   gtsam::Vector evaluateError(

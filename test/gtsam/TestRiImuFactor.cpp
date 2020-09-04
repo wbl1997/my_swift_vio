@@ -31,12 +31,13 @@ class RiImuFactorTest : public ::testing::Test {
     gtsam::RiPreintegratedImuMeasurements ripim(imuMeas, cpc.get_imu_params(),
                                                 imuMeas.front().timeStamp,
                                                 imuMeas.back().timeStamp);
+    ripim.redoPreintegration(extendedPosei_, biasi_);
     riFactor_ =
         gtsam::RiImuFactor(gtsam::Symbol('x', 1u), gtsam::Symbol('x', 2u),
                            gtsam::Symbol('b', 1u), ripim);
   }
 
-  void  checkJacobians(const gtsam::RiExtendedPose3& extendedPosej) {
+  void  checkJacobians(const gtsam::RiExtendedPose3& extendedPosej, bool forceRedo) {
     Eigen::MatrixXd aH1, aH2, aH3; // analytical Jacobians
     const Eigen::VectorXd error =
         riFactor_.evaluateError(extendedPosei_, extendedPosej, biasi_, aH1, aH2, aH3);
@@ -59,12 +60,18 @@ class RiImuFactorTest : public ::testing::Test {
 
     // Ensure that the redoIntegration is invoked, otherwise, the Jacobian is
     // simply dx_{j|i}/dx_i instead of de / dx_i.
-    double delta = std::pow(
-        10, std::ceil(std::log10(
-                std::max(riFactor_.pim().kRelinThresholdGyro,
-                         riFactor_.pim().RiPreintegratedImuMeasurements::
-                             kRelinThresholdAccelerometer) /
-                riFactor_.pim().dt())));
+    double thresholdOrder = std::log10(
+        std::max(
+            riFactor_.pim().kRelinThresholdGyro,
+            riFactor_.pim()
+                .RiPreintegratedImuMeasurements::kRelinThresholdAccelerometer) /
+        riFactor_.pim().dt());
+    double delta = 0;
+    if (forceRedo) {
+      delta = std::pow(10, std::ceil(thresholdOrder));
+    } else {
+      delta = std::pow(10, std::floor(thresholdOrder));
+    }
 
     LOG(INFO) << "gtsam computing numerical Jacobians for Ba Bg at i with h " << delta;
     Eigen::Matrix<double, 9, 6> nH3 =
@@ -88,7 +95,6 @@ TEST_F(RiImuFactorTest, JacobiansNoisyStateJ) {
   stateNoise.setRandom();
   stateNoise *= 1e-2;
   gtsam::RiPreintegratedImuMeasurements pimCopy = riFactor_.pim();
-  pimCopy.redoPreintegration(extendedPosei_, biasi_);
   const gtsam::RiExtendedPose3 extendedPosej =
       pimCopy.predict(extendedPosei_);
   const gtsam::RiExtendedPose3 extendedPosejNoisy =
@@ -97,14 +103,21 @@ TEST_F(RiImuFactorTest, JacobiansNoisyStateJ) {
       riFactor_.evaluateError(extendedPosei_, extendedPosej, biasi_);
   EXPECT_LT(errorOrig.lpNorm<Eigen::Infinity>(), 1e-7);
   LOG(INFO) << "Check Jacobians for noisy state j";
-  checkJacobians(extendedPosejNoisy);
+  checkJacobians(extendedPosejNoisy, true);
 }
 
 TEST_F(RiImuFactorTest, JacobiansRandomStateJ) {
   gtsam::RiExtendedPose3 extendedPosej;
   extendedPosej.setRandom();
   LOG(INFO) << "Check Jacobians for random state j";
-  checkJacobians(extendedPosej);
+  checkJacobians(extendedPosej, true);
+}
+
+TEST_F(RiImuFactorTest, JacobiansRandomStateJLin) {
+  gtsam::RiExtendedPose3 extendedPosej;
+  extendedPosej.setRandom();
+  LOG(INFO) << "Check Jacobians for random state j without redo propagation";
+  checkJacobians(extendedPosej, false);
 }
 
 TEST_F(RiImuFactorTest, evaluateError) {
@@ -131,8 +144,8 @@ TEST_F(RiImuFactorTest, evaluateError) {
 }
 
 TEST_F(RiImuFactorTest, predict) {
+  // compare with prediction results from another method based on gtsam PIM.
   gtsam::RiPreintegratedImuMeasurements ripim = riFactor_.pim();
-  ripim.redoPreintegration(extendedPosei_, biasi_);
   gtsam::RiExtendedPose3 extendedPosej = ripim.predict(extendedPosei_);
 
   okvis::ImuFrontEnd::PimPtr combinedPim;
@@ -164,7 +177,6 @@ TEST_F(RiImuFactorTest, predict) {
 
 TEST_F(RiImuFactorTest, predict2) {
   gtsam::RiPreintegratedImuMeasurements ripim(riFactor_.pim());
-  ripim.redoPreintegration(extendedPosei_, biasi_);
   gtsam::RiExtendedPose3 extendedPosej = ripim.predict(extendedPosei_);
 
   Eigen::VectorXd error =

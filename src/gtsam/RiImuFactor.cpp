@@ -53,22 +53,34 @@ gtsam::Vector RiImuFactor::evaluateError(
     boost::optional<Matrix&> H1,
     boost::optional<Matrix&> H2,
     boost::optional<Matrix&> H3) const {
+  Vector9 error;
   redo_ = redo_ || pim_.needToRedoPreintegration(bias_i);
   if (redo_) {
     pim_.redoPreintegration(x_i, bias_i);
     redoCounter_++;
     redo_ = false;
-//    if (redoCounter_ > 1) {
-//      LOG(INFO) << "pre-integration no. " << redoCounter_;
-//    }
+    //    if (redoCounter_ > 1) {
+    //      LOG(INFO) << "pre-integration no. " << redoCounter_;
+    //    }
+
+    RiExtendedPose3 x_j_from_i = pim_.predict(x_i);
+    error = RiExtendedPose3::Logmap(x_j * x_j_from_i.inverse());
+
+    Eigen::Matrix<double, 9, 9> Jr_inv = geometry::SEK3Jr_inv(error);
+    de_db_i_ = -Jr_inv * pim_.jacobian_.block<9, 6>(0, 9);
+    biasJacobianReady_= true;
+  } else {
+    RiExtendedPose3 x_j_from_i = pim_.predict(x_i);
+    // also account for the effect of bias.
+    error = RiExtendedPose3::Logmap(x_j * x_j_from_i.inverse());
+    if (biasJacobianReady_) {
+      error += de_db_i_ * (bias_i - pim_.biasLin()).vector();
+    } else {
+      Eigen::Matrix<double, 9, 9> Jr_inv = geometry::SEK3Jr_inv(error);
+      de_db_i_ = -Jr_inv * pim_.jacobian_.block<9, 6>(0, 9);
+      biasJacobianReady_ = true;
+    }
   }
-
-  RiExtendedPose3 x_j_from_i = pim_.predict(x_i);
-
-  // also account for the effect of bias.
-  Vector9 error = RiExtendedPose3::Logmap(x_j * x_j_from_i.inverse()) -
-                  pim_.jacobian_.topRightCorner<9, 6>() *
-                      (bias_i - pim_.biasLin()).vector();
 
   if (H1) {  // de / dx_i = de / dx_{j|i} * dx_{j|i} / dx_i
     *H1 = - geometry::SEK3Jr_inv(error) * pim_.jacobian_.topLeftCorner<9, 9>();
