@@ -146,22 +146,29 @@ TEST_F(BackwardIntegrationTest, BackwardEuler) {
 }
 
 void IMUOdometryTrapezoidRule(
-    const Eigen::Vector3d& p_WS_W0, const Eigen::Quaterniond& q_WS0,
-    const okvis::SpeedAndBiases& sb0,
-    const Eigen::Matrix<double, kImuAugmentedParamsDim, 1>& vTgTsTa,
-    const okvis::ImuMeasurementDeque& imuMeasurements,
-    const okvis::ImuParameters& imuParams, Eigen::Vector3d* p_WS_W1,
+    const CovPropConfig& cpc,
+    Eigen::Vector3d* p_WS_W1,
     Eigen::Quaterniond* q_WS1, okvis::SpeedAndBiases* sb1,
     Eigen::MatrixXd* covariance,
     Eigen::MatrixXd* jacobian,
-    bool bVarianceForShapeMatrices = false, bool verbose = false) {
+    bool zeroVarianceForImuExtraParams = true,
+    bool usePositionVelocityLin = true,
+    bool verbose = false) {
+  const Eigen::Vector3d p_WS_W0 = cpc.get_p_WS_W0();
+  const Eigen::Quaterniond q_WS0 = cpc.get_q_WS0();
+  const okvis::SpeedAndBiases sb0 = cpc.get_sb0();
+  const Eigen::Matrix<double, kImuAugmentedParamsDim, 1>& vTgTsTa = cpc.get_vTgTsTa();
+  const okvis::ImuMeasurementDeque& imuMeasurements = cpc.get_imu_measurements();
+  const okvis::ImuParameters& imuParams = cpc.get_imu_params();
+
   okvis::kinematics::Transformation T_WS(p_WS_W0, q_WS0);
   okvis::SpeedAndBiases sb = sb0;
   okvis::timing::Timer okvisTimer("okvis", false);
 
   *covariance = Eigen::Matrix<double, kNavAndImuParamsDim, kNavAndImuParamsDim>::Identity();
-  if (!bVarianceForShapeMatrices)
+  if (zeroVarianceForImuExtraParams) {
     covariance->bottomRightCorner<kImuAugmentedParamsDim, kImuAugmentedParamsDim>().setZero();
+  }
   *jacobian = Eigen::Matrix<double, kNavAndImuParamsDim, kNavAndImuParamsDim>::Identity();
 
   int numUsedImuMeasurements = 0;
@@ -173,7 +180,8 @@ void IMUOdometryTrapezoidRule(
   numUsedImuMeasurements = okvis::ImuOdometry::propagation(
       imuMeasurements, imuParams, T_WS, v_WS, imuModel,
       imuMeasurements.begin()->timeStamp, imuMeasurements.rbegin()->timeStamp,
-      covariance, jacobian, &linearizationPoint);
+      covariance, jacobian,
+      usePositionVelocityLin ? &linearizationPoint : nullptr);
   sb.head<3>() = v_WS;
   double timeElapsed = okvisTimer.stop();
 
@@ -203,11 +211,45 @@ void IMUOdometryTrapezoidRule(
   }
 }
 
+TEST(ImuOdometry, linearizationPointForPV) {
+  srand((unsigned int)time(0));
+  CovPropConfig cpc(false, true);
+  bool zeroVarForImuExtraParams = true;
+  bool verbose = false;
+
+  bool usePositionVelocityLin = false;
+  Eigen::Vector3d p_WS;
+  Eigen::Quaterniond q_WS;
+  okvis::SpeedAndBiases speedAndBias;
+
+  Eigen::MatrixXd cov;
+  Eigen::MatrixXd jacobian;
+  IMUOdometryTrapezoidRule(cpc, &p_WS, &q_WS, &speedAndBias, &cov, &jacobian,
+                           zeroVarForImuExtraParams, usePositionVelocityLin,
+                           verbose);
+
+  usePositionVelocityLin = true;
+  Eigen::Vector3d p_WS_lin;
+  Eigen::Quaterniond q_WS_lin;
+  okvis::SpeedAndBiases speedAndBiasLin;
+  Eigen::MatrixXd covLin;
+  Eigen::MatrixXd jacobianLin;
+  IMUOdometryTrapezoidRule(cpc, &p_WS_lin, &q_WS_lin, &speedAndBiasLin, &covLin,
+                           &jacobianLin, zeroVarForImuExtraParams,
+                           usePositionVelocityLin, verbose);
+
+  checkSelectiveRatio(p_WS, p_WS_lin, 1e-4, 1e-4, 1e-3);
+  check_q_near(q_WS, q_WS_lin, 1e-6);
+  checkSelectiveRatio(speedAndBias, speedAndBiasLin, 1e-4, 1e-4, 1e-3);
+  checkSelectiveRatio(cov, covLin, 1e-4, 1e-4, 1e-3);
+  checkSelectiveRatio(jacobian, jacobianLin, 1e-4, 1e-4, 1e-3);
+}
+
 /// test and compare the propagation for both states and covariance by both the
 /// classic RK4 and okvis's state transition method
 TEST(ImuOdometry, IMUCovariancePropagation) {
-  bool bVarianceForShapeMatrices =
-      false;             // use positive variance for elements in Tg Ts Ta?
+  // use positive variance for elements in Tg Ts Ta?
+  bool zeroVarForImuExtraParams = true;
   bool verbose = true;  // print the covariance and jacobian results
 
   srand((unsigned int)time(0));
@@ -219,11 +261,13 @@ TEST(ImuOdometry, IMUCovariancePropagation) {
   okvis::SpeedAndBiases sb = cpc.get_sb0();
 
   Eigen::MatrixXd covRK4 = Eigen::MatrixXd::Identity(kNavAndImuParamsDim, kNavAndImuParamsDim);
-  if (!bVarianceForShapeMatrices) covRK4.bottomRightCorner<kImuAugmentedParamsDim, kImuAugmentedParamsDim>().setZero();
+  if (zeroVarForImuExtraParams) {
+    covRK4.bottomRightCorner<kImuAugmentedParamsDim, kImuAugmentedParamsDim>().setZero();
+  }
   Eigen::MatrixXd jacobianRK4 = Eigen::MatrixXd::Identity(kNavAndImuParamsDim, kNavAndImuParamsDim);
 
   okvis::timing::Timer RK4Timer("RK4", false);
-  okvis::ImuMeasurementDeque imuMeasurements = cpc.get_imu_measurements();
+  const okvis::ImuMeasurementDeque& imuMeasurements = cpc.get_imu_measurements();
   auto iterLast = imuMeasurements.begin();
   for (auto iter = imuMeasurements.begin(); iter != imuMeasurements.end();
        ++iter) {
@@ -268,13 +312,13 @@ TEST(ImuOdometry, IMUCovariancePropagation) {
   Eigen::Vector3d p_WS_Trapezoid;
   Eigen::Quaterniond q_WS_Trapezoid;
   okvis::SpeedAndBiases speedAndBiasTrapezoid;
-
+  bool usePositionVelocityLin = true;
   Eigen::MatrixXd covTrapezoid;
   Eigen::MatrixXd jacobianTrapezoid;
-  IMUOdometryTrapezoidRule(
-      cpc.get_p_WS_W0(), cpc.get_q_WS0(), cpc.get_sb0(), cpc.get_vTgTsTa(),
-      cpc.get_imu_measurements(), cpc.get_imu_params(), &p_WS_Trapezoid, &q_WS_Trapezoid, &speedAndBiasTrapezoid,
-      &covTrapezoid, &jacobianTrapezoid, bVarianceForShapeMatrices, verbose);
+  IMUOdometryTrapezoidRule(cpc, &p_WS_Trapezoid, &q_WS_Trapezoid,
+                           &speedAndBiasTrapezoid, &covTrapezoid,
+                           &jacobianTrapezoid, zeroVarForImuExtraParams,
+                           usePositionVelocityLin, verbose);
   Eigen::Matrix<double, 42, 1> sqrtCovDiagonalTrapezoid = covTrapezoid.diagonal().cwiseSqrt();
   Eigen::Matrix<double, 42, 1> jacobianFirstRowTrapezoid = jacobianTrapezoid.row(0);
 
@@ -507,6 +551,7 @@ TEST(ImuOdometry, RiCovariancePropagationFromZero) {
     std::cout << sqrtCovDiagonalOkvis.transpose() << std::endl;
     std::cout << "Jacobian super diagonal " << std::endl;
     std::cout << vio::superdiagonal(jacobianOkvis).transpose() << std::endl;
+//    std::cout << "cov\n" << covOkvis << "\njac\n" << jacobianOkvis << "\n";
   }
 
   // Right invariant error method.
@@ -551,6 +596,7 @@ TEST(ImuOdometry, RiCovariancePropagationFromZero) {
               << covariance_ri.diagonal().cwiseSqrt().transpose() << "\n";
     std::cout << "Jacobian super diagonal\n"
               << vio::superdiagonal(jacobian_ri).transpose() << "\n";
+//    std::cout << "cov\n" << covariance_ri << "\njac\n" << jacobian_ri << "\n";
   }
 
   std::cout << "Check jacobians of okvis and right invariant error\n";

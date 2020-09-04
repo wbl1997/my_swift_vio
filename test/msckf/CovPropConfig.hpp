@@ -147,11 +147,11 @@ struct CovPropConfig {
   Eigen::Vector3d get_p_WS_W0() const { return p_WS_W0; }
   Eigen::Quaterniond get_q_WS0() const { return q_WS0; }
   Eigen::Matrix<double, 9, 1> get_sb0() const { return sb0; }
-  okvis::ImuMeasurementDeque get_imu_measurements() const {
+  const okvis::ImuMeasurementDeque& get_imu_measurements() const {
     return imuMeasurements;
   }
-  Eigen::Matrix<double, kImuAugmentedParamsDim, 1> get_vTgTsTa() const { return vTgTsTa; }
-  okvis::ImuParameters get_imu_params() const { return imuParams; }
+  const Eigen::Matrix<double, kImuAugmentedParamsDim, 1>& get_vTgTsTa() const { return vTgTsTa; }
+  const okvis::ImuParameters& get_imu_params() const { return imuParams; }
   okvis::Time get_meas_begin_time() const {
     return imuMeasurements.begin()->timeStamp;
   }
