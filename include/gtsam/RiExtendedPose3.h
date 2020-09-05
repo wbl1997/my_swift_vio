@@ -169,16 +169,38 @@ class GTSAM_EXPORT RiExtendedPose3 {
   }
 
   /// @}
-  /// @name Manifold
+  /// @name Manifold, with left invariant error formulation.
   /// @{
-  /// Retract with optional derivatives (given correction, change this navstate)
+  /**
+   * @brief retract Retract with optional derivatives (given correction, change this navstate).
+   * @param xi
+   * @return exp(xi) * X.
+   */
   RiExtendedPose3 retract(const Vector9& xi) const;
 
-  /// Converting function from our overparameterization to the local
-  /// representation
+  /**
+   * @brief localCoordinates Converting function from our overparameterization to the local representation.
+   * a.localCoordinates(a.retract(xi)) = xi.
+   * @param state
+   * @return Logmap(state * X^{-1})
+   */
   Vector9 localCoordinates(const RiExtendedPose3& state) const;
 
+  /**
+   * @brief expmap Retract with optional derivatives (given correction, change this navstate).
+   * @param xi
+   * @return exp(xi) * X.
+   */
+  RiExtendedPose3 expmap(const Vector9& xi) const;
+
+  /**
+   * @brief logmap Converting function from our overparameterization to the local representation.
+   * @param state
+   * @return Logmap(state * X^{-1})
+   */
+  Vector9 logmap(const RiExtendedPose3& state) const;
   /// @}
+
   /// @name Lie Group
   /// @{
 
@@ -192,13 +214,9 @@ class GTSAM_EXPORT RiExtendedPose3 {
   static Vector9 Logmap(const RiExtendedPose3& pose,
                         OptionalJacobian<9, 9> Hpose = boost::none);
 
-  /// Retract with optional derivatives (given correction, change this navstate)
-  RiExtendedPose3 expmap(const Vector9& xi) const;
-
-  /// Converting function from our overparameterization to the local
-  /// representation
-  Vector9 logmap(const RiExtendedPose3& state) const;
-
+  /// @name gtsam conventional Lie functions.
+  /// @brief The below 4 compose and between functions are copied from gtsam/gtsam/base/Lie.h.
+  /// @{
   RiExtendedPose3 compose(const RiExtendedPose3& g) const { return *this * g; }
 
   RiExtendedPose3 between(const RiExtendedPose3& g) const {
@@ -219,6 +237,7 @@ class GTSAM_EXPORT RiExtendedPose3 {
     if (H2) *H2 = Eigen::Matrix<double, 9, 9>::Identity();
     return result;
   }
+  /// @}
 
   inline void setRandom() { setRandom(1.0, M_PI, 2.0); }
 
