@@ -233,6 +233,7 @@ list(APPEND SOURCEFILES
     src/gtsam/ImuFrontEnd.cpp
     src/gtsam/ImuFrontEndParams.cpp
     src/gtsam/RiExtendedPose3.cpp
+    src/gtsam/RiExtendedPose3Prior.cpp
     src/gtsam/RiImuFactor.cpp
     src/gtsam/VioBackEndParams.cpp
     src/gtsam/SlidingWindowSmoother.cpp
@@ -366,6 +367,7 @@ list(APPEND TEST_SRC_FILES
     test/gtsam/TestImuFrontEnd.cpp
     test/gtsam/TestIncrementalFixedLagSmoother.cpp
     test/gtsam/TestRiExtendedPose3.cpp
+    test/gtsam/TestRiExtendedPose3Prior.cpp
     test/gtsam/TestRiImuFactor.cpp
     test/loop_closure/TestGtsamBetweenFactor.cpp
     test/loop_closure/TestLoopClosureMethod.cpp
