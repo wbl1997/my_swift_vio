@@ -82,7 +82,7 @@ class RiImuFactorTest : public ::testing::Test {
     Eigen::Matrix<double, 9, 3> aHg = aH3.rightCols(3);
 
     EXPECT_TRUE(gtsam::assert_equal(nHa, aHa, 1e-4));
-    checkSelectiveRatio(nHg, aHg, 1e-3, 1e-4, 1e-3);
+    checkSelectiveRatio(nHg, aHg, 5e-3, 1e-4, 1e-3);
   }
 
   gtsam::RiExtendedPose3 extendedPosei_;
@@ -133,12 +133,12 @@ TEST_F(RiImuFactorTest, evaluateError) {
       << "Rotation error: Ri " << error.head<3>().transpose() << "\nGtsam "
       << errorRef.head<3>().transpose();
 
-  checkSelectiveRatio(errorRef.segment<3>(3), error.segment<3>(3), 1e-2, 0.1);
+  checkSelectiveRatio(errorRef.segment<3>(3), error.segment<3>(3), 5e-2, 0.1);
 
   EXPECT_LT(diff.tail<3>()
                 .cwiseQuotient(errorRef.tail<3>())
                 .lpNorm<Eigen::Infinity>(),
-            1e-2)
+            5e-2)
       << "Position error: Ri " << error.tail<3>().transpose() << "\nGtsam "
       << errorRef.tail<3>().transpose();
 }
@@ -169,10 +169,10 @@ TEST_F(RiImuFactorTest, predict) {
   EXPECT_TRUE(gtsam::assert_equal(predictedState_j.pose().rotation(),
                                   extendedPosej.rotation()));
   checkSelectiveRatio(predictedState_j.velocity(),
-                      extendedPosej.velocity().vector(), 1e-2, 1e-4, 1e-3);
+                      extendedPosej.velocity().vector(), 8e-2, 1e-4, 1e-3);
   Eigen::Vector3d predictedPosition_j = predictedState_j.position();
   checkSelectiveRatio(predictedPosition_j, extendedPosej.position().vector(),
-                      1e-2, 1e-3, 1e-3);
+                      8e-2, 1e-3, 1e-3);
 }
 
 TEST_F(RiImuFactorTest, predict2) {
