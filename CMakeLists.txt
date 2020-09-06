@@ -232,6 +232,8 @@ list(APPEND SOURCEFILES
 
     src/gtsam/ImuFrontEnd.cpp
     src/gtsam/ImuFrontEndParams.cpp
+    src/gtsam/RiProjectionFactorIDP.cpp
+    src/gtsam/RiProjectionFactorIDPAnchor.cpp
     src/gtsam/RiExtendedPose3.cpp
     src/gtsam/RiExtendedPose3Prior.cpp
     src/gtsam/RiImuFactor.cpp
@@ -369,6 +371,7 @@ list(APPEND TEST_SRC_FILES
     test/gtsam/TestRiExtendedPose3.cpp
     test/gtsam/TestRiExtendedPose3Prior.cpp
     test/gtsam/TestRiImuFactor.cpp
+    test/gtsam/TestRiProjectionFactorIDP.cpp
     test/gtsam/TestRiTransformPointJacobian.cpp
     test/loop_closure/TestGtsamBetweenFactor.cpp
     test/loop_closure/TestLoopClosureMethod.cpp
