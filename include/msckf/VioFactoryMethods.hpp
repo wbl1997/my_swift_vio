@@ -16,8 +16,10 @@ std::shared_ptr<okvis::Frontend> createFrontend(
     int numCameras, const okvis::FrontendOptions& frontendOptions,
     okvis::EstimatorAlgorithm algorithm);
 
-std::shared_ptr<okvis::Estimator> createBackend(okvis::EstimatorAlgorithm algorithm,
-                                                const okvis::BackendParams& backendParams);
+std::shared_ptr<okvis::Estimator> createBackend(
+    okvis::EstimatorAlgorithm algorithm,
+    const okvis::BackendParams& backendParams,
+    std::shared_ptr<okvis::ceres::Map> mapPtr);
 
 /**
  * @brief createLoopClosureMethod

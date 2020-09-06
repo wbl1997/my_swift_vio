@@ -27,30 +27,40 @@ std::shared_ptr<okvis::Frontend> createFrontend(
       new okvis::HybridFrontend(numCameras, frontendOptions));
 }
 
-std::shared_ptr<okvis::Estimator> createBackend(okvis::EstimatorAlgorithm algorithm,
-                                                const okvis::BackendParams& backendParams) {
+std::shared_ptr<okvis::Estimator> createBackend(
+    okvis::EstimatorAlgorithm algorithm,
+    const okvis::BackendParams& backendParams,
+    std::shared_ptr<okvis::ceres::Map> mapPtr) {
   switch (algorithm) {
+    // we do not use make_shared because it may interfere with alignment, see
     // http://eigen.tuxfamily.org/bz/show_bug.cgi?id=1049
+    case okvis::EstimatorAlgorithm::OKVIS:
+      return std::shared_ptr<okvis::Estimator>(new okvis::Estimator(mapPtr));
+
     case okvis::EstimatorAlgorithm::General:
-      return std::shared_ptr<okvis::Estimator>(new okvis::GeneralEstimator());
+      return std::shared_ptr<okvis::Estimator>(
+          new okvis::GeneralEstimator(mapPtr));
 
     case okvis::EstimatorAlgorithm::Consistent:
-      return std::shared_ptr<okvis::Estimator>(new okvis::ConsistentEstimator());
-
-    case okvis::EstimatorAlgorithm::OKVIS:
-      return std::shared_ptr<okvis::Estimator>(new okvis::Estimator());
-
-    case okvis::EstimatorAlgorithm::MSCKF:
-      return std::shared_ptr<okvis::Estimator>(new okvis::MSCKF2());
-
-    case okvis::EstimatorAlgorithm::TFVIO:
-      return std::shared_ptr<okvis::Estimator>(new okvis::TFVIO());
-
-    case okvis::EstimatorAlgorithm::InvariantEKF:
-      return std::shared_ptr<okvis::Estimator>(new okvis::InvariantEKF());
+      return std::shared_ptr<okvis::Estimator>(
+          new okvis::ConsistentEstimator(mapPtr));
 
     case okvis::EstimatorAlgorithm::SlidingWindowSmoother:
-      return std::shared_ptr<okvis::Estimator>(new okvis::SlidingWindowSmoother(backendParams));
+      return std::shared_ptr<okvis::Estimator>(
+          new okvis::SlidingWindowSmoother(backendParams, mapPtr));
+
+    case okvis::EstimatorAlgorithm::RiSlidingWindowSmoother:
+      return std::shared_ptr<okvis::Estimator>(
+          new okvis::RiSlidingWindowSmoother(backendParams, mapPtr));
+
+    case okvis::EstimatorAlgorithm::MSCKF:
+      return std::shared_ptr<okvis::Estimator>(new okvis::MSCKF2(mapPtr));
+
+    case okvis::EstimatorAlgorithm::TFVIO:
+      return std::shared_ptr<okvis::Estimator>(new okvis::TFVIO(mapPtr));
+
+    case okvis::EstimatorAlgorithm::InvariantEKF:
+      return std::shared_ptr<okvis::Estimator>(new okvis::InvariantEKF(mapPtr));
 
     default:
       LOG(ERROR) << "Unknown Estimator type!";

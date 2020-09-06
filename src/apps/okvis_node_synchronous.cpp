@@ -181,8 +181,9 @@ int main(int argc, char **argv) {
   okvis::PgoPublisher pgoPublisher;
 
   okvis::BackendParams backendParams;
-  std::shared_ptr<okvis::Estimator> estimator =
-      msckf::createBackend(parameters.optimization.algorithm, backendParams);
+  std::shared_ptr<okvis::ceres::Map> mapPtr(new okvis::ceres::Map());
+  std::shared_ptr<okvis::Estimator> estimator = msckf::createBackend(
+      parameters.optimization.algorithm, backendParams, mapPtr);
   std::shared_ptr<okvis::Frontend> frontend = msckf::createFrontend(
       parameters.nCameraSystem.numCameras(),
       parameters.frontendOptions,

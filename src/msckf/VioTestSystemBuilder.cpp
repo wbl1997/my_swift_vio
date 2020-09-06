@@ -7,6 +7,7 @@
 #include <gtsam/SlidingWindowSmoother.hpp>
 #include <msckf/TFVIO.hpp>
 #include <msckf/VioEvaluationCallback.hpp>
+#include <msckf/VioFactoryMethods.hpp>
 
 #include <gflags/gflags.h>
 
@@ -178,32 +179,14 @@ void VioTestSystemBuilder::createVioSystem(
   }
   distortionType_ = cameraSystem2->cameraGeometry(0)->distortionType();
   okvis::BackendParams backendParams;
+  estimator = msckf::createBackend(testSetting.estimator_algorithm,
+                                   backendParams, mapPtr);
+
   okvis::VisualConstraints constraintScheme(okvis::OnlyReprojectionErrors);
-  switch (testSetting.estimator_algorithm) {
-    case okvis::EstimatorAlgorithm::OKVIS:
-      estimator.reset(new okvis::Estimator(mapPtr));
-      break;
-    case okvis::EstimatorAlgorithm::General:
-      estimator.reset(new okvis::GeneralEstimator(mapPtr));
-      constraintScheme = okvis::OnlyTwoViewConstraints;
-      break;
-    case okvis::EstimatorAlgorithm::Consistent:
-      estimator.reset(new okvis::ConsistentEstimator(mapPtr));
-      break;
-    case okvis::EstimatorAlgorithm::TFVIO:
-      estimator.reset(new okvis::TFVIO(mapPtr));
-      break;
-    case okvis::EstimatorAlgorithm::InvariantEKF:
-      estimator.reset(new okvis::InvariantEKF(mapPtr));
-      break;
-    case okvis::EstimatorAlgorithm::SlidingWindowSmoother:
-      estimator.reset(new okvis::SlidingWindowSmoother(backendParams, mapPtr));
-      break;
-    case okvis::EstimatorAlgorithm::MSCKF:
-    default:
-      estimator.reset(new okvis::MSCKF2(mapPtr));
-      break;
+  if (testSetting.estimator_algorithm == okvis::EstimatorAlgorithm::General) {
+    constraintScheme = okvis::OnlyTwoViewConstraints;
   }
+
   estimator->setUseEpipolarConstraint(testSetting.useEpipolarConstraint);
   estimator->setCameraObservationModel(testSetting.cameraObservationModelId);
   okvis::PointLandmarkOptions plOptions;
