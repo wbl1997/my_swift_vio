@@ -573,11 +573,11 @@ void testHybridFilterSinusoid(const okvis::TestSetting& testSetting,
 
       check_tail_mse(rmse.back().second, projOptModelId);
       check_tail_nees(nees.back().second);
-      std::stringstream ss;
-      ss << "Run " << run << " finishes with last added frame " << frameCount
-                << " of tracked features " << trackedFeatures;
-      LOG(INFO) << ss.str();
-      metaStream << ss.str() << std::endl;
+      std::stringstream messageStream;
+      messageStream << "Run " << run << " finishes with last added frame "
+                    << frameCount << " of tracked features " << trackedFeatures;
+      LOG(INFO) << messageStream.str();
+      metaStream << messageStream.str() << std::endl;
       // output track length distribution
       std::ofstream trackStatStream(trackStatFile, std::ios_base::out);
       estimator->printTrackLengthHistogram(trackStatStream);
