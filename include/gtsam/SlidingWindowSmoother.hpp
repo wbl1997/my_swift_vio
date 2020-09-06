@@ -1,5 +1,11 @@
-#ifndef INCLUDE_OKVIS_SLIDING_WINDOW_SMOOTHER_HPP_
-#define INCLUDE_OKVIS_SLIDING_WINDOW_SMOOTHER_HPP_
+/**
+ * @file   SlidingWindowSmoother.hpp
+ * @brief  Declaration of SlidingWindowSmoother which wraps gtsam::FixedLagSmoother for VIO.
+ * @author Jianzhu Huai
+ */
+
+#ifndef INCLUDE_GTSAM_SLIDING_WINDOW_SMOOTHER_HPP_
+#define INCLUDE_GTSAM_SLIDING_WINDOW_SMOOTHER_HPP_
 
 #include <memory>
 
@@ -12,7 +18,6 @@
 #ifdef HAVE_GTSAM
 #define INCREMENTAL_SMOOTHER
 
-
 #include <gtsam/geometry/Cal3DS2.h>
 #include <gtsam/navigation/CombinedImuFactor.h>
 #include <gtsam/navigation/ImuBias.h>
@@ -24,7 +29,6 @@
 #include "gtsam/VioBackEndParams.h"
 #include "gtsam/ImuFrontEnd.h"
 
-/// \brief okvis Main namespace of this package.
 namespace okvis {
 #ifdef INCREMENTAL_SMOOTHER
 typedef gtsam::IncrementalFixedLagSmoother Smoother;
@@ -61,17 +65,17 @@ class SlidingWindowSmoother : public Estimator {
 
   virtual ~SlidingWindowSmoother();
 
-  void addInitialPriorFactors();
+  virtual void addInitialPriorFactors();
 
   /**
    * @brief addImuValues add values for the last navigation state variable.
    */
-  void addImuValues();
+  virtual void addImuValues();
 
   /**
    * @brief addImuFactor add the IMU factor for the last navigation state variable.
    */
-  void addImuFactor();
+  virtual void addImuFactor();
 
   int addImu(const okvis::ImuParameters & imuParameters) override;
 
@@ -88,11 +92,11 @@ class SlidingWindowSmoother : public Estimator {
    * @param asKeyframe Is this new frame a keyframe?
    * @return True if successful.
    */
-  virtual bool addStates(okvis::MultiFramePtr multiFrame,
+  bool addStates(okvis::MultiFramePtr multiFrame,
                          const okvis::ImuMeasurementDeque& imuMeasurements,
                          bool asKeyframe) final;
 
-  virtual void optimize(size_t numIter, size_t numThreads = 1,
+  void optimize(size_t numIter, size_t numThreads = 1,
                         bool verbose = false) final;
 
   /**
@@ -103,7 +107,7 @@ class SlidingWindowSmoother : public Estimator {
    * are outside of the sliding window will be erased.
    * @return True if successful.
    */
-  virtual bool applyMarginalizationStrategy(
+  bool applyMarginalizationStrategy(
       size_t numKeyframes, size_t numImuFrames,
       okvis::MapPointVector& removedLandmarks) final;
 
@@ -118,17 +122,10 @@ class SlidingWindowSmoother : public Estimator {
    */
   bool computeCovariance(Eigen::MatrixXd* cov) const override;
 
-  /**
-   * @brief computeJointMarginalCovariance works for both Incremental and BatchFixedLagSmoother.
-   * @warning slow
-   * @param cov
-   * @return
-   */
-  bool computeJointMarginalCovariance(Eigen::MatrixXd* cov) const;
 
   bool print(std::ostream& stream) const override;
 
- private:
+ protected:
   /**
    * @brief getMinValidStateId get minimum id of nav state variables in the NonlinearFactorGraph.
    * @return
@@ -139,18 +136,18 @@ class SlidingWindowSmoother : public Estimator {
    * @brief addLandmarkToGraph add a new landmark to the graph.
    * @param landmarkId
    */
-  void addLandmarkToGraph(uint64_t landmarkId, const Eigen::Vector3d& pW);
+  virtual void addLandmarkToGraph(uint64_t landmarkId, const Eigen::Vector3d& pW);
 
   /**
    * @brief updateLandmarkInGraph add observations for an existing landmark.
    * @param landmarkId
    */
-  void updateLandmarkInGraph(uint64_t landmarkId);
+  virtual void updateLandmarkInGraph(uint64_t landmarkId);
 
   /**
    * @brief update state variables with FixedLagSmoother estimates.
    */
-  void updateStates();
+  virtual void updateStates();
 
   /**
    * @brief updateSmoother add new factors and/or values to the
@@ -196,7 +193,7 @@ class SlidingWindowSmoother : public Estimator {
    * @param[in, out] cov
    * @return
    */
-  bool gtsamMarginalCovariance(Eigen::MatrixXd* cov) const;
+  virtual bool gtsamMarginalCovariance(Eigen::MatrixXd* cov) const;
 
   /**
    * @brief gtsamJointMarginalCovariance compute the joint marginal covariance
@@ -224,27 +221,6 @@ class SlidingWindowSmoother : public Estimator {
       const std::map<gtsam::Key, double>& timestamps,
       const gtsam::FactorIndices& delete_slots);
 
-  void deleteAllFactorsWithKeyFromFactorGraph(
-      const gtsam::Key& key,
-      const gtsam::NonlinearFactorGraph& new_factors_tmp,
-      gtsam::NonlinearFactorGraph* factor_graph_output);
-
-  // Returns if the key in timestamps could be removed or not.
-  bool deleteKeyFromTimestamps(const gtsam::Key& key,
-                               const std::map<gtsam::Key, double>& timestamps,
-                               std::map<gtsam::Key, double>* timestamps_output);
-
-  // Returns if the key in timestamps could be removed or not.
-  bool deleteKeyFromValues(const gtsam::Key& key,
-                           const gtsam::Values& values,
-                           gtsam::Values* values_output);
-
-  // Find all slots of factors that have the given key in the list of keys.
-  void findSlotsOfFactorsWithKey(
-      const gtsam::Key& key,
-      const gtsam::NonlinearFactorGraph& graph,
-      std::vector<size_t>* slots_of_factors_with_key);
-
   bool deleteLmkFromFeatureTracks(uint64_t lmkId);
 
   /**
@@ -263,7 +239,6 @@ class SlidingWindowSmoother : public Estimator {
   bool triangulateWithDisparityCheck(uint64_t lmkId, Eigen::Vector3d* pW,
                                      double focalLength, double raySigmaScalar) const;
 
-
  protected:
   okvis::BackendParams backendParams_;
   okvis::ImuParams imuParams_;
@@ -274,10 +249,9 @@ class SlidingWindowSmoother : public Estimator {
   // Vision params.
   gtsam::SmartStereoProjectionParams smart_factors_params_;
   gtsam::SharedNoiseModel smart_noise_;
-  // Pose of the left camera wrt body
-  const gtsam::Pose3 B_Pose_leftCam_;
+
   // Stores calibration, baseline.
-  const gtsam::Cal3_S2Stereo::shared_ptr stereo_cal_;
+//  const gtsam::Cal3_S2Stereo::shared_ptr stereo_cal_;
 
   //!< current state variables of the system calculated by the FixedLagSmoother.
   gtsam::Values state_;
@@ -289,7 +263,7 @@ class SlidingWindowSmoother : public Estimator {
 
   // camera intrinsic parameters with distortion.
   boost::shared_ptr<gtsam::Cal3DS2> cal0_;
-  // camera extrinsic parameters.
+  // Pose of the left camera wrt body.
   gtsam::Pose3 body_P_cam0_;
 
   //!< new states to be added
@@ -329,12 +303,48 @@ class SlidingWindowSmoother : public Estimator {
   // current frame?
   double trackingRate_;
 };
+
+
+void deleteAllFactorsWithKeyFromFactorGraph(
+    const gtsam::Key& key,
+    const gtsam::NonlinearFactorGraph& new_factors_tmp,
+    gtsam::NonlinearFactorGraph* factor_graph_output);
+
+// Returns if the key in timestamps could be removed or not.
+bool deleteKeyFromTimestamps(const gtsam::Key& key,
+                             const std::map<gtsam::Key, double>& timestamps,
+                             std::map<gtsam::Key, double>* timestamps_output);
+
+
+// Returns if the key in timestamps could be removed or not.
+bool deleteKeyFromValues(const gtsam::Key& key,
+                         const gtsam::Values& values,
+                         gtsam::Values* values_output);
+
+// Find all slots of factors that have the given key in the list of keys.
+void findSlotsOfFactorsWithKey(
+    const gtsam::Key& key,
+    const gtsam::NonlinearFactorGraph& graph,
+    std::vector<size_t>* slots_of_factors_with_key);
+
 }  // namespace okvis
 #else
 namespace okvis {
-  typedef Estimator SlidingWindowSmoother;
+class SlidingWindowSmoother : public Estimator {
+ public:
+  OKVIS_DEFINE_EXCEPTION(Exception, std::runtime_error)
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+
+  SlidingWindowSmoother(const okvis::BackendParams& backendParams) : Estimator() {}
+
+  /**
+   * @brief Constructor if a ceres map is already available.
+   * @param mapPtr Shared pointer to ceres map.
+   */
+  SlidingWindowSmoother(const okvis::BackendParams& backendParams,
+                        std::shared_ptr<okvis::ceres::Map> mapPtr) : Estimator(mapPtr) {}
+}
 }  // namespace okvis
 #endif // # ifdef HAVE_GTSAM
 
-
-#endif /* INCLUDE_OKVIS_SLIDING_WINDOW_SMOOTHER_HPP_ */
+#endif /* INCLUDE_GTSAM_SLIDING_WINDOW_SMOOTHER_HPP_ */

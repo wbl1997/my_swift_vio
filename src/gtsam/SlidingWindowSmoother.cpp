@@ -1,3 +1,9 @@
+/**
+ * @file   SlidingWindowSmoother.cpp
+ * @brief  Implementation of SlidingWindowSmoother which wraps gtsam::FixedLagSmoother for VIO.
+ * @author Jianzhu Huai
+ */
+
 #include <gtsam/SlidingWindowSmoother.hpp>
 
 #include <glog/logging.h>
@@ -452,6 +458,7 @@ bool SlidingWindowSmoother::addStates(
   }
 
   addImuValues();
+  // TODO(jhuai): add camera extrinsic parameter blocks to gtsam graph?
 
   // depending on whether or not this is the very beginning, we will add priors
   // or relative terms to the last state:
@@ -589,7 +596,7 @@ void SlidingWindowSmoother::addLandmarkToGraph(uint64_t lmkId, const Eigen::Vect
   // more efficient.
 //  SmartStereoFactor::shared_ptr new_factor =
 //      boost::make_shared<SmartStereoFactor>(
-//          smart_noise_, smart_factors_params_, B_Pose_leftCam_);
+//          smart_noise_, smart_factors_params_, body_P_cam0_);
 
 //  VLOG(10) << "Adding landmark with: " << ft.obs_.size()
 //           << " landmarks to graph, with keys: ";
@@ -1537,7 +1544,7 @@ bool SlidingWindowSmoother::deleteLmkFromFeatureTracks(uint64_t lmkId) {
   return true;
 }
 
-void SlidingWindowSmoother::deleteAllFactorsWithKeyFromFactorGraph(
+void deleteAllFactorsWithKeyFromFactorGraph(
     const gtsam::Key& key,
     const gtsam::NonlinearFactorGraph& factor_graph,
     gtsam::NonlinearFactorGraph* factor_graph_output) {
@@ -1573,7 +1580,7 @@ void SlidingWindowSmoother::deleteAllFactorsWithKeyFromFactorGraph(
 }
 
 // Returns if the key in timestamps could be removed or not.
-bool SlidingWindowSmoother::deleteKeyFromTimestamps(
+bool deleteKeyFromTimestamps(
     const gtsam::Key& key,
     const std::map<gtsam::Key, double>& timestamps,
     std::map<gtsam::Key, double>* timestamps_output) {
@@ -1587,7 +1594,7 @@ bool SlidingWindowSmoother::deleteKeyFromTimestamps(
 }
 
 // Returns if the key in timestamps could be removed or not.
-bool SlidingWindowSmoother::deleteKeyFromValues(const gtsam::Key& key,
+bool deleteKeyFromValues(const gtsam::Key& key,
                                      const gtsam::Values& values,
                                      gtsam::Values* values_output) {
   CHECK_NOTNULL(values_output);
@@ -1611,7 +1618,7 @@ bool SlidingWindowSmoother::deleteKeyFromValues(const gtsam::Key& key,
 }
 
 // Returns if the key in timestamps could be removed or not.
-void SlidingWindowSmoother::findSlotsOfFactorsWithKey(
+void findSlotsOfFactorsWithKey(
     const gtsam::Key& key,
     const gtsam::NonlinearFactorGraph& graph,
     std::vector<size_t>* slots_of_factors_with_key) {

@@ -237,6 +237,7 @@ list(APPEND SOURCEFILES
     src/gtsam/RiExtendedPose3.cpp
     src/gtsam/RiExtendedPose3Prior.cpp
     src/gtsam/RiImuFactor.cpp
+    src/gtsam/RiSlidingWindowSmoother.cpp
     src/gtsam/VioBackEndParams.cpp
     src/gtsam/SlidingWindowSmoother.cpp
 )

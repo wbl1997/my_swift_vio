@@ -1,12 +1,13 @@
 #include <msckf/VioFactoryMethods.hpp>
 
+#include <msckf/ConsistentEstimator.hpp>
+#include <msckf/GeneralEstimator.hpp>
 #include <msckf/HybridFrontend.hpp>
 #include <msckf/MSCKF2.hpp>
 #include <msckf/InvariantEKF.hpp>
+#include <gtsam/RiSlidingWindowSmoother.hpp>
 #include <gtsam/SlidingWindowSmoother.hpp>
 #include <msckf/TFVIO.hpp>
-#include <msckf/GeneralEstimator.hpp>
-#include <msckf/ConsistentEstimator.hpp>
 
 #include <loop_closure/LoopClosureDetector.h>
 
