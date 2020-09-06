@@ -605,8 +605,9 @@ bool ConsistentEstimator::computeCovariance(Eigen::MatrixXd* cov) const {
       Eigen::aligned_allocator<Eigen::Matrix<double, -1, -1, Eigen::RowMajor>>>
       varianceList;
   bool status = false;
+  std::shared_ptr<::ceres::Problem> clonedProblem = mapPtr_->cloneProblem();
   status = mapPtr_->getParameterBlockMinimalCovariance(
-      parameterBlockIdList, &varianceList);
+      parameterBlockIdList, clonedProblem.get(), &varianceList);
   if (status) {
     cov->topLeftCorner<6, 6>() = varianceList[0];
     cov->bottomRightCorner<9, 9>() = varianceList[1];
