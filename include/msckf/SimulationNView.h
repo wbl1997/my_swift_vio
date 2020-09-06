@@ -199,13 +199,13 @@ class SimulationNView {
   }
 
  protected:
-  Eigen::Vector4d truePoint_;
+  Eigen::Vector4d truePoint_; // homogeneous coordinates in W frame.
   std::vector<Eigen::Vector3d,
               Eigen::aligned_allocator<Eigen::Matrix<double, 3, 1>>>
-      obsDirections_;
+      obsDirections_; // list of [x/z + noise, y/z + noise, 1].
   std::vector<okvis::kinematics::Transformation,
               Eigen::aligned_allocator<okvis::kinematics::Transformation>>
-      T_CWs_;
+      T_CWs_; // T_CW * hpW = hpC.
 };
 
 class SimulationThreeView : public SimulationNView {
@@ -289,100 +289,130 @@ class SimulationThreeView : public SimulationNView {
   }
 };
 
-class SimulationTwoView : public SimulationNView
-{
-public:
-    EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+class SimulationTwoView : public SimulationNView {
+ public:
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
-    SimulationTwoView(int caseId = 0, double depth = 1.0) : SimulationNView(2) {
+  SimulationTwoView(int caseId = 0, double depth = 1.0,
+                    double rayNoiseSigma = 0.01)
+      : SimulationNView(2) {
+    switch (caseId) {
+      case 0:
+        obsDirections_[0] = Eigen::Vector3d{-0.51809, 0.149922, 1};
+        obsDirections_[1] =
+            Eigen::Vector3d{-0.513966413218, 0.150864740297, 1.0};
+        T_CWs_[0] = okvis::kinematics::Transformation();
+        T_CWs_[1] = okvis::kinematics::Transformation(
+            -Eigen::Vector3d{-0.00161695, 0.00450899, 0.0435501},
+            Eigen::Quaterniond::Identity());
+        truePoint_ = Eigen::Vector4d(-0.444625, 0.129972, 0.865497, 0.190606);
+        truePoint_ /= truePoint_[3];
+        break;
+      case 1:
+        obsDirections_[0] = Eigen::Vector3d{-0.130586, 0.0692999, 1};
+        obsDirections_[1] = Eigen::Vector3d{-0.129893, 0.0710077, 0.998044};
+        obsDirections_[1] /= obsDirections_[1][2];
+        T_CWs_[0] = okvis::kinematics::Transformation();
+        T_CWs_[1] = okvis::kinematics::Transformation(
+            -Eigen::Vector3d{-0.00398223, 0.0133035, 0.112868},
+            Eigen::Quaterniond::Identity());
+        truePoint_ = Eigen::Vector4d(-0.124202, 0.0682118, 0.962293, 0.23219);
+        truePoint_ /= truePoint_[3];
+        break;
+      case 2:
+        obsDirections_[0] = Eigen::Vector3d{0.0604648, 0.0407913, 1};
+        obsDirections_[1] = Eigen::Vector3d{0.0681188, 0.0312081, 1.00403};
+        obsDirections_[1] /= obsDirections_[1][2];
+        T_CWs_[0] = okvis::kinematics::Transformation();
+        T_CWs_[1] = okvis::kinematics::Transformation(
+            -Eigen::Vector3d{0.0132888, 0.0840325, 0.148991},
+            Eigen::Quaterniond::Identity());
+        truePoint_ = Eigen::Vector4d(0.0637098, 0.0402793, 0.990112, 0.11831);
+        truePoint_ /= truePoint_[3];
+        break;
+      case 3:  // pure rotation
+        T_CWs_[0] = okvis::kinematics::Transformation();
+        T_CWs_[1] = okvis::kinematics::Transformation(
+            Eigen::Vector3d::Zero(),
+            Eigen::Quaterniond(
+                Eigen::AngleAxisd(-30 * M_PI / 180, Eigen::Vector3d::UnitY())));
+
+        obsDirections_[0] = Eigen::Vector3d(
+            cos(15 * M_PI / 180) * cos(45 * M_PI / 180), -sin(15 * M_PI / 180),
+            cos(15 * M_PI / 180) * sin(45 * M_PI / 180));
+        obsDirections_[1] = T_CWs_[1].C() * obsDirections_[0];
+        obsDirections_[0] /= obsDirections_[0][2];
+        obsDirections_[1] /= obsDirections_[1][2];
+        truePoint_ << obsDirections_[0], 0.0;
+        break;
+      case 4:  // fake pure rotation observations for stationary motion
+        T_CWs_[0] = okvis::kinematics::Transformation();
+        T_CWs_[1] = okvis::kinematics::Transformation();
+
+        obsDirections_[0] = Eigen::Vector3d(
+            cos(15 * M_PI / 180) * cos(45 * M_PI / 180), -sin(15 * M_PI / 180),
+            cos(15 * M_PI / 180) * sin(45 * M_PI / 180));
+        obsDirections_[1] = T_CWs_[1].C().transpose() * obsDirections_[0];
+        obsDirections_[0] /= obsDirections_[0][2];
+        obsDirections_[1] /= obsDirections_[1][2];
+        truePoint_ << obsDirections_[0], 0.0;
+        break;
+      case 5:  // points at varying depths
+        T_CWs_[0] = okvis::kinematics::Transformation();
+        T_CWs_[1] = okvis::kinematics::Transformation(
+            Eigen::Vector3d::Random(),
+            Eigen::Quaterniond(
+                Eigen::AngleAxisd(-30 * M_PI / 180, Eigen::Vector3d::UnitY())
+                    .toRotationMatrix()));
+
+        obsDirections_[0] << depth * cos(15 * M_PI / 180) *
+                                 cos(45 * M_PI / 180),
+            -depth * sin(15 * M_PI / 180),
+            depth * cos(15 * M_PI / 180) * sin(45 * M_PI / 180);
+
+        obsDirections_[1] = T_CWs_[1].C() * obsDirections_[0] + T_CWs_[1].r();
+        truePoint_ << obsDirections_[0], 1.0;
+        obsDirections_[0] = obsDirections_[0] / obsDirections_[0][2];
+        obsDirections_[1] = obsDirections_[1] / obsDirections_[1][2];
+        break;
+      default:
+        break;
+    }
+
+    if (rayNoiseSigma > 0) {
+      vio::Sample noise_generator;
+      switch (caseId) {
+        case 3:
+        case 4:
+        case 5:
+          for (size_t j = 0; j < 2u; ++j) {
+            obsDirections_[j][0] += noise_generator.gaussian(rayNoiseSigma);
+            obsDirections_[j][1] += noise_generator.gaussian(rayNoiseSigma);
+          }
+          break;
+        default:
+          break;
+      }
+    } else {
       switch (caseId) {
         case 0:
-          obsDirections_[0] = Eigen::Vector3d{-0.51809, 0.149922, 1};
-          obsDirections_[1] =
-              Eigen::Vector3d{-0.513966413218, 0.150864740297, 1.0};
-          T_CWs_[0] = okvis::kinematics::Transformation();
-          T_CWs_[1] = okvis::kinematics::Transformation(
-              -Eigen::Vector3d{-0.00161695, 0.00450899, 0.0435501},
-              Eigen::Quaterniond::Identity());
-          truePoint_ = Eigen::Vector4d(-0.444625, 0.129972, 0.865497, 0.190606);
-          truePoint_ /= truePoint_[3];
-          break;
         case 1:
-          obsDirections_[0] = Eigen::Vector3d{-0.130586, 0.0692999, 1};
-          obsDirections_[1] = Eigen::Vector3d{-0.129893, 0.0710077, 0.998044};
-          obsDirections_[1] /= obsDirections_[1][2];
-          T_CWs_[0] = okvis::kinematics::Transformation();
-          T_CWs_[1] = okvis::kinematics::Transformation(
-              -Eigen::Vector3d{-0.00398223, 0.0133035, 0.112868},
-              Eigen::Quaterniond::Identity());
-          truePoint_ = Eigen::Vector4d(-0.124202, 0.0682118, 0.962293, 0.23219);
-          truePoint_ /= truePoint_[3];
-          break;
         case 2:
-          obsDirections_[0] = Eigen::Vector3d{0.0604648, 0.0407913, 1};
-          obsDirections_[1] = Eigen::Vector3d{0.0681188, 0.0312081, 1.00403};
-          obsDirections_[1] /= obsDirections_[1][2];
-          T_CWs_[0] = okvis::kinematics::Transformation();
-          T_CWs_[1] = okvis::kinematics::Transformation(
-              -Eigen::Vector3d{0.0132888, 0.0840325, 0.148991},
-              Eigen::Quaterniond::Identity());
-          break;
-        case 3:  // pure rotation
-          T_CWs_[0] = okvis::kinematics::Transformation();
-          T_CWs_[1] = okvis::kinematics::Transformation(
-              Eigen::Vector3d::Zero(),
-              Eigen::Quaterniond(Eigen::AngleAxisd(-30 * M_PI / 180,
-                                                   Eigen::Vector3d::UnitY())));
-
-          obsDirections_[0] =
-              Eigen::Vector3d(cos(15 * M_PI / 180) * cos(45 * M_PI / 180),
-                              -sin(15 * M_PI / 180),
-                              cos(15 * M_PI / 180) * sin(45 * M_PI / 180));
-          obsDirections_[1] = T_CWs_[1].C() * obsDirections_[0];
-          obsDirections_[0] /= obsDirections_[0][2];
-          obsDirections_[1] /= obsDirections_[1][2];
-          truePoint_ << obsDirections_[0], 0.0;
-          break;
-        case 4:  // fake pure rotation observations for stationary motion
-          T_CWs_[0] = okvis::kinematics::Transformation();
-          T_CWs_[1] = okvis::kinematics::Transformation();
-
-          obsDirections_[0] =
-              Eigen::Vector3d(cos(15 * M_PI / 180) * cos(45 * M_PI / 180),
-                              -sin(15 * M_PI / 180),
-                              cos(15 * M_PI / 180) * sin(45 * M_PI / 180));
-          obsDirections_[1] = T_CWs_[1].C().transpose() * obsDirections_[0];
-          obsDirections_[0] /= obsDirections_[0][2];
-          obsDirections_[1] /= obsDirections_[1][2];
-          truePoint_ << obsDirections_[0], 0.0;
-          break;
-        case 5:  // points at varying depths
-          T_CWs_[0] = okvis::kinematics::Transformation();
-          T_CWs_[1] = okvis::kinematics::Transformation(
-              Eigen::Vector3d::Random(),
-              Eigen::Quaterniond(
-                  Eigen::AngleAxisd(-30 * M_PI / 180, Eigen::Vector3d::UnitY())
-                      .toRotationMatrix()));
-
-          obsDirections_[0]
-              << depth * cos(15 * M_PI / 180) * cos(45 * M_PI / 180),
-              -depth * sin(15 * M_PI / 180),
-              depth * cos(15 * M_PI / 180) * sin(45 * M_PI / 180);
-
-          obsDirections_[1] = T_CWs_[1].C() * obsDirections_[0] + T_CWs_[1].r();
-          truePoint_ << obsDirections_[0], 1.0;
-          obsDirections_[0] = obsDirections_[0] / obsDirections_[0][2];
-          obsDirections_[1] = obsDirections_[1] / obsDirections_[1][2];
+          for (size_t j = 0; j < 2u; ++j) {
+            Eigen::Matrix<double, 4, 1> hpC = T_CWs_[j] * truePoint_;
+            obsDirections_[j] = hpC.head<3>() / hpC[2];
+          }
           break;
         default:
           break;
       }
     }
+  }
 };
 
 class SimulationNViewSphere : public SimulationNView {
 public:
-  SimulationNViewSphere() : SimulationNView(6) {
+  SimulationNViewSphere(double rayNoiseSigma = 0.01) : SimulationNView(6) {
     // Set the real feature at the origin of the world frame.
     truePoint_ = Eigen::Vector4d(0.5, 0.0, 0.0, 1.0);
 
@@ -427,16 +457,17 @@ public:
       Eigen::Isometry3d cam_pose_inv = cam_poses[i].inverse();
       Eigen::Vector3d p = cam_pose_inv.linear() * truePoint_.head<3>() +
                           cam_pose_inv.translation();
-      double u = p(0) / p(2) + noise_generator.gaussian(0.01);
-      double v = p(1) / p(2) + noise_generator.gaussian(0.01);
-      // double u = p(0) / p(2);
-      // double v = p(1) / p(2);
+      double u = p(0) / p(2) + noise_generator.gaussian(rayNoiseSigma);
+      double v = p(1) / p(2) + noise_generator.gaussian(rayNoiseSigma);
       measurements[i] = Eigen::Vector2d(u, v);
       obsDirections_[i] = Eigen::Vector3d(u, v, 1.0);
     }
   }
 };
 
+/**
+ * @brief The SimulationNViewStatic class All views are at the same location.
+ */
 class SimulationNViewStatic : public SimulationNView {
  public:
   SimulationNViewStatic(bool addSidewaysView, bool addObsNoise) : SimulationNView(6) {

@@ -43,7 +43,8 @@ class RiProjectionFactorIDPTest : public ::testing::Test {
     const Eigen::Matrix<double, 2, 2> covariance =
         Eigen::Matrix<double, 2, 2>::Identity();
     const Eigen::Vector2d uv;
-    simul::SimulationNViewSphere snv(0.0);
+    simul::SimulationTwoView snv(0, 1.0, 0.0);
+//    simul::SimulationNViewSphere snv(0.0);
 
     AlignedVector<Eigen::Vector3d> rayList = snv.obsDirections();
     AlignedVector<Eigen::Vector2d> imagePointList;
