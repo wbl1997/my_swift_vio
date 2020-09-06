@@ -222,7 +222,9 @@ class RiImuFactor : public NoiseModelFactor3<RiExtendedPose3, RiExtendedPose3,
   RiImuFactor(Key xi, Key xj, Key bi, const RiPreintegratedImuMeasurements& pim)
       : NoiseModelFactor3<RiExtendedPose3, RiExtendedPose3,
                           imuBias::ConstantBias>(
-            noiseModel::Gaussian::Covariance(pim_.covariance_), xi, xj, bi),
+            noiseModel::Gaussian::Covariance(
+                pim.covariance_.topLeftCorner<9, 9>()),
+            xi, xj, bi),
         pim_(pim),
         redo_(false),
         redoCounter_(0),

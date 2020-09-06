@@ -143,13 +143,20 @@ void RiSlidingWindowSmoother::addImuFactor() {
 
 void RiSlidingWindowSmoother::addLandmarkToGraph(
     uint64_t lmkId, const Eigen::Vector3d& externalPointW) {
-  new_values_.insert(gtsam::symbol('l', lmkId), gtsam::Point3(externalPointW));
+  uint64_t currentFrameId = statesMap_.rbegin()->first;
+  okvis::kinematics::Transformation T_WB;
+  get_T_WS(currentFrameId, T_WB);
+  okvis::kinematics::Transformation T_CW = (T_WB * camera_rig_.getCameraExtrinsic(0)).inverse();
+  Eigen::Vector3d pC = T_CW.C() * externalPointW + T_CW.r();
+  double rho = 1.0 / pC[2];
+  gtsam::Point3 abrho(pC[0] * rho, pC[1] * rho, rho);
+  new_values_.insert(gtsam::symbol('l', lmkId), abrho);
 
   navStateToLandmarks_.at(statesMap_.rbegin()->first).push_back(lmkId);
 
   uint64_t minValidStateId = statesMap_.begin()->first;
   okvis::MapPoint& mp = landmarksMap_.at(lmkId);
-  uint64_t anchorFrameId = 0u;
+
   for (auto obsIter = mp.observations.rbegin();
        obsIter != mp.observations.rend(); ++obsIter) {
     if (obsIter->first.frameId < minValidStateId) {
@@ -175,7 +182,7 @@ void RiSlidingWindowSmoother::addLandmarkToGraph(
 
     // TODO(jhuai): support more than one cameras by extending the gtsam
     // reprojection factor.
-    if (anchorFrameId == 0u) {
+    if (obsIter == mp.observations.rbegin()) {
       // The anchor frame is set to the last observation's frame which is
       // essentially the last frame so the anchor frame will persist until the
       // landmark is marginalized.
@@ -186,13 +193,14 @@ void RiSlidingWindowSmoother::addLandmarkToGraph(
               camera_rig_.getCameraExtrinsic(0u),
               camera_rig_.getCameraExtrinsic(0u));
       new_reprojection_factors_.add(factor);
-      anchorFrameId = obsIter->first.frameId;
-      mp.anchorStateId = anchorFrameId;
+      mp.anchorStateId = obsIter->first.frameId;
+      OKVIS_ASSERT_EQ(Exception, mp.anchorStateId, currentFrameId,
+                      "Landmark should have the last observation at the current frame.");
     } else {
       gtsam::RiProjectionFactorIDP::shared_ptr factor =
           boost::make_shared<gtsam::RiProjectionFactorIDP>(
               gtsam::Symbol('x', obsIter->first.frameId),
-              gtsam::Symbol('x', anchorFrameId), gtsam::Symbol('l', lmkId),
+              gtsam::Symbol('x', mp.anchorStateId), gtsam::Symbol('l', lmkId),
               covariance, measurement, camera_rig_.getCameraGeometry(0u),
               camera_rig_.getCameraExtrinsic(0u),
               camera_rig_.getCameraExtrinsic(0u));
