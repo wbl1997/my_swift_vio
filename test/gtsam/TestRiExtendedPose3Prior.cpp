@@ -20,7 +20,7 @@ public:
     state_ = state_.expmap(xi_);
     factor_ = gtsam::RiExtendedPose3Prior(
         gtsam::Symbol('x', 1u), prior_,
-        Eigen::Matrix<double, 9, 9>::Identity() * 100);
+        Eigen::Matrix<double, 9, 9>::Identity() * 100, false);
   }
 
   gtsam::RiExtendedPose3 prior_;

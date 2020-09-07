@@ -56,7 +56,7 @@ void RiSlidingWindowSmoother::addInitialPriorFactors() {
           gtsam::Symbol('x', frameId),
           gtsam::RiExtendedPose3(gtsam::Rot3(T_WB.q()), vel_bias.head<3>(),
                                  T_WB.r()),
-          state_prior_covariance));
+          state_prior_covariance, true));
 
   // Add initial bias priors:
   Eigen::Matrix<double, 6, 1> prior_biasSigmas;

@@ -24,15 +24,18 @@ class RiExtendedPose3Prior : public NoiseModelFactor1<RiExtendedPose3> {
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
  private:
   RiExtendedPose3 measured_;  ///< R_WB, V_WB, P_WB
+  bool lockJacobian_;
 
  public:
   RiExtendedPose3Prior() {}
 
-  RiExtendedPose3Prior(Key state_i, const RiExtendedPose3& z,
-                       const Eigen::Matrix<double, 9, 9>& covariance)
+  RiExtendedPose3Prior(Key state_i, const RiExtendedPose3 &z,
+                       const Eigen::Matrix<double, 9, 9> &covariance,
+                       bool lockJacobian)
       : NoiseModelFactor1<RiExtendedPose3>(
             noiseModel::Gaussian::Covariance(covariance), state_i),
-        measured_(z) {}
+        measured_(z),
+        lockJacobian_(lockJacobian) {}
 
   RiExtendedPose3Prior(Key state_i, const Eigen::Quaterniond &q, const Eigen::Vector3d &v,
                        const Eigen::Vector3d &p, const Eigen::Matrix<double, 9, 9>& covariance)

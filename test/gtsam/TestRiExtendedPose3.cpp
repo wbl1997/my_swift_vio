@@ -313,6 +313,18 @@ TEST(LieJacobians, SO3Jr_inv) {
   EXPECT_TRUE(assert_equal(product, eye));
 }
 
+TEST(LieJacobians, SO3Jr0) {
+  Eigen::Matrix3d Jr = gtsam::geometry::SO3Jr(Eigen::Vector3d::Zero());
+  Eigen::Matrix3d eye = Eigen::Matrix3d::Identity();
+  EXPECT_TRUE(assert_equal(Jr, eye));
+}
+
+TEST(LieJacobians, SO3Jr_inv0) {
+  Eigen::Matrix3d Jr_inv = gtsam::geometry::SO3Jr_inv(Eigen::Vector3d::Zero());
+  Eigen::Matrix3d eye = Eigen::Matrix3d::Identity();
+  EXPECT_TRUE(assert_equal(Jr_inv, eye));
+}
+
 TEST(LieJacobians, SE3Jr_inv) {
   Eigen::Matrix<double, 6, 1> xi = Eigen::Matrix<double, 6, 1>::Random();
   Eigen::Matrix<double, 6, 6> Jr = gtsam::geometry::SE3Jr(xi);
@@ -322,6 +334,20 @@ TEST(LieJacobians, SE3Jr_inv) {
   EXPECT_TRUE(assert_equal(product, eye));
 }
 
+TEST(LieJacobians, SE3Jr0) {
+  Eigen::Matrix<double, 6, 6> Jr =
+      gtsam::geometry::SE3Jr(Eigen::Matrix<double, 6, 1>::Zero());
+  Eigen::Matrix<double, 6, 6> eye = Eigen::Matrix<double, 6, 6>::Identity();
+  EXPECT_TRUE(assert_equal(Jr, eye));
+}
+
+TEST(LieJacobians, SE3Jr_inv0) {
+  Eigen::Matrix<double, 6, 6> Jr_inv =
+      gtsam::geometry::SE3Jr_inv(Eigen::Matrix<double, 6, 1>::Zero());
+  Eigen::Matrix<double, 6, 6> eye = Eigen::Matrix<double, 6, 6>::Identity();
+  EXPECT_TRUE(assert_equal(Jr_inv, eye));
+}
+
 TEST(LieJacobians, SEK3Jr_inv) {
   Eigen::Matrix<double, 9, 1> xi = Eigen::Matrix<double, 9, 1>::Random();
   Eigen::Matrix<double, 9, 9> Jr = gtsam::geometry::SEK3Jr(xi);
@@ -329,6 +355,20 @@ TEST(LieJacobians, SEK3Jr_inv) {
   Eigen::Matrix<double, 9, 9> product = Jr * Jr_inv;
   Eigen::Matrix<double, 9, 9> eye = Eigen::Matrix<double, 9, 9>::Identity();
   EXPECT_TRUE(assert_equal(product, eye));
+}
+
+TEST(LieJacobians, SEK3Jr0) {
+  Eigen::Matrix<double, 9, 9> Jr =
+      gtsam::geometry::SEK3Jr(Eigen::Matrix<double, 9, 1>::Zero());
+  Eigen::Matrix<double, 9, 9> eye = Eigen::Matrix<double, 9, 9>::Identity();
+  EXPECT_TRUE(assert_equal(Jr, eye));
+}
+
+TEST(LieJacobians, SEK3Jr_inv0) {
+  Eigen::Matrix<double, 9, 9> Jr_inv =
+      gtsam::geometry::SEK3Jr_inv(Eigen::Matrix<double, 9, 1>::Zero());
+  Eigen::Matrix<double, 9, 9> eye = Eigen::Matrix<double, 9, 9>::Identity();
+  EXPECT_TRUE(assert_equal(Jr_inv, eye));
 }
 
 TEST(LieJacobians, SO3Jl_inv) {
