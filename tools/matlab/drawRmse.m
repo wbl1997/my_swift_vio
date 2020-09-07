@@ -13,10 +13,12 @@ probeEpochs = [0, 3, 10, 30, 100, 300];
 
 fileColumnStyles =  {
         {'-r', '-g', '-b', '-k', '.k', '.b', ...
-        '-c', '-m', '-y'},
+        '-c', '-m', '-y'}, ...
         {'--r', '--g', '--b', '--k', '-.k', '-.b', ...
-        '--c', '--m', '--y'},
+        '--c', '--m', '--y'}, ...
         {':r', ':g', ':b', ':k', '-.r', '-.g', ...
+        ':c', ':m', ':y'}, ...
+        {'.r', '.g', '.b', '.k', '-.r', '-.g', ...
         ':c', ':m', ':y'}};
 
 close all;
@@ -57,7 +59,7 @@ end
 
 figure;
 indices = 2:4;
-drawColumnsInMultipleMatrices(matrices, fileLabels, {'x', 'y', 'z'}, indices, fileColumnStyles);
+drawColumnsInMultipleMatrices(matrices, fileLabels, {'x', 'y', 'z'}, indices, 0, fileColumnStyles);
 estAvg = probeRmse(matrices, fileLabels, indices, 'position', epochIndexList);
 recordRmse(estAvg, 'position');
 formatList{componentIndex} = '%.3f';
@@ -74,7 +76,7 @@ export_fig(outputfig);
 figure;
 indices = 5:7;
 scale = 180 / pi;
-drawColumnsInMultipleMatrices(matrices, fileLabels, {'x', 'y', 'z'}, indices, fileColumnStyles, scale);
+drawColumnsInMultipleMatrices(matrices, fileLabels, {'x', 'y', 'z'}, indices, 0, fileColumnStyles, scale);
 estAvg = probeRmse(matrices, fileLabels, indices, 'orientation (deg)', epochIndexList, scale);
 recordRmse(estAvg, 'orientation (deg)');
 formatList{componentIndex} = '%.3f';
@@ -89,7 +91,7 @@ export_fig(outputfig);
 
 figure;
 indices = 8:10;
-drawColumnsInMultipleMatrices(matrices, fileLabels, {'x', 'y', 'z'}, indices, fileColumnStyles);
+drawColumnsInMultipleMatrices(matrices, fileLabels, {'x', 'y', 'z'}, indices, 0, fileColumnStyles);
 estAvg = probeRmse(matrices, fileLabels, indices, 'velocity', epochIndexList);
 recordRmse(estAvg, 'velocity');
 formatList{componentIndex} = '%.3f';
@@ -105,7 +107,7 @@ export_fig(outputfig);
 figure;
 indices = 11:13;
 scale = 180/pi;
-drawColumnsInMultipleMatrices(matrices, fileLabels, {'x', 'y', 'z'}, indices, fileColumnStyles, scale);
+drawColumnsInMultipleMatrices(matrices, fileLabels, {'x', 'y', 'z'}, indices, 0, fileColumnStyles, scale);
 estAvg = probeRmse(matrices, fileLabels, indices, 'bg (deg/s)', epochIndexList, scale);
 recordRmse(estAvg, 'bg (deg/s)');
 formatList{componentIndex} = '%.2f';
@@ -120,7 +122,7 @@ export_fig(outputfig);
 
 figure;
 indices = 14:16;
-drawColumnsInMultipleMatrices(matrices, fileLabels, {'x', 'y', 'z'}, indices, fileColumnStyles);
+drawColumnsInMultipleMatrices(matrices, fileLabels, {'x', 'y', 'z'}, indices, 0, fileColumnStyles);
 estAvg = probeRmse(matrices, fileLabels, indices, 'ba', epochIndexList);
 recordRmse(estAvg, 'ba');
 formatList{componentIndex} = '%.3f';
@@ -137,7 +139,7 @@ figure;
 indices = 17 + (0:8);
 scale = 1000;
 drawColumnsInMultipleMatrices(matrices, fileLabels, {'x', 'y', 'z'}, ...
-    indices, fileColumnStyles, scale);
+    indices, 0, fileColumnStyles, scale);
 estAvg = probeRmse(matrices, fileLabels, indices, 'Tg (0.001)', epochIndexList, scale);
 recordRmse(estAvg, 'Tg (0.001)');
 formatList{componentIndex} = '%.2f';
@@ -154,7 +156,7 @@ figure;
 indices = 26 + (0:8);
 scale = 1000;
 drawColumnsInMultipleMatrices(matrices, fileLabels, {'x', 'y', 'z'}, ...
-    indices, fileColumnStyles, scale);
+    indices, 0, fileColumnStyles, scale);
 estAvg = probeRmse(matrices, fileLabels, indices, 'Ts (0.001)', epochIndexList, scale);
 recordRmse(estAvg, 'Ts (0.001)');
 formatList{componentIndex} = '%.2f';
@@ -171,7 +173,7 @@ figure;
 indices = 35 + (0:8);
 scale = 1000;
 drawColumnsInMultipleMatrices(matrices, fileLabels, {'x', 'y', 'z'}, ...
-    indices, fileColumnStyles, scale);
+    indices, 0, fileColumnStyles, scale);
 estAvg = probeRmse(matrices, fileLabels, indices, 'Ta (0.001)', epochIndexList, scale);
 recordRmse(estAvg, 'Ta (0.001)');
 formatList{componentIndex} = '%.2f';
@@ -187,7 +189,7 @@ export_fig(outputfig);
 figure;
 indices = 44:46;
 scale = 100;
-drawColumnsInMultipleMatrices(matrices, fileLabels, {'x', 'y', 'z'}, indices, fileColumnStyles, scale);
+drawColumnsInMultipleMatrices(matrices, fileLabels, {'x', 'y', 'z'}, indices, 0, fileColumnStyles, scale);
 estAvg = probeRmse(matrices, fileLabels, indices, 'p_CB (cm)', epochIndexList, scale);
 recordRmse(estAvg, 'p_CB (cm)');
 formatList{componentIndex} = '%.2f';
@@ -202,7 +204,7 @@ export_fig(outputfig);
 
 figure;
 indices = 47:48;
-drawColumnsInMultipleMatrices(matrices, fileLabels, {'fx', 'fy'}, indices, fileColumnStyles);
+drawColumnsInMultipleMatrices(matrices, fileLabels, {'fx', 'fy'}, indices, 0, fileColumnStyles);
 estAvg = probeRmse(matrices, fileLabels, indices, 'fxy', epochIndexList);
 recordRmse(estAvg, 'fxy');
 formatList{componentIndex} = '%.2f';
@@ -217,7 +219,7 @@ export_fig(outputfig);
 
 figure;
 indices = 49:50;
-drawColumnsInMultipleMatrices(matrices, fileLabels, {'cx', 'cy'}, indices, fileColumnStyles);
+drawColumnsInMultipleMatrices(matrices, fileLabels, {'cx', 'cy'}, indices, 0, fileColumnStyles);
 estAvg = probeRmse(matrices, fileLabels, indices, 'cxy', epochIndexList);
 recordRmse(estAvg, 'cxy');
 formatList{componentIndex} = '%.2f';
@@ -234,7 +236,7 @@ figure;
 indices = 51:52;
 scale = 1000;
 drawColumnsInMultipleMatrices(matrices, fileLabels, {'k1', 'k2'}, ...
-    indices, fileColumnStyles, scale);
+    indices, 0, fileColumnStyles, scale);
 estAvg = probeRmse(matrices, fileLabels, indices, 'k12 (0.001)', epochIndexList, scale);
 recordRmse(estAvg, 'k12 (0.001)');
 formatList{componentIndex} = '%.2f';
@@ -251,7 +253,7 @@ figure;
 indices = 53:54;
 scale = 1000;
 drawColumnsInMultipleMatrices(matrices, fileLabels, {'p1', 'p2'}, ...
-    indices, fileColumnStyles, scale);
+    indices, 0, fileColumnStyles, scale);
 estAvg = probeRmse(matrices, fileLabels, indices, 'p12 (0.001)', epochIndexList, scale);
 recordRmse(estAvg, 'p12 (0.001)');
 formatList{componentIndex} = '%.2f';
@@ -267,7 +269,7 @@ export_fig(outputfig);
 figure;
 indices = 55:56;
 scale = 1000;
-drawColumnsInMultipleMatrices(matrices, fileLabels, {'t_d', 't_r'}, indices, fileColumnStyles, scale);
+drawColumnsInMultipleMatrices(matrices, fileLabels, {'t_d', 't_r'}, indices, 0, fileColumnStyles, scale);
 estAvg = probeRmse(matrices, fileLabels, indices(1), 'td (ms)', epochIndexList, scale);
 recordRmse(estAvg, 'td (ms)');
 formatList{componentIndex} = '%.2f';

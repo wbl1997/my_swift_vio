@@ -1,5 +1,6 @@
 function drawColumnsInMultipleMatrices(matrices, matrixLabels, ...
-    columnLabels, columnIndices, matrixColumnStyles, dataMultiplier)
+    columnLabels, columnIndices, plot3d, ...
+    matrixColumnStyles, dataMultiplier)
 % draw multiple columns in multiple matrices in one figure.
 % warn: this function will modify matrices by aligning all timestamps in 
 % matrices to a common startTime.
@@ -10,17 +11,22 @@ function drawColumnsInMultipleMatrices(matrices, matrixLabels, ...
 % e.g., {{'r', 'g'}, {'b', 'k'}}
 % dataMultiplier scale factor
 
-if nargin < 6
+if nargin < 7
     dataMultiplier = 1.0;
 end
-if nargin < 5
+if nargin < 6
     matrixColumnStyles =  {
         {'-r', '-g', '-b', '-k', '.k', '.b', ...
-        '-c', '-m', '-y'},
+        '-c', '-m', '-y'}, ...
         {'--r', '--g', '--b', '--k', '-.k', '-.b', ...
-        '--c', '--m', '--y'},
+        '--c', '--m', '--y'}, ... 
         {':r', ':g', ':b', ':k', '-.r', '-.g', ...
+        ':c', ':m', ':y'}, ...
+        {'.r', '.g', '.b', '.k', '-.r', '-.g', ...
         ':c', ':m', ':y'}};
+end
+if nargin < 5
+    plot3d = 0;
 end
 legend_list = cell(1, length(matrices) * length(columnLabels));
 startTime = 0;
@@ -36,7 +42,7 @@ for i = 1:length(matrices)
     matrices{i}(:, 1) = matrices{i}(:, 1) - startTime;
 
     est_line_style = matrixColumnStyles{i};
-    drawColumnsInMatrix(matrices{i}, columnIndices, false, ...
+    drawColumnsInMatrix(matrices{i}, columnIndices, plot3d, ...
         dataMultiplier, est_line_style); hold on;
     for j = 1: length(columnLabels)
         legend_list((i - 1) * length(columnLabels) + j) = ...
@@ -44,6 +50,8 @@ for i = 1:length(matrices)
     end
 end
 legend(legend_list);
-xlabel('time (sec)');
-xlim([dataBegin-10, dataEnd+10]);
+if ~plot3d
+    xlabel('time (sec)');
+    xlim([dataBegin-10, dataEnd+10]);
+end
 end

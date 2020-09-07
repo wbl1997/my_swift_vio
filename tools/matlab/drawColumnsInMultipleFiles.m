@@ -1,5 +1,5 @@
 function drawColumnsInMultipleFiles(dataFiles, fileLabels, ...
-    columnLabels, columnIndices)
+    columnLabels, columnIndices, plot3d)
 
 matrices = cell(length(dataFiles), 1);
 for i = 1:length(dataFiles)
@@ -7,5 +7,5 @@ for i = 1:length(dataFiles)
     matrices{i} = readmatrix(file, 'NumHeaderLines', 1);
 end
 drawColumnsInMultipleMatrices(matrices, fileLabels, ...
-    columnLabels, columnIndices);
+    columnLabels, columnIndices, plot3d);
 end

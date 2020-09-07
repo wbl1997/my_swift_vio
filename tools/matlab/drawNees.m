@@ -7,7 +7,7 @@ function drawNees(est_files, labels, num_runs, export_fig_path)
 
 addpath(export_fig_path);
 
-line_styles = {{':r', ':g', ':b'}, {'-r', '-g', '-b'}, {'--r', '--g', '--b'}};
+line_styles = {{':r', ':g', ':b'}, {'-r', '-g', '-b'}, {'--r', '--g', '--b'}, {'--m', '--c', '--k'}};
 [result_dir, ~, ~] = fileparts(est_files{1});
 
 indices = 2:4;
