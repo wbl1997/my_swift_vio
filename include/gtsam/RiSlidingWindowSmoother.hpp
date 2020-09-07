@@ -12,17 +12,6 @@
 
 #ifdef HAVE_GTSAM
 
-//#include <gtsam/geometry/Cal3DS2.h>
-//#include <gtsam/navigation/CombinedImuFactor.h>
-//#include <gtsam/navigation/ImuBias.h>
-
-//#include <gtsam_unstable/nonlinear/BatchFixedLagSmoother.h>
-//#include <gtsam_unstable/nonlinear/IncrementalFixedLagSmoother.h>
-//#include <gtsam_unstable/slam/SmartStereoProjectionPoseFactor.h>
-
-//#include "gtsam/VioBackEndParams.h"
-//#include "gtsam/ImuFrontEnd.h"
-
 namespace okvis {
 /**
  * RiSlidingWindowSmoother builds upon gtsam FixedLagSmoother with right invariant errors.

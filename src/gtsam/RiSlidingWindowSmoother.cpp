@@ -9,11 +9,9 @@
 
 #include <glog/logging.h>
 
-//#include <gtsam/nonlinear/LinearContainerFactor.h>
 #include <gtsam/nonlinear/Marginals.h>
 
 #include <gtsam/ImuFactorTestHelpers.h>
-
 #include <gtsam/RiExtendedPose3Prior.h>
 #include <gtsam/RiImuFactor.h>
 #include <gtsam/RiProjectionFactorIDP.h>
@@ -26,7 +24,6 @@
 #include <okvis/IdProvider.hpp>
 #include <okvis/ceres/ImuError.hpp>
 
-/// \brief okvis Main namespace of this package.
 namespace okvis {
 RiSlidingWindowSmoother::RiSlidingWindowSmoother(
     const okvis::BackendParams& vioParams,
@@ -152,7 +149,7 @@ void RiSlidingWindowSmoother::addLandmarkToGraph(
   gtsam::Point3 abrho(pC[0] * rho, pC[1] * rho, rho);
   new_values_.insert(gtsam::symbol('l', lmkId), abrho);
 
-  navStateToLandmarks_.at(statesMap_.rbegin()->first).push_back(lmkId);
+  navStateToLandmarks_.at(currentFrameId).push_back(lmkId);
 
   uint64_t minValidStateId = statesMap_.begin()->first;
   okvis::MapPoint& mp = landmarksMap_.at(lmkId);
@@ -189,9 +186,9 @@ void RiSlidingWindowSmoother::addLandmarkToGraph(
       gtsam::RiProjectionFactorIDPAnchor::shared_ptr factor =
           boost::make_shared<gtsam::RiProjectionFactorIDPAnchor>(
               gtsam::Symbol('l', lmkId), covariance, measurement,
-              camera_rig_.getCameraGeometry(0u),
-              camera_rig_.getCameraExtrinsic(0u),
-              camera_rig_.getCameraExtrinsic(0u));
+              camera_rig_.getCameraGeometry(obsIter->first.cameraIndex),
+              camera_rig_.getCameraExtrinsic(obsIter->first.cameraIndex),
+              camera_rig_.getCameraExtrinsic(0));
       new_reprojection_factors_.add(factor);
       mp.anchorStateId = obsIter->first.frameId;
       OKVIS_ASSERT_EQ(Exception, mp.anchorStateId, currentFrameId,
@@ -201,9 +198,10 @@ void RiSlidingWindowSmoother::addLandmarkToGraph(
           boost::make_shared<gtsam::RiProjectionFactorIDP>(
               gtsam::Symbol('x', obsIter->first.frameId),
               gtsam::Symbol('x', mp.anchorStateId), gtsam::Symbol('l', lmkId),
-              covariance, measurement, camera_rig_.getCameraGeometry(0u),
-              camera_rig_.getCameraExtrinsic(0u),
-              camera_rig_.getCameraExtrinsic(0u));
+              covariance, measurement,
+              camera_rig_.getCameraGeometry(obsIter->first.cameraIndex),
+              camera_rig_.getCameraExtrinsic(obsIter->first.cameraIndex),
+              camera_rig_.getCameraExtrinsic(0));
       new_reprojection_factors_.add(factor);
     }
   }
@@ -214,7 +212,7 @@ void RiSlidingWindowSmoother::updateLandmarkInGraph(uint64_t lmkId) {
   auto obsIter = mp.observations.rbegin();
   OKVIS_ASSERT_EQ(
       Exception, obsIter->first.frameId, statesMap_.rbegin()->first,
-      "Only update landmark with observation in the current frame.");
+      "Only update landmarks observed in the current frame.");
 
   // get the keypoint measurement.
   okvis::MultiFramePtr multiFramePtr =
@@ -236,9 +234,10 @@ void RiSlidingWindowSmoother::updateLandmarkInGraph(uint64_t lmkId) {
       boost::make_shared<gtsam::RiProjectionFactorIDP>(
           gtsam::Symbol('x', obsIter->first.frameId),
           gtsam::Symbol('x', mp.anchorStateId), gtsam::Symbol('l', lmkId),
-          covariance, measurement, camera_rig_.getCameraGeometry(0u),
-          camera_rig_.getCameraExtrinsic(0u),
-          camera_rig_.getCameraExtrinsic(0u));
+          covariance, measurement,
+          camera_rig_.getCameraGeometry(obsIter->first.cameraIndex),
+          camera_rig_.getCameraExtrinsic(obsIter->first.cameraIndex),
+          camera_rig_.getCameraExtrinsic(0));
   new_reprojection_factors_.add(factor);
 }
 
@@ -249,22 +248,19 @@ void RiSlidingWindowSmoother::updateStates() {
   // update poses, velocities, and biases from isam2 estimates.
   for (auto iter = statesMap_.begin(); iter != statesMap_.end(); ++iter) {
     uint64_t stateId = iter->first;
-    auto xval = estimates.find(gtsam::Symbol('x', iter->first));
+    auto xval = estimates.find(gtsam::Symbol('x', stateId));
     if (xval == estimates.end()) {
-      if (iter->first != statesMap_.begin()->first) {
-        std::string msg =
-            "The oldest nav state variables may just have been marginalized "
-            "from iSAM2 in the preceding update step, but others should not.";
-        LOG(WARNING) << "State of id " << iter->first
-                     << " not found in smoother estimates when the first nav "
-                        "state id is "
-                     << statesMap_.begin()->first;
+      if (stateId != statesMap_.begin()->first) {
+        LOG(INFO) << "State of id " << stateId
+                  << " not found in smoother estimates when the first nav "
+                     "state id is "
+                  << statesMap_.begin()->first;
       }
       continue;
     }
 
     gtsam::RiExtendedPose3 rvp =
-        estimates.at<gtsam::RiExtendedPose3>(gtsam::Symbol('x', iter->first));
+        estimates.at<gtsam::RiExtendedPose3>(gtsam::Symbol('x', stateId));
 
     std::shared_ptr<ceres::PoseParameterBlock> poseParamBlockPtr =
         std::static_pointer_cast<ceres::PoseParameterBlock>(
@@ -285,10 +281,9 @@ void RiSlidingWindowSmoother::updateStates() {
     SpeedAndBiases sb = sbParamBlockPtr->estimate();
     sb.head<3>() = rvp.velocity();
 
-    auto bval = estimates.find(gtsam::Symbol('b', iter->first));
     gtsam::imuBias::ConstantBias imuBias =
         estimates.at<gtsam::imuBias::ConstantBias>(
-            gtsam::Symbol('b', iter->first));
+            gtsam::Symbol('b', stateId));
     sb.segment<3>(3) = imuBias.gyroscope();
     sb.tail<3>(3) = imuBias.accelerometer();
 
@@ -302,9 +297,6 @@ void RiSlidingWindowSmoother::updateStates() {
     updateLandmarksTimer.start();
     for (auto it = landmarksMap_.begin(); it != landmarksMap_.end(); ++it) {
       if (it->second.residualizeCase == NotInState_NotTrackedNow) continue;
-      // #Obs may be 1 for a new landmark by the KLT tracking frontend.
-      // It ought to be >= 2 for descriptor matching frontend.
-      if (it->second.observations.size() < 2) continue;
       uint64_t lmkId = it->first;
       auto estimatesIter = estimates.find(gtsam::Symbol('l', lmkId));
       if (estimatesIter == estimates.end()) {
@@ -326,23 +318,23 @@ bool RiSlidingWindowSmoother::gtsamMarginalCovariance(
     Eigen::MatrixXd* cov) const {
   gtsam::Marginals marginals(smoother_->getFactors(), state_,
                              gtsam::Marginals::Factorization::CHOLESKY);
-  uint64_t T_WS_id = statesMap_.rbegin()->first;
+  uint64_t stateId = statesMap_.rbegin()->first;
   okvis::kinematics::Transformation T_WB;
-  get_T_WS(T_WS_id, T_WB);
+  get_T_WS(stateId, T_WB);
   Eigen::Matrix<double, 9, 1> speedAndBgBa;
-  getSpeedAndBias(T_WS_id, 0u, speedAndBgBa);
+  getSpeedAndBias(stateId, 0u, speedAndBgBa);
 
   *cov = Eigen::Matrix<double, 15, 15>::Identity();
   Eigen::Matrix<double, 15, 15> dokvis_drierror =
       gtsam::dokvis_drightinvariant(T_WB, speedAndBgBa.head<3>());
   Eigen::MatrixXd rvpMargCov =
-      marginals.marginalCovariance(gtsam::Symbol('x', T_WS_id));
+      marginals.marginalCovariance(gtsam::Symbol('x', stateId));
   cov->topLeftCorner<9, 9>() =
       dokvis_drierror.topLeftCorner<9, 9>() * rvpMargCov *
       dokvis_drierror.topLeftCorner<9, 9>().transpose();
   cov->block<6, 6>(9, 9) =
       dokvis_drierror.bottomRightCorner<6, 6>() *
-      marginals.marginalCovariance(gtsam::Symbol('b', T_WS_id)) *
+      marginals.marginalCovariance(gtsam::Symbol('b', stateId)) *
       dokvis_drierror.bottomRightCorner<6, 6>().transpose();
   return true;
 }

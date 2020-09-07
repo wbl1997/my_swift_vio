@@ -701,7 +701,7 @@ void SlidingWindowSmoother::updateLandmarkInGraph(uint64_t lmkId) {
   auto obsIter = mp.observations.rbegin();
   OKVIS_ASSERT_EQ(
       Exception, obsIter->first.frameId, statesMap_.rbegin()->first,
-      "Only update landmark with observation in the current frame.");
+      "Only update landmarks observed in the current frame.");
 
   // get the keypoint measurement.
   okvis::MultiFramePtr multiFramePtr =
@@ -734,22 +734,19 @@ void SlidingWindowSmoother::updateStates() {
   // update poses, velocities, and biases from isam2 estimates.
   for (auto iter = statesMap_.begin(); iter != statesMap_.end(); ++iter) {
     uint64_t stateId = iter->first;
-    auto xval = estimates.find(gtsam::Symbol('x', iter->first));
+    auto xval = estimates.find(gtsam::Symbol('x', stateId));
     if (xval == estimates.end()) {
-      if (iter->first != statesMap_.begin()->first) {
-        std::string msg =
-            "The oldest nav state variables may just have been marginalized "
-            "from iSAM2 in the preceding update step, but others should not.";
-        LOG(WARNING) << "State of id " << iter->first
-                     << " not found in smoother estimates when the first nav "
-                        "state id is "
-                     << statesMap_.begin()->first;
+      if (stateId != statesMap_.begin()->first) {
+        LOG(INFO) << "State of id " << stateId
+                  << " not found in smoother estimates when the first nav "
+                     "state id is "
+                  << statesMap_.begin()->first;
       }
       continue;
     }
 
     gtsam::Pose3 W_T_B =
-        estimates.at<gtsam::Pose3>(gtsam::Symbol('x', iter->first));
+        estimates.at<gtsam::Pose3>(gtsam::Symbol('x', stateId));
 
     std::shared_ptr<ceres::PoseParameterBlock> poseParamBlockPtr =
         std::static_pointer_cast<ceres::PoseParameterBlock>(
@@ -768,15 +765,15 @@ void SlidingWindowSmoother::updateStates() {
             mapPtr_->parameterBlockPtr(SBId));
     SpeedAndBiases sb = sbParamBlockPtr->estimate();
 
-    auto vval = estimates.find(gtsam::Symbol('v', iter->first));
+    auto vval = estimates.find(gtsam::Symbol('v', stateId));
     gtsam::Vector3 W_v_B =
-        estimates.at<gtsam::Vector3>(gtsam::Symbol('v', iter->first));
+        estimates.at<gtsam::Vector3>(gtsam::Symbol('v', stateId));
     sb.head<3>() = W_v_B;
 
-    auto bval = estimates.find(gtsam::Symbol('b', iter->first));
+    auto bval = estimates.find(gtsam::Symbol('b', stateId));
     gtsam::imuBias::ConstantBias imuBias =
         estimates.at<gtsam::imuBias::ConstantBias>(
-            gtsam::Symbol('b', iter->first));
+            gtsam::Symbol('b', stateId));
     sb.segment<3>(3) = imuBias.gyroscope();
     sb.tail<3>(3) = imuBias.accelerometer();
 
@@ -790,9 +787,6 @@ void SlidingWindowSmoother::updateStates() {
     updateLandmarksTimer.start();
     for (auto it = landmarksMap_.begin(); it != landmarksMap_.end(); ++it) {
       if (it->second.residualizeCase == NotInState_NotTrackedNow) continue;
-      // #Obs may be 1 for a new landmark by the KLT tracking frontend.
-      // It ought to be >= 2 for descriptor matching frontend.
-      if (it->second.observations.size() < 2) continue;
       uint64_t lmkId = it->first;
       auto estimatesIter = estimates.find(gtsam::Symbol('l', lmkId));
       if (estimatesIter == estimates.end()) {
