@@ -16,6 +16,8 @@ class RiTransformPointJacobian : public okvis::TransformPointJacobian {
  public:
   RiTransformPointJacobian() : okvis::TransformPointJacobian() {}
 
+  virtual ~RiTransformPointJacobian() {}
+
   RiTransformPointJacobian(const okvis::kinematics::Transformation& T_AB,
                            const Eigen::Vector4d& hpB)
       : okvis::TransformPointJacobian(T_AB, hpB) {}
@@ -39,6 +41,8 @@ class RiInverseTransformPointJacobian
     : public okvis::InverseTransformPointJacobian {
  public:
   RiInverseTransformPointJacobian() : okvis::InverseTransformPointJacobian() {}
+
+  virtual ~RiInverseTransformPointJacobian() {}
 
   RiInverseTransformPointJacobian(const okvis::kinematics::Transformation& T_AB,
                                   const Eigen::Vector4d& hpB)

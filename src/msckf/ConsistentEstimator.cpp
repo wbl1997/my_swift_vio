@@ -60,34 +60,40 @@ bool ConsistentEstimator::triangulateWithDisparityCheck(
   return true;
 }
 
-void ConsistentEstimator::addLandmarkToGraph(uint64_t lmkId, const Eigen::Vector4d& hpW) {
+bool ConsistentEstimator::addLandmarkToGraph(uint64_t lmkId,
+                                             const Eigen::Vector4d& hpW) {
   okvis::cameras::NCameraSystem::DistortionType distortionType =
       camera_rig_.getDistortionType(0);
   ::ceres::ResidualBlockId retVal = 0u;
   uint64_t minValidStateId = statesMap_.begin()->first;
   okvis::MapPoint& mp = landmarksMap_.at(lmkId);
 
-  std::shared_ptr<okvis::ceres::HomogeneousPointParameterBlock> pointParameterBlock(
-      new okvis::ceres::HomogeneousPointParameterBlock(hpW, lmkId));
-  bool paramBlockedAdded = mapPtr_->addParameterBlock(pointParameterBlock,
-                                  okvis::ceres::Map::HomogeneousPoint);
-  OKVIS_ASSERT_TRUE_DBG(Exception, paramBlockedAdded, "Failed to add landmark param block!");
+  std::shared_ptr<okvis::ceres::HomogeneousPointParameterBlock>
+      pointParameterBlock(
+          new okvis::ceres::HomogeneousPointParameterBlock(hpW, lmkId));
+  if (!mapPtr_->addParameterBlock(pointParameterBlock,
+                                  okvis::ceres::Map::HomogeneousPoint))
+    return false;
 
-  for (std::map<okvis::KeypointIdentifier, uint64_t>::iterator obsIter = mp.observations.begin();
+  for (std::map<okvis::KeypointIdentifier, uint64_t>::iterator obsIter =
+           mp.observations.begin();
        obsIter != mp.observations.end(); ++obsIter) {
     if (obsIter->first.frameId < minValidStateId) {
       // Some observations may be outside the horizon.
       continue;
     }
 
-#define DISTORTION_MODEL_CASE(camera_geometry_t)                               \
-  retVal = addPointFrameResidual<camera_geometry_t>(lmkId, obsIter->first);    \
+#define DISTORTION_MODEL_CASE(camera_geometry_t)                            \
+  retVal = addPointFrameResidual<camera_geometry_t>(lmkId, obsIter->first); \
   obsIter->second = reinterpret_cast<uint64_t>(retVal);
 
-          switch (distortionType) { DISTORTION_MODEL_SWITCH_CASES }
+    switch (distortionType) { DISTORTION_MODEL_SWITCH_CASES }
 
 #undef DISTORTION_MODEL_CASE
   }
+
+  mp.residualizeCase = InState_TrackedNow;
+  return true;
 }
 
 bool ConsistentEstimator::addReprojectionFactors() {
@@ -120,7 +126,6 @@ bool ConsistentEstimator::addReprojectionFactors() {
           pit->first, &hpW, focalLength, FLAGS_ray_sigma_scalar);
       if (triangulateOk) {
         addLandmarkToGraph(pit->first, hpW);
-        pit->second.residualizeCase = InState_TrackedNow;
       } // else do nothing
     } else {
       // examine starting from the rear of a landmark's observations, add

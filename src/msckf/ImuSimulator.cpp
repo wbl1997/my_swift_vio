@@ -280,7 +280,7 @@ TorusTrajectory::computeGlobalPose(const okvis::Time time) const {
 
 SphereTrajectory::SphereTrajectory(double _rxy, double _maxThetaZ)
     : CircularSinusoidalTrajectory(_maxThetaZ) {
-  rxy = rxy;
+  rxy = _rxy;
 }
 
 SphereTrajectory::SphereTrajectory(

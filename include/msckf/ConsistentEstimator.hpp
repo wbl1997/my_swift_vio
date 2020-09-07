@@ -63,8 +63,9 @@ class ConsistentEstimator : public Estimator
   /**
    * @brief addLandmarkToGraph add all observations of a landmark as factors to the estimator.
    * @param landmarkId
+   * @return true if successfully added.
    */
-  void addLandmarkToGraph(uint64_t landmarkId, const Eigen::Vector4d& hpW);
+  bool addLandmarkToGraph(uint64_t landmarkId, const Eigen::Vector4d& hpW);
 
   /**
    * @brief addReprojectionFactors see descriptions in Estimator.
