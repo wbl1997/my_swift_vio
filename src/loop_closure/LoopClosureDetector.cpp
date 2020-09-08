@@ -171,7 +171,7 @@ bool LoopClosureDetector::addConstraintsAndOptimize(
       shared_noise_model =
           gtsam::noiseModel::Gaussian::Covariance(cov_e, tryToSimplify);
     }
-    shared_noise_model->print("Prior factor noise model");
+//    shared_noise_model->print("Prior factor noise model:");
     gtsam::NonlinearFactorGraph init_nfg;
     gtsam::Values init_val;
     init_val.insert(gtsam::Symbol(queryKeyframeInDB.dbowId_),

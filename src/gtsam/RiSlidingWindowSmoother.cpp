@@ -24,6 +24,9 @@
 #include <okvis/IdProvider.hpp>
 #include <okvis/ceres/ImuError.hpp>
 
+DEFINE_bool(rifls_lock_jacobian, true,
+            "Lock jacobians for RiExtendedPose3Prior and RiImuFactor?");
+
 namespace okvis {
 RiSlidingWindowSmoother::RiSlidingWindowSmoother(
     const okvis::BackendParams& vioParams,
@@ -56,7 +59,7 @@ void RiSlidingWindowSmoother::addInitialPriorFactors() {
           gtsam::Symbol('x', frameId),
           gtsam::RiExtendedPose3(gtsam::Rot3(T_WB.q()), vel_bias.head<3>(),
                                  T_WB.r()),
-          state_prior_covariance, true));
+          state_prior_covariance, FLAGS_rifls_lock_jacobian));
 
   // Add initial bias priors:
   Eigen::Matrix<double, 6, 1> prior_biasSigmas;
@@ -119,7 +122,7 @@ void RiSlidingWindowSmoother::addImuFactor() {
   new_imu_prior_and_other_factors_.push_back(
       boost::make_shared<gtsam::RiImuFactor>(
           gtsam::Symbol('x', from_id), gtsam::Symbol('x', to_id),
-          gtsam::Symbol('b', from_id), ripim, true));
+          gtsam::Symbol('b', from_id), ripim, FLAGS_rifls_lock_jacobian));
 
   gtsam::imuBias::ConstantBias zero_bias;
 
@@ -145,8 +148,8 @@ bool RiSlidingWindowSmoother::addLandmarkToGraph(
           new okvis::ceres::HomogeneousPointParameterBlock(hpW, lmkId));
   if (!mapPtr_->addParameterBlock(pointParameterBlock,
                                   okvis::ceres::Map::HomogeneousPoint)) {
-    LOG(WARNING) << "Unable to add parameter block for landmark of id "
-                 << lmkId;
+    // This can happen when a landmark moves out of the smoother's horizon and
+    // then reappears.
     return false;
   }
 
@@ -314,13 +317,15 @@ void RiSlidingWindowSmoother::updateStates() {
       if (estimatesIter == estimates.end()) {
         continue;
       }
-      gtsam::Point3 pW = estimates.at<gtsam::Point3>(gtsam::Symbol('l', lmkId));
-      Eigen::Vector4d hpW;
-      hpW.head<3>() = pW;
-      hpW[3] = 1.0;
 
+      gtsam::Point3 abrho = estimates.at<gtsam::Point3>(gtsam::Symbol('l', lmkId));
+      Eigen::Vector4d ab1rho(abrho[0], abrho[1], 1.0, abrho[2]);
+      okvis::kinematics::Transformation T_WB;
+      get_T_WS(it->second.anchorStateId, T_WB);
+      okvis::kinematics::Transformation T_WC =
+          T_WB * *camera_rig_.getCameraExtrinsicPtr(0u);
       it->second.quality = 1.0;
-      it->second.pointHomog = hpW;
+      it->second.pointHomog = T_WC * ab1rho;
     }
     updateLandmarksTimer.stop();
   }

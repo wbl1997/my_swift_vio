@@ -628,8 +628,8 @@ bool SlidingWindowSmoother::addLandmarkToGraph(uint64_t lmkId, const Eigen::Vect
           new okvis::ceres::HomogeneousPointParameterBlock(hpW, lmkId));
   if (!mapPtr_->addParameterBlock(pointParameterBlock,
                                   okvis::ceres::Map::HomogeneousPoint)) {
-    LOG(WARNING) << "Unable to add parameter block for landmark of id "
-                 << lmkId;
+    // This can happen when a landmark moves out of the smoother's horizon and
+    // then reappears.
     return false;
   }
 
