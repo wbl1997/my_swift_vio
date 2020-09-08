@@ -1305,9 +1305,7 @@ void MSCKF2::optimize(size_t /*numIter*/, size_t /*numThreads*/, bool verbose) {
 
     for (auto it = landmarksMap_.begin(); it != landmarksMap_.end();
          ++it) {
-      if (it->second.residualizeCase ==
-          NotInState_NotTrackedNow)
-        continue;
+      if (it->second.residualizeCase == NotInState_NotTrackedNow) continue;
       // #Obs may be 1 for a new landmark by the KLT tracking frontend.
       // It ought to be >= 2 for descriptor matching frontend.
       if (it->second.observations.size() < 2)

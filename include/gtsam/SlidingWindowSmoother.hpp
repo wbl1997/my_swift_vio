@@ -136,7 +136,7 @@ class SlidingWindowSmoother : public Estimator {
    * @brief addLandmarkToGraph add a new landmark to the graph.
    * @param landmarkId
    */
-  virtual void addLandmarkToGraph(uint64_t landmarkId, const Eigen::Vector3d& pW);
+  virtual bool addLandmarkToGraph(uint64_t landmarkId, const Eigen::Vector4d& hpW);
 
   /**
    * @brief updateLandmarkInGraph add observations for an existing landmark.
@@ -229,14 +229,14 @@ class SlidingWindowSmoother : public Estimator {
    * @param lmkId
    * @return
    */
-  bool triangulateSafe(uint64_t lmkId, Eigen::Vector3d* pW) const;
+  bool triangulateSafe(uint64_t lmkId, Eigen::Vector4d* hpW) const;
 
   /**
    * @brief triangulateWithDisparityCheck custom triangulation by using DLT with disparity check
    * @param lmkId
    * @return
    */
-  bool triangulateWithDisparityCheck(uint64_t lmkId, Eigen::Vector3d* pW,
+  bool triangulateWithDisparityCheck(uint64_t lmkId, Eigen::Vector4d* hpW,
                                      double focalLength, double raySigmaScalar) const;
 
  protected:

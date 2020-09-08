@@ -591,7 +591,7 @@ bool SlidingWindowSmoother::applyMarginalizationStrategy(
 }
 
 // Refer to InvUVFactor and process_feat_normal in CPI, closed-form preintegration repo of Eckenhoff.
-void SlidingWindowSmoother::addLandmarkToGraph(uint64_t lmkId, const Eigen::Vector3d& externalPointW) {
+bool SlidingWindowSmoother::addLandmarkToGraph(uint64_t lmkId, const Eigen::Vector4d& hpW) {
   // We use a unit pinhole projection camera for the smart factors to be
   // more efficient.
 //  SmartStereoFactor::shared_ptr new_factor =
@@ -623,14 +623,25 @@ void SlidingWindowSmoother::addLandmarkToGraph(uint64_t lmkId, const Eigen::Vect
 //  old_smart_factors_.insert(
 //      std::make_pair(lmk_id, std::make_pair(new_factor, -1)));
 
-  new_values_.insert(gtsam::symbol('l', lmkId), gtsam::Point3(externalPointW));
+  std::shared_ptr<okvis::ceres::HomogeneousPointParameterBlock>
+      pointParameterBlock(
+          new okvis::ceres::HomogeneousPointParameterBlock(hpW, lmkId));
+  if (!mapPtr_->addParameterBlock(pointParameterBlock,
+                                  okvis::ceres::Map::HomogeneousPoint)) {
+    LOG(WARNING) << "Unable to add parameter block for landmark of id "
+                 << lmkId;
+    return false;
+  }
+
+  new_values_.insert(gtsam::symbol('l', lmkId), gtsam::Point3(hpW.head<3>() / hpW[3]));
 
   navStateToLandmarks_.at(statesMap_.rbegin()->first).push_back(lmkId);
 
   uint64_t minValidStateId = statesMap_.begin()->first;
-  const okvis::MapPoint& mp = landmarksMap_.at(lmkId);
-  for (auto obsIter = mp.observations.begin(); obsIter != mp.observations.end();
-       ++obsIter) {
+  okvis::MapPoint& mp = landmarksMap_.at(lmkId);
+  for (std::map<okvis::KeypointIdentifier, uint64_t>::const_iterator obsIter =
+           mp.observations.begin();
+       obsIter != mp.observations.end(); ++obsIter) {
     if (obsIter->first.frameId < minValidStateId) {
       // Some observations may be outside the horizon.
       continue;
@@ -661,6 +672,8 @@ void SlidingWindowSmoother::addLandmarkToGraph(uint64_t lmkId, const Eigen::Vect
 
     new_reprojection_factors_.add(factor);
   }
+  mp.residualizeCase = InState_TrackedNow;
+  return true;
 }
 
 void SlidingWindowSmoother::updateLandmarkInGraph(uint64_t lmkId) {
@@ -964,7 +977,7 @@ bool SlidingWindowSmoother::updateSmoother(gtsam::FixedLagSmoother::Result* resu
   return true;
 }
 
-bool SlidingWindowSmoother::triangulateSafe(uint64_t lmkId, Eigen::Matrix<double, 3, 1>* pW) const {
+bool SlidingWindowSmoother::triangulateSafe(uint64_t lmkId, Eigen::Vector4d* hpW) const {
   const MapPoint& mp = landmarksMap_.at(lmkId);
   uint64_t minValidStateId = statesMap_.begin()->first;
 
@@ -1008,7 +1021,8 @@ bool SlidingWindowSmoother::triangulateSafe(uint64_t lmkId, Eigen::Matrix<double
 
   gtsam::TriangulationResult result = gtsam::triangulateSafe(cameras, measurements, params);
   if (result.valid()) {
-    *pW = Eigen::Vector3d(*result);
+    hpW->head<3>() = Eigen::Vector3d(*result);
+    hpW->w() = 1.0;
     return true;
   } else {
     return false;
@@ -1016,7 +1030,7 @@ bool SlidingWindowSmoother::triangulateSafe(uint64_t lmkId, Eigen::Matrix<double
 }
 
 bool SlidingWindowSmoother::triangulateWithDisparityCheck(
-    uint64_t lmkId, Eigen::Matrix<double, 3, 1>* pW,
+    uint64_t lmkId, Eigen::Matrix<double, 4, 1>* hpW,
     double focalLength, double raySigmaScalar) const {
   const MapPoint& mp = landmarksMap_.at(lmkId);
   AlignedVector<Eigen::Vector3d> obsDirections;
@@ -1028,8 +1042,8 @@ bool SlidingWindowSmoother::triangulateWithDisparityCheck(
   }
   if (msckf::hasLowDisparity(obsDirections, T_CWs, imageNoiseStd, focalLength, raySigmaScalar))
     return false;
-  Eigen::Matrix<double, 4, 1> hpW = msckf::triangulateHomogeneousDLT(obsDirections, T_CWs);
-  *pW = hpW.head<3>() / hpW[3];
+  *hpW = msckf::triangulateHomogeneousDLT(obsDirections, T_CWs);
+  *hpW /= hpW->w();
   return true;
 }
 
@@ -1072,15 +1086,14 @@ void SlidingWindowSmoother::optimize(size_t /*numIter*/, size_t /*numThreads*/,
     if (landmarkStatus == NotInState_NotTrackedNow) {
       // The landmark has not been added to the graph.
       if (observedInCurrentFrame) {
-        Eigen::Vector3d pW;
+        Eigen::Vector4d hpW;
         // Preliminary test implied that triangulateSafe may be lead to worse
         // result than  triangulateWithDisparityCheck.
 //        bool triangulateOk = triangulateSafe(it->first, &pW);
         bool triangulateOk = triangulateWithDisparityCheck(
-            it->first, &pW, focalLength, FLAGS_ray_sigma_scalar);
+            it->first, &hpW, focalLength, FLAGS_ray_sigma_scalar);
         if (triangulateOk) {
-          addLandmarkToGraph(it->first, pW);
-          it->second.residualizeCase = InState_TrackedNow;
+          addLandmarkToGraph(it->first, hpW);
         }  // else do nothing
       }  // else do nothing
     } else { // The landmark has been added to the graph.

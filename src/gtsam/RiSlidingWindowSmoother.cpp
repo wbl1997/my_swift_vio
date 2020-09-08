@@ -138,15 +138,25 @@ void RiSlidingWindowSmoother::addImuFactor() {
           bias_noise_model));
 }
 
-void RiSlidingWindowSmoother::addLandmarkToGraph(
-    uint64_t lmkId, const Eigen::Vector3d& externalPointW) {
+bool RiSlidingWindowSmoother::addLandmarkToGraph(
+    uint64_t lmkId, const Eigen::Vector4d& hpW) {
+  std::shared_ptr<okvis::ceres::HomogeneousPointParameterBlock>
+      pointParameterBlock(
+          new okvis::ceres::HomogeneousPointParameterBlock(hpW, lmkId));
+  if (!mapPtr_->addParameterBlock(pointParameterBlock,
+                                  okvis::ceres::Map::HomogeneousPoint)) {
+    LOG(WARNING) << "Unable to add parameter block for landmark of id "
+                 << lmkId;
+    return false;
+  }
+
   uint64_t currentFrameId = statesMap_.rbegin()->first;
   okvis::kinematics::Transformation T_WB;
   get_T_WS(currentFrameId, T_WB);
   okvis::kinematics::Transformation T_CW = (T_WB * camera_rig_.getCameraExtrinsic(0)).inverse();
-  Eigen::Vector3d pC = T_CW.C() * externalPointW + T_CW.r();
-  double rho = 1.0 / pC[2];
-  gtsam::Point3 abrho(pC[0] * rho, pC[1] * rho, rho);
+  Eigen::Vector4d hpC = T_CW * hpW;
+  double rho = 1.0 / hpC[2];
+  gtsam::Point3 abrho(hpC[0] * rho, hpC[1] * rho, rho);
   new_values_.insert(gtsam::symbol('l', lmkId), abrho);
 
   navStateToLandmarks_.at(currentFrameId).push_back(lmkId);
@@ -205,6 +215,8 @@ void RiSlidingWindowSmoother::addLandmarkToGraph(
       new_reprojection_factors_.add(factor);
     }
   }
+  mp.residualizeCase = InState_TrackedNow;
+  return true;
 }
 
 void RiSlidingWindowSmoother::updateLandmarkInGraph(uint64_t lmkId) {

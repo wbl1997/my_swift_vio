@@ -49,7 +49,7 @@ class RiSlidingWindowSmoother : public SlidingWindowSmoother {
    * @brief addLandmarkToGraph add a new landmark to the graph.
    * @param landmarkId
    */
-  void addLandmarkToGraph(uint64_t landmarkId, const Eigen::Vector3d& pW) override;
+  bool addLandmarkToGraph(uint64_t landmarkId, const Eigen::Vector4d& hpW) override;
 
   /**
    * @brief updateLandmarkInGraph add observations for an existing landmark.
