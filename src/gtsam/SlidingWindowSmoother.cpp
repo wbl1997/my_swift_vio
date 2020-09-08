@@ -827,8 +827,8 @@ bool SlidingWindowSmoother::updateSmoother(gtsam::FixedLagSmoother::Result* resu
     LOG(ERROR) << "IndeterminantLinearSystemException: Nearby variable has type '" << symb.chr() << "' "
                << "and index " << symb.index() << std::endl;
     LOG(ERROR) << e.what();
-    smoother_->getFactors().print("Smoother's factors:\n[\n\t");
-    LOG(INFO) << " ]";
+//    smoother_->getFactors().print("Smoother's factors:\n[\n\t");
+//    LOG(INFO) << " ]";
     state_.print("State values\n[\n\t");
     LOG(INFO) << " ]";
     printSmootherInfo(new_factors, delete_slots);

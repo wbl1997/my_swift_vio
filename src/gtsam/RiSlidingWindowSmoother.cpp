@@ -156,14 +156,14 @@ void RiSlidingWindowSmoother::addLandmarkToGraph(
 
   for (auto obsIter = mp.observations.rbegin();
        obsIter != mp.observations.rend(); ++obsIter) {
-    if (obsIter->first.frameId < minValidStateId) {
+    uint64_t observingFrameId = obsIter->first.frameId;
+    if (observingFrameId < minValidStateId) {
       // Some observations may be outside the horizon.
       continue;
     }
-
     // get the keypoint measurement
     okvis::MultiFramePtr multiFramePtr =
-        multiFramePtrMap_.at(obsIter->first.frameId);
+        multiFramePtrMap_.at(observingFrameId);
     Eigen::Vector2d measurement;
     multiFramePtr->getKeypoint(obsIter->first.cameraIndex,
                                obsIter->first.keypointIndex, measurement);
@@ -190,13 +190,13 @@ void RiSlidingWindowSmoother::addLandmarkToGraph(
               camera_rig_.getCameraExtrinsic(obsIter->first.cameraIndex),
               camera_rig_.getCameraExtrinsic(0));
       new_reprojection_factors_.add(factor);
-      mp.anchorStateId = obsIter->first.frameId;
+      mp.anchorStateId = observingFrameId;
       OKVIS_ASSERT_EQ(Exception, mp.anchorStateId, currentFrameId,
                       "Landmark should have the last observation at the current frame.");
     } else {
       gtsam::RiProjectionFactorIDP::shared_ptr factor =
           boost::make_shared<gtsam::RiProjectionFactorIDP>(
-              gtsam::Symbol('x', obsIter->first.frameId),
+              gtsam::Symbol('x', observingFrameId),
               gtsam::Symbol('x', mp.anchorStateId), gtsam::Symbol('l', lmkId),
               covariance, measurement,
               camera_rig_.getCameraGeometry(obsIter->first.cameraIndex),

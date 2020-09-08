@@ -521,9 +521,6 @@ void testHybridFilterSinusoid(const okvis::TestSetting& testSetting,
             numImuFrames);
         okvis::MapPointVector removedLandmarks;
 
-        if (isFilteringMethod(estimatorAlgorithm)) {
-          numKeyFrames = 10u;
-        }
         estimator->applyMarginalizationStrategy(numKeyFrames, numImuFrames, removedLandmarks);
         estimator->print(debugStream);
         debugStream << std::endl;
