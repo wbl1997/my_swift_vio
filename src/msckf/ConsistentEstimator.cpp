@@ -605,18 +605,48 @@ bool ConsistentEstimator::computeCovariance(Eigen::MatrixXd* cov) const {
                                  .at(ImuSensorStates::SpeedAndBias)
                                  .id;
   std::vector<uint64_t> parameterBlockIdList{T_WS_id, speedAndBias_id};
-  std::vector<
-      Eigen::Matrix<double, -1, -1, Eigen::RowMajor>,
-      Eigen::aligned_allocator<Eigen::Matrix<double, -1, -1, Eigen::RowMajor>>>
-      varianceList;
-  bool status = false;
-  std::shared_ptr<::ceres::Problem> clonedProblem = mapPtr_->cloneProblem();
-  status = mapPtr_->getParameterBlockMinimalCovariance(
-      parameterBlockIdList, clonedProblem.get(), &varianceList);
-  if (status) {
-    cov->topLeftCorner<6, 6>() = varianceList[0];
-    cov->bottomRightCorner<9, 9>() = varianceList[1];
+
+
+  std::unordered_map<uint64_t, std::shared_ptr<okvis::ceres::ParameterBlock>>
+      blockId2BlockCopyPtr;
+  std::shared_ptr<::ceres::Problem> clonedProblem =
+      mapPtr_->cloneProblem(&blockId2BlockCopyPtr);
+
+  std::vector<double*> newParamBlockList;
+  for (auto oldId : parameterBlockIdList) {
+    newParamBlockList.push_back(blockId2BlockCopyPtr.at(oldId)->parameters());
   }
-  return status;
+
+  ::ceres::Covariance::Options covariance_options;
+  covariance_options.algorithm_type = ::ceres::SPARSE_QR;
+  covariance_options.null_space_rank = -1;
+  covariance_options.num_threads = 1;
+  covariance_options.min_reciprocal_condition_number = 1e-32;
+  covariance_options.apply_loss_function = true;
+  ::ceres::Covariance covariance(covariance_options);
+  std::vector<std::pair<const double*, const double*>> covariance_blocks;
+
+  for (double* block : newParamBlockList) {
+    covariance_blocks.push_back(std::make_pair(block, block));
+  }
+
+  if (!covariance.Compute(covariance_blocks, clonedProblem.get())) {
+    mapPtr_->printMapInfo();
+    return false;
+  }
+
+  Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>
+      poseCovariance(6, 6);
+  covariance.GetCovarianceBlockInTangentSpace(
+      newParamBlockList[0], newParamBlockList[0], poseCovariance.data());
+  Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>
+      speedAndBiasCovariance(9, 9);
+  covariance.GetCovarianceBlock(
+      newParamBlockList[1], newParamBlockList[1], speedAndBiasCovariance.data());
+
+  cov->topLeftCorner<6, 6>() = poseCovariance;
+  cov->bottomRightCorner<9, 9>() = speedAndBiasCovariance;
+
+  return true;
 }
 }  // namespace okvis
