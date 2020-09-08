@@ -34,7 +34,7 @@ class RiImuFactorTest : public ::testing::Test {
     ripim.redoPreintegration(extendedPosei_, biasi_);
     riFactor_ =
         gtsam::RiImuFactor(gtsam::Symbol('x', 1u), gtsam::Symbol('x', 2u),
-                           gtsam::Symbol('b', 1u), ripim);
+                           gtsam::Symbol('b', 1u), ripim, false);
   }
 
   void  checkJacobians(const gtsam::RiExtendedPose3& extendedPosej, bool forceRedo) {

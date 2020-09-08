@@ -119,7 +119,7 @@ void RiSlidingWindowSmoother::addImuFactor() {
   new_imu_prior_and_other_factors_.push_back(
       boost::make_shared<gtsam::RiImuFactor>(
           gtsam::Symbol('x', from_id), gtsam::Symbol('x', to_id),
-          gtsam::Symbol('b', from_id), ripim));
+          gtsam::Symbol('b', from_id), ripim, true));
 
   gtsam::imuBias::ConstantBias zero_bias;
 

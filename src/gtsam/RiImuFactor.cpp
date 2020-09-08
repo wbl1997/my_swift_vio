@@ -81,22 +81,41 @@ gtsam::Vector RiImuFactor::evaluateError(
       biasJacobianReady_ = true;
     }
   }
-
-  if (H1) {  // de / dx_i = de / dx_{j|i} * dx_{j|i} / dx_i
-    *H1 = - geometry::SEK3Jr_inv(error) * pim_.jacobian_.topLeftCorner<9, 9>();
-  }
-  if (H2) {  // de / dx_j
-    *H2 = geometry::SEK3Jl_inv(error);
-  }
-  if (H3) {  // de / db_i = de / dx_{j|i} * dx_{j|i} / db_i
-    // The last term partly alleviates the inaccuracy caused by changing x_i.
-    Eigen::Matrix3d incrementalRotation = (pim_.RotiLin().inverse() * x_i.rotation()).matrix();
-    H3->resize(9, 6);
-    Eigen::Matrix<double, 9, 9> Jr_inv = geometry::SEK3Jr_inv(error);
-    H3->topLeftCorner<9, 3>() =
-        -Jr_inv * pim_.jacobian_.block<9, 3>(0, 9) * incrementalRotation;
-    H3->topRightCorner<9, 3>() =
-        -Jr_inv * pim_.jacobian_.block<9, 3>(0, 12) * incrementalRotation;
+  if (lockJacobian_) {
+    if (H1) {  // de / dx_i = de / dx_{j|i} * dx_{j|i} / dx_i
+      *H1 = -pim_.jacobian_.topLeftCorner<9, 9>();
+    }
+    if (H2) {  // de / dx_j
+      *H2 = Eigen::Matrix<double, 9, 9>::Identity();
+    }
+    if (H3) {  // de / db_i = de / dx_{j|i} * dx_{j|i} / db_i
+      // The last term partly alleviates the inaccuracy caused by changing x_i.
+      Eigen::Matrix3d incrementalRotation =
+          (pim_.RotiLin().inverse() * x_i.rotation()).matrix();
+      H3->resize(9, 6);
+      H3->topLeftCorner<9, 3>() =
+          pim_.jacobian_.block<9, 3>(0, 9) * (-incrementalRotation);
+      H3->topRightCorner<9, 3>() =
+          pim_.jacobian_.block<9, 3>(0, 12) * (-incrementalRotation);
+    }
+  } else {
+    if (H1) {  // de / dx_i = de / dx_{j|i} * dx_{j|i} / dx_i
+      *H1 = -geometry::SEK3Jr_inv(error) * pim_.jacobian_.topLeftCorner<9, 9>();
+    }
+    if (H2) {  // de / dx_j
+      *H2 = geometry::SEK3Jl_inv(error);
+    }
+    if (H3) {  // de / db_i = de / dx_{j|i} * dx_{j|i} / db_i
+      // The last term partly alleviates the inaccuracy caused by changing x_i.
+      Eigen::Matrix3d incrementalRotation =
+          (pim_.RotiLin().inverse() * x_i.rotation()).matrix();
+      H3->resize(9, 6);
+      Eigen::Matrix<double, 9, 9> Jr_inv = geometry::SEK3Jr_inv(error);
+      H3->topLeftCorner<9, 3>() =
+          -Jr_inv * pim_.jacobian_.block<9, 3>(0, 9) * incrementalRotation;
+      H3->topRightCorner<9, 3>() =
+          -Jr_inv * pim_.jacobian_.block<9, 3>(0, 12) * incrementalRotation;
+    }
   }
   return error;
 }

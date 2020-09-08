@@ -203,6 +203,7 @@ class RiImuFactor : public NoiseModelFactor3<RiExtendedPose3, RiExtendedPose3,
 
   mutable Eigen::Matrix<double, 9, 6> de_db_i_;
   mutable bool biasJacobianReady_; // is the bias Jacobian ready?
+  bool lockJacobian_;
 
  public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
@@ -219,7 +220,8 @@ class RiImuFactor : public NoiseModelFactor3<RiExtendedPose3, RiExtendedPose3,
    * @param pim The preintegrated imu measurements for which redoPreintegration
    * should have been called at least once.
    */
-  RiImuFactor(Key xi, Key xj, Key bi, const RiPreintegratedImuMeasurements& pim)
+  RiImuFactor(Key xi, Key xj, Key bi,
+              const RiPreintegratedImuMeasurements& pim, bool lockJacobian)
       : NoiseModelFactor3<RiExtendedPose3, RiExtendedPose3,
                           imuBias::ConstantBias>(
             noiseModel::Gaussian::Covariance(
@@ -228,7 +230,8 @@ class RiImuFactor : public NoiseModelFactor3<RiExtendedPose3, RiExtendedPose3,
         pim_(pim),
         redo_(false),
         redoCounter_(0),
-        biasJacobianReady_(false) {}
+        biasJacobianReady_(false),
+        lockJacobian_(lockJacobian) {}
 
   RiImuFactor(const RiImuFactor& other)
       : NoiseModelFactor3<RiExtendedPose3, RiExtendedPose3,
@@ -239,7 +242,8 @@ class RiImuFactor : public NoiseModelFactor3<RiExtendedPose3, RiExtendedPose3,
         redo_(other.redo()),
         redoCounter_(other.redoCounter()),
         de_db_i_(other.de_db_i_),
-        biasJacobianReady_(other.biasJacobianReady_) {}
+        biasJacobianReady_(other.biasJacobianReady_),
+        lockJacobian_(other.lockJacobian_) {}
 
   RiImuFactor& operator=(const RiImuFactor& rhs) {
     if (this != &rhs) {
@@ -249,6 +253,7 @@ class RiImuFactor : public NoiseModelFactor3<RiExtendedPose3, RiExtendedPose3,
       redoCounter_ = rhs.redoCounter();
       de_db_i_ = rhs.de_db_i();
       biasJacobianReady_ = rhs.isBiasJacobianReady();
+      lockJacobian_ = rhs.lockJacobian_;
     }
     return *this;
   }
