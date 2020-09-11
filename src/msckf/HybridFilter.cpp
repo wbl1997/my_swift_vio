@@ -316,7 +316,7 @@ bool HybridFilter::addStates(okvis::MultiFramePtr multiFrame,
     speedAndBias.setZero();
     speedAndBias.head<3>() = pvstd_.v_WS;
     speedAndBias.segment<3>(3) = imuParametersVec_.at(0).g0;
-    speedAndBias.segment<3>(6) = imuParametersVec_.at(0).a0;
+    speedAndBias.tail<3>() = imuParametersVec_.at(0).a0;
   } else {
     // get the previous states
     uint64_t T_WS_id = statesMap_.rbegin()->second.id;

@@ -28,8 +28,8 @@ void VioTestSystemBuilder::createVioSystem(
     double td, double tr,
     std::string imuLogFile,
     std::string pointFile) {
+  // The following parameters are in metric units.
   const double kDuration = 300.0;  // length of motion in seconds
-
   double pCB_std = 2e-2;
   double bg_std = 5e-3;
   double ba_std = 2e-2;
