@@ -47,11 +47,33 @@ class RiProjectionFactorIDP
   RiProjectionFactorIDP() {}
 
   RiProjectionFactorIDP(Key state_j, Key state_a, Key state_p,
-                        const Eigen::Matrix<double, 2, 2>& covariance,
+                        const Eigen::Vector2d& variance,
                         const Eigen::Vector2d& uv,
                         std::shared_ptr<const okvis::cameras::CameraBase> cameraGeometry,
                         const okvis::kinematics::Transformation& T_BCj,
                         const okvis::kinematics::Transformation& T_BCa);
+
+  //  * @param
+  /**
+   * @brief RiProjectionFactorIDP
+   * @param state_j
+   * @param state_a
+   * @param state_p
+   * @param variance
+   * @param uv
+   * @param cameraGeometry
+   * @param T_BCj
+   * @param T_BCa
+   * @param huber_threshold in units of sigmas. sqrt(5.99) ~ 2.447.
+   * A sound value is obtained by checking the Chi2 distribution with 2DOF at alpha=5%.
+   */
+  RiProjectionFactorIDP(
+      Key state_j, Key state_a, Key state_p,
+      const Eigen::Vector2d& variance, const Eigen::Vector2d& uv,
+      std::shared_ptr<const okvis::cameras::CameraBase> cameraGeometry,
+      const okvis::kinematics::Transformation& T_BCj,
+      const okvis::kinematics::Transformation& T_BCa,
+      double huber_threshold);
 
   const Eigen::Vector2d& measurement() const { return uv_; }
 

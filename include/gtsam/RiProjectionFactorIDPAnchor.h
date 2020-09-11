@@ -34,13 +34,13 @@ class RiProjectionFactorIDPAnchor : public NoiseModelFactor1<Point3> {
   RiProjectionFactorIDPAnchor() {}
 
   RiProjectionFactorIDPAnchor(Key state_p,
-                        const Eigen::Matrix<double, 2, 2>& covariance,
+                        const Eigen::Vector2d& variance,
                         const Eigen::Vector2d& uv,
                         std::shared_ptr<const okvis::cameras::CameraBase> cameraGeometry,
                         const okvis::kinematics::Transformation& T_BCj,
                         const okvis::kinematics::Transformation& T_BCa)
       : NoiseModelFactor1<Point3>(
-            noiseModel::Gaussian::Covariance(covariance), state_p),
+            noiseModel::Isotropic::Variances(variance), state_p),
         uv_(uv),
         cameraGeometry_(cameraGeometry),
         T_BCj_(T_BCj),

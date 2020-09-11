@@ -12,14 +12,31 @@
 
 namespace gtsam {
 RiProjectionFactorIDP::RiProjectionFactorIDP(
-    Key state_j, Key state_a, Key state_p,
-    const Eigen::Matrix<double, 2, 2>& covariance, const Eigen::Vector2d& uv,
+    Key state_j, Key state_a, Key state_p, const Eigen::Vector2d& variance,
+    const Eigen::Vector2d& uv,
     std::shared_ptr<const okvis::cameras::CameraBase> cameraGeometry,
     const okvis::kinematics::Transformation& T_BCj,
     const okvis::kinematics::Transformation& T_BCa)
     : NoiseModelFactor3<RiExtendedPose3, RiExtendedPose3, Point3>(
-          noiseModel::Gaussian::Covariance(covariance), state_j, state_a,
+          noiseModel::Isotropic::Variances(variance), state_j, state_a,
           state_p),
+      uv_(uv),
+      cameraGeometry_(cameraGeometry),
+      T_BCj_(T_BCj),
+      T_BCa_(T_BCa),
+      exponentList_{-1, -1, 1, 1} {}
+
+RiProjectionFactorIDP::RiProjectionFactorIDP(
+    Key state_j, Key state_a, Key state_p, const Eigen::Vector2d& variance,
+    const Eigen::Vector2d& uv,
+    std::shared_ptr<const okvis::cameras::CameraBase> cameraGeometry,
+    const okvis::kinematics::Transformation& T_BCj,
+    const okvis::kinematics::Transformation& T_BCa, double huber_threshold)
+    : NoiseModelFactor3<RiExtendedPose3, RiExtendedPose3, Point3>(
+          gtsam::noiseModel::Robust::Create(
+              gtsam::noiseModel::mEstimator::Huber::Create(huber_threshold),
+              noiseModel::Isotropic::Variances(variance)),
+          state_j, state_a, state_p),
       uv_(uv),
       cameraGeometry_(cameraGeometry),
       T_BCj_(T_BCj),

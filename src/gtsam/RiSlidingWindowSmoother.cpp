@@ -27,6 +27,11 @@
 DEFINE_bool(rifls_lock_jacobian, true,
             "Lock jacobians for RiExtendedPose3Prior and RiImuFactor?");
 
+DEFINE_double(rifls_huber_threshold, -1,
+              "if negative, Gaussian loss will be used, otherwise, robust "
+              "projection factor with this huber threshold (say 2.447) will be "
+              "used. However, it will be much slower.");
+
 namespace okvis {
 RiSlidingWindowSmoother::RiSlidingWindowSmoother(
     const okvis::BackendParams& vioParams,
@@ -184,11 +189,9 @@ bool RiSlidingWindowSmoother::addLandmarkToGraph(
     double size = 1.0;
     multiFramePtr->getKeypointSize(obsIter->first.cameraIndex,
                                    obsIter->first.keypointIndex, size);
-    Eigen::Matrix<double, 2, 2> covariance;
-    covariance(0, 0) = size * size / 64.0;
-    covariance(1, 1) = covariance(0, 0);
-    covariance(0, 1) = 0.0;
-    covariance(1, 0) = 0.0;
+    Eigen::Matrix<double, 2, 1> variance;
+    variance[0] = size * size / 64.0;
+    variance[1] = variance[0];
 
     // TODO(jhuai): support more than one cameras by extending the gtsam
     // reprojection factor.
@@ -198,7 +201,7 @@ bool RiSlidingWindowSmoother::addLandmarkToGraph(
       // landmark is marginalized.
       gtsam::RiProjectionFactorIDPAnchor::shared_ptr factor =
           boost::make_shared<gtsam::RiProjectionFactorIDPAnchor>(
-              gtsam::Symbol('l', lmkId), covariance, measurement,
+              gtsam::Symbol('l', lmkId), variance, measurement,
               camera_rig_.getCameraGeometry(obsIter->first.cameraIndex),
               camera_rig_.getCameraExtrinsic(obsIter->first.cameraIndex),
               camera_rig_.getCameraExtrinsic(0));
@@ -207,14 +210,24 @@ bool RiSlidingWindowSmoother::addLandmarkToGraph(
       OKVIS_ASSERT_EQ(Exception, mp.anchorStateId, currentFrameId,
                       "Landmark should have the last observation at the current frame.");
     } else {
-      gtsam::RiProjectionFactorIDP::shared_ptr factor =
-          boost::make_shared<gtsam::RiProjectionFactorIDP>(
-              gtsam::Symbol('x', observingFrameId),
-              gtsam::Symbol('x', mp.anchorStateId), gtsam::Symbol('l', lmkId),
-              covariance, measurement,
-              camera_rig_.getCameraGeometry(obsIter->first.cameraIndex),
-              camera_rig_.getCameraExtrinsic(obsIter->first.cameraIndex),
-              camera_rig_.getCameraExtrinsic(0));
+      gtsam::RiProjectionFactorIDP::shared_ptr factor;
+      if (FLAGS_rifls_huber_threshold > 0.01) {
+        factor = boost::make_shared<gtsam::RiProjectionFactorIDP>(
+            gtsam::Symbol('x', observingFrameId),
+            gtsam::Symbol('x', mp.anchorStateId), gtsam::Symbol('l', lmkId),
+            variance, measurement,
+            camera_rig_.getCameraGeometry(obsIter->first.cameraIndex),
+            camera_rig_.getCameraExtrinsic(obsIter->first.cameraIndex),
+            camera_rig_.getCameraExtrinsic(0), FLAGS_rifls_huber_threshold);
+      } else {
+        factor = boost::make_shared<gtsam::RiProjectionFactorIDP>(
+            gtsam::Symbol('x', observingFrameId),
+            gtsam::Symbol('x', mp.anchorStateId), gtsam::Symbol('l', lmkId),
+            variance, measurement,
+            camera_rig_.getCameraGeometry(obsIter->first.cameraIndex),
+            camera_rig_.getCameraExtrinsic(obsIter->first.cameraIndex),
+            camera_rig_.getCameraExtrinsic(0));
+      }
       new_reprojection_factors_.add(factor);
     }
   }
@@ -239,20 +252,28 @@ void RiSlidingWindowSmoother::updateLandmarkInGraph(uint64_t lmkId) {
   multiFramePtr->getKeypointSize(obsIter->first.cameraIndex,
                                  obsIter->first.keypointIndex, size);
 
-  Eigen::Matrix<double, 2, 2> covariance;
-  covariance(0, 0) = size * size / 64.0;
-  covariance(1, 1) = covariance(0, 0);
-  covariance(0, 1) = 0.0;
-  covariance(1, 0) = 0.0;
+  Eigen::Matrix<double, 2, 1> variance;
+  variance[0] = size * size / 64.0;
+  variance[1] = variance[0];
 
-  gtsam::RiProjectionFactorIDP::shared_ptr factor =
-      boost::make_shared<gtsam::RiProjectionFactorIDP>(
-          gtsam::Symbol('x', obsIter->first.frameId),
-          gtsam::Symbol('x', mp.anchorStateId), gtsam::Symbol('l', lmkId),
-          covariance, measurement,
-          camera_rig_.getCameraGeometry(obsIter->first.cameraIndex),
-          camera_rig_.getCameraExtrinsic(obsIter->first.cameraIndex),
-          camera_rig_.getCameraExtrinsic(0));
+  gtsam::RiProjectionFactorIDP::shared_ptr factor;
+  if (FLAGS_rifls_huber_threshold > 0.01) {
+    factor = boost::make_shared<gtsam::RiProjectionFactorIDP>(
+        gtsam::Symbol('x', obsIter->first.frameId),
+        gtsam::Symbol('x', mp.anchorStateId), gtsam::Symbol('l', lmkId),
+        variance, measurement,
+        camera_rig_.getCameraGeometry(obsIter->first.cameraIndex),
+        camera_rig_.getCameraExtrinsic(obsIter->first.cameraIndex),
+        camera_rig_.getCameraExtrinsic(0), FLAGS_rifls_huber_threshold);
+  } else {
+    factor = boost::make_shared<gtsam::RiProjectionFactorIDP>(
+        gtsam::Symbol('x', obsIter->first.frameId),
+        gtsam::Symbol('x', mp.anchorStateId), gtsam::Symbol('l', lmkId),
+        variance, measurement,
+        camera_rig_.getCameraGeometry(obsIter->first.cameraIndex),
+        camera_rig_.getCameraExtrinsic(obsIter->first.cameraIndex),
+        camera_rig_.getCameraExtrinsic(0));
+  }
   new_reprojection_factors_.add(factor);
 }
 

@@ -40,8 +40,8 @@ class RiProjectionFactorIDPTest : public ::testing::Test {
     // camera extrinsics
     okvis::kinematics::Transformation T_BC = *cameraSystemRef->T_SC(0u);
 
-    const Eigen::Matrix<double, 2, 2> covariance =
-        Eigen::Matrix<double, 2, 2>::Identity();
+    const Eigen::Matrix<double, 2, 1> variance =
+        Eigen::Matrix<double, 2, 1>::Constant(1.0);
     const Eigen::Vector2d uv;
     simul::SimulationTwoView snv(0, 1.0, 0.0);
 //    simul::SimulationNViewSphere snv(0.0);
@@ -72,10 +72,10 @@ class RiProjectionFactorIDPTest : public ::testing::Test {
 
     factor_ = gtsam::RiProjectionFactorIDP(
         gtsam::Symbol('x', kObservingIndex), gtsam::Symbol('x', kAnchorIndex),
-        gtsam::Symbol('l', 1u), covariance, imagePointList[kObservingIndex],
+        gtsam::Symbol('l', 1u), variance, imagePointList[kObservingIndex],
         cameraGeometryRef, T_BC, T_BC);
     factorAnchor_ = gtsam::RiProjectionFactorIDPAnchor(
-        gtsam::Symbol('l', 1u), covariance, imagePointList[kAnchorIndex],
+        gtsam::Symbol('l', 1u), variance, imagePointList[kAnchorIndex],
         cameraGeometryRef, T_BC, T_BC);
   }
 
