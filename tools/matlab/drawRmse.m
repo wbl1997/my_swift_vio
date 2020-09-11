@@ -8,17 +8,17 @@ if nargin < 3
     exportFigPath = '/tools/export_fig/';
 end
 addpath(exportFigPath);
+backgroundColor = 'w'; % 'w' for debugging, 'None' for production.
 
 probeEpochs = [0, 3, 10, 30, 100, 300];
-
 fileColumnStyles =  {
         {'-r', '-g', '-b', '-k', '.k', '.b', ...
         '-c', '-m', '-y'}, ...
         {'--r', '--g', '--b', '--k', '-.k', '-.b', ...
         '--c', '--m', '--y'}, ...
-        {':r', ':g', ':b', ':k', '-.r', '-.g', ...
+        {'-.r', '-.g', '-.b', ':k', '-.r', '-.g', ...
         ':c', ':m', ':y'}, ...
-        {'.r', '.g', '.b', '.k', '-.r', '-.g', ...
+        {'--m', '--c', '--k', '.k', '-.r', '-.g', ...
         ':c', ':m', ':y'}};
 
 close all;
@@ -59,13 +59,14 @@ end
 
 figure;
 indices = 2:4;
-drawColumnsInMultipleMatrices(matrices, fileLabels, {'x', 'y', 'z'}, indices, 0, fileColumnStyles);
+drawColumnsInMultipleMatrices(matrices, fileLabels, {'x', 'y', 'z'}, ...
+    indices, 0, fileColumnStyles);
 estAvg = probeRmse(matrices, fileLabels, indices, 'position', epochIndexList);
 recordRmse(estAvg, 'position');
 formatList{componentIndex} = '%.3f';
 
-ylabel('$\delta \mathbf{t}_{WB}$ (m)', 'Interpreter', 'latex');
-set(gcf, 'Color', 'None');
+ylabel('$\delta \mathbf{p}_{WB} (m)$', 'Interpreter', 'latex');
+set(gcf, 'Color', backgroundColor);
 grid on;
 outputfig = [result_dir, '/', 'rmse_t_WB.eps'];
 if exist(outputfig, 'file')==2
@@ -76,12 +77,13 @@ export_fig(outputfig);
 figure;
 indices = 5:7;
 scale = 180 / pi;
-drawColumnsInMultipleMatrices(matrices, fileLabels, {'x', 'y', 'z'}, indices, 0, fileColumnStyles, scale);
+drawColumnsInMultipleMatrices(matrices, fileLabels, {'x', 'y', 'z'}, ...
+    indices, 0, fileColumnStyles, scale);
 estAvg = probeRmse(matrices, fileLabels, indices, 'orientation (deg)', epochIndexList, scale);
 recordRmse(estAvg, 'orientation (deg)');
 formatList{componentIndex} = '%.3f';
 ylabel('$\delta \mathbf{\theta}_{WB} (^{\circ})$', 'Interpreter', 'latex');
-set(gcf, 'Color', 'None');
+set(gcf, 'Color', backgroundColor);
 grid on;
 outputfig = [result_dir, '/', 'rmse_theta_WB.eps'];
 if exist(outputfig, 'file')==2
@@ -91,12 +93,13 @@ export_fig(outputfig);
 
 figure;
 indices = 8:10;
-drawColumnsInMultipleMatrices(matrices, fileLabels, {'x', 'y', 'z'}, indices, 0, fileColumnStyles);
+drawColumnsInMultipleMatrices(matrices, fileLabels, {'x', 'y', 'z'}, ...
+    indices, 0, fileColumnStyles);
 estAvg = probeRmse(matrices, fileLabels, indices, 'velocity', epochIndexList);
 recordRmse(estAvg, 'velocity');
 formatList{componentIndex} = '%.3f';
-ylabel('$\delta \mathbf{v}_{WB}$ (m/s)', 'Interpreter', 'latex');
-set(gcf, 'Color', 'None');
+ylabel('$\delta \mathbf{v}_{WB} (m/s)$', 'Interpreter', 'latex');
+set(gcf, 'Color', backgroundColor);
 grid on;
 outputfig = [result_dir, '/', 'rmse_v_WB.eps'];
 if exist(outputfig, 'file')==2
@@ -107,12 +110,13 @@ export_fig(outputfig);
 figure;
 indices = 11:13;
 scale = 180/pi;
-drawColumnsInMultipleMatrices(matrices, fileLabels, {'x', 'y', 'z'}, indices, 0, fileColumnStyles, scale);
+drawColumnsInMultipleMatrices(matrices, fileLabels, {'x', 'y', 'z'}, ...
+    indices, 0, fileColumnStyles, scale);
 estAvg = probeRmse(matrices, fileLabels, indices, 'bg (deg/s)', epochIndexList, scale);
 recordRmse(estAvg, 'bg (deg/s)');
 formatList{componentIndex} = '%.2f';
-ylabel('$\delta \mathbf{b}_{g}$ (deg/s)', 'Interpreter', 'latex');
-set(gcf, 'Color', 'None');
+ylabel('$\delta \mathbf{b}_{g} (^{\circ}/s)$', 'Interpreter', 'latex');
+set(gcf, 'Color', backgroundColor);
 grid on;
 outputfig = [result_dir, '/', 'rmse_b_g.eps'];
 if exist(outputfig, 'file')==2
@@ -122,12 +126,13 @@ export_fig(outputfig);
 
 figure;
 indices = 14:16;
-drawColumnsInMultipleMatrices(matrices, fileLabels, {'x', 'y', 'z'}, indices, 0, fileColumnStyles);
+drawColumnsInMultipleMatrices(matrices, fileLabels, {'x', 'y', 'z'}, ...
+    indices, 0, fileColumnStyles);
 estAvg = probeRmse(matrices, fileLabels, indices, 'ba', epochIndexList);
 recordRmse(estAvg, 'ba');
 formatList{componentIndex} = '%.3f';
-ylabel('$\delta \mathbf{b}_{a}$ (m/s)', 'Interpreter', 'latex');
-set(gcf, 'Color', 'None');
+ylabel('$\delta \mathbf{b}_{a} (m/s^2)$', 'Interpreter', 'latex');
+set(gcf, 'Color', backgroundColor);
 grid on;
 outputfig = [result_dir, '/', 'rmse_b_a.eps'];
 if exist(outputfig, 'file')==2
@@ -143,8 +148,8 @@ drawColumnsInMultipleMatrices(matrices, fileLabels, {'x', 'y', 'z'}, ...
 estAvg = probeRmse(matrices, fileLabels, indices, 'Tg (0.001)', epochIndexList, scale);
 recordRmse(estAvg, 'Tg (0.001)');
 formatList{componentIndex} = '%.2f';
-ylabel('$\delta \mathbf{T}_{g}$ (m/s)', 'Interpreter', 'latex');
-set(gcf, 'Color', 'None');
+ylabel('$\delta \mathbf{T}_{g} (0.001)$', 'Interpreter', 'latex');
+set(gcf, 'Color', backgroundColor);
 grid on;
 outputfig = [result_dir, '/', 'rmse_T_g.eps'];
 if exist(outputfig, 'file')==2
@@ -160,8 +165,8 @@ drawColumnsInMultipleMatrices(matrices, fileLabels, {'x', 'y', 'z'}, ...
 estAvg = probeRmse(matrices, fileLabels, indices, 'Ts (0.001)', epochIndexList, scale);
 recordRmse(estAvg, 'Ts (0.001)');
 formatList{componentIndex} = '%.2f';
-ylabel('$\delta \mathbf{T}_{s}$ (m/s)', 'Interpreter', 'latex');
-set(gcf, 'Color', 'None');
+ylabel('$\delta \mathbf{T}_{s} (0.001 \frac{rad/s}{m/s^2})$', 'Interpreter', 'latex');
+set(gcf, 'Color', backgroundColor);
 grid on;
 outputfig = [result_dir, '/', 'rmse_T_s.eps'];
 if exist(outputfig, 'file')==2
@@ -177,8 +182,8 @@ drawColumnsInMultipleMatrices(matrices, fileLabels, {'x', 'y', 'z'}, ...
 estAvg = probeRmse(matrices, fileLabels, indices, 'Ta (0.001)', epochIndexList, scale);
 recordRmse(estAvg, 'Ta (0.001)');
 formatList{componentIndex} = '%.2f';
-ylabel('$\delta \mathbf{T}_{a}$ (m/s)', 'Interpreter', 'latex');
-set(gcf, 'Color', 'None');
+ylabel('$\delta \mathbf{T}_{a} (0.001)$', 'Interpreter', 'latex');
+set(gcf, 'Color', backgroundColor);
 grid on;
 outputfig = [result_dir, '/', 'rmse_T_a.eps'];
 if exist(outputfig, 'file')==2
@@ -189,12 +194,13 @@ export_fig(outputfig);
 figure;
 indices = 44:46;
 scale = 100;
-drawColumnsInMultipleMatrices(matrices, fileLabels, {'x', 'y', 'z'}, indices, 0, fileColumnStyles, scale);
+drawColumnsInMultipleMatrices(matrices, fileLabels, {'x', 'y', 'z'}, ...
+    indices, 0, fileColumnStyles, scale);
 estAvg = probeRmse(matrices, fileLabels, indices, 'p_CB (cm)', epochIndexList, scale);
 recordRmse(estAvg, 'p_CB (cm)');
 formatList{componentIndex} = '%.2f';
-ylabel('$\delta \mathbf{p}_{CB}$ (m/s)', 'Interpreter', 'latex');
-set(gcf, 'Color', 'None');
+ylabel('$\delta \mathbf{p}_{CB} (cm)$', 'Interpreter', 'latex');
+set(gcf, 'Color', backgroundColor);
 grid on;
 outputfig = [result_dir, '/', 'rmse_p_CB.eps'];
 if exist(outputfig, 'file')==2
@@ -204,12 +210,13 @@ export_fig(outputfig);
 
 figure;
 indices = 47:48;
-drawColumnsInMultipleMatrices(matrices, fileLabels, {'fx', 'fy'}, indices, 0, fileColumnStyles);
+drawColumnsInMultipleMatrices(matrices, fileLabels, {'fx', 'fy'}, ...
+    indices, 0, fileColumnStyles);
 estAvg = probeRmse(matrices, fileLabels, indices, 'fxy', epochIndexList);
 recordRmse(estAvg, 'fxy');
 formatList{componentIndex} = '%.2f';
-ylabel('$\delta \mathbf{f}$ (pixel)', 'Interpreter', 'latex');
-set(gcf, 'Color', 'None');
+ylabel('$\delta \mathbf{f} (pixel)$', 'Interpreter', 'latex');
+set(gcf, 'Color', backgroundColor);
 grid on;
 outputfig = [result_dir, '/', 'rmse_fxy.eps'];
 if exist(outputfig, 'file')==2
@@ -219,12 +226,13 @@ export_fig(outputfig);
 
 figure;
 indices = 49:50;
-drawColumnsInMultipleMatrices(matrices, fileLabels, {'cx', 'cy'}, indices, 0, fileColumnStyles);
+drawColumnsInMultipleMatrices(matrices, fileLabels, {'cx', 'cy'}, ...
+    indices, 0, fileColumnStyles);
 estAvg = probeRmse(matrices, fileLabels, indices, 'cxy', epochIndexList);
 recordRmse(estAvg, 'cxy');
 formatList{componentIndex} = '%.2f';
 ylabel('$\delta \mathbf{c} (pixel)$', 'Interpreter', 'latex');
-set(gcf, 'Color', 'None');
+set(gcf, 'Color', backgroundColor);
 grid on;
 outputfig = [result_dir, '/', 'rmse_cxy.eps'];
 if exist(outputfig, 'file')==2
@@ -240,8 +248,8 @@ drawColumnsInMultipleMatrices(matrices, fileLabels, {'k1', 'k2'}, ...
 estAvg = probeRmse(matrices, fileLabels, indices, 'k12 (0.001)', epochIndexList, scale);
 recordRmse(estAvg, 'k12 (0.001)');
 formatList{componentIndex} = '%.2f';
-ylabel('$\delta \mathbf{k}$', 'Interpreter', 'latex');
-set(gcf, 'Color', 'None');
+ylabel('$\delta \mathbf{k} (0.001)$', 'Interpreter', 'latex');
+set(gcf, 'Color', backgroundColor);
 grid on;
 outputfig = [result_dir, '/', 'rmse_k.eps'];
 if exist(outputfig, 'file')==2
@@ -257,8 +265,8 @@ drawColumnsInMultipleMatrices(matrices, fileLabels, {'p1', 'p2'}, ...
 estAvg = probeRmse(matrices, fileLabels, indices, 'p12 (0.001)', epochIndexList, scale);
 recordRmse(estAvg, 'p12 (0.001)');
 formatList{componentIndex} = '%.2f';
-ylabel('$\delta \mathbf{p}$', 'Interpreter', 'latex');
-set(gcf, 'Color', 'None');
+ylabel('$\delta \mathbf{p} (0.001)$', 'Interpreter', 'latex');
+set(gcf, 'Color', backgroundColor);
 grid on;
 outputfig = [result_dir, '/', 'rmse_p.eps'];
 if exist(outputfig, 'file')==2
@@ -269,15 +277,16 @@ export_fig(outputfig);
 figure;
 indices = 55:56;
 scale = 1000;
-drawColumnsInMultipleMatrices(matrices, fileLabels, {'t_d', 't_r'}, indices, 0, fileColumnStyles, scale);
+drawColumnsInMultipleMatrices(matrices, fileLabels, {'t_d', 't_r'}, ...
+    indices, 0, fileColumnStyles, scale);
 estAvg = probeRmse(matrices, fileLabels, indices(1), 'td (ms)', epochIndexList, scale);
 recordRmse(estAvg, 'td (ms)');
 formatList{componentIndex} = '%.2f';
 estAvg = probeRmse(matrices, fileLabels, indices(2), 'tr (ms)', epochIndexList, scale);
 recordRmse(estAvg, 'tr (ms)');
 formatList{componentIndex} = '%.2f';
-ylabel('$\delta \mathbf{td-tr}$ (ms)', 'Interpreter', 'latex');
-set(gcf, 'Color', 'None');
+ylabel('$\delta t_d \delta t_r (ms)$', 'Interpreter', 'latex');
+set(gcf, 'Color', backgroundColor);
 grid on;
 outputfig = [result_dir, '/', 'rmse_td-tr.eps'];
 if exist(outputfig, 'file')==2
@@ -289,9 +298,9 @@ export_fig(outputfig);
 rmseOutputFile = [result_dir, '/', 'rmse_at_epochs.txt'];
 fid = fopen(rmseOutputFile, 'w');
 delimiter = ' ';
-logRmseFromBgIndex = 4;
+logRmseStartIndex = 1;
 fprintf(fid, ['time(sec)', delimiter]);
-for j = logRmseFromBgIndex:componentIndex
+for j = logRmseStartIndex:componentIndex
     fprintf(fid, ['%s', delimiter], componentList{j});
 end
 fprintf(fid, '\n');
@@ -299,7 +308,7 @@ fprintf(fid, '\n');
 for i = 1:length(rmseList)
     for k = 1 : size(rmseList{i}, 1)
         fprintf(fid, ['%.1f', delimiter], probeEpochs(k));
-        for j = logRmseFromBgIndex : componentIndex
+        for j = logRmseStartIndex : componentIndex
             fprintf(fid, [formatList{j}, delimiter], rmseList{i}(k, j));
         end
         fprintf(fid, '\n');
