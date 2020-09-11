@@ -59,14 +59,15 @@ void RiSlidingWindowSmoother::addInitialPriorFactors() {
   state_prior_covariance.diagonal().tail(3) = pvstd_.std_p_WS.cwiseAbs2();
 
   // Add RVP prior.
+  // Lock Jacobian for the prior factor is unneeded.
   new_imu_prior_and_other_factors_.push_back(
       boost::make_shared<gtsam::RiExtendedPose3Prior>(
           gtsam::Symbol('x', frameId),
           gtsam::RiExtendedPose3(gtsam::Rot3(T_WB.q()), vel_bias.head<3>(),
                                  T_WB.r()),
-          state_prior_covariance, FLAGS_rifls_lock_jacobian));
+          state_prior_covariance, false));
 
-  // Add initial bias priors:
+  // Add initial bias priors.
   Eigen::Matrix<double, 6, 1> prior_biasSigmas;
   prior_biasSigmas.head<3>().setConstant(imuParametersVec_.at(0).sigma_ba);
   prior_biasSigmas.tail<3>().setConstant(imuParametersVec_.at(0).sigma_bg);
