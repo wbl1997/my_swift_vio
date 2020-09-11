@@ -129,3 +129,22 @@ TEST(StandardC, AssignToBaseClass) {
   bool res = b->equals(*backup);
   EXPECT_FALSE(res);
 }
+
+struct S {
+  virtual std::string f() const { return "B::f" + g(); }
+  std::string g() const { return "B::g"; }  // not virtual
+};
+
+struct E : S {
+  std::string f() const override { return "D::f" + g(); }  // overrides B::f
+  std::string g() const { return "D::g"; }
+};
+
+TEST(StandardC, VirtualMemberCallOverride) {
+  // This test shows that the virtual member for a derived class will call the
+  // member function of the derived class rather than the counterpart in the
+  // Base class.
+  std::shared_ptr<S> dptr(new E());
+  std::shared_ptr<E> d(new E());
+  EXPECT_TRUE(dptr->f() == d->f());
+}

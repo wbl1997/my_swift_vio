@@ -71,7 +71,7 @@ class ConsistentEstimator : public Estimator
    * @brief addReprojectionFactors see descriptions in Estimator.
    * @return
    */
-  bool addReprojectionFactors() override;
+  bool addReprojectionFactors();
 
   /**
    * @brief Start ceres optimization.
