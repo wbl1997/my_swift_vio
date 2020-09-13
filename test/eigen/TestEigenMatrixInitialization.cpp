@@ -105,3 +105,40 @@ TEST(EigenMatrix, setIdentity) {
   EXPECT_TRUE(r42.isApprox(m42, eps));
   EXPECT_TRUE(r42.isApprox(n42, eps));
 }
+
+TEST(EigenMatrix, EmptyMatrix) {
+  // test that MarginalizationError::addResidualBlock() and
+  // EvaluateWithMinimalJacobians() works with constant parameter blocks which
+  // comes with a zero column Jacobian.
+  int residualDim = 2;
+  int parameterDim = 0;
+  int orderIndex = 10;
+  Eigen::Matrix<double, -1, -1, Eigen::RowMajor> jacobianEigen;
+  jacobianEigen.resize(residualDim, parameterDim);
+  double* jacobianRaw = jacobianEigen.data();
+
+  Eigen::MatrixXd J(orderIndex, orderIndex);
+  Eigen::Map<Eigen::Matrix<double, -1, -1, Eigen::RowMajor>> jacobianMap(
+      jacobianRaw, residualDim, parameterDim);
+  jacobianMap = J.block(0, orderIndex, residualDim, parameterDim);
+
+  Eigen::Matrix<double, -1, -1, Eigen::RowMajor> J_lift(6, 7);
+  Eigen::Matrix<double, -1, -1, Eigen::RowMajor> Jmin =
+      J.block(0, orderIndex, residualDim, parameterDim);
+  ASSERT_DEATH(jacobianMap = Jmin * J_lift,
+               "if you wanted a coeff-wise or a dot product use the respective "
+               "explicit functions");
+
+  Eigen::VectorXd residual(residualDim);
+  jacobianEigen =
+      0.1 *
+      (jacobianEigen - 0.5 * residual * (residual.transpose() * jacobianEigen));
+
+  Eigen::MatrixXd H(orderIndex, orderIndex);
+  H.block(orderIndex, orderIndex, 0, 0) +=
+      jacobianEigen.transpose().eval() * jacobianEigen;
+
+  Eigen::MatrixXd jacobianEigenj(residualDim, 4);
+  H.block(orderIndex, 6, 0, 4) +=
+      jacobianEigen.transpose().eval() * jacobianEigenj;
+}

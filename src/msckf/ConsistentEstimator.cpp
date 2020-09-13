@@ -483,7 +483,6 @@ bool ConsistentEstimator::applyMarginalizationStrategy(
         if(residuals.size()==0){
           mapPtr_->removeParameterBlock(pit->first);
           removedLandmarks.push_back(pit->second);
-          LOG(INFO) << "l445 Erase landmark " << pit->first;
           pit = landmarksMap_.erase(pit);
           continue;
         }
@@ -531,7 +530,6 @@ bool ConsistentEstimator::applyMarginalizationStrategy(
           mapPtr_->removeParameterBlock(pit->first);
           removedLandmarks.push_back(pit->second);
           pit = landmarksMap_.erase(pit);
-          LOG(INFO) << "l493 Erase landmark " << pit->first;
           continue;
         }
         if(marginalize&&errorTermAdded){
@@ -539,7 +537,6 @@ bool ConsistentEstimator::applyMarginalizationStrategy(
           keepParameterBlocks.push_back(false);
           removedLandmarks.push_back(pit->second);
           pit = landmarksMap_.erase(pit);
-          LOG(INFO) << "l501 Erase landmark " << pit->first;
           continue;
         }
 
@@ -598,55 +595,14 @@ bool ConsistentEstimator::applyMarginalizationStrategy(
 bool ConsistentEstimator::computeCovariance(Eigen::MatrixXd* cov) const {
   // variance for p_WB, q_WB, v_WB, bg, ba
   *cov = Eigen::Matrix<double, 15, 15>::Identity();
-  uint64_t T_WS_id = statesMap_.rbegin()->second.id;
-  uint64_t speedAndBias_id = statesMap_.rbegin()
-                                 ->second.sensors.at(SensorStates::Imu)
-                                 .at(0)
-                                 .at(ImuSensorStates::SpeedAndBias)
-                                 .id;
-  std::vector<uint64_t> parameterBlockIdList{T_WS_id, speedAndBias_id};
-
-
-  std::unordered_map<uint64_t, std::shared_ptr<okvis::ceres::ParameterBlock>>
-      blockId2BlockCopyPtr;
-  std::shared_ptr<::ceres::Problem> clonedProblem =
-      mapPtr_->cloneProblem(&blockId2BlockCopyPtr);
-
-  std::vector<double*> newParamBlockList;
-  for (auto oldId : parameterBlockIdList) {
-    newParamBlockList.push_back(blockId2BlockCopyPtr.at(oldId)->parameters());
-  }
-
-  ::ceres::Covariance::Options covariance_options;
-  covariance_options.algorithm_type = ::ceres::SPARSE_QR;
-  covariance_options.null_space_rank = -1;
-  covariance_options.num_threads = 1;
-  covariance_options.min_reciprocal_condition_number = 1e-32;
-  covariance_options.apply_loss_function = true;
-  ::ceres::Covariance covariance(covariance_options);
-  std::vector<std::pair<const double*, const double*>> covariance_blocks;
-
-  for (double* block : newParamBlockList) {
-    covariance_blocks.push_back(std::make_pair(block, block));
-  }
-
-  if (!covariance.Compute(covariance_blocks, clonedProblem.get())) {
-    mapPtr_->printMapInfo();
-    return false;
-  }
-
-  Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>
-      poseCovariance(6, 6);
-  covariance.GetCovarianceBlockInTangentSpace(
-      newParamBlockList[0], newParamBlockList[0], poseCovariance.data());
-  Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>
-      speedAndBiasCovariance(9, 9);
-  covariance.GetCovarianceBlock(
-      newParamBlockList[1], newParamBlockList[1], speedAndBiasCovariance.data());
-
-  cov->topLeftCorner<6, 6>() = poseCovariance;
-  cov->bottomRightCorner<9, 9>() = speedAndBiasCovariance;
-
-  return true;
+//  return false;
+  // jhuai: Skip the below unless necessary as it is slow.
+  uint64_t poseId = statesMap_.rbegin()->second.id;
+  uint64_t speedAndBiasId = statesMap_.rbegin()
+                                ->second.sensors.at(SensorStates::Imu)
+                                .at(0)
+                                .at(ImuSensorStates::SpeedAndBias)
+                                .id;
+  return mapPtr_->computeNavStateCovariance(poseId, speedAndBiasId, cov);
 }
 }  // namespace okvis
