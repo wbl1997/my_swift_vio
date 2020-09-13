@@ -1,8 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <gtsam/VioBackEndParams.h>
 #include <io_wrap/StreamHelper.hpp>
 #include <msckf/VioTestSystemBuilder.hpp>
-
 namespace {
 void computeNavErrors(
     const okvis::Estimator* estimator,
@@ -136,8 +136,8 @@ void testPointLandmarkJacobian(std::string projOptModelName,
                                  okvis::LandmarkGridType::FourWalls, landmarkRadius);
   simul::SimulatedTrajectoryType trajectoryType = simul::SimulatedTrajectoryType::Torus;
 
-
-  vioSystemBuilder.createVioSystem(testSetting, trajectoryType,
+  okvis::BackendParams backendParams;
+  vioSystemBuilder.createVioSystem(testSetting, backendParams, trajectoryType,
                                    projOptModelName, extrinsicModelName,
                                    timeOffset, readoutTime,
                                    "", "");

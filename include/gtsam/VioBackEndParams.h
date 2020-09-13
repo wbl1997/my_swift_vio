@@ -61,6 +61,13 @@ struct BackendOutputParams {
   bool output_lmk_id_to_lmk_type_map_ = false;
 };
 
+enum class BackendModality {
+  //! Only use structureless factors.
+  STRUCTURELESS = 0,
+  //! Only use projection factors
+  PROJECTION = 1,
+};
+
 class BackendParams : public PipelineParams {
  public:
   POINTER_TYPEDEFS(BackendParams);
@@ -85,17 +92,16 @@ class BackendParams : public PipelineParams {
   void printVioBackEndParams() const;
 
  public:
+  BackendModality backendModality_ = BackendModality::STRUCTURELESS;
 
   //! Smart factor params
-  double smartNoiseSigma_ = 3.0;
+  double smartNoiseSigma_ = 1.5;
   double rankTolerance_ = 1.0;
   //! max distance to triangulate point in meters
   double landmarkDistanceThreshold_ = 20.0;
   //! max acceptable reprojection error // before tuning: 3
   double outlierRejection_ = 8.0;
   double retriangulationThreshold_ = 1.0e-3;
-  //! below how many sigmas do we consider rays have low disparity?
-//  double raySigmaScalar_ = 6.0;
 
   bool addBetweenStereoFactors_ = true;
 

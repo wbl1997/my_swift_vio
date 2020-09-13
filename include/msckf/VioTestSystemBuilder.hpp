@@ -1,6 +1,8 @@
 #ifndef INCLUDE_MSCKF_VIO_TEST_SYSTEM_BUILDER_HPP_
 #define INCLUDE_MSCKF_VIO_TEST_SYSTEM_BUILDER_HPP_
 
+#include <gtsam/VioBackEndParams.h>
+
 #include <msckf/ImuSimulator.h>
 #include <msckf/MSCKF2.hpp>
 #include <msckf/SimulationFrontend.hpp>
@@ -15,6 +17,7 @@ public:
   virtual ~VioTestSystemBuilder() {}
 
   void createVioSystem(const okvis::TestSetting& testSetting,
+                       const okvis::BackendParams& backendParams,
                        SimulatedTrajectoryType trajectoryId,
                        std::string projOptModelName, std::string extrinsicModelName,
                        double td, double tr,

@@ -21,6 +21,7 @@
 #include <gtsam/geometry/Cal3DS2.h>
 #include <gtsam/navigation/CombinedImuFactor.h>
 #include <gtsam/navigation/ImuBias.h>
+#include <gtsam/slam/SmartProjectionPoseFactor.h>
 
 #include <gtsam_unstable/nonlinear/BatchFixedLagSmoother.h>
 #include <gtsam_unstable/nonlinear/IncrementalFixedLagSmoother.h>
@@ -36,13 +37,36 @@ typedef gtsam::IncrementalFixedLagSmoother Smoother;
 typedef gtsam::BatchFixedLagSmoother Smoother;
 #endif
 
-using SmartStereoFactor = gtsam::SmartStereoProjectionPoseFactor;
 using LandmarkId = uint64_t;
-using LandmarkIdSmartFactorMap =
-    std::unordered_map<LandmarkId, SmartStereoFactor::shared_ptr>;
+using LandmarkIdSmartFactorMap = std::unordered_map<
+    LandmarkId, gtsam::SmartProjectionPoseFactor<gtsam::Cal3DS2>::shared_ptr>;
 using Slot = long int;
-using SmartFactorMap =
-    gtsam::FastMap<LandmarkId, std::pair<SmartStereoFactor::shared_ptr, Slot>>;
+using SmartFactorMap = gtsam::FastMap<
+    LandmarkId,
+    std::pair<gtsam::SmartProjectionPoseFactor<gtsam::Cal3DS2>::shared_ptr,
+              Slot>>;
+using PointsWithIdMap = std::unordered_map<LandmarkId, gtsam::Point3>;
+enum class LandmarkType { SMART = 0, PROJECTION };
+using LmkIdToLmkTypeMap = std::unordered_map<LandmarkId, LandmarkType>;
+
+// Set parameters for smart factors.
+void setSmartFactorsParams(
+    gtsam::SharedNoiseModel* smart_noise,
+    gtsam::SmartProjectionParams* smart_factors_params,
+    double smart_noise_sigma,
+    double rank_tolerance,
+    double landmark_distance_threshold,
+    double retriangulation_threshold,
+    double outlier_rejection);
+
+// Set parameters for all types of factors.
+void setFactorsParams(
+    const BackendParams& vio_params,
+    gtsam::SharedNoiseModel* smart_noise,
+    gtsam::SmartProjectionParams* smart_factors_params,
+    gtsam::SharedNoiseModel* no_motion_prior_noise,
+    gtsam::SharedNoiseModel* zero_velocity_prior_noise,
+    gtsam::SharedNoiseModel* constant_velocity_prior_noise);
 
 /**
  * SlidingWindowSmoother builds upon gtsam FixedLagSmoother.
@@ -122,8 +146,18 @@ class SlidingWindowSmoother : public Estimator {
    */
   bool computeCovariance(Eigen::MatrixXd* cov) const override;
 
-
   bool print(std::ostream& stream) const override;
+
+  /**
+   * @brief getMapLmkIdsTo3dPointsInTimeHorizon Get valid 3D points and corresponding lmk id.
+   * @warning  It only works for BackendModality::Structureless for now.
+   * @param lmk_id_to_lmk_type_map
+   * @param min_age
+   * @return
+   */
+  PointsWithIdMap getMapLmkIdsTo3dPointsInTimeHorizon(
+      LmkIdToLmkTypeMap* lmk_id_to_lmk_type_map = nullptr,
+      const size_t& min_age = 2) const;
 
  protected:
   /**
@@ -143,6 +177,25 @@ class SlidingWindowSmoother : public Estimator {
    * @param landmarkId
    */
   virtual void updateLandmarkInGraph(uint64_t landmarkId);
+
+  /**
+   * @brief addLandmarkSmartFactorToGraph Adds the smart factor of a landmark to
+   * the graph for the first time.
+   * @param lm_id
+   */
+  virtual void addLandmarkSmartFactorToGraph(const LandmarkId& lm_id);
+
+  /**
+   * @brief updateLandmarkSmartFactorInGraph: Update the smart factor for
+   * a landmark already in the graph.
+   * @param lmk_id
+   */
+  virtual void updateLandmarkSmartFactorInGraph(const LandmarkId& lmk_id);
+
+  void assembleNewFactorsAndDeleteSlots(
+      gtsam::NonlinearFactorGraph* new_factors_tmp,
+      gtsam::FactorIndices* delete_slots,
+      std::vector<LandmarkId>* lmk_ids_of_new_smart_factors_tmp) const;
 
   /**
    * @brief update state variables with FixedLagSmoother estimates.
@@ -223,6 +276,11 @@ class SlidingWindowSmoother : public Estimator {
 
   bool deleteLmkFromFeatureTracks(uint64_t lmkId);
 
+  void updateNewSmartFactorsSlots(
+      const std::vector<LandmarkId>& lmk_ids_of_new_smart_factors_tmp,
+      SmartFactorMap* old_smart_factors);
+
+
   /**
    * @brief triangulateSafe wrap of gtsam::triangulateSafe.
    * It can be used as an alternative to triangulateWithDisparityCheck.
@@ -247,8 +305,13 @@ class SlidingWindowSmoother : public Estimator {
   std::unique_ptr<okvis::ImuFrontEnd> imuFrontend_;
 
   // Vision params.
-  gtsam::SmartStereoProjectionParams smart_factors_params_;
+  gtsam::SmartProjectionParams smart_factors_params_;
   gtsam::SharedNoiseModel smart_noise_;
+
+  //! No motion factors settings.
+  gtsam::SharedNoiseModel zero_velocity_prior_noise_;
+  gtsam::SharedNoiseModel no_motion_prior_noise_;
+  gtsam::SharedNoiseModel constant_velocity_prior_noise_;
 
   // Stores calibration, baseline.
 //  const gtsam::Cal3_S2Stereo::shared_ptr stereo_cal_;

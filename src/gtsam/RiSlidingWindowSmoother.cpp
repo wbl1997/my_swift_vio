@@ -152,12 +152,10 @@ bool RiSlidingWindowSmoother::addLandmarkToGraph(
   std::shared_ptr<okvis::ceres::HomogeneousPointParameterBlock>
       pointParameterBlock(
           new okvis::ceres::HomogeneousPointParameterBlock(hpW, lmkId));
-  if (!mapPtr_->addParameterBlock(pointParameterBlock,
-                                  okvis::ceres::Map::HomogeneousPoint)) {
-    // This can happen when a landmark moves out of the smoother's horizon and
-    // then reappears.
-    return false;
-  }
+  mapPtr_->addParameterBlock(pointParameterBlock,
+                             okvis::ceres::Map::HomogeneousPoint);
+  // addParameterBlock may fail when a landmark moves out of the smoother's
+  // horizon and then reappears.
 
   uint64_t currentFrameId = statesMap_.rbegin()->first;
   okvis::kinematics::Transformation T_WB;
@@ -200,6 +198,7 @@ bool RiSlidingWindowSmoother::addLandmarkToGraph(
       // The anchor frame is set to the last observation's frame which is
       // essentially the last frame so the anchor frame will persist until the
       // landmark is marginalized.
+      // This also means better "locality", see Ila 2017 3DV fast incremental...
       gtsam::RiProjectionFactorIDPAnchor::shared_ptr factor =
           boost::make_shared<gtsam::RiProjectionFactorIDPAnchor>(
               gtsam::Symbol('l', lmkId), variance, measurement,

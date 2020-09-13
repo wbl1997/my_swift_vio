@@ -35,6 +35,10 @@ bool BackendParams::parseYAML(const std::string& filepath) {
 bool BackendParams::parseYAMLVioBackEndParams(
     const YamlParser& yaml_parser) {
   // VISION PARAMS
+  int backend_modality = 0;
+  yaml_parser.getYamlParam("backend_modality", &backend_modality);
+  backendModality_ = static_cast<BackendModality>(backend_modality);
+
   yaml_parser.getYamlParam("smartNoiseSigma", &smartNoiseSigma_);
   yaml_parser.getYamlParam("rankTolerance", &rankTolerance_);
   yaml_parser.getYamlParam("landmarkDistanceThreshold",
@@ -42,8 +46,7 @@ bool BackendParams::parseYAMLVioBackEndParams(
   yaml_parser.getYamlParam("outlierRejection", &outlierRejection_);
   yaml_parser.getYamlParam("retriangulationThreshold",
                            &retriangulationThreshold_);
-//  yaml_parser.getYamlParam("raySigmaScalar",
-//                           &raySigmaScalar_);
+
   yaml_parser.getYamlParam("addBetweenStereoFactors",
                            &addBetweenStereoFactors_);
   yaml_parser.getYamlParam("betweenRotationPrecision",
@@ -72,6 +75,7 @@ bool BackendParams::equalsVioBackEndParams(const BackendParams& vp2,
                                               double tol) const {
   return
       // VISION PARAMS
+      (backendModality_ == vp2.backendModality_) &&
       (fabs(smartNoiseSigma_ - vp2.smartNoiseSigma_) <= tol) &&
       (fabs(rankTolerance_ - vp2.rankTolerance_) <= tol) &&
       (fabs(landmarkDistanceThreshold_ - vp2.landmarkDistanceThreshold_) <=
@@ -79,7 +83,6 @@ bool BackendParams::equalsVioBackEndParams(const BackendParams& vp2,
       (fabs(outlierRejection_ - vp2.outlierRejection_) <= tol) &&
       (fabs(retriangulationThreshold_ - vp2.retriangulationThreshold_) <=
        tol) &&
-//      (fabs(raySigmaScalar_ - vp2.raySigmaScalar_) <= tol) &&
       (addBetweenStereoFactors_ == vp2.addBetweenStereoFactors_) &&
       (fabs(betweenRotationPrecision_ - vp2.betweenRotationPrecision_) <=
        tol) &&
@@ -108,7 +111,6 @@ void BackendParams::printVioBackEndParams() const {
             << '\n'
             << "outlierRejection_: " << outlierRejection_ << '\n'
             << "retriangulationThreshold_: " << retriangulationThreshold_ << '\n'
-//            << "raySigmaScalar_: " << raySigmaScalar_ << '\n'
             << "addBetweenStereoFactors_: " << addBetweenStereoFactors_ << '\n'
             << "betweenRotationPrecision_: " << betweenRotationPrecision_
             << '\n'

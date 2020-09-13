@@ -77,6 +77,73 @@ void setIsam2Params(const okvis::BackendParams& vio_params,
   isam_param->factorization = gtsam::ISAM2Params::CHOLESKY;  // QR
 }
 
+void setSmartFactorsParams(
+    gtsam::SharedNoiseModel* smart_noise,
+    gtsam::SmartProjectionParams* smart_factors_params,
+    double smart_noise_sigma,
+    double rank_tolerance,
+    double landmark_distance_threshold,
+    double retriangulation_threshold,
+    double outlier_rejection) {
+  gtsam::SharedNoiseModel model =
+      gtsam::noiseModel::Isotropic::Sigma(2, smart_noise_sigma);
+  // smart_noise_ = gtsam::noiseModel::Robust::Create(
+  //                  gtsam::noiseModel::mEstimator::Huber::Create(1.345),
+  //                  model);
+  *smart_noise = model;
+  *smart_factors_params =
+      gtsam::SmartProjectionParams(gtsam::HESSIAN,             // JACOBIAN_SVD
+                        gtsam::ZERO_ON_DEGENERACY,  // IGNORE_DEGENERACY
+                        false,                      // ThrowCherality = false
+                        true);                      // verboseCherality = true
+  smart_factors_params->setRankTolerance(rank_tolerance);
+  smart_factors_params->setLandmarkDistanceThreshold(
+      landmark_distance_threshold);
+  smart_factors_params->setRetriangulationThreshold(retriangulation_threshold);
+  smart_factors_params->setDynamicOutlierRejectionThreshold(outlier_rejection);
+}
+
+void setFactorsParams(
+    const BackendParams& vio_params,
+    gtsam::SharedNoiseModel* smart_noise,
+    gtsam::SmartProjectionParams* smart_factors_params,
+    gtsam::SharedNoiseModel* no_motion_prior_noise,
+    gtsam::SharedNoiseModel* zero_velocity_prior_noise,
+    gtsam::SharedNoiseModel* constant_velocity_prior_noise) {
+  CHECK_NOTNULL(smart_noise);
+  CHECK_NOTNULL(smart_factors_params);
+  CHECK_NOTNULL(no_motion_prior_noise);
+  CHECK_NOTNULL(zero_velocity_prior_noise);
+  CHECK_NOTNULL(constant_velocity_prior_noise);
+
+  //////////////////////// SMART PROJECTION FACTORS SETTINGS
+  //////////////////////
+  setSmartFactorsParams(smart_noise,
+                        smart_factors_params,
+                        vio_params.smartNoiseSigma_,
+                        vio_params.rankTolerance_,
+                        vio_params.landmarkDistanceThreshold_,
+                        vio_params.retriangulationThreshold_,
+                        vio_params.outlierRejection_);
+
+  //////////////////////// NO MOTION FACTORS SETTINGS
+  /////////////////////////////
+  Eigen::Matrix<double, 6, 1> sigmas;
+  sigmas.head<3>().setConstant(vio_params.noMotionRotationSigma_);
+  sigmas.tail<3>().setConstant(vio_params.noMotionPositionSigma_);
+  *no_motion_prior_noise = gtsam::noiseModel::Diagonal::Sigmas(sigmas);
+
+  //////////////////////// ZERO VELOCITY FACTORS SETTINGS
+  /////////////////////////
+  *zero_velocity_prior_noise =
+      gtsam::noiseModel::Isotropic::Sigma(3, vio_params.zeroVelocitySigma_);
+
+  //////////////////////// CONSTANT VELOCITY FACTORS SETTINGS
+  /////////////////////
+  *constant_velocity_prior_noise =
+      gtsam::noiseModel::Isotropic::Sigma(3, vio_params.constantVelSigma_);
+}
+
 void SlidingWindowSmoother::setupSmoother(
     const okvis::BackendParams& vioParams) {
 #ifdef INCREMENTAL_SMOOTHER
@@ -104,6 +171,13 @@ SlidingWindowSmoother::SlidingWindowSmoother(
       marginalizeTimer("3.4 marginalize", true),
       updateLandmarksTimer("3.5 updateLandmarks", true) {
   setupSmoother(vioParams);
+  // Set parameters for all factors.
+  setFactorsParams(vioParams,
+                   &smart_noise_,
+                   &smart_factors_params_,
+                   &no_motion_prior_noise_,
+                   &zero_velocity_prior_noise_,
+                   &constant_velocity_prior_noise_);
 }
 
 SlidingWindowSmoother::SlidingWindowSmoother(const okvis::BackendParams& vioParams)
@@ -530,6 +604,40 @@ bool SlidingWindowSmoother::applyMarginalizationStrategy(
     navStateToLandmarks_.erase(itemPtr);
   }
 
+  // remove smart factors that are marginalized from the graph or whose pointer changes.
+  const gtsam::NonlinearFactorGraph& graph = smoother_->getFactors();
+  for (SmartFactorMap::const_iterator old_smart_factor_it =
+           old_smart_factors_.begin();
+       old_smart_factor_it != old_smart_factors_.end();) {
+    // When a feature track is so long (longer than factor graph's time
+    // horizon), then the factor is marginalization from the graph. Erase this
+    // factor and feature track, as it has gone past the horizon.
+    LandmarkId lmkId = old_smart_factor_it->first;
+    Slot slot_id = old_smart_factor_it->second.second;
+    if (!graph.exists(slot_id)) {
+      old_smart_factor_it = old_smart_factors_.erase(old_smart_factor_it);
+      landmarksMap_.at(lmkId).residualizeCase = NotInState_NotTrackedNow;
+      continue;
+    }
+
+    // Check that the pointer smart_factor_ptr points to the right element
+    // in the graph.
+    const gtsam::SmartProjectionPoseFactor<gtsam::Cal3DS2>::shared_ptr smart_factor_ptr =
+        old_smart_factor_it->second.first;
+    if (smart_factor_ptr != graph.at(slot_id)) {
+      // Pointer in the graph does not match
+      // the one we stored in old_smart_factors_
+      LOG(ERROR) << "The factor with slot id: " << slot_id
+                 << " in the graph does not match the old_smart_factor of "
+                 << "lmk with id: " << lmkId << "\n."
+                 << "Deleting old_smart_factor of the lmk";
+      old_smart_factor_it = old_smart_factors_.erase(old_smart_factor_it);
+      landmarksMap_.at(lmkId).residualizeCase = NotInState_NotTrackedNow;
+      continue;
+    }
+    ++old_smart_factor_it;
+  }
+
   // remove feature tracks that do not overlap the sliding window.
   for (PointMap::iterator pit = landmarksMap_.begin();
        pit != landmarksMap_.end();) {
@@ -593,46 +701,13 @@ bool SlidingWindowSmoother::applyMarginalizationStrategy(
 
 // Refer to InvUVFactor and process_feat_normal in CPI, closed-form preintegration repo of Eckenhoff.
 bool SlidingWindowSmoother::addLandmarkToGraph(uint64_t lmkId, const Eigen::Vector4d& hpW) {
-  // We use a unit pinhole projection camera for the smart factors to be
-  // more efficient.
-//  SmartStereoFactor::shared_ptr new_factor =
-//      boost::make_shared<SmartStereoFactor>(
-//          smart_noise_, smart_factors_params_, body_P_cam0_);
-
-//  VLOG(10) << "Adding landmark with: " << ft.obs_.size()
-//           << " landmarks to graph, with keys: ";
-
-//  // Add observations to smart factor
-//  if (VLOG_IS_ON(10)) new_factor->print();
-//  for (const std::pair<FrameId, StereoPoint2>& obs : ft.obs_) {
-//    const FrameId& frame_id = obs.first;
-//    const gtsam::Symbol& pose_symbol = gtsam::Symbol('x', frame_id);
-//    if (smoother_->getFactors().exists(pose_symbol)) {
-//      const StereoPoint2& measurement = obs.second;
-//      new_factor->add(measurement, pose_symbol, stereo_cal_);
-//    } else {
-//      VLOG(10) << "Factor with lmk id " << lmk_id
-//               << " is linking to a marginalized state!";
-//    }
-
-//    if (VLOG_IS_ON(10)) std::cout << " " << obs.first;
-//  }
-//  if (VLOG_IS_ON(10)) std::cout << std::endl;
-
-//  // add new factor to suitable structures:
-//  new_smart_factors_.insert(std::make_pair(lmk_id, new_factor));
-//  old_smart_factors_.insert(
-//      std::make_pair(lmk_id, std::make_pair(new_factor, -1)));
-
   std::shared_ptr<okvis::ceres::HomogeneousPointParameterBlock>
       pointParameterBlock(
           new okvis::ceres::HomogeneousPointParameterBlock(hpW, lmkId));
-  if (!mapPtr_->addParameterBlock(pointParameterBlock,
-                                  okvis::ceres::Map::HomogeneousPoint)) {
-    // This can happen when a landmark moves out of the smoother's horizon and
-    // then reappears.
-    return false;
-  }
+  mapPtr_->addParameterBlock(pointParameterBlock,
+                             okvis::ceres::Map::HomogeneousPoint);
+  // addParameterBlock may fail when a landmark moves out of the smoother's
+  // horizon and then reappears.
 
   new_values_.insert(gtsam::symbol('l', lmkId), gtsam::Point3(hpW.head<3>() / hpW[3]));
 
@@ -678,39 +753,6 @@ bool SlidingWindowSmoother::addLandmarkToGraph(uint64_t lmkId, const Eigen::Vect
 }
 
 void SlidingWindowSmoother::updateLandmarkInGraph(uint64_t lmkId) {
-  // Update existing smart-factor
-//  auto old_smart_factors_it = old_smart_factors_.find(lmk_id);
-//  CHECK(old_smart_factors_it != old_smart_factors_.end())
-//      << "Landmark not found in old_smart_factors_ with id: " << lmk_id;
-
-//  const SmartStereoFactor::shared_ptr& old_factor =
-//      old_smart_factors_it->second.first;
-//  // Clone old factor to keep all previous measurements, now append one.
-//  SmartStereoFactor::shared_ptr new_factor =
-//      boost::make_shared<SmartStereoFactor>(*old_factor);
-//  gtsam::Symbol pose_symbol('x', new_measurement.first);
-//  if (smoother_->getFactors().exists(pose_symbol)) {
-//    const StereoPoint2& measurement = new_measurement.second;
-//    new_factor->add(measurement, pose_symbol, stereo_cal_);
-//  } else {
-//    VLOG(10) << "Factor with lmk id " << lmk_id
-//             << " is linking to a marginalized state!";
-//  }
-
-//  // Update the factor
-//  Slot slot = old_smart_factors_it->second.second;
-//  if (slot != -1) {
-//    new_smart_factors_.insert(std::make_pair(lmk_id, new_factor));
-//  } else {
-//    // If it's slot in the graph is still -1, it means that the factor has not
-//    // been inserted yet in the graph...
-//    LOG(FATAL) << "When updating the smart factor, its slot should not be -1!"
-//                  " Offensive lmk_id: "
-//               << lmk_id;
-//  }
-//  old_smart_factors_it->second.first = new_factor;
-//  VLOG(10) << "updateLandmarkInGraph: added observation to point: " << lmk_id;
-
   const okvis::MapPoint& mp = landmarksMap_.at(lmkId);
   auto obsIter = mp.observations.rbegin();
   OKVIS_ASSERT_EQ(
@@ -739,6 +781,170 @@ void SlidingWindowSmoother::updateLandmarkInGraph(uint64_t lmkId) {
           measurement, noise, gtsam::Symbol('x', obsIter->first.frameId),
           gtsam::Symbol('l', lmkId), cal0_, body_P_cam0_);
   new_reprojection_factors_.add(factor);
+}
+
+void SlidingWindowSmoother::addLandmarkSmartFactorToGraph(const LandmarkId& lmkId) {
+  uint64_t minValidStateId = statesMap_.begin()->first;
+  okvis::MapPoint& mp = landmarksMap_.at(lmkId);
+  auto obsIt = mp.observations.lower_bound(okvis::KeypointIdentifier(minValidStateId, 0u, 0u));
+  size_t numValidObs = std::distance(obsIt, mp.observations.end());
+  if (numValidObs < minTrackLength_) {
+      return;
+  }
+  std::shared_ptr<okvis::ceres::HomogeneousPointParameterBlock>
+      pointParameterBlock(
+          new okvis::ceres::HomogeneousPointParameterBlock(mp.pointHomog, lmkId));
+  mapPtr_->addParameterBlock(pointParameterBlock,
+                             okvis::ceres::Map::HomogeneousPoint);
+  // addParameterBlock may fail when a landmark moves out of the smoother's
+  // horizon and then reappears.
+
+  gtsam::SmartProjectionPoseFactor<gtsam::Cal3DS2>::shared_ptr new_factor =
+      boost::make_shared<gtsam::SmartProjectionPoseFactor<gtsam::Cal3DS2>>(
+          smart_noise_, cal0_, body_P_cam0_, smart_factors_params_);
+  for (std::map<okvis::KeypointIdentifier, uint64_t>::const_iterator obsIter =
+           mp.observations.begin();
+       obsIter != mp.observations.end(); ++obsIter) {
+    if (obsIter->first.frameId < minValidStateId) {
+      // Some observations may be outside the horizon.
+      continue;
+    }
+
+    // get the keypoint measurement
+    okvis::MultiFramePtr multiFramePtr =
+        multiFramePtrMap_.at(obsIter->first.frameId);
+    Eigen::Vector2d measurement;
+    multiFramePtr->getKeypoint(obsIter->first.cameraIndex,
+                               obsIter->first.keypointIndex, measurement);
+
+    new_factor->add(measurement, gtsam::Symbol('x', obsIter->first.frameId));
+  }
+  mp.residualizeCase = InState_TrackedNow;
+
+  new_smart_factors_.emplace(lmkId, new_factor);
+  old_smart_factors_.emplace(lmkId, std::make_pair(new_factor, -1));
+}
+
+void SlidingWindowSmoother::updateLandmarkSmartFactorInGraph(
+    const LandmarkId& lmkId) {
+  const okvis::MapPoint& mp = landmarksMap_.at(lmkId);
+  auto obsIter = mp.observations.rbegin();
+  OKVIS_ASSERT_EQ(Exception, obsIter->first.frameId, statesMap_.rbegin()->first,
+                  "Only update landmarks observed in the current frame.");
+
+  // get the keypoint measurement.
+  okvis::MultiFramePtr multiFramePtr =
+      multiFramePtrMap_.at(obsIter->first.frameId);
+  Eigen::Vector2d measurement;
+  multiFramePtr->getKeypoint(obsIter->first.cameraIndex,
+                             obsIter->first.keypointIndex, measurement);
+
+  // Update existing smart-factor
+  auto old_smart_factors_it = old_smart_factors_.find(lmkId);
+  CHECK(old_smart_factors_it != old_smart_factors_.end())
+      << "Landmark not found in old_smart_factors_ with id: " << lmkId;
+  const gtsam::SmartProjectionPoseFactor<gtsam::Cal3DS2>::shared_ptr&
+      old_factor = old_smart_factors_it->second.first;
+  // Clone old factor to keep all previous measurements, now append one.
+  gtsam::SmartProjectionPoseFactor<gtsam::Cal3DS2>::shared_ptr new_factor =
+      boost::make_shared<gtsam::SmartProjectionPoseFactor<gtsam::Cal3DS2>>(
+          *old_factor);
+  new_factor->add(measurement, gtsam::Symbol('x', obsIter->first.frameId));
+
+  // Update the factor
+  Slot slot = old_smart_factors_it->second.second;
+  if (slot != -1) {
+    new_smart_factors_.emplace(lmkId, new_factor);
+  } else {
+    LOG(FATAL)
+        << "If its slot in the graph is still -1, it means that the factor has "
+           "not been inserted yet in the graph! Offensive lmk_id: "
+        << lmkId;
+  }
+  old_smart_factors_it->second.first = new_factor;
+}
+
+void SlidingWindowSmoother::assembleNewFactorsAndDeleteSlots(
+    gtsam::NonlinearFactorGraph* new_factors_tmp,
+    gtsam::FactorIndices* delete_slots,
+    std::vector<LandmarkId>* lmk_ids_of_new_smart_factors_tmp) const {
+  if (backendParams_.backendModality_ == BackendModality::STRUCTURELESS) {
+    /////////////////////// BOOKKEEPING ////////////////////////////////////
+    size_t new_smart_factors_size = new_smart_factors_.size();
+    // We need to remove all previous smart factors in the factor graph
+    // for which we have new observations.
+    // The following is just to update the vector delete_slots with those
+    // slots in the factor graph that correspond to smart factors for which
+    // we've got new observations.
+    // We initialize delete_slots with Extra factor slots to delete contains
+    // potential factors that we want to delete, it is typically an empty
+    // vector, and is only used to give flexibility to subclasses (regular
+    // vio).
+
+    // TODO we know the actual end size... but I am not sure how to use factor
+    // graph API for appending factors without copying or re-allocation...
+
+    lmk_ids_of_new_smart_factors_tmp->reserve(new_smart_factors_size);
+
+    new_factors_tmp->reserve(new_smart_factors_size +
+                            new_imu_prior_and_other_factors_.size());
+    for (const auto& new_smart_factor : new_smart_factors_) {
+      // Push back the smart factor to the list of new factors to add to the
+      // graph. // Smart factor, so same address right?
+      LandmarkId lmk_id = new_smart_factor.first;  // don't use &
+
+      // Find smart factor and slot in old_smart_factors_ corresponding to
+      // the lmk with id of the new smart factor.
+      const auto& old_smart_factor_it = old_smart_factors_.find(lmk_id);
+      CHECK(old_smart_factor_it != old_smart_factors_.end())
+          << "Lmk with id: " << lmk_id
+          << " could not be found in old_smart_factors_.";
+
+      Slot slot = old_smart_factor_it->second.second;
+      if (slot != -1) {
+        // Smart factor Slot is different than -1, therefore the factor should
+        // be already in the factor graph.
+        DCHECK_GE(slot, 0);
+        if (smoother_->getFactors().exists(slot)) {
+          // Confirmed, the factor is in the graph.
+          // We must delete the old smart factor from the graph.
+          // TODO what happens if delete_slots has repeated elements?
+          delete_slots->push_back(slot);
+          // And we must add the new smart factor to the graph.
+          new_factors_tmp->push_back(new_smart_factor.second);
+          // Store lmk id of the smart factor to add to the graph.
+          lmk_ids_of_new_smart_factors_tmp->push_back(lmk_id);
+        } else {
+          LOG(WARNING)
+              << "Smart factor added to the graph is not found. It should not "
+                 "happen because we purge smart factors from old_smart_factors "
+                 "that are marginalized from the graph.";
+        }
+      } else {
+        // We just add the new smart factor to the graph, as it has never been
+        // there before.
+        new_factors_tmp->push_back(new_smart_factor.second);
+        // Store lmk id of the smart factor to add to the graph.
+        lmk_ids_of_new_smart_factors_tmp->push_back(lmk_id);
+      }
+    }
+
+    // Add also other factors (imu, priors).
+    // SMART FACTORS MUST BE FIRST, otherwise when recovering the slots
+    // for the smart factors we will mess up.
+    // push back many factors with an iterator over shared_ptr
+    // (factors are not copied)
+    new_factors_tmp->push_back(new_imu_prior_and_other_factors_.begin(),
+                              new_imu_prior_and_other_factors_.end());
+  } else {
+    size_t new_reproj_factors_size = new_reprojection_factors_.size();
+    new_factors_tmp->reserve(new_reproj_factors_size +
+                            new_imu_prior_and_other_factors_.size());
+    new_factors_tmp->push_back(new_reprojection_factors_.begin(),
+                              new_reprojection_factors_.end());
+    new_factors_tmp->push_back(new_imu_prior_and_other_factors_.begin(),
+                              new_imu_prior_and_other_factors_.end());
+  }
 }
 
 void SlidingWindowSmoother::updateStates() {
@@ -817,7 +1023,6 @@ void SlidingWindowSmoother::updateStates() {
     updateLandmarksTimer.stop();
   }
 }
-
 
 bool SlidingWindowSmoother::updateSmoother(gtsam::FixedLagSmoother::Result* result,
                                 const gtsam::NonlinearFactorGraph& new_factors,
@@ -1087,19 +1292,27 @@ void SlidingWindowSmoother::optimize(size_t /*numIter*/, size_t /*numThreads*/,
     if (landmarkStatus == NotInState_NotTrackedNow) {
       // The landmark has not been added to the graph.
       if (observedInCurrentFrame) {
-        Eigen::Vector4d hpW;
-        // Preliminary test implied that triangulateSafe may be lead to worse
-        // result than  triangulateWithDisparityCheck.
-//        bool triangulateOk = triangulateSafe(it->first, &pW);
-        bool triangulateOk = triangulateWithDisparityCheck(
-            it->first, &hpW, focalLength, FLAGS_ray_sigma_scalar);
-        if (triangulateOk) {
-          addLandmarkToGraph(it->first, hpW);
-        }  // else do nothing
+        if (backendParams_.backendModality_ == BackendModality::PROJECTION) {
+          Eigen::Vector4d hpW;
+          // Preliminary test implied that triangulateSafe may be lead to worse
+          // result than  triangulateWithDisparityCheck.
+          //        bool triangulateOk = triangulateSafe(it->first, &pW);
+          bool triangulateOk = triangulateWithDisparityCheck(
+              it->first, &hpW, focalLength, FLAGS_ray_sigma_scalar);
+          if (triangulateOk) {
+            addLandmarkToGraph(it->first, hpW);
+          }  // else do nothing
+        } else {
+          addLandmarkSmartFactorToGraph(it->first);
+        }
       }  // else do nothing
-    } else { // The landmark has been added to the graph.
+    } else {  // The landmark has been added to the graph.
       if (observedInCurrentFrame) {
-        updateLandmarkInGraph(it->first);
+        if (backendParams_.backendModality_ == BackendModality::PROJECTION) {
+          updateLandmarkInGraph(it->first);
+        } else {
+          updateLandmarkSmartFactorInGraph(it->first);
+        }
       }  // else do nothing
     }
   }
@@ -1108,14 +1321,11 @@ void SlidingWindowSmoother::optimize(size_t /*numIter*/, size_t /*numThreads*/,
   trackingRate_ = static_cast<double>(numTracked) /
                   static_cast<double>(landmarksMap_.size());
 
-  size_t new_reproj_factors_size = new_reprojection_factors_.size();
   gtsam::NonlinearFactorGraph new_factors_tmp;
-  new_factors_tmp.reserve(new_reproj_factors_size +
-                          new_imu_prior_and_other_factors_.size());
-  new_factors_tmp.push_back(new_reprojection_factors_.begin(),
-                            new_reprojection_factors_.end());
-  new_factors_tmp.push_back(new_imu_prior_and_other_factors_.begin(),
-                            new_imu_prior_and_other_factors_.end());
+  gtsam::FactorIndices delete_slots;
+  std::vector<LandmarkId> lmk_ids_of_new_smart_factors_tmp;
+  assembleNewFactorsAndDeleteSlots(&new_factors_tmp, &delete_slots,
+                                   &lmk_ids_of_new_smart_factors_tmp);
 
   // Use current timestamp for each new value. This timestamp will be used
   // to determine if the variable should be marginalized.
@@ -1127,8 +1337,6 @@ void SlidingWindowSmoother::optimize(size_t /*numIter*/, size_t /*numThreads*/,
     timestamps[key_value.key] = currentTimeSecs;
   }
 
-  gtsam::FactorIndices delete_slots;
-
   isam2UpdateTimer.start();
 //  LOG(INFO) << "iSAM2 update with " << new_factors_tmp.size() << " new factors"
 //           << ", " << new_values_.size() << " new values"
@@ -1139,6 +1347,7 @@ void SlidingWindowSmoother::optimize(size_t /*numIter*/, size_t /*numThreads*/,
 
   if (is_smoother_ok) {
     // Reset everything for next round.
+    new_smart_factors_.clear();
     new_reprojection_factors_.resize(0);
 
     // Reset list of new imu, prior and other factors to be added.
@@ -1146,6 +1355,14 @@ void SlidingWindowSmoother::optimize(size_t /*numIter*/, size_t /*numThreads*/,
 
     new_values_.clear();
 
+#ifdef INCREMENTAL_SMOOTHER
+    updateNewSmartFactorsSlots(lmk_ids_of_new_smart_factors_tmp,
+                               &old_smart_factors_);
+#else
+    if (backendParams_.backendModality_ == BackendModality::STRUCTURELESS) {
+      throw std::runtime_error("Updating smart factor indices has not been implemented!");
+    }
+#endif
     // Do some more optimization iterations.
     for (int n_iter = 1; n_iter < backendParams_.numOptimize_ && is_smoother_ok;
          ++n_iter) {
@@ -1255,7 +1472,7 @@ bool SlidingWindowSmoother::gtsamJointMarginalCovariance(
 }
 
 void printSmartFactor(
-    boost::shared_ptr<SmartStereoFactor> gsf) {
+    boost::shared_ptr<gtsam::SmartProjectionPoseFactor<gtsam::Cal3DS2>> gsf) {
   CHECK(gsf);
   std::cout << "Smart Factor (valid: " << (gsf->isValid() ? "yes" : "NO!")
             << ", deg: " << (gsf->isDegenerate() ? "YES!" : "no")
@@ -1303,7 +1520,7 @@ void printSelectedFactors(
   }
 
   if (print_smart_factors) {
-    const auto& gsf = boost::dynamic_pointer_cast<SmartStereoFactor>(g);
+    const auto& gsf = boost::dynamic_pointer_cast<gtsam::SmartProjectionPoseFactor<gtsam::Cal3DS2>>(g);
     if (gsf) {
       std::cout << "\tSlot # " << slot << ": ";
       printSmartFactor(gsf);
@@ -1525,7 +1742,6 @@ void SlidingWindowSmoother::cleanCheiralityLmk(
   VLOG(10) << "Finished delete from feature tracks.";
 }
 
-
 // Returns if the key in feature tracks could be removed or not.
 bool SlidingWindowSmoother::deleteLmkFromFeatureTracks(uint64_t lmkId) {
   auto pit = landmarksMap_.find(lmkId);
@@ -1570,7 +1786,7 @@ void deleteAllFactorsWithKeyFromFactorGraph(
         // We are not deleting a smart factor right?
         // Otherwise we need to update structure:
         // lmk_ids_of_new_smart_factors...
-        CHECK(!boost::dynamic_pointer_cast<SmartStereoFactor>(*it));
+        CHECK(!boost::dynamic_pointer_cast<gtsam::SmartProjectionPoseFactor<gtsam::Cal3DS2>>(*it));
         // Whatever factor this is, it has our lmk...
         // Delete it.
         LOG(WARNING) << "Delete factor in new_factors at slot # "
@@ -1643,7 +1859,7 @@ void findSlotsOfFactorsWithKey(
         CHECK(
             !boost::dynamic_pointer_cast<gtsam::PriorFactor<gtsam::Point3>>(g));
         // Sanity check that we are not deleting a smart factor.
-        CHECK(!boost::dynamic_pointer_cast<SmartStereoFactor>(g));
+        CHECK(!boost::dynamic_pointer_cast<gtsam::SmartProjectionPoseFactor<gtsam::Cal3DS2>>(g));
         // Delete it.
         LOG(WARNING) << "Delete factor in graph at slot # " << slot
                      << " corresponding to lmk with id: "
@@ -1661,6 +1877,218 @@ bool SlidingWindowSmoother::print(std::ostream& stream) const {
   Eigen::Matrix<double, Eigen::Dynamic, 1> variances = covariance_.diagonal();
   stream << " " << variances.cwiseSqrt().transpose().format(kSpaceInitFmt);
   return true;
+}
+
+// BOOKKEEPING: updates the SlotIdx in the old_smart_factors such that
+// this idx points to the updated slots in the graph after optimization.
+// for next iteration to know which slots have to be deleted
+// before adding the new smart factors.
+void SlidingWindowSmoother::updateNewSmartFactorsSlots(
+    const std::vector<LandmarkId>& lmk_ids_of_new_smart_factors,
+    SmartFactorMap* old_smart_factors) {
+  const gtsam::ISAM2Result& result = smoother_->getISAM2Result();
+
+  // Simple version of find smart factors.
+  for (size_t i = 0u; i < lmk_ids_of_new_smart_factors.size(); ++i) {
+    DCHECK(i < result.newFactorsIndices.size())
+        << "There are more new smart factors than new factors added to the "
+           "graph.";
+    // Get new slot in the graph for the newly added smart factor.
+    const size_t& slot = result.newFactorsIndices.at(i);
+
+    // TODO this will not work if there are non-smart factors!!!
+    // Update slot using isam2 indices.
+    // ORDER of inclusion of factors in the ISAM2::update() function
+    // matters, as these indices have a 1-to-1 correspondence with the
+    // factors.
+
+    // BOOKKEEPING, for next iteration to know which slots have to be
+    // deleted before adding the new smart factors. Find the entry in
+    // old_smart_factors_.
+    SmartFactorMap::iterator it =
+        old_smart_factors->find(lmk_ids_of_new_smart_factors.at(i));
+
+    DCHECK(it != old_smart_factors->end())
+        << "Trying to access unavailable factor.";
+    const gtsam::NonlinearFactorGraph& graph = smoother_->getFactors();
+    auto factor = boost::dynamic_pointer_cast<
+        gtsam::SmartProjectionPoseFactor<gtsam::Cal3DS2>>(graph.at(slot));
+    if (factor) {
+      // CHECK that shared ptrs point to the same smart factor.
+      // make sure no one is cloning SmartSteroFactors.
+      DCHECK_EQ(it->second.first, factor)
+          << "Non-matching addresses for same factors for lmk with id: "
+          << lmk_ids_of_new_smart_factors.at(i) << " in old_smart_factors_ "
+          << "VS factor in graph at slot: " << slot
+          << ". Slot previous to update was: " << it->second.second;
+
+      // Update slot number in old_smart_factors_.
+      it->second.second = slot;
+    } else {
+      gtsam::SmartProjectionPoseFactor<gtsam::Cal3DS2>::shared_ptr oldfactor =
+          it->second.first;
+      uint64_t frameId = gtsam::Symbol(oldfactor->keys().front()).index();
+      LOG(WARNING) << "The smart factor for landmark "
+                   << lmk_ids_of_new_smart_factors.at(i)
+                   << " of the first pose " << frameId
+                   << " has probably been marginalized!";
+    }
+  }
+}
+
+PointsWithIdMap SlidingWindowSmoother::getMapLmkIdsTo3dPointsInTimeHorizon(
+    LmkIdToLmkTypeMap* lmk_id_to_lmk_type_map,
+    const size_t& min_age) const {
+  PointsWithIdMap points_with_id;
+
+  if (lmk_id_to_lmk_type_map) {
+    lmk_id_to_lmk_type_map->clear();
+  }
+
+  // Step 1:
+  /////////////// Add landmarks encoded in the smart factors. //////////////////
+  const gtsam::NonlinearFactorGraph& graph = smoother_->getFactors();
+
+  // old_smart_factors_ has all smart factors included so far.
+  // Retrieve lmk ids from smart factors in state.
+  size_t nr_valid_smart_lmks = 0, nr_smart_lmks = 0, nr_proj_lmks = 0;
+  for (SmartFactorMap::const_iterator old_smart_factor_it =
+           old_smart_factors_.begin();
+       old_smart_factor_it !=
+       old_smart_factors_
+           .end();) {  //!< landmarkId -> {SmartFactorPtr, SlotIndex}
+    // Store number of smart lmks (one smart factor per landmark).
+    nr_smart_lmks++;
+
+    // Retrieve lmk_id of the smart factor.
+    const LandmarkId& lmk_id = old_smart_factor_it->first;
+
+    // Retrieve smart factor.
+    const gtsam::SmartProjectionPoseFactor<gtsam::Cal3DS2>::shared_ptr& smart_factor_ptr =
+        old_smart_factor_it->second.first;
+    // Check that pointer is well definied.
+    CHECK(smart_factor_ptr) << "Smart factor is not well defined.";
+
+    // Retrieve smart factor slot in the graph.
+    const Slot& slot_id = old_smart_factor_it->second.second;
+
+    // Check that slot is admissible.
+    // Slot should be positive.
+    DCHECK(slot_id >= 0) << "Slot of smart factor is not admissible.";
+    // Ensure the graph size is small enough to cast to int.
+    DCHECK_LT(graph.size(), std::numeric_limits<Slot>::max())
+        << "Invalid cast, that would cause an overflow!";
+    // Slot should be inferior to the size of the graph.
+    DCHECK_LT(slot_id, static_cast<Slot>(graph.size()));
+
+    // Check that this slot_id exists in the graph, aka check that it is
+    // in bounds and that the pointer is live (aka at(slot_id) works).
+    if (!graph.exists(slot_id)) {
+      // This slot does not exist in the current graph...
+      LOG(WARNING)
+          << "The slot with id: " << slot_id
+          << " does not exist in the graph.\n"
+          << "This should not happen because we purge old_smart_factors!";
+      ++old_smart_factor_it;
+      continue;
+    }
+
+    // Check that the pointer smart_factor_ptr points to the right element
+    // in the graph.
+    if (smart_factor_ptr != graph.at(slot_id)) {
+      // Pointer in the graph does not match
+      // the one we stored in old_smart_factors_
+      // ERROR: if the pointers don't match, then the code that follows does
+      // not make any sense, since we are using lmk_id which comes from
+      // smart_factor and result which comes from graph[slot_id], we should
+      // use smart_factor_ptr instead then...
+      LOG(WARNING) << "The factor with slot id: " << slot_id
+                 << " in the graph does not match the old_smart_factor of "
+                 << "lmk with id: " << lmk_id << "\n."
+                 << "Deleting old_smart_factor of lmk id: " << lmk_id
+                 << "\nThis should not happen because we purge old_smart_factors!";
+      ++old_smart_factor_it;
+      continue;
+    }
+
+    // Why do we do this? all info is in smart_factor_ptr
+    // such as the triangulated point, whether it is valid or not
+    // and the number of observations...
+    // Is graph more up to date?
+    boost::shared_ptr<gtsam::SmartProjectionPoseFactor<gtsam::Cal3DS2>> gsf =
+        boost::dynamic_pointer_cast<gtsam::SmartProjectionPoseFactor<gtsam::Cal3DS2>>(graph.at(slot_id));
+    CHECK(gsf) << "Cannot cast factor in graph to a smart stereo factor.";
+
+    // Get triangulation result from smart factor.
+    const gtsam::TriangulationResult& result = gsf->point();
+    // Check that the boost::optional result is initialized.
+    // Otherwise we will be dereferencing a nullptr and we will head
+    // directly to undefined behaviour wonderland.
+    if (result.is_initialized()) {
+      if (result.valid()) {
+        if (gsf->measured().size() >= min_age) {
+          // Triangulation result from smart factor is valid and
+          // we have observed the lmk at least min_age times.
+          VLOG(20) << "Adding lmk with id: " << lmk_id
+                   << " to list of lmks in time horizon";
+          // Check that we have not added this lmk already...
+          CHECK(points_with_id.find(lmk_id) == points_with_id.end());
+          points_with_id[lmk_id] = *result;
+          if (lmk_id_to_lmk_type_map) {
+            (*lmk_id_to_lmk_type_map)[lmk_id] = LandmarkType::SMART;
+          }
+          nr_valid_smart_lmks++;
+        } else {
+          VLOG(20) << "Rejecting lmk with id: " << lmk_id
+                   << " from list of lmks in time horizon: "
+                   << "not enough measurements, " << gsf->measured().size()
+                   << ", vs min_age of " << min_age << ".";
+        }  // gsf->measured().size() >= min_age ?
+      } else {
+        VLOG(20) << "Rejecting lmk with id: " << lmk_id
+                 << " from list of lmks in time horizon:\n"
+                 << "triangulation result is not valid (result= {" << result
+                 << "}).";
+      }  // result.valid()?
+    } else {
+      VLOG(20) << "Triangulation result for smart factor of lmk with id "
+               << lmk_id << " is not initialized...";
+    }  // result.is_initialized()?
+
+    // Next iteration.
+    old_smart_factor_it++;
+  }
+
+  // Step 2:
+  ////////////// Add landmarks that now are in projection factors. /////////////
+  for (const gtsam::Values::Filtered<gtsam::Value>::ConstKeyValuePair&
+           key_value : state_.filter(gtsam::Symbol::ChrTest('l'))) {
+    DCHECK_EQ(gtsam::Symbol(key_value.key).chr(), 'l');
+    const LandmarkId& lmk_id = gtsam::Symbol(key_value.key).index();
+    DCHECK(points_with_id.find(lmk_id) == points_with_id.end());
+    points_with_id[lmk_id] = key_value.value.cast<gtsam::Point3>();
+    if (lmk_id_to_lmk_type_map) {
+      (*lmk_id_to_lmk_type_map)[lmk_id] = LandmarkType::PROJECTION;
+    }
+    nr_proj_lmks++;
+  }
+
+  // TODO aren't these points post-optimization? Shouldn't we instead add
+  // the points before optimization? Then the regularities we enforce will
+  // have the most impact, otherwise the points in the optimization horizon
+  // do not move that much after optimizing... they are almost frozen and
+  // are not visually changing much...
+  // They might actually not be changing that much because we are not
+  // enforcing the regularities on the points that are out of current frame
+  // in the backend currently...
+
+  VLOG(10) << "Landmark typology to be used for the mesh:\n"
+           << "Number of valid smart factors " << nr_valid_smart_lmks
+           << " out of " << nr_smart_lmks << "\n"
+           << "Number of landmarks (not involved in a smart factor) "
+           << nr_proj_lmks << ".\n Total number of landmarks: "
+           << (nr_valid_smart_lmks + nr_proj_lmks);
+  return points_with_id;
 }
 
 }  // namespace okvis

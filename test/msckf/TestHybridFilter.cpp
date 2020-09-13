@@ -6,6 +6,8 @@
 
 #include <vio/Sample.h>
 
+#include <gtsam/VioBackEndParams.h>
+
 #include <io_wrap/StreamHelper.hpp>
 
 #include <okvis/IdProvider.hpp>
@@ -317,10 +319,10 @@ std::string cameraOrientationIdToShorthand(
  * @param trajLabel The trajectory name must be one of the predefined ones.
  * @param numRuns repetition of the same test.
  */
-void testHybridFilterSinusoid(const okvis::TestSetting& testSetting,
-                              const std::string& outputPath,
-                              std::string estimatorLabel, std::string trajLabel,
-                              int numRuns) {
+void testHybridFilterSinusoid(
+    const okvis::TestSetting& testSetting, const std::string& outputPath,
+    std::string estimatorLabel, std::string trajLabel, int numRuns,
+    const okvis::BackendParams& backendParams = okvis::BackendParams()) {
   okvis::EstimatorAlgorithm estimatorAlgorithm = testSetting.estimator_algorithm;
 
   // definition of NEES in Huang et al. 2007 Generalized Analysis and
@@ -401,7 +403,7 @@ void testHybridFilterSinusoid(const okvis::TestSetting& testSetting,
 
     simul::SimulatedTrajectoryType trajectoryId =
         simul::trajectoryLabelToId.find(trajLabel)->second;
-    vioSystemBuilder.createVioSystem(testSetting, trajectoryId,
+    vioSystemBuilder.createVioSystem(testSetting, backendParams, trajectoryId,
                                      projOptModelName, extrinsicModelName,
                                      timeOffset, readoutTime,
                                      bVerbose ? imuSampleFile : "",
@@ -842,8 +844,10 @@ TEST(RiSlidingWindowSmoother, TrajectoryLabel) {
       cameraObservationModelId, landmarkModelId,
       simul::SimCameraModelType::EUROC, simul::CameraOrientation::Forward,
       okvis::LandmarkGridType::FourWalls, landmarkRadius);
+  okvis::BackendParams backendParams;
+  backendParams.backendModality_ = okvis::BackendModality::PROJECTION;
   testHybridFilterSinusoid(testSetting, FLAGS_log_dir, "RiSlidingWindowSmoother",
-                           FLAGS_sim_trajectory_label, FLAGS_num_runs);
+                           FLAGS_sim_trajectory_label, FLAGS_num_runs, backendParams);
 }
 
 TEST(ConsistentEstimator, TrajectoryLabel) {

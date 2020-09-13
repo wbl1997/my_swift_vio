@@ -22,6 +22,7 @@ DEFINE_bool(zero_imu_intrinsic_param_noise, true,
 namespace simul {
 void VioTestSystemBuilder::createVioSystem(
     const okvis::TestSetting& testSetting,
+    const okvis::BackendParams& backendParams,
     SimulatedTrajectoryType trajectoryType,
     std::string projOptModelName,
     std::string extrinsicModelName,
@@ -178,7 +179,7 @@ void VioTestSystemBuilder::createVioSystem(
     csc.createNominalCameraSystem(&cameraGeometry2, &cameraSystem2);
   }
   distortionType_ = cameraSystem2->cameraGeometry(0)->distortionType();
-  okvis::BackendParams backendParams;
+
   estimator = msckf::createBackend(testSetting.estimator_algorithm,
                                    backendParams, mapPtr);
 
