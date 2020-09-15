@@ -489,7 +489,9 @@ TEST(RiSmartProjectionFactor, approximateErrorByHessianAndInfoVectorInf) {
       delta.transpose() * expectedInfoVector;
   double expectedDelta = expectedDeltaEigen(0, 0);
   double actualDelta = perturbedError - error;
-  EXPECT_LT(std::fabs(expectedDelta - actualDelta), 5e-4);
+  EXPECT_LT(std::fabs(expectedDelta - actualDelta), 5e-4)
+      << "Expected from Hessian " << expectedDelta << " Actual by projection "
+      << actualDelta;
 }
 
 /* *************************************************************************/
@@ -564,31 +566,41 @@ TEST(RiSmartProjectionFactor, computeImplicitJacobian) {
   Matrix expectedE;
   Vector expectedb;
 
-  AlignedVector<RiExtendedPose3> cameras;
-  cameras.emplace_back(level_camera.pose().rotation(), gtsam::Point3(), level_camera.pose().translation());
-  cameras.emplace_back(level_camera_right.pose().rotation(), gtsam::Point3(), level_camera_right.pose().translation());
+  AlignedVector<RiExtendedPose3> stateList;
+  stateList.emplace_back(T_WB1.rotation(), gtsam::Point3(), T_WB1.translation());
+  stateList.emplace_back(T_WB2.rotation(), gtsam::Point3(), T_WB2.translation());
 
   factor1->error(
       values);  // this is important to have a triangulation of the point
   Point3 point(0, 0, 0);
   if (factor1->point()) point = *(factor1->point());
+  Eigen::Vector3d pC = level_pose.transformTo(point);
+  double zinv = 1.0 / pC[2];
+  Eigen::Vector3d abrho(pC[0] * zinv, pC[1] * zinv, zinv);
+
   Matrix Fs;
-  factor1->computeJacobians(Fs, expectedE, expectedb, cameras, point.vector());
+  factor1->computeJacobians(Fs, expectedE, expectedb, stateList, abrho);
+  Matrix3 expectedVinv = factor1->PointCov(expectedE);
 
   NonlinearFactorGraph generalGraph;
-  SFMFactor sfm1(level_uv, unit2, c1, l1);
-  SFMFactor sfm2(level_uv_right, unit2, c2, l1);
+  okvis::kinematics::Transformation T_BC(body_P_sensor.translation(), body_P_sensor.rotation().toQuaternion());
+  RiProjectionFactorIDPAnchor sfm1(l1, Eigen::Vector2d(1.0, 1.0), level_uv, cameraGeometry, T_BC, T_BC);
+  RiProjectionFactorIDP sfm2(c2, c1, l1, Eigen::Vector2d(1.0, 1.0), level_uv_right, cameraGeometry, T_BC, T_BC);
   generalGraph.push_back(sfm1);
   generalGraph.push_back(sfm2);
-  Values gtsamValues;
-  gtsamValues.insert(c1, level_camera);
-  gtsamValues.insert(c2, level_camera_right);
-  gtsamValues.insert(
-      l1, point);  // note: we get rid of possible errors in the triangulation
-  Matrix actualFullHessian = generalGraph.linearize(gtsamValues)->hessian().first;
+  gtsam::Point3 abrhoValue(abrho);
+  values.insert(l1, abrhoValue);  // note: we get rid of possible errors in
+                                     // the triangulation
+  Eigen::Vector2d error1 = sfm1.evaluateError(abrho);
+  Eigen::Vector2d error2 = sfm2.evaluateError(
+      RiExtendedPose3(T_WB2.rotation(), gtsam::Point3(), T_WB2.translation()),
+      RiExtendedPose3(T_WB1.rotation(), gtsam::Point3(), T_WB1.translation()),
+      abrho);
+  EXPECT_LT(error1.lpNorm<Eigen::Infinity>(), 1e-7);
+  EXPECT_LT(error2.lpNorm<Eigen::Infinity>(), 1e-7);
+  Matrix actualFullHessian = generalGraph.linearize(values)->hessian().first;
   Matrix actualVinv = (actualFullHessian.block(18, 18, 3, 3)).inverse();
 
-  Matrix3 expectedVinv = factor1->PointCov(expectedE);
   EXPECT_TRUE(assert_equal(expectedVinv, actualVinv, 1e-7));
 }
 
