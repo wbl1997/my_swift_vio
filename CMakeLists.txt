@@ -374,6 +374,7 @@ list(APPEND TEST_SRC_FILES
     test/gtsam/TestRiExtendedPose3Prior.cpp
     test/gtsam/TestRiImuFactor.cpp
     test/gtsam/TestRiProjectionFactorIDP.cpp
+    test/gtsam/TestRiSmartProjectionFactor.cpp
     test/gtsam/TestRiTransformPointJacobian.cpp
     test/loop_closure/TestGtsamBetweenFactor.cpp
     test/loop_closure/TestLoopClosureMethod.cpp
