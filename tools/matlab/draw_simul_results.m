@@ -37,20 +37,24 @@ figure;
 index = 19:21;
 drawColumnsInFile(est_file, index, 0, ...
     1, {'r', 'g', 'b'});
-legend('p_x', 'p_y', 'p_z');
+legend('$\mathbf{p}_x (m)$', '$\mathbf{p}_y (m)$', '$\mathbf{p}_z (m)$', ...
+    'Interpreter', 'latex');
 
 figure;
 index = 22:24;
+scale = 180 / pi;
 drawColumnsInFile(est_file, index, 0, ...
-    1, {'r', 'g', 'b'});
-legend('\theta_x', '\theta_y', '\theta_z');
+    scale, {'r', 'g', 'b'});
+legend('$\mbox{\boldmath$\theta$}_x (^{\circ})$', ...
+    '$\mbox{\boldmath$\theta$}_y (^{\circ})$', ...
+    '$\mbox{\boldmath$\theta$}_z (^{\circ})$', 'Interpreter', 'latex');
 
 figure;
 index = 25:27;
 drawColumnsInFile(est_file, index, 0, ...
     1, {'r', 'g', 'b'});
-legend('v_x', 'v_y', 'v_z');
-
+legend('$\mathbf{v}_x (m/s)$', '$\mathbf{v}_y (m/s)$', ...
+    '$\mathbf{v}_z (m/s)$', 'Interpreter', 'latex');
 end
 
 function traj_name = find_traj_name(name_est)
