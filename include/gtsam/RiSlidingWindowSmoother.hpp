@@ -57,6 +57,21 @@ class RiSlidingWindowSmoother : public SlidingWindowSmoother {
    */
   void updateLandmarkInGraph(uint64_t landmarkId) override;
 
+
+  /**
+   * @brief addLandmarkSmartFactorToGraph Adds the smart factor of a landmark to
+   * the graph for the first time.
+   * @param lm_id
+   */
+  void addLandmarkSmartFactorToGraph(const LandmarkId& lm_id) final;
+
+  /**
+   * @brief updateLandmarkSmartFactorInGraph: Update the smart factor for
+   * a landmark already in the graph.
+   * @param lmk_id
+   */
+  void updateLandmarkSmartFactorInGraph(const LandmarkId& lmk_id) final;
+
   /**
    * @brief update state variables with FixedLagSmoother estimates.
    */

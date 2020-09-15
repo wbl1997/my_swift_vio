@@ -7,7 +7,7 @@
 
 #pragma once
 
-#include <gtsam/slam/SmartFactorBase.h>
+#include <gtsam/slam/SmartProjectionFactor.h>
 #include <gtsam/slam/SmartFactorParams.h>
 
 #include <gtsam/geometry/triangulation.h>
@@ -33,7 +33,7 @@ namespace gtsam {
  * The calibration is fixed and assumed to be the same for all observations.
  */
 template<class CALIBRATION>
-class RiSmartProjectionFactor: public SmartFactorBase<PinholePose<CALIBRATION> > {
+class RiSmartProjectionFactor: public SmartProjectionFactor<PinholePose<CALIBRATION> > {
 
 public:
   enum {
@@ -42,9 +42,8 @@ public:
   };
 private:
   typedef PinholePose<CALIBRATION> CAMERA;
-  typedef SmartFactorBase<CAMERA> Base;
+  typedef SmartProjectionFactor<CAMERA> Base;
   typedef RiSmartProjectionFactor<CALIBRATION> This;
-  typedef RiSmartProjectionFactor<CALIBRATION> SmartProjectionCameraFactor;
 
 protected:
 
@@ -90,11 +89,12 @@ public:
       const boost::shared_ptr<CALIBRATION> K,
       std::shared_ptr<const okvis::cameras::CameraBase> cameraGeometry,
       const SmartProjectionParams& params = SmartProjectionParams())
-      : Base(sharedNoiseModel, body_P_sensor),
+      : Base(sharedNoiseModel, params),
         K_(K),
         cameraGeometry_(cameraGeometry),
         params_(params),
         result_(TriangulationResult::Degenerate()), anchorIndex_(-1) {
+    Base::body_P_sensor_ = body_P_sensor;
   }
 
   /** Virtual destructor */
@@ -512,7 +512,7 @@ public:
       Eigen::Vector3d rayxy1;
       cameraGeometry_->backProject(Base::measured_.at(anchorIndex_), &rayxy1);
       Unit3 backprojected(cameras.at(anchorIndex_).rotation().rotate(rayxy1));
-      return Base::totalReprojectionError(cameras, backprojected);
+      return SmartFactorBase<CAMERA>::totalReprojectionError(cameras, backprojected);
     } else
       // if we don't want to manage the exceptions we discard the factor
       return 0.0;

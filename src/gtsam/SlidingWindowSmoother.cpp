@@ -65,7 +65,7 @@ void setIsam2Params(const okvis::BackendParams& vio_params,
     gauss_newton_params.wildfireThreshold = vio_params.wildfire_threshold_;
     isam_param->optimizationParams = gauss_newton_params;
   }
-
+  LOG(INFO) << "Backend modality " << (int)vio_params.backendModality_;
   // Cache Linearized Factors seems to improve performance.
   isam_param->setCacheLinearizedFactors(true);
   isam_param->relinearizeThreshold = vio_params.relinearizeThreshold_;
@@ -623,8 +623,7 @@ bool SlidingWindowSmoother::applyMarginalizationStrategy(
 
     // Check that the pointer smart_factor_ptr points to the right element
     // in the graph.
-    const gtsam::SmartProjectionPoseFactor<gtsam::Cal3DS2>::shared_ptr smart_factor_ptr =
-        old_smart_factor_it->second.first;
+    auto smart_factor_ptr = old_smart_factor_it->second.first;
     if (smart_factor_ptr != graph.at(slot_id)) {
       // Pointer in the graph does not match
       // the one we stored in old_smart_factors_
@@ -858,8 +857,10 @@ void SlidingWindowSmoother::updateLandmarkSmartFactorInGraph(
   auto old_smart_factors_it = old_smart_factors_.find(lmkId);
   CHECK(old_smart_factors_it != old_smart_factors_.end())
       << "Landmark not found in old_smart_factors_ with id: " << lmkId;
-  const gtsam::SmartProjectionPoseFactor<gtsam::Cal3DS2>::shared_ptr&
-      old_factor = old_smart_factors_it->second.first;
+  const gtsam::SmartProjectionPoseFactor<gtsam::Cal3DS2>::shared_ptr
+      old_factor = boost::static_pointer_cast<
+          gtsam::SmartProjectionPoseFactor<gtsam::Cal3DS2>>(
+          old_smart_factors_it->second.first);
   // Clone old factor to keep all previous measurements, now append one.
   gtsam::SmartProjectionPoseFactor<gtsam::Cal3DS2>::shared_ptr new_factor =
       boost::make_shared<gtsam::SmartProjectionPoseFactor<gtsam::Cal3DS2>>(
@@ -1940,8 +1941,7 @@ void SlidingWindowSmoother::updateNewSmartFactorsSlots(
       // Update slot number in old_smart_factors_.
       it->second.second = slot;
     } else {
-      gtsam::SmartProjectionPoseFactor<gtsam::Cal3DS2>::shared_ptr oldfactor =
-          it->second.first;
+      auto oldfactor = it->second.first;
       uint64_t frameId = gtsam::Symbol(oldfactor->keys().front()).index();
       OKVIS_ASSERT_LT(Exception, frameId, statesMap_.rbegin()->first,
                       "If a smart factor of landmark "
@@ -1971,9 +1971,7 @@ PointsWithIdMap SlidingWindowSmoother::getMapLmkIdsTo3dPointsInTimeHorizon(
   size_t nr_valid_smart_lmks = 0, nr_smart_lmks = 0, nr_proj_lmks = 0;
   for (SmartFactorMap::const_iterator old_smart_factor_it =
            old_smart_factors_.begin();
-       old_smart_factor_it !=
-       old_smart_factors_
-           .end();) {  //!< landmarkId -> {SmartFactorPtr, SlotIndex}
+       old_smart_factor_it != old_smart_factors_.end();) {  //!< landmarkId -> {SmartFactorPtr, SlotIndex}
     // Store number of smart lmks (one smart factor per landmark).
     nr_smart_lmks++;
 
@@ -1981,7 +1979,8 @@ PointsWithIdMap SlidingWindowSmoother::getMapLmkIdsTo3dPointsInTimeHorizon(
     const LandmarkId& lmk_id = old_smart_factor_it->first;
 
     // Retrieve smart factor.
-    const gtsam::SmartProjectionPoseFactor<gtsam::Cal3DS2>::shared_ptr& smart_factor_ptr =
+    const gtsam::SmartProjectionFactor<
+        gtsam::PinholePose<gtsam::Cal3DS2>>::shared_ptr smart_factor_ptr =
         old_smart_factor_it->second.first;
     // Check that pointer is well definied.
     CHECK(smart_factor_ptr) << "Smart factor is not well defined.";
@@ -2032,8 +2031,11 @@ PointsWithIdMap SlidingWindowSmoother::getMapLmkIdsTo3dPointsInTimeHorizon(
     // such as the triangulated point, whether it is valid or not
     // and the number of observations...
     // Is graph more up to date?
-    boost::shared_ptr<gtsam::SmartProjectionPoseFactor<gtsam::Cal3DS2>> gsf =
-        boost::dynamic_pointer_cast<gtsam::SmartProjectionPoseFactor<gtsam::Cal3DS2>>(graph.at(slot_id));
+    boost::shared_ptr<
+        gtsam::SmartProjectionFactor<gtsam::PinholePose<gtsam::Cal3DS2>>>
+        gsf = boost::dynamic_pointer_cast<
+            gtsam::SmartProjectionFactor<gtsam::PinholePose<gtsam::Cal3DS2>>>(
+            graph.at(slot_id));
     CHECK(gsf) << "Cannot cast factor in graph to a smart stereo factor.";
 
     // Get triangulation result from smart factor.

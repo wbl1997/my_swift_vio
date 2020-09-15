@@ -16,6 +16,7 @@
 #include <gtsam/RiImuFactor.h>
 #include <gtsam/RiProjectionFactorIDP.h>
 #include <gtsam/RiProjectionFactorIDPAnchor.h>
+#include <gtsam/RiSmartProjectionFactor.h>
 
 #include <loop_closure/GtsamWrap.hpp>
 
@@ -282,6 +283,100 @@ void RiSlidingWindowSmoother::updateLandmarkInGraph(uint64_t lmkId) {
         camera_rig_.getCameraExtrinsic(0));
   }
   new_reprojection_factors_.add(factor);
+}
+
+
+void RiSlidingWindowSmoother::addLandmarkSmartFactorToGraph(const LandmarkId& lmkId) {
+  uint64_t minValidStateId = statesMap_.begin()->first;
+  okvis::MapPoint& mp = landmarksMap_.at(lmkId);
+  auto obsIt = mp.observations.lower_bound(okvis::KeypointIdentifier(minValidStateId, 0u, 0u));
+  size_t numValidObs = std::distance(obsIt, mp.observations.end());
+  if (numValidObs < minTrackLength_) {
+      return;
+  }
+  std::shared_ptr<okvis::ceres::HomogeneousPointParameterBlock>
+      pointParameterBlock(
+          new okvis::ceres::HomogeneousPointParameterBlock(mp.pointHomog, lmkId));
+  mapPtr_->addParameterBlock(pointParameterBlock,
+                             okvis::ceres::Map::HomogeneousPoint);
+  // addParameterBlock may fail when a landmark moves out of the smoother's
+  // horizon and then reappears.
+
+  gtsam::RiSmartProjectionFactor<gtsam::Cal3DS2>::shared_ptr new_factor =
+      boost::make_shared<gtsam::RiSmartProjectionFactor<gtsam::Cal3DS2>>(
+          smart_noise_, body_P_cam0_, cal0_, camera_rig_.getCameraGeometry(0),
+          smart_factors_params_);
+
+  IsObservedInFrame lastImageId(0u, 0u);
+  for (std::map<okvis::KeypointIdentifier, uint64_t>::const_iterator obsIter =
+           mp.observations.begin();
+       obsIter != mp.observations.end(); ++obsIter) {
+    if (obsIter->first.frameId < minValidStateId) {
+      // Some observations may be outside the horizon.
+      continue;
+    }
+    if (lastImageId(*obsIter)) {
+      //      LOG(WARNING) << "okvis frontend may associate one landmark two
+      //      observations in the same image!";
+      continue;
+    }
+    // get the keypoint measurement
+    okvis::MultiFramePtr multiFramePtr =
+        multiFramePtrMap_.at(obsIter->first.frameId);
+    Eigen::Vector2d measurement;
+    multiFramePtr->getKeypoint(obsIter->first.cameraIndex,
+                               obsIter->first.keypointIndex, measurement);
+
+    new_factor->add(measurement, gtsam::Symbol('x', obsIter->first.frameId));
+    lastImageId =
+        IsObservedInFrame(obsIter->first.frameId, obsIter->first.cameraIndex);
+  }
+  mp.residualizeCase = InState_TrackedNow;
+  new_factor->setAnchorIndex(new_factor->keys().size() - 1);
+
+  new_smart_factors_.emplace(lmkId, new_factor);
+  old_smart_factors_.emplace(lmkId, std::make_pair(new_factor, -1));
+}
+
+void RiSlidingWindowSmoother::updateLandmarkSmartFactorInGraph(
+    const LandmarkId& lmkId) {
+  const okvis::MapPoint& mp = landmarksMap_.at(lmkId);
+  auto obsIter = mp.observations.rbegin();
+  OKVIS_ASSERT_EQ(Exception, obsIter->first.frameId, statesMap_.rbegin()->first,
+                  "Only update landmarks observed in the current frame.");
+
+  // get the keypoint measurement.
+  okvis::MultiFramePtr multiFramePtr =
+      multiFramePtrMap_.at(obsIter->first.frameId);
+  Eigen::Vector2d measurement;
+  multiFramePtr->getKeypoint(obsIter->first.cameraIndex,
+                             obsIter->first.keypointIndex, measurement);
+
+  // Update existing smart-factor
+  auto old_smart_factors_it = old_smart_factors_.find(lmkId);
+  CHECK(old_smart_factors_it != old_smart_factors_.end())
+      << "Landmark not found in old_smart_factors_ with id: " << lmkId;
+  const gtsam::RiSmartProjectionFactor<gtsam::Cal3DS2>::shared_ptr old_factor =
+      boost::static_pointer_cast<
+          gtsam::RiSmartProjectionFactor<gtsam::Cal3DS2>>(
+          old_smart_factors_it->second.first);
+  // Clone old factor to keep all previous measurements, now append one.
+  gtsam::RiSmartProjectionFactor<gtsam::Cal3DS2>::shared_ptr new_factor =
+      boost::make_shared<gtsam::RiSmartProjectionFactor<gtsam::Cal3DS2>>(
+          *old_factor);
+  new_factor->add(measurement, gtsam::Symbol('x', obsIter->first.frameId));
+
+  // Update the factor
+  Slot slot = old_smart_factors_it->second.second;
+  if (slot != -1) {
+    new_smart_factors_.emplace(lmkId, new_factor);
+  } else {
+    LOG(FATAL)
+        << "If its slot in the graph is still -1, it means that the factor has "
+           "not been inserted yet in the graph! Offensive lmk_id: "
+        << lmkId;
+  }
+  old_smart_factors_it->second.first = new_factor;
 }
 
 void RiSlidingWindowSmoother::updateStates() {

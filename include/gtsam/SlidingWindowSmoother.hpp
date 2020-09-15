@@ -39,12 +39,13 @@ typedef gtsam::BatchFixedLagSmoother Smoother;
 
 using LandmarkId = uint64_t;
 using LandmarkIdSmartFactorMap = std::unordered_map<
-    LandmarkId, gtsam::SmartProjectionPoseFactor<gtsam::Cal3DS2>::shared_ptr>;
+    LandmarkId,
+    gtsam::SmartProjectionFactor<gtsam::PinholePose<gtsam::Cal3DS2>>::shared_ptr>;
 using Slot = long int;
 using SmartFactorMap = gtsam::FastMap<
-    LandmarkId,
-    std::pair<gtsam::SmartProjectionPoseFactor<gtsam::Cal3DS2>::shared_ptr,
-              Slot>>;
+    LandmarkId, std::pair<gtsam::SmartProjectionFactor<
+                              gtsam::PinholePose<gtsam::Cal3DS2>>::shared_ptr,
+                          Slot>>;
 using PointsWithIdMap = std::unordered_map<LandmarkId, gtsam::Point3>;
 enum class LandmarkType { SMART = 0, PROJECTION };
 using LmkIdToLmkTypeMap = std::unordered_map<LandmarkId, LandmarkType>;
