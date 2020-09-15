@@ -170,12 +170,17 @@ bool RiSlidingWindowSmoother::addLandmarkToGraph(
 
   uint64_t minValidStateId = statesMap_.begin()->first;
   okvis::MapPoint& mp = landmarksMap_.at(lmkId);
-
+  IsObservedInFrame lastImageId(0u, 0u);
   for (auto obsIter = mp.observations.rbegin();
        obsIter != mp.observations.rend(); ++obsIter) {
     uint64_t observingFrameId = obsIter->first.frameId;
     if (observingFrameId < minValidStateId) {
       // Some observations may be outside the horizon.
+      continue;
+    }
+    if (lastImageId(*obsIter)) {
+      //      LOG(WARNING) << "okvis frontend may associate one landmark two
+      //      observations in the same image!";
       continue;
     }
     // get the keypoint measurement
@@ -230,6 +235,8 @@ bool RiSlidingWindowSmoother::addLandmarkToGraph(
       }
       new_reprojection_factors_.add(factor);
     }
+    lastImageId =
+        IsObservedInFrame(obsIter->first.frameId, obsIter->first.cameraIndex);
   }
   mp.residualizeCase = InState_TrackedNow;
   return true;

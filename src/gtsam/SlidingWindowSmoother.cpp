@@ -85,6 +85,7 @@ void setSmartFactorsParams(
     double landmark_distance_threshold,
     double retriangulation_threshold,
     double outlier_rejection) {
+  // The first argument is irrelevant for Isotropic noise, i.e., can be 2 or 3.
   gtsam::SharedNoiseModel model =
       gtsam::noiseModel::Isotropic::Sigma(2, smart_noise_sigma);
   // smart_noise_ = gtsam::noiseModel::Robust::Create(
@@ -715,6 +716,7 @@ bool SlidingWindowSmoother::addLandmarkToGraph(uint64_t lmkId, const Eigen::Vect
 
   uint64_t minValidStateId = statesMap_.begin()->first;
   okvis::MapPoint& mp = landmarksMap_.at(lmkId);
+  IsObservedInFrame lastImageId(0u, 0u);
   for (std::map<okvis::KeypointIdentifier, uint64_t>::const_iterator obsIter =
            mp.observations.begin();
        obsIter != mp.observations.end(); ++obsIter) {
@@ -722,7 +724,11 @@ bool SlidingWindowSmoother::addLandmarkToGraph(uint64_t lmkId, const Eigen::Vect
       // Some observations may be outside the horizon.
       continue;
     }
-
+    if (lastImageId(*obsIter)) {
+      //      LOG(WARNING) << "okvis frontend may associate one landmark two
+      //      observations in the same image!";
+      continue;
+    }
     // get the keypoint measurement
     okvis::MultiFramePtr multiFramePtr =
         multiFramePtrMap_.at(obsIter->first.frameId);
@@ -747,6 +753,8 @@ bool SlidingWindowSmoother::addLandmarkToGraph(uint64_t lmkId, const Eigen::Vect
             gtsam::Symbol('l', lmkId), cal0_, body_P_cam0_);
 
     new_reprojection_factors_.add(factor);
+    lastImageId =
+        IsObservedInFrame(obsIter->first.frameId, obsIter->first.cameraIndex);
   }
   mp.residualizeCase = InState_TrackedNow;
   return true;
@@ -802,6 +810,7 @@ void SlidingWindowSmoother::addLandmarkSmartFactorToGraph(const LandmarkId& lmkI
   gtsam::SmartProjectionPoseFactor<gtsam::Cal3DS2>::shared_ptr new_factor =
       boost::make_shared<gtsam::SmartProjectionPoseFactor<gtsam::Cal3DS2>>(
           smart_noise_, cal0_, body_P_cam0_, smart_factors_params_);
+  IsObservedInFrame lastImageId(0u, 0u);
   for (std::map<okvis::KeypointIdentifier, uint64_t>::const_iterator obsIter =
            mp.observations.begin();
        obsIter != mp.observations.end(); ++obsIter) {
@@ -809,7 +818,11 @@ void SlidingWindowSmoother::addLandmarkSmartFactorToGraph(const LandmarkId& lmkI
       // Some observations may be outside the horizon.
       continue;
     }
-
+    if (lastImageId(*obsIter)) {
+      //      LOG(WARNING) << "okvis frontend may associate one landmark two
+      //      observations in the same image!";
+      continue;
+    }
     // get the keypoint measurement
     okvis::MultiFramePtr multiFramePtr =
         multiFramePtrMap_.at(obsIter->first.frameId);
@@ -818,6 +831,8 @@ void SlidingWindowSmoother::addLandmarkSmartFactorToGraph(const LandmarkId& lmkI
                                obsIter->first.keypointIndex, measurement);
 
     new_factor->add(measurement, gtsam::Symbol('x', obsIter->first.frameId));
+    lastImageId =
+        IsObservedInFrame(obsIter->first.frameId, obsIter->first.cameraIndex);
   }
   mp.residualizeCase = InState_TrackedNow;
 
@@ -1928,10 +1943,12 @@ void SlidingWindowSmoother::updateNewSmartFactorsSlots(
       gtsam::SmartProjectionPoseFactor<gtsam::Cal3DS2>::shared_ptr oldfactor =
           it->second.first;
       uint64_t frameId = gtsam::Symbol(oldfactor->keys().front()).index();
-      LOG(WARNING) << "The smart factor for landmark "
-                   << lmk_ids_of_new_smart_factors.at(i)
-                   << " of the first pose " << frameId
-                   << " has probably been marginalized!";
+      OKVIS_ASSERT_LT(Exception, frameId, statesMap_.rbegin()->first,
+                      "If a smart factor of landmark "
+                          << lmk_ids_of_new_smart_factors.at(i)
+                          << " with the first pose " << frameId
+                          << " is no longer in the graph, it should have been "
+                             "marginalized!");
     }
   }
 }
