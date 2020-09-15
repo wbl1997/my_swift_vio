@@ -103,6 +103,14 @@ class ConsistentEstimator : public Estimator
    */
   bool computeCovariance(Eigen::MatrixXd* cov) const override;
 };
+
+/**
+ * @brief hasMultipleObservationsInOneImage
+ * @param mapPoint
+ * @return
+ */
+bool hasMultipleObservationsInOneImage(const MapPoint& mapPoint);
+
 }  // namespace okvis
 
 #endif /* #ifndef INCLUDE_MSCKF_CONSISTENT_ESTIMATOR_HPP_ */

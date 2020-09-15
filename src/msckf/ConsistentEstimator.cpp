@@ -605,4 +605,19 @@ bool ConsistentEstimator::computeCovariance(Eigen::MatrixXd* cov) const {
                                 .id;
   return mapPtr_->computeNavStateCovariance(poseId, speedAndBiasId, cov);
 }
+
+bool hasMultipleObservationsInOneImage(const MapPoint& mapPoint) {
+  uint64_t lastFrameId = 0u;
+  size_t duplicates = 0u;
+  for (std::map<okvis::KeypointIdentifier, uint64_t>::const_iterator
+           obsIt = mapPoint.observations.begin();
+       obsIt != mapPoint.observations.end(); ++obsIt) {
+    if (obsIt->first.frameId == lastFrameId) {
+      ++duplicates;
+    }
+    lastFrameId = obsIt->first.frameId;
+  }
+  return duplicates > 0u;
+}
+
 }  // namespace okvis
