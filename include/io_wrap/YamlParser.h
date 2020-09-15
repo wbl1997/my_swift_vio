@@ -39,39 +39,49 @@ class YamlParser {
 
   template <class T>
   void getYamlParam(const std::string& id, T* output) const {
-    CHECK(!id.empty());
+    if (id.empty()) {
+      return;
+    }
     const cv::FileNode& file_handle = fs_[id];
-    CHECK_NE(file_handle.type(), cv::FileNode::NONE)
-        << "Missing parameter: " << id.c_str()
-        << " in file: " << filepath_.c_str();
-    file_handle >> *CHECK_NOTNULL(output);
+    if (file_handle.type() == cv::FileNode::NONE)
+      LOG(WARNING) << "Missing parameter: " << id.c_str()
+                   << " in file: " << filepath_.c_str();
+    else
+      file_handle >> *output;
   }
 
   template <class T>
-  void getNestedYamlParam(const std::string& id,
-                          const std::string& id_2,
+  void getNestedYamlParam(const std::string& id, const std::string& id_2,
                           T* output) const {
-    CHECK(!id.empty());
-    CHECK(!id_2.empty());
+    if (id.empty() || id_2.empty()) {
+      return;
+    }
     const cv::FileNode& file_handle = fs_[id];
-    CHECK_NE(file_handle.type(), cv::FileNode::NONE)
-        << "Missing parameter: " << id.c_str()
-        << " in file: " << filepath_.c_str();
+    if (file_handle.type() == cv::FileNode::NONE) {
+      LOG(WARNING) << "Missing parameter: " << id.c_str()
+                   << " in file: " << filepath_.c_str();
+      return;
+    }
     const cv::FileNode& file_handle_2 = file_handle[id_2];
-    CHECK_NE(file_handle_2.type(), cv::FileNode::NONE)
-        << "Missing nested parameter: " << id_2.c_str() << " inside "
-        << id.c_str() << '\n'
-        << " in file: " << filepath_.c_str();
-    CHECK(file_handle.isMap())
-        << "I think that if this is not a map, we can't use >>";
-    file_handle_2 >> *CHECK_NOTNULL(output);
+    if (file_handle_2.type() == cv::FileNode::NONE) {
+      LOG(WARNING) << "Missing nested parameter: " << id_2.c_str() << " inside "
+                   << id.c_str() << '\n'
+                   << " in file: " << filepath_.c_str();
+      return;
+    }
+    if (!file_handle.isMap()) {
+      LOG(WARNING) << "I think that if the parent node is not a map, we can't "
+                      "use >> for the child node";
+      return;
+    }
+    file_handle_2 >> *output;
   }
 
  private:
   void openFile(const std::string& filepath, cv::FileStorage* fs) const {
     CHECK(!filepath.empty()) << "Empty filepath!";
     try {
-      CHECK_NOTNULL(fs)->open(filepath, cv::FileStorage::READ);
+      fs->open(filepath, cv::FileStorage::READ);
     } catch (cv::Exception& e) {
       LOG(FATAL) << "Cannot open file: " << filepath << '\n'
                  << "OpenCV error code: " << e.msg;
@@ -81,9 +91,7 @@ class YamlParser {
         << " (remember that the first line should be: %YAML:1.0)";
   }
 
-  inline void closeFile(cv::FileStorage* fs) const {
-    CHECK_NOTNULL(fs)->release();
-  }
+  inline void closeFile(cv::FileStorage* fs) const { fs->release(); }
 
  private:
   cv::FileStorage fs_;
