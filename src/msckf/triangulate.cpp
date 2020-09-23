@@ -242,6 +242,8 @@ struct ReprojectionError {
     return (new ceres::AutoDiffCostFunction<ReprojectionError, 2, 3>(
         new ReprojectionError(Tw2c, observed)));
   }
+
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
   Sophus::SE3Group<double> Tw2c;
   Eigen::Matrix<double, 2, 1> observed;
 };
@@ -308,6 +310,8 @@ class ReprojectionErrorJ : public ceres::SizedCostFunction<2, 3> {
     }
     return true;
   }
+
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
   Sophus::SE3Group<double> Tw2c;
   Eigen::Matrix<double, 2, 1> observed;
 };

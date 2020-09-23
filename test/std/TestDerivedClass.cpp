@@ -132,11 +132,13 @@ TEST(StandardC, AssignToBaseClass) {
 
 struct S {
   virtual std::string f() const { return "B::f" + g(); }
+  virtual ~S() {}
   std::string g() const { return "B::g"; }  // not virtual
 };
 
 struct E : S {
   std::string f() const override { return "D::f" + g(); }  // overrides B::f
+  virtual ~E() {}
   std::string g() const { return "D::g"; }
 };
 

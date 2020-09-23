@@ -45,8 +45,8 @@ class RiInverseTransformPointJacobian
   virtual ~RiInverseTransformPointJacobian() {}
 
   RiInverseTransformPointJacobian(const okvis::kinematics::Transformation& T_AB,
-                                  const Eigen::Vector4d& hpB)
-      : okvis::InverseTransformPointJacobian(T_AB, hpB) {}
+                                  const Eigen::Vector4d& hpA)
+      : okvis::InverseTransformPointJacobian(T_AB, hpA) {}
 
   void dhpB_dT_AB(Eigen::Matrix<double, 4, 6>* j) const override {
     j->topLeftCorner<3, 3>().noalias() =
