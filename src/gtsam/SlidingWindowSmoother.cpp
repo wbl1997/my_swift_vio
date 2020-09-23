@@ -565,6 +565,32 @@ uint64_t SlidingWindowSmoother::getMinValidStateId() const {
   }
 }
 
+// Get a copy of all the landmarks as a PointMap.
+size_t SlidingWindowSmoother::getLandmarks(MapPointVector& landmarks) const {
+  if (backendParams_.backendModality_ == BackendModality::STRUCTURELESS) {
+    std::lock_guard<std::mutex> l(Estimator::statesMutex_);
+    LmkIdToLmkTypeMap lmk_id_to_lmk_type_map;
+    size_t min_age = 2u;
+    PointsWithIdMap points_with_id =
+        getMapLmkIdsTo3dPointsInTimeHorizon(&lmk_id_to_lmk_type_map, min_age);
+
+    landmarks.clear();
+    landmarks.reserve(points_with_id.size());
+
+    for (auto point : points_with_id) {
+      landmarks.emplace_back(point.first,
+                             Eigen::Vector4d(point.second[0], point.second[1],
+                                             point.second[2], 1.0),
+                             1.0, std::fabs(point.second[2]));
+    }
+    LOG(INFO) << "Found " << points_with_id.size() << " valid landmarks out of "
+              << old_smart_factors_.size() << " smart factors!";
+    return landmarks.size();
+  } else {
+    return Estimator::getLandmarks(landmarks);
+  }
+}
+
 // The major job of marginalization is done in the smoother optimization step.
 // Here we only remove old landmarks and states.
 bool SlidingWindowSmoother::applyMarginalizationStrategy(

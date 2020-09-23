@@ -124,6 +124,8 @@ class SlidingWindowSmoother : public Estimator {
   void optimize(size_t numIter, size_t numThreads = 1,
                         bool verbose = false) final;
 
+  size_t getLandmarks(okvis::MapPointVector& landmarks) const override;
+
   /**
    * @brief Remove unused landmarks and state variables to keep pace with the
    * internal smoother. After this function, statesMap_ and landmarksMap_ should
