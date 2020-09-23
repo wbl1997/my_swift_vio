@@ -1488,7 +1488,9 @@ bool SlidingWindowSmoother::gtsamJointMarginalCovariance(
 }
 
 void printSmartFactor(
-    boost::shared_ptr<gtsam::SmartProjectionPoseFactor<gtsam::Cal3DS2>> gsf) {
+    boost::shared_ptr<
+        gtsam::SmartProjectionFactor<gtsam::PinholePose<gtsam::Cal3DS2>>>
+        gsf) {
   CHECK(gsf);
   std::cout << "Smart Factor (valid: " << (gsf->isValid() ? "yes" : "NO!")
             << ", deg: " << (gsf->isDegenerate() ? "YES!" : "no")
@@ -1536,7 +1538,8 @@ void printSelectedFactors(
   }
 
   if (print_smart_factors) {
-    const auto& gsf = boost::dynamic_pointer_cast<gtsam::SmartProjectionPoseFactor<gtsam::Cal3DS2>>(g);
+    const auto& gsf = boost::dynamic_pointer_cast<
+        gtsam::SmartProjectionFactor<gtsam::PinholePose<gtsam::Cal3DS2>>>(g);
     if (gsf) {
       std::cout << "\tSlot # " << slot << ": ";
       printSmartFactor(gsf);
@@ -1802,7 +1805,9 @@ void deleteAllFactorsWithKeyFromFactorGraph(
         // We are not deleting a smart factor right?
         // Otherwise we need to update structure:
         // lmk_ids_of_new_smart_factors...
-        CHECK(!boost::dynamic_pointer_cast<gtsam::SmartProjectionPoseFactor<gtsam::Cal3DS2>>(*it));
+        CHECK(!boost::dynamic_pointer_cast<
+              gtsam::SmartProjectionFactor<gtsam::PinholePose<gtsam::Cal3DS2>>>(
+            *it));
         // Whatever factor this is, it has our lmk...
         // Delete it.
         LOG(WARNING) << "Delete factor in new_factors at slot # "
@@ -1875,7 +1880,9 @@ void findSlotsOfFactorsWithKey(
         CHECK(
             !boost::dynamic_pointer_cast<gtsam::PriorFactor<gtsam::Point3>>(g));
         // Sanity check that we are not deleting a smart factor.
-        CHECK(!boost::dynamic_pointer_cast<gtsam::SmartProjectionPoseFactor<gtsam::Cal3DS2>>(g));
+        CHECK(!boost::dynamic_pointer_cast<
+              gtsam::SmartProjectionFactor<gtsam::PinholePose<gtsam::Cal3DS2>>>(
+            g));
         // Delete it.
         LOG(WARNING) << "Delete factor in graph at slot # " << slot
                      << " corresponding to lmk with id: "
@@ -1928,7 +1935,7 @@ void SlidingWindowSmoother::updateNewSmartFactorsSlots(
         << "Trying to access unavailable factor.";
     const gtsam::NonlinearFactorGraph& graph = smoother_->getFactors();
     auto factor = boost::dynamic_pointer_cast<
-        gtsam::SmartProjectionPoseFactor<gtsam::Cal3DS2>>(graph.at(slot));
+        gtsam::SmartProjectionFactor<gtsam::PinholePose<gtsam::Cal3DS2>>>(graph.at(slot));
     if (factor) {
       // CHECK that shared ptrs point to the same smart factor.
       // make sure no one is cloning SmartSteroFactors.
