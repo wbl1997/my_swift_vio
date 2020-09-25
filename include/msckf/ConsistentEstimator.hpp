@@ -93,15 +93,8 @@ class ConsistentEstimator : public Estimator
       size_t numKeyframes, size_t numImuFrames,
       okvis::MapPointVector& removedLandmarks) override;
 
-  /**
-   * @brief computeCovariance the block covariance for the navigation state
-   * with an abuse of notation, i.e., diag(cov(p, q), cov(v), cov(bg),
-   * cov(ba))
-   * @param[in, out] cov pointer to the covariance matrix which will be
-   * resized in this function.
-   * @return true if covariance is successfully computed.
-   */
-  bool computeCovariance(Eigen::MatrixXd* cov) const override;
+  bool getStateStd(
+      Eigen::Matrix<double, Eigen::Dynamic, 1>* stateStd) const override;
 };
 
 /**

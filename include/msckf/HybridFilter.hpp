@@ -128,11 +128,11 @@ class HybridFilter : public Estimator {
   /// @name Getters
   ///\{
 
-  virtual int getEstimatedVariableMinimalDim() const final {
+  int getEstimatedVariableMinimalDim() const final {
     return covariance_.rows();
   }
 
-  virtual bool computeCovariance(Eigen::MatrixXd* cov) const final {
+  bool computeCovariance(Eigen::MatrixXd* cov) const final {
     *cov = covariance_;
     return true;
   }
@@ -293,12 +293,11 @@ class HybridFilter : public Estimator {
 
   bool getStateStd(Eigen::Matrix<double, Eigen::Dynamic, 1>* stateStd) const final;
 
-  virtual void setKeyframeRedundancyThresholds(double dist, double angle,
-                                               double trackingRate,
-                                               size_t minTrackLength,
-                                               size_t numKeyframes,
-                                               size_t numImuFrames);
-
+  void setKeyframeRedundancyThresholds(double dist, double angle,
+                                       double trackingRate,
+                                       size_t minTrackLength,
+                                       size_t numKeyframes,
+                                       size_t numImuFrames) override;
 
   void initCovariance();
 

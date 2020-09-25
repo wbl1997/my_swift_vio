@@ -149,6 +149,9 @@ class SlidingWindowSmoother : public Estimator {
    */
   bool computeCovariance(Eigen::MatrixXd* cov) const override;
 
+  bool getStateStd(
+      Eigen::Matrix<double, Eigen::Dynamic, 1>* stateStd) const final;
+
   bool print(std::ostream& stream) const override;
 
   /**

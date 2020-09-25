@@ -1513,6 +1513,14 @@ bool SlidingWindowSmoother::gtsamJointMarginalCovariance(
   return true;
 }
 
+bool SlidingWindowSmoother::getStateStd(
+    Eigen::Matrix<double, Eigen::Dynamic, 1>* stateStd) const {
+  Eigen::MatrixXd covariance;
+  bool status = computeCovariance(&covariance);
+  *stateStd = covariance.diagonal().cwiseSqrt();
+  return status;
+}
+
 void printSmartFactor(
     boost::shared_ptr<
         gtsam::SmartProjectionFactor<gtsam::PinholePose<gtsam::Cal3DS2>>>

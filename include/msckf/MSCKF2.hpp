@@ -187,11 +187,11 @@ class MSCKF2 : public HybridFilter {
                   Eigen::MatrixXd& R_oi,
                   std::vector<uint64_t>* involved_frame_ids=nullptr) const;
 
-  virtual void setKeyframeRedundancyThresholds(double dist, double angle,
-                                               double trackingRate,
-                                               size_t minTrackLength,
-                                               size_t numKeyframes,
-                                               size_t numImuFrames) final;
+  void setKeyframeRedundancyThresholds(double dist, double angle,
+                                       double trackingRate,
+                                       size_t minTrackLength,
+                                       size_t numKeyframes,
+                                       size_t numImuFrames) final;
 
  private:
   int computeStackedJacobianAndResidual(

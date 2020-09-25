@@ -592,18 +592,12 @@ bool ConsistentEstimator::applyMarginalizationStrategy(
 	return true;
 }
 
-bool ConsistentEstimator::computeCovariance(Eigen::MatrixXd* cov) const {
-  // variance for p_WB, q_WB, v_WB, bg, ba
-  *cov = Eigen::Matrix<double, 15, 15>::Identity();
-//  return false;
-  // jhuai: Skip the below unless necessary as it is slow.
-  uint64_t poseId = statesMap_.rbegin()->second.id;
-  uint64_t speedAndBiasId = statesMap_.rbegin()
-                                ->second.sensors.at(SensorStates::Imu)
-                                .at(0)
-                                .at(ImuSensorStates::SpeedAndBias)
-                                .id;
-  return mapPtr_->computeNavStateCovariance(poseId, speedAndBiasId, cov);
+bool ConsistentEstimator::getStateStd(
+    Eigen::Matrix<double, Eigen::Dynamic, 1>* stateStd) const {
+  Eigen::MatrixXd covariance;
+  bool status = computeCovariance(&covariance);
+  *stateStd = covariance.diagonal().cwiseSqrt();
+  return status;
 }
 
 bool hasMultipleObservationsInOneImage(const MapPoint& mapPoint) {

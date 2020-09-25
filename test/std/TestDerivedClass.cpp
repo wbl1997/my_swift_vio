@@ -57,21 +57,10 @@ class Foo {
 
 TEST(StandardC, DerivedClass) {
   Foo foo;
-  Base b;
   Derived d;
-
-  foo.get(b);
-  foo.set(b);
-  b.print();
-  EXPECT_EQ(b.valAt(0), 1);
-  EXPECT_EQ(b.valAt(2), 100);
-  EXPECT_EQ(b.valAt(4), 5);
-
-  foo.get(d);
   // set() will use the base::set for the derived object,
   // but it will not slice the derived instance.
   foo.set(d);
-  d.print();
   EXPECT_EQ(d.valAt(0), 6);
   EXPECT_EQ(d.valAt(1), 100);
   EXPECT_EQ(d.valAt(2), 8);
@@ -131,22 +120,40 @@ TEST(StandardC, AssignToBaseClass) {
 }
 
 struct S {
-  virtual std::string f() const { return "B::f" + g(); }
+  virtual std::string f() const { return "B::f " + g(); }
   virtual ~S() {}
   std::string g() const { return "B::g"; }  // not virtual
+
+  std::string h() const {
+      return "B::h " + k();
+  }
+  virtual std::string k() const {return "B::k";}
 };
 
 struct E : S {
-  std::string f() const override { return "D::f" + g(); }  // overrides B::f
+  std::string f() const override { return "D::f " + g(); }  // overrides B::f
   virtual ~E() {}
-  std::string g() const { return "D::g"; }
+  std::string g() const { return "D::g "; }
+
+  std::string h() const {
+      return "D::h " + k();
+  }
+  std::string k() const override {return "D::k"; }
 };
 
 TEST(StandardC, VirtualMemberCallOverride) {
-  // This test shows that the virtual member for a derived class will call the
+  // This shows that the virtual member for a derived class will call the
   // member function of the derived class rather than the counterpart in the
   // Base class.
-  std::shared_ptr<S> dptr(new E());
-  std::shared_ptr<E> d(new E());
-  EXPECT_TRUE(dptr->f() == d->f());
+  std::shared_ptr<S> bptr(new E());
+  std::shared_ptr<E> dptr(new E());
+  EXPECT_TRUE(dptr->f() == bptr->f());
+}
+
+TEST(StandardC, NonVirtualCallVirtual) {
+  // This shows that a non-virtual member can call the correct virtual function.
+  std::shared_ptr<S> bptr(new E());
+  std::shared_ptr<E> dptr(new E());
+  EXPECT_TRUE(dptr->h() == "D::h D::k");
+  EXPECT_TRUE(bptr->h() == "B::h D::k");
 }
