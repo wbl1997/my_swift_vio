@@ -845,7 +845,7 @@ TEST(RiSlidingWindowSmoother, TrajectoryLabel) {
       simul::SimCameraModelType::EUROC, simul::CameraOrientation::Forward,
       okvis::LandmarkGridType::FourWalls, landmarkRadius);
   okvis::BackendParams backendParams;
-  backendParams.backendModality_ = okvis::BackendModality::PROJECTION;
+  backendParams.backendModality_ = okvis::BackendModality::STRUCTURELESS;
   testHybridFilterSinusoid(testSetting, FLAGS_log_dir, "RiSlidingWindowSmoother",
                            FLAGS_sim_trajectory_label, FLAGS_num_runs, backendParams);
 }
