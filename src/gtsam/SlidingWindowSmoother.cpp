@@ -583,8 +583,8 @@ size_t SlidingWindowSmoother::getLandmarks(MapPointVector& landmarks) const {
                                              point.second[2], 1.0),
                              1.0, std::fabs(point.second[2]));
     }
-    LOG(INFO) << "Found " << points_with_id.size() << " valid landmarks out of "
-              << old_smart_factors_.size() << " smart factors!";
+//    LOG(INFO) << "Found " << points_with_id.size() << " valid landmarks out of "
+//              << old_smart_factors_.size() << " smart factors!";
     return landmarks.size();
   } else {
     return Estimator::getLandmarks(landmarks);

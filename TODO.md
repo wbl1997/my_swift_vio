@@ -110,8 +110,6 @@ my previous vin-csfm repo that depends on gtsam, and cpi closed_form preintegrat
 the structureless factor from Forster RSS2017.
 Refer to OKVIS, rovio, svo2, VINS Fusion, and MSCKF_VIO for developing stereo frontend.
 
-40. develop the invariant EKF, refer to Zhang Teng, and Ross Hartley thesis
-
 41. use FREAK besides BRISK in the frontend for feature description.
 
 42. Tune the feature descriptor extraction parameters, the number of keyframes for matching,
