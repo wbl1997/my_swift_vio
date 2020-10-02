@@ -212,7 +212,18 @@ make check
 
 * To run integration tests,
 You will need to download [rpg_trajectory_evaluation](https://github.com/uzh-rpg/rpg_trajectory_evaluation.git) which is the evaluation engine.
-Also you will need to download the EuRoC dataset and optionally the UZH-FPV dataset.
+And install its dependencies,
+```
+pip2 install --upgrade pyyaml
+pip2 install numpy matplotlib colorama ruamel.yaml
+```
+Because python scripts under evaluation/ directory also deaults to use python3, 
+you also need to install the python3 counterparts,
+```
+pip3 install numpy matplotlib colorama pyyaml ruamel.yaml
+```
+
+For tests, you will need to download the EuRoC dataset and optionally the UZH-FPV dataset.
 ```
 msckf/evaluation/smoke_test.py tests the program with one data session from EuRoC dataset.
 msckf/evaluation/main_evaluation.py tests the program with multiple data session from EuRoC and UZH-FPV dataset.
