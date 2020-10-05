@@ -18,7 +18,7 @@ import numpy as np
 
 import matplotlib.pyplot as plt
 
-import kalibr_okvis_config
+import dataset_okvis_config
 
 FORMAT = '.pdf'
 PALLETE = ['b', 'g', 'r', 'c', 'k', 'y', 'm']
@@ -67,9 +67,9 @@ TUMVI_IMU_INTRINSICS = {
 
 TUMVI_IMAGE_DELAY = 126788 * 1e-9  # nanoseconds
 
-TUMVI_R_SC = np.array(kalibr_okvis_config.TUMVI_PARAMETERS['cameras'][0]['T_SC']).reshape(4, 4)[:3, :3]
+TUMVI_R_SC = np.array(dataset_okvis_config.TUMVI_PARAMETERS['cameras'][0]['T_SC']).reshape(4, 4)[:3, :3]
 
-Nominal_R_SC = np.array(kalibr_okvis_config.TUMVI_NOMINAL_PARAMETERS['cameras'][0]['T_SC']).reshape(4, 4)[:3, :3]
+Nominal_R_SC = np.array(dataset_okvis_config.TUMVI_NOMINAL_PARAMETERS['cameras'][0]['T_SC']).reshape(4, 4)[:3, :3]
 
 TUMVIS_R_NominalS = np.matmul(TUMVI_R_SC, np.transpose(Nominal_R_SC))
 
@@ -192,8 +192,8 @@ def get_ksf_model_parameters(tumvi_imu_parameters):
     ksf_intrinsics['Tg'] = np.matmul(invMg, R_S1S2).reshape(9)
     ksf_intrinsics['Ts'] = np.zeros((3, 3)).reshape(9)
     ksf_intrinsics['Ta'] = np.matmul(invMa, R_S1S2).reshape(9)
-    T_SC0 = np.array(kalibr_okvis_config.TUMVI_PARAMETERS['cameras'][0]['T_SC']).reshape([4, 4])
-    T_SC1 = np.array(kalibr_okvis_config.TUMVI_PARAMETERS['cameras'][1]['T_SC']).reshape([4, 4])
+    T_SC0 = np.array(dataset_okvis_config.TUMVI_PARAMETERS['cameras'][0]['T_SC']).reshape([4, 4])
+    T_SC1 = np.array(dataset_okvis_config.TUMVI_PARAMETERS['cameras'][1]['T_SC']).reshape([4, 4])
     ksf_intrinsics['p_C0B'] = - np.matmul(np.transpose(T_SC0[:3, :3]), T_SC0[:3, 3])
     ksf_intrinsics['p_BC1'] = np.matmul(np.transpose(TUMVIS_R_NominalS), T_SC1[:3, 3])
     ksf_intrinsics['q_BC1'] = dcm2quat(np.matmul(np.transpose(TUMVIS_R_NominalS), T_SC1[:3, :3]))
@@ -203,12 +203,12 @@ def get_ksf_model_parameters(tumvi_imu_parameters):
         distort = np.zeros(4)
         tdtr = np.zeros(2)
 
-        focal_length = kalibr_okvis_config.TUMVI_PARAMETERS['cameras'][j]['focal_length']
+        focal_length = dataset_okvis_config.TUMVI_PARAMETERS['cameras'][j]['focal_length']
         fc[0] = (focal_length[0] + focal_length[1])*0.5
-        fc[1:] = np.array(kalibr_okvis_config.TUMVI_PARAMETERS['cameras'][j]['principal_point'])
-        distort = np.array(kalibr_okvis_config.TUMVI_PARAMETERS['cameras'][j]['distortion_coefficients'])
+        fc[1:] = np.array(dataset_okvis_config.TUMVI_PARAMETERS['cameras'][j]['principal_point'])
+        distort = np.array(dataset_okvis_config.TUMVI_PARAMETERS['cameras'][j]['distortion_coefficients'])
         tdtr[0] = TUMVI_IMAGE_DELAY
-        tdtr[1] = kalibr_okvis_config.TUMVI_PARAMETERS['cameras'][j]["image_readout_time"]
+        tdtr[1] = dataset_okvis_config.TUMVI_PARAMETERS['cameras'][j]["image_readout_time"]
         ksf_intrinsics['fc' + suffix] = fc
         ksf_intrinsics['distort' + suffix] = distort
         ksf_intrinsics['tdtr' + suffix] = tdtr

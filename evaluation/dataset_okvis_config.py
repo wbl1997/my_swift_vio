@@ -1,6 +1,8 @@
 #!/usr/bin/python
 
 """
+Generate configuration file to OKVIS for a variety of data.
+The interface is main_okvis_config.py.
 author: Yukai Lin
 author: Jianzhu Huai
 """

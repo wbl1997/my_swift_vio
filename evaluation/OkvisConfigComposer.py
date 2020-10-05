@@ -2,7 +2,7 @@ import os
 import shutil
 
 import dataset_parameters
-import kalibr_okvis_config
+import dataset_okvis_config
 
 """If the bagname keyword is found in the bag's full path, then the 
 corresponding calibration files will be used in creating okvis config yaml"""
@@ -51,7 +51,7 @@ class OkvisConfigComposer(object):
         imu_calib_file, camera_calib_files = self.get_calib_files()
         calib_format = dataset_parameters.calibration_format(dataset_type)
 
-        kalibr_okvis_config.create_okvis_config_yaml(
+        dataset_okvis_config.create_okvis_config_yaml(
             self.vio_config_template, calib_format,
             self.vio_yaml_mission, camera_calib_files,
             imu_calib_file, algo_code, self.bag_fullname, use_nominal_value)
