@@ -252,65 +252,6 @@ void check_tail_nees(const Eigen::Vector3d &nees_tail) {
   EXPECT_LT(nees_tail[2], 10) << "Pose NEES";
 }
 
-
-std::string cameraObservationModelToShorthand(int cameraObservationId) {
-  std::string suffix;
-  switch (cameraObservationId) {
-    case okvis::cameras::kReprojectionErrorId:
-      suffix = "_Proj";
-      break;
-    case okvis::cameras::kEpipolarFactorId:
-      suffix = "_Epi";
-      break;
-    case okvis::cameras::kChordalDistanceId:
-      suffix = "_Chord";
-      break;
-    case okvis::cameras::kReprojectionErrorWithPapId:
-      suffix = "_ProjPap";
-      break;
-    default:
-      LOG(ERROR) << "Unknown camera observation model " << cameraObservationId;
-      break;
-  }
-  return suffix;
-}
-
-std::string landmarkModelIdToShorthand(int landmarkModelId) {
-  std::string suffix;
-  switch (landmarkModelId) {
-    case msckf::HomogeneousPointParameterization::kModelId:
-      suffix = "_Euc";
-      break;
-    case msckf::ParallaxAngleParameterization::kModelId:
-      suffix = "_Pap";
-      break;
-    case msckf::InverseDepthParameterization::kModelId:
-      suffix = "_Idp";
-      break;
-  }
-  return suffix;
-}
-
-std::string cameraOrientationIdToShorthand(
-    simul::CameraOrientation cameraOrientation) {
-  std::string suffix;
-  switch (cameraOrientation) {
-    case simul::CameraOrientation::Left:
-      suffix = "_L";
-      break;
-    case simul::CameraOrientation::Right:
-      suffix = "_R";
-      break;
-    case simul::CameraOrientation::Backward:
-      suffix = "_B";
-      break;
-    case simul::CameraOrientation::Forward:
-      suffix = "_F";
-      break;
-  }
-  return suffix;
-}
-
 /**
  * @brief testHybridFilterSinusoid
  * @param testSetting
@@ -773,43 +714,6 @@ TEST(OKVIS, TrajectoryLabel) {
                            FLAGS_sim_trajectory_label, FLAGS_num_runs);
 }
 
-TEST(MSCKFWithReprojectionErrorPAP, TrajectoryLabel) {
-  bool addImageNoise = true;
-  bool useImageObservation = true;
-  bool useEpipolarConstraint = false;
-  int cameraObservationModelId = 3;
-  int landmarkModelId = 2;
-  double landmarkRadius = 5;
-  okvis::TestSetting testSetting(
-      true, FLAGS_noisyInitialSpeedAndBiases, FLAGS_noisyInitialSensorParams,
-      addImageNoise, useImageObservation, FLAGS_sim_imu_noise_factor,
-      FLAGS_sim_imu_bias_noise_factor, okvis::EstimatorAlgorithm::MSCKF,
-      useEpipolarConstraint, cameraObservationModelId, landmarkModelId,
-      simul::SimCameraModelType::EUROC, simul::CameraOrientation::Forward,
-      okvis::LandmarkGridType::FourWalls, landmarkRadius);
-  testHybridFilterSinusoid(testSetting, FLAGS_log_dir,
-                           "MSCKFWithReprojectionErrorPAP",
-                           FLAGS_sim_trajectory_label, FLAGS_num_runs);
-}
-
-TEST(MSCKFWithEuclidean, TrajectoryLabel) {
-  bool addImageNoise = true;
-  bool useImageObservation = true;
-  bool useEpipolarConstraint = false;
-  int cameraObservationModelId = 0;
-  int landmarkModelId = 0;
-  double landmarkRadius = 5;
-  okvis::TestSetting testSetting(
-      true, FLAGS_noisyInitialSpeedAndBiases, FLAGS_noisyInitialSensorParams,
-      addImageNoise, useImageObservation, FLAGS_sim_imu_noise_factor,
-      FLAGS_sim_imu_bias_noise_factor, okvis::EstimatorAlgorithm::MSCKF,
-      useEpipolarConstraint, cameraObservationModelId, landmarkModelId,
-      simul::SimCameraModelType::EUROC, simul::CameraOrientation::Forward,
-      okvis::LandmarkGridType::FourWalls, landmarkRadius);
-  testHybridFilterSinusoid(testSetting, FLAGS_log_dir, "MSCKFWithEuclidean",
-                           FLAGS_sim_trajectory_label, FLAGS_num_runs);
-}
-
 TEST(SlidingWindowSmoother, TrajectoryLabel) {
   bool addImageNoise = true;
   bool useImageObservation = true;
@@ -887,6 +791,24 @@ TEST(TFVIO, TrajectoryLabel) {
                            FLAGS_sim_trajectory_label, FLAGS_num_runs);
 }
 
+TEST(MSCKFWithEuclidean, TrajectoryLabel) {
+  bool addImageNoise = true;
+  bool useImageObservation = true;
+  bool useEpipolarConstraint = false;
+  int cameraObservationModelId = 0;
+  int landmarkModelId = 0;
+  double landmarkRadius = 5;
+  okvis::TestSetting testSetting(
+      true, FLAGS_noisyInitialSpeedAndBiases, FLAGS_noisyInitialSensorParams,
+      addImageNoise, useImageObservation, FLAGS_sim_imu_noise_factor,
+      FLAGS_sim_imu_bias_noise_factor, okvis::EstimatorAlgorithm::MSCKF,
+      useEpipolarConstraint, cameraObservationModelId, landmarkModelId,
+      simul::SimCameraModelType::EUROC, simul::CameraOrientation::Forward,
+      okvis::LandmarkGridType::FourWalls, landmarkRadius);
+  testHybridFilterSinusoid(testSetting, FLAGS_log_dir, "MSCKFWithEuclidean",
+                           FLAGS_sim_trajectory_label, FLAGS_num_runs);
+}
+
 TEST(MSCKFWithPAP, TrajectoryLabel) {
   bool addImageNoise = true;
   bool useImageObservation = true;
@@ -902,6 +824,25 @@ TEST(MSCKFWithPAP, TrajectoryLabel) {
       simul::SimCameraModelType::EUROC, simul::CameraOrientation::Forward,
       okvis::LandmarkGridType::FourWalls, landmarkRadius);
   testHybridFilterSinusoid(testSetting, FLAGS_log_dir, "MSCKFWithPAP",
+                           FLAGS_sim_trajectory_label, FLAGS_num_runs);
+}
+
+TEST(MSCKFWithReprojectionErrorPAP, TrajectoryLabel) {
+  bool addImageNoise = true;
+  bool useImageObservation = true;
+  bool useEpipolarConstraint = false;
+  int cameraObservationModelId = 3;
+  int landmarkModelId = 2;
+  double landmarkRadius = 5;
+  okvis::TestSetting testSetting(
+      true, FLAGS_noisyInitialSpeedAndBiases, FLAGS_noisyInitialSensorParams,
+      addImageNoise, useImageObservation, FLAGS_sim_imu_noise_factor,
+      FLAGS_sim_imu_bias_noise_factor, okvis::EstimatorAlgorithm::MSCKF,
+      useEpipolarConstraint, cameraObservationModelId, landmarkModelId,
+      simul::SimCameraModelType::EUROC, simul::CameraOrientation::Forward,
+      okvis::LandmarkGridType::FourWalls, landmarkRadius);
+  testHybridFilterSinusoid(testSetting, FLAGS_log_dir,
+                           "MSCKFWithReprojectionErrorPAP",
                            FLAGS_sim_trajectory_label, FLAGS_num_runs);
 }
 
