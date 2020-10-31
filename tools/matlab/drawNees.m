@@ -1,4 +1,4 @@
-function drawNees(est_files, labels, num_runs, export_fig_path)
+function drawNees(est_files, labels, export_fig_path, num_runs)
 % This function requires Matlab signal processing toolbox for downsample()
 
 % Example use:
@@ -6,8 +6,13 @@ function drawNees(est_files, labels, num_runs, export_fig_path)
 % draw_nees({[sim_dir, 'msckf_simul_test_nofej/MSCKF_WavyCircle_NEES.txt'], ...
 % [sim_dir, 'msckf_simul_wave/MSCKF_WavyCircle_NEES.txt'], ...
 % [sim_dir, 'msckf_simul_ball/MSCKF_Ball_NEES.txt']}, ...
-% 1000, {'Naive', 'Wave', 'Torus'}, '/tools/export_fig');
-
+% {'Naive', 'Wave', 'Torus'}, '/tools/export_fig', 100);
+if nargin < 4
+    num_runs = 100;
+end
+if nargin < 3
+    export_fig_path = '/path/to/export_fig';
+end
 
 addpath(export_fig_path);
 
