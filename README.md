@@ -339,19 +339,37 @@ The running program will exit once the sequence finishes.
    You will find a corresponding calibration / estimator configuration in the 
    okvis/config folder.
 
-2. Run the node
+2. Process a rosbag.
 
 ```
-rosrun msckf okvis_node $HOME/Documents/docker/msckf_ws/src/msckf/config/config_fpga_p2_euroc_dissertation.yaml
- --dump_output_option=0 --load_input_option=0 --output_dir=$HOME/Desktop/temp 
+export MSCKF_WS=$HOME/Documents/docker/msckf_ws
+rosrun msckf okvis_node $MSCKF_WS/src/msckf/config/config_fpga_p2_euroc.yaml \
+ $MSCKF_WS/src/msckf/config/LcdParams.yaml \
+ --vocabulary_path=$MSCKF_WS/src/msckf/vocabulary/ORBvoc.yml \
+ --dump_output_option=0 --load_input_option=0 --output_dir=$HOME/Desktop/temp
 
 rosbag play --pause --start=5.0 --rate=1.0 /media/$USER/Seagate/$USER/data/euroc/MH_01_easy.bag /cam0/image_raw:=/camera0 /imu0:=/imu
 
-rosrun rviz rviz -d $HOME/Documents/docker/msckf_ws/src/msckf/config/rviz.rviz
+rosrun rviz rviz -d $MSCKF_WS/src/msckf/config/rviz.rviz
 ```
 
 In this case, the program will exit once the Ctrl+C is entered in the terminal that runs the msckf_node.
 Note the program will not exit if Ctrl+C is entered in the terminal of roscore.
+
+3. Process the zip synchronously.
+
+```
+export MSCKF_WS=$HOME/Documents/docker/msckf_ws
+rosrun msckf okvis_node_synchronous $MSCKF_WS/src/msckf/config/config_fpga_p2_euroc.yaml \
+ $MSCKF_WS/src/msckf/config/LcdParams.yaml \
+ --vocabulary_path=$MSCKF_WS/src/msckf/vocabulary/ORBvoc.yml \
+ --bagname=/media/$USER/Seagate/$USER/data/euroc/MH_01_easy.bag --skip_first_seconds=0 --max_inc_tol=30.0 \
+ --camera_topics="/cam0/image_raw,/cam1/image_raw" --imu_topic="/imu0"
+ --dump_output_option=3 --output_dir=$HOME/Desktop/temp --publish_via_ros=true
+
+rosrun rviz rviz -d $MSCKF_WS/src/msckf/config/rviz.rviz
+```
+
 
 ### Process the TUM VI dataset
 
