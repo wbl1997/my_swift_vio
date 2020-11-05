@@ -105,11 +105,11 @@ if __name__ == '__main__':
         },
         ('ri-fls', 'OKVIS'): {
             "algo_code": "RiSlidingWindowSmoother",
-            "extra_gflags": "--publish_via_ros=false,--rifls_lock_jacobian=true",
+            "extra_gflags": "--publish_via_ros=false --rifls_lock_jacobian=true",
         },
         ('ri-fls-exact', 'OKVIS'): {
             "algo_code": "RiSlidingWindowSmoother",
-            "extra_gflags": "--publish_via_ros=false,--rifls_lock_jacobian=false",
+            "extra_gflags": "--publish_via_ros=false --rifls_lock_jacobian=false",
         },
         ('OKVIS_4_4', 'OKVIS'): {
             "sigma_g_c": 12.0e-4 * 4,
