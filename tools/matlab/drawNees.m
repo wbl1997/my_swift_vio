@@ -20,6 +20,11 @@ line_styles = {{'-.r', '-.g', '-.b'}, {'-r', '-g', '-b'}, ...
     {'--r', '--g', '--b'}, {'--m', '--c', '--k'}};
 [result_dir, ~, ~] = fileparts(est_files{1});
 
+downsamplefactor = 10; % 1 original data.
+backgroundColor = 'None'; % 'w' for debugging, 'None' for production.
+drawOnlyPose = 1; % 0 draw position, orientation, and pose.
+single_line_styles={'r-', 'k-.', 'r--', 'k:'};
+
 indices = 2:4;
 Q = 0.05;
 [Tl, Tr] = two_sided_prob_region_nees(Q, 6, num_runs);
@@ -28,18 +33,18 @@ Q = 0.05;
 
 close all;
 figure;
-startTime = 0;
-downsamplefactor = 1; % 1 original data.
-backgroundColor = 'w'; % 'w' for debugging, 'None' for production.
+hold on;
 for i = 1:length(est_files)
     est_data = readmatrix(est_files{i}, 'NumHeaderLines', 1);
-    if startTime == 0
-        startTime = est_data(1, 1);
-    end
-    est_data(:, 1) = est_data(:, 1) - startTime;
+    est_data(:, 1) = est_data(:, 1) - est_data(1, 1);
     est_data = downsample(est_data, downsamplefactor);
-    drawColumnsInMatrix(est_data, indices, false, 1.0, line_styles{i});
-   
+    if drawOnlyPose == 1
+        plot(est_data(:, 1), est_data(:, indices(3)), ...
+            single_line_styles{i}, 'LineWidth', 1, 'MarkerSize', 1.5);
+    else
+        drawColumnsInMatrix(est_data, indices, false, 1.0, line_styles{i});
+    end
+
     % find average of last 10 secs.
     avgPeriod = 10;
     timeTol = 0.05;
@@ -47,15 +52,23 @@ for i = 1:length(est_files)
     disp(['average of position, ori., pose, in the last 10 secs: ', num2str(avg)]);
 end
 
-% xlim([-10, est_data(end, 1) + 10]);
-% ylim([0, 20]);
+xlim([-10, est_data(end, 1) + 10]);
+ylim([0, 20]);
 xlabel('time (sec)');
 ylabel('NEES (1)');
 
-label_list = cell(1, length(est_files) * 3);
-for i = 1:length(est_files)
-    label_list(1, (i-1) * 3 + (1:3)) = {[labels{i}, '-Position'], ...
-        [labels{i}, '-Orientation'], [labels{i}, '-Pose']};
+if drawOnlyPose == 1
+    label_list = cell(1, length(est_files));
+    for i = 1:length(est_files)
+        
+        label_list(1, i) = {labels{i}};
+    end
+else
+    label_list = cell(1, length(est_files) * 3);
+    for i = 1:length(est_files)
+        label_list(1, (i-1) * 3 + (1:3)) = {[labels{i}, '-Position'], ...
+            [labels{i}, '-Orientation'], [labels{i}, '-Pose']};
+    end
 end
 leg = legend(label_list);
 set(leg,'Interpreter', 'none');
