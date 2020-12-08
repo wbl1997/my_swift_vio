@@ -108,8 +108,8 @@ void VioTestSystemBuilder::createVioSystem(
   circularSinusoidalTrajectory->getTrueInertialMeasurements(
       tStart - okvis::Duration(1), tEnd + okvis::Duration(1), imuMeasurements_);
 
-  initialNavState_.std_p_WS = Eigen::Vector3d(1e-8, 1e-8, 1e-8);
-  initialNavState_.std_q_WS = Eigen::Vector3d(1e-8, 1e-8, 1e-8);
+  initialNavState_.std_p_WS = Eigen::Vector3d(1e-5, 1e-5, 1e-5);
+  initialNavState_.std_q_WS = Eigen::Vector3d(M_PI / 180, M_PI / 180, 1e-5);
   initialNavState_.std_v_WS = Eigen::Vector3d(5e-2, 5e-2, 5e-2);
   okvis::Time startEpoch = times_.front();
   okvis::kinematics::Transformation truePose =

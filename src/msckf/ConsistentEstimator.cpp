@@ -583,8 +583,8 @@ bool ConsistentEstimator::applyMarginalizationStrategy(
 		//mapPtr_->resetParameterization(statesMap_.begin()->first, ceres::Map::Pose3d);
 		okvis::kinematics::Transformation T_WS_0;
 		get_T_WS(statesMap_.begin()->first, T_WS_0);
-		Eigen::Matrix<double,6,6> information = Eigen::Matrix<double,6,6>::Zero();
-		information(5,5) = 1.0e14; information(0,0) = 1.0e14; information(1,1) = 1.0e14; information(2,2) = 1.0e14;
+		Eigen::Matrix<double, 6, 6> information;
+		pvstd_.toInformation(&information);
 		std::shared_ptr<ceres::PoseError > poseError(new ceres::PoseError(T_WS_0, information));
 		mapPtr_->addResidualBlock(poseError,NULL,mapPtr_->parameterBlockPtr(statesMap_.begin()->first));
 	}

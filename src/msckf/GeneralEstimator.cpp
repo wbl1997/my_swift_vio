@@ -273,8 +273,8 @@ bool GeneralEstimator::addStates(
   // depending on whether or not this is the very beginning, we will add priors or relative terms to the last state:
   if (statesMap_.size() == 1) {
     // let's add a prior
-    Eigen::Matrix<double,6,6> information = Eigen::Matrix<double,6,6>::Zero();
-    information(5,5) = 1.0e8; information(0,0) = 1.0e8; information(1,1) = 1.0e8; information(2,2) = 1.0e8;
+    Eigen::Matrix<double, 6, 6> information;
+    pvstd_.toInformation(&information);
     std::shared_ptr<ceres::PoseError > poseError(new ceres::PoseError(T_WS, information));
     /*auto id2= */ mapPtr_->addResidualBlock(poseError,NULL,poseParameterBlock);
     //mapPtr_->isJacobianCorrect(id2,1.0e-6);
@@ -805,8 +805,8 @@ bool GeneralEstimator::applyMarginalizationStrategy(
 		//mapPtr_->resetParameterization(statesMap_.begin()->first, ceres::Map::Pose3d);
 		okvis::kinematics::Transformation T_WS_0;
 		get_T_WS(statesMap_.begin()->first, T_WS_0);
-	  Eigen::Matrix<double,6,6> information = Eigen::Matrix<double,6,6>::Zero();
-	  information(5,5) = 1.0e14; information(0,0) = 1.0e14; information(1,1) = 1.0e14; information(2,2) = 1.0e14;
+		Eigen::Matrix<double, 6, 6> information;
+		pvstd_.toInformation(&information);
 	  std::shared_ptr<ceres::PoseError > poseError(new ceres::PoseError(T_WS_0, information));
 	  mapPtr_->addResidualBlock(poseError,NULL,mapPtr_->parameterBlockPtr(statesMap_.begin()->first));
 	}

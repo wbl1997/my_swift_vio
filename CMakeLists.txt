@@ -333,7 +333,6 @@ list(APPEND TEST_SRC_FILES
     test/msckf/TestHybridFilter.cpp
     test/msckf/TestImuOdometry.cpp
     test/msckf/TestImuSimulator.cpp
-    test/msckf/TestMatrixSqrt.cpp
     test/msckf/TestMergeTwoLandmarks.cpp
     test/msckf/TestOkvisTriangulateFast.cpp
     test/msckf/TestOkvisTime.cpp
