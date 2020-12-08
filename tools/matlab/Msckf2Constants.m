@@ -42,15 +42,16 @@ classdef Msckf2Constants
     methods
         function obj = Msckf2Constants(misalignment_dim, extrinsic_global_dim, ...
                 project_intrinsic_dim, distort_intrinsic_dim, ...
-                fix_extrinsic, fix_intrinsic)
+                fix_extrinsic, fix_intrinsic, td_dim, tr_dim)
             obj.T_g = 19:27;
             obj.T_g_diag = [19, 23, 27];
             obj.T_s = 28:36;
             obj.T_s_diag = [28, 32, 36];
             obj.T_a = 37:45;
             obj.T_a_diag = [37, 41, 45];
-            param_index = 46;
             
+            param_index = 19 + misalignment_dim;
+   
             obj.p_BC = param_index + (0:(extrinsic_global_dim - 1));
             param_index = param_index + extrinsic_global_dim;
             
@@ -74,8 +75,8 @@ classdef Msckf2Constants
             end
             param_index = param_index + distort_intrinsic_dim;
             obj.td = param_index;
-            obj.tr = param_index + 1;
-            param_index = param_index + 2;
+            obj.tr = param_index + td_dim;
+            param_index = param_index + td_dim + tr_dim;
             
             obj.r_std = param_index + (0:2);
             obj.q_std = param_index + (3:5);

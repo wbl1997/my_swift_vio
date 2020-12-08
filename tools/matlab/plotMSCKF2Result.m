@@ -1,7 +1,7 @@
 function plotMSCKF2Result(msckf_csv, export_fig_path, ...
     gt_file, output_dir, avg_since_start, avg_trim_end, ...
     misalignment_dim, extrinsic_dim, project_intrinsic_dim, ...
-    distort_intrinsic_dim, fix_extrinsic, fix_intrinsic)
+    distort_intrinsic_dim, fix_extrinsic, fix_intrinsic, td_dim, tr_dim)
 addpath('cgraumann-umeyama');
 if nargin < 1
     disp(['Usage:plotMSCKF2Result msckf_csv ...']);
@@ -12,6 +12,12 @@ if ~exist('fix_extrinsic', 'var')
 end
 if ~exist('fix_intrinsic', 'var')
     fix_intrinsic = 0;
+end
+if ~exist('td_dim', 'var')
+    td_dim = 1;
+end
+if ~exist('tr_dim', 'var')
+    tr_dim = 1;
 end
 
 close all;
@@ -68,14 +74,14 @@ else
 end
 end
 msckf_index_server = Msckf2Constants(misalignment_dim, extrinsic_dim, ...
-    project_intrinsic_dim, distort_intrinsic_dim, fix_extrinsic, fix_intrinsic);
+    project_intrinsic_dim, distort_intrinsic_dim, fix_extrinsic, ...
+    fix_intrinsic, td_dim, tr_dim);
 
 fontsize = 18;
 data = readmatrix(msckf_csv, 'NumHeaderLines', 1);
 original_data = data;
 
 sec_to_nanos = 1e9;
-data(:,1)= data(:,1) /sec_to_nanos;
 startTime = data(1, 1);
 endTime = data(end, 1);
 
@@ -113,13 +119,18 @@ if (gt_file)
     end
     % association end
 
-    gt(:,1) = gt(:,1)- startTime;
-
-    if applyUmeyama
+    gt(:,1) = gt(:,1) - startTime;
+    if data(1, 1) > sec_to_nanos
+        data(:,1) = (data(:,1) - startTime) / sec_to_nanos;
+    else
+        data(:,1) = data(:,1) - startTime;
+    end
+    
+    if applyUmeyama == 1
         % umeyama transform to gt
         src = data(100:end, msckf_index_server.r);
         dst = gt(assocIndex(100:end), gt_index.r);
-        [R_res, t_res] = umeyama(src',dst')
+        [R_res, t_res] = umeyama(src',dst');
         data(:,msckf_index_server.r) = (R_res*data(:, msckf_index_server.r)'+ ...
             repmat(t_res, 1, size(data,1)))';
 
@@ -211,7 +222,7 @@ if(~isempty(gt))
     if size(gt, 2) >= 11
         drawMeanAndStdBound(data_diff, msckf_index_server.v, ...
             msckf_index_server.v_std, 1, 1);
-        ylabel('$\mathbf{v}_{WB} (m/s)$', 'Interpreter', 'Latex');
+        ylabel('$\delta \mathbf{v}_{WB} (m/s)$', 'Interpreter', 'Latex');
         saveas(gcf,[output_dir, '\Error v_WB'],'epsc');
     end
 end
@@ -245,6 +256,12 @@ end
 
 figure;
 drawMeanAndStdBound(data, msckf_index_server.v, msckf_index_server.v_std);
+if(~isempty(gt))
+    plot(gt(:,1), gt(:,gt_index.v(1)), '-.r');
+    plot(gt(:,1), gt(:,gt_index.v(2)), '-.g');
+    plot(gt(:,1), gt(:,gt_index.v(3)), '-.b');
+    legend('vx', 'vy', 'vz', 'std x', 'std y', 'std z', '-std x', '-std y', '-std z', 'gt vx', 'gt vy', 'gt vz');
+end
 ylabel('v_{GB}[m/s]');
 outputfig = [output_dir, '/v_GB.eps'];
 if exist(outputfig, 'file')==2
