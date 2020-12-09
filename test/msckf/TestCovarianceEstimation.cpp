@@ -344,21 +344,3 @@ TEST(CovarianceEstimation, Simple)
         << "Ceres gives a covariance different from the expected covariance\n"
         << expectedcov << "\nCeres covariance\n" << cerescov;
 }
-
-// Test ceres covariance computation with a visual inertial problem to verify that
-// the homogeneous landmark parameterization is the cause of the rank deficient Jacobians
-// in computing covariance by okvis::Estimator.
-TEST(CovarianceEstimation, MonoVisualInertial) {
-  // TODO(jhuai): Currently, OKVIS estimator constructs a ceres Problem, add
-  // parameter blocks and residual blocks incrementally, then optimize the
-  // solution, and marginalize redundant variables. But regardless of the
-  // marginalization step, the estimator always fails to compute the covariance
-  // because of rank deficient Jacobian with SPARSE_QR approach.
-
-  // construct a ceres::Problem
-  // add poses in the world frame, and homogeneous landmarks in the world frame
-  // compute covariance for these poses
-
-  // refer to ceres-solver/internal/ceres/covariance_test.cc, and TestEstimator
-  // to construct a test fixture.
-}

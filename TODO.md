@@ -127,8 +127,7 @@ Some landmarks with small disparity may cause rank deficiency in computing the p
 OKVIS addObservation() adds observations to the landmarkMap and as residuals to the ceres problem at the same time.
 A better approach is to separate adding observations to feature tracks and adding residuals.
 
-51. improve OKVIS marginalization strategy so that the covariance for poses can be successfully computed as in SVO+GTSAM.
-Also to investigate the NEES consistency, we can test exact first estimate Jacobian which means to use first estimates in
+51. To improve OKVIS NEES consistency, we can test exact first estimate Jacobian which means to use first estimates in
 computing Jacobians for variables of fixed linearization points.
 Refer to Basalt and GTSAM for alternate margialization strategies.
 
