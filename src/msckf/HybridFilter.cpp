@@ -2014,18 +2014,18 @@ void HybridFilter::updateStates(
 
   // update feature states, correction is  \delta[\alpha, \beta, \rho], stored
   // states are [\alpha, \beta, 1, \rho]
-  int kale = 0;
+  int numberLandmarks = 0;
   size_t lkStart = startIndexOfClonedStatesFast() + kClonedStateMinimalDimen * statesMap_.size();
   size_t aStart = lkStart - 3;  // a dummy initialization
   for (auto iter = mInCovLmIds.begin(), iterEnd = mInCovLmIds.end();
-       iter != iterEnd; ++iter, ++kale) {
+       iter != iterEnd; ++iter, ++numberLandmarks) {
     std::shared_ptr<okvis::ceres::HomogeneousPointParameterBlock> hppb =
         std::static_pointer_cast<okvis::ceres::HomogeneousPointParameterBlock>(
             mapPtr_->parameterBlockPtr(*iter));
     Eigen::Vector4d ab1rho =
         hppb->estimate();  // inverse depth parameterization in the anchor
                            // frame, [\alpha= X/Z, \beta= Y/Z, 1, \rho=1/Z]
-    aStart = lkStart + 3 * kale;
+    aStart = lkStart + 3 * numberLandmarks;
     ab1rho[0] += deltaX[aStart];
     ab1rho[1] += deltaX[aStart + 1];
     ab1rho[3] += deltaX[aStart + 2];

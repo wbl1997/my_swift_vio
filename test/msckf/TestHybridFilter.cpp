@@ -364,8 +364,8 @@ void testHybridFilterSinusoid(
     }
 
     std::vector<uint64_t> multiFrameIds;
-    size_t kale = 0;  // imu data counter
-    bool bStarted = false;
+    size_t poseIndex = 0u;
+    bool hasStarted = false;
     int frameCount = -1;               // number of frames used in estimator
     int trackedFeatures = 0;  // feature tracks observed in a frame
     const int cameraIntervalRatio = 10; // number imu meas for 1 camera frame
@@ -391,9 +391,9 @@ void testHybridFilterSinusoid(
     rmse.reserve(expectedNumFrames);
     try {
       for (auto iter = times.begin(), iterEnd = times.end(); iter != iterEnd;
-           iter += cameraIntervalRatio, kale += cameraIntervalRatio,
+           iter += cameraIntervalRatio, poseIndex += cameraIntervalRatio,
            trueBiasIter += cameraIntervalRatio) {
-        okvis::kinematics::Transformation T_WS(ref_T_WS_list[kale]);
+        okvis::kinematics::Transformation T_WS(ref_T_WS_list[poseIndex]);
         // assemble a multi-frame
         std::shared_ptr<okvis::MultiFrame> mf(new okvis::MultiFrame);
         uint64_t id = okvis::IdProvider::instance().newId();
@@ -416,8 +416,8 @@ void testHybridFilterSinusoid(
             imuDataBeginTime, imuDataEndTime, imuMeasurements, nullptr);
         bool asKeyframe = true;
         // add it in the window to create a new time instance
-        if (!bStarted) {
-          bStarted = true;
+        if (!hasStarted) {
+          hasStarted = true;
           frameCount = 0;
           estimator->setInitialNavState(vioSystemBuilder.initialNavState());
           estimator->addStates(mf, imuSegment, asKeyframe);

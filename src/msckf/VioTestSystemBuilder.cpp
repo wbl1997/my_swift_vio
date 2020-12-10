@@ -51,7 +51,7 @@ void VioTestSystemBuilder::createVioSystem(
                           zeroImuIntrinsicParamNoise);
   imuModelType_ = imuParameters.model_type;
 
-  const okvis::Time tStart(kDuration + 100);
+  const okvis::Time tStart(100);
   const okvis::Time tEnd = tStart + okvis::Duration(kDuration);
 
   switch (trajectoryType) {
