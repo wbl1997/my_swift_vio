@@ -3,6 +3,8 @@
 #include <gtsam/VioBackEndParams.h>
 #include <io_wrap/StreamHelper.hpp>
 #include <msckf/VioTestSystemBuilder.hpp>
+#include <vio/eigen_utils.h>
+
 namespace {
 void computeNavErrors(
     const okvis::Estimator* estimator,

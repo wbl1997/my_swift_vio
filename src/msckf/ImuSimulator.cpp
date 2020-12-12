@@ -1,5 +1,5 @@
 #include "msckf/ImuSimulator.h"
-#include <glog/logging.h>
+#include <gflags/gflags.h>
 
 #include "ceres/internal/autodiff.h"
 

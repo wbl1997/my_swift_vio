@@ -324,6 +324,7 @@ list(APPEND TEST_SRC_FILES
 
     test/msckf/TestBoundedImuDeque.cpp
     test/msckf/TestCovarianceEstimation.cpp
+    test/msckf/TestEpipolarFactor.cpp
     test/msckf/TestEpipolarJacobian.cpp
     test/msckf/TestEuclideanParamError.cpp
     test/msckf/TestExtrinsicJacobian.cpp
@@ -343,7 +344,7 @@ list(APPEND TEST_SRC_FILES
     test/msckf/TestRelativeMotionJacobian.cpp
     test/msckf/TestRsReprojectionError.cpp
     test/msckf/TestReprojectionErrorWithPap.cpp
-    test/msckf/TestEpipolarFactor.cpp
+    test/msckf/TestSE3Interpolation.cpp
     test/msckf/TestTriangulate.cpp
     test/msckf/TestTwoViewPair.cpp
 

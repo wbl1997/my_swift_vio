@@ -30,6 +30,8 @@
 #include <msckf/ProjParamOptModels.hpp>
 #include <msckf/VioTestSystemBuilder.hpp>
 
+#include <vio/eigen_utils.h>
+
 DEFINE_bool(
     noisyInitialSpeedAndBiases, true,
     "add noise to the initial value of velocity, gyro bias, accelerometer "
@@ -621,6 +623,24 @@ TEST(DeadreckoningO, TrajectoryLabel) {
       simul::SimCameraModelType::EUROC, simul::CameraOrientation::Forward,
       okvis::LandmarkGridType::FourWalls, landmarkRadius);
   testHybridFilterSinusoid(testSetting, FLAGS_log_dir, "DeadreckoningO",
+                           FLAGS_sim_trajectory_label, FLAGS_num_runs);
+}
+
+TEST(HybridFilter, TrajectoryLabel) {
+  bool addImageNoise = true;
+  bool useImageObservation = true;
+  bool useEpipolarConstraint = false;
+  int cameraObservationModelId = 0;
+  int landmarkModelId = 1;
+  double landmarkRadius = 5;
+  okvis::TestSetting testSetting(
+      true, FLAGS_noisyInitialSpeedAndBiases, FLAGS_noisyInitialSensorParams,
+      addImageNoise, useImageObservation, FLAGS_sim_imu_noise_factor,
+      FLAGS_sim_imu_bias_noise_factor, okvis::EstimatorAlgorithm::HybridFilter,
+      useEpipolarConstraint, cameraObservationModelId, landmarkModelId,
+      simul::SimCameraModelType::EUROC, simul::CameraOrientation::Forward,
+      okvis::LandmarkGridType::FourWalls, landmarkRadius);
+  testHybridFilterSinusoid(testSetting, FLAGS_log_dir, "HybridFilter",
                            FLAGS_sim_trajectory_label, FLAGS_num_runs);
 }
 
