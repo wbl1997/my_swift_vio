@@ -54,6 +54,9 @@ std::shared_ptr<okvis::Estimator> createBackend(
       return std::shared_ptr<okvis::Estimator>(
           new okvis::RiSlidingWindowSmoother(backendParams, mapPtr));
 
+    case okvis::EstimatorAlgorithm::HybridFilter:
+      return std::shared_ptr<okvis::Estimator>(new okvis::HybridFilter(mapPtr));
+
     case okvis::EstimatorAlgorithm::MSCKF:
       return std::shared_ptr<okvis::Estimator>(new okvis::MSCKF2(mapPtr));
 
