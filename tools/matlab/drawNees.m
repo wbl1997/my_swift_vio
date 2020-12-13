@@ -16,15 +16,16 @@ end
 
 addpath(export_fig_path);
 
-line_styles = {{'-.r', '-.g', '-.b'}, {'-r', '-g', '-b'}, ...
-    {'--r', '--g', '--b'}, {'--m', '--c', '--k'}};
+line_styles = {{'-.r', '-.g', '-.b'}, {'--r', '--g', '--b'}, ...
+    {'-r', '-g', '-b'}, {'--m', '--c', '--k'}};
+line_widths = {{2, 2, 2}, {2, 2, 2}, {1, 1, 1}, {2, 2, 2}};
 [result_dir, ~, ~] = fileparts(est_files{1});
 
 downsamplefactor = 10; % 1 original data.
 backgroundColor = 'None'; % 'w' for debugging, 'None' for production.
 drawOnlyPose = 1; % 0 draw position, orientation, and pose.
-single_line_styles={'r-', 'k-.', 'r--', 'k:'};
-
+single_line_styles={'r--', 'k-.', 'b-', 'g:'};
+single_line_widths={2, 2, 1, 2};
 indices = 2:4;
 Q = 0.05;
 [Tl, Tr] = two_sided_prob_region_nees(Q, 6, num_runs);
@@ -40,9 +41,9 @@ for i = 1:length(est_files)
     est_data = downsample(est_data, downsamplefactor);
     if drawOnlyPose == 1
         plot(est_data(:, 1), est_data(:, indices(3)), ...
-            single_line_styles{i}, 'LineWidth', 1, 'MarkerSize', 1.5);
+            single_line_styles{i}, 'LineWidth', single_line_widths{i}, 'MarkerSize', 1.5);
     else
-        drawColumnsInMatrix(est_data, indices, false, 1.0, line_styles{i});
+        drawColumnsInMatrix(est_data, indices, false, 1.0, line_styles{i}, line_widths{i});
     end
 
     % find average of last 10 secs.
@@ -70,7 +71,7 @@ else
             [labels{i}, '-Orientation'], [labels{i}, '-Pose']};
     end
 end
-leg = legend(label_list);
+leg = legend(label_list, 'Location', 'Best');
 set(leg,'Interpreter', 'none');
 set(gcf, 'Color', backgroundColor);
 grid on;

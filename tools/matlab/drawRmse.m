@@ -8,19 +8,21 @@ if nargin < 3
     exportFigPath = '/tools/export_fig/';
 end
 addpath(exportFigPath);
-backgroundColor = 'w'; % 'w' for debugging, 'None' for production.
+backgroundColor = 'None'; % 'w' for debugging, 'None' for production.
+subPlot = 1;
 
 probeEpochs = [0, 3, 10, 30, 100, 300];
 fileColumnStyles =  {
-        {'-r', '-g', '-b', '-k', '.k', '.b', ...
+        {'--r', '-g', '-b', '-k', '.k', '.b', ...
         '-c', '-m', '-y'}, ...
-        {'--r', '--g', '--b', '--k', '-.k', '-.b', ...
+        {'-.k', '--g', '--b', '--k', '-.k', '-.b', ...
         '--c', '--m', '--y'}, ...
-        {'-.r', '-.g', '-.b', ':k', '-.r', '-.g', ...
+        {'-b', '-.g', '-.b', ':k', '-.r', '-.g', ...
         ':c', ':m', ':y'}, ...
-        {'--m', '--c', '--k', '.k', '-.r', '-.g', ...
+        {':g', '--c', '--k', '.k', '-.r', '-.g', ...
         ':c', ':m', ':y'}};
-
+matrixColumnLineWidths = {{1,1,1,1,1,1,1,1,1}, {1,1,1,1,1,1,1,1,1}, ...
+        {1,1,1,1,1,1,1,1,1}, {2,1,1,1,1,1,1,1,1}};
 close all;
 [result_dir, ~, ~] = fileparts(dataFiles{1});
 format short;
@@ -59,13 +61,15 @@ end
 
 figure;
 indices = 2:4;
-drawColumnsInMultipleMatrices(matrices, fileLabels, {'x', 'y', 'z'}, ...
-    indices, 0, fileColumnStyles);
+labels = {'x (m)', 'y (m)', 'z (m)'};
+drawColumnsInMultipleMatrices(matrices, fileLabels, labels, ...
+    indices, 0, fileColumnStyles, matrixColumnLineWidths, 1.0, subPlot);
 estAvg = probeRmse(matrices, fileLabels, indices, 'position', epochIndexList);
 recordRmse(estAvg, 'position');
 formatList{componentIndex} = '%.3f';
-
+if ~subPlot
 ylabel('$\delta \mathbf{p}_{WB} (m)$', 'Interpreter', 'latex');
+end
 set(gcf, 'Color', backgroundColor);
 grid on;
 outputfig = [result_dir, '/', 'rmse_t_WB.eps'];
@@ -77,12 +81,14 @@ export_fig(outputfig);
 figure;
 indices = 5:7;
 scale = 180 / pi;
-drawColumnsInMultipleMatrices(matrices, fileLabels, {'x', 'y', 'z'}, ...
-    indices, 0, fileColumnStyles, scale);
+drawColumnsInMultipleMatrices(matrices, fileLabels, {['x (', char(176), ')'], ['y (', char(176), ')'], ['z (', char(176), ')']}, ...
+    indices, 0, fileColumnStyles, matrixColumnLineWidths, scale, subPlot);
 estAvg = probeRmse(matrices, fileLabels, indices, 'orientation (deg)', epochIndexList, scale);
 recordRmse(estAvg, 'orientation (deg)');
 formatList{componentIndex} = '%.3f';
+if ~subPlot
 ylabel('$\delta \mathbf{\theta}_{WB} (^{\circ})$', 'Interpreter', 'latex');
+end
 set(gcf, 'Color', backgroundColor);
 grid on;
 outputfig = [result_dir, '/', 'rmse_theta_WB.eps'];
@@ -93,12 +99,14 @@ export_fig(outputfig);
 
 figure;
 indices = 8:10;
-drawColumnsInMultipleMatrices(matrices, fileLabels, {'x', 'y', 'z'}, ...
-    indices, 0, fileColumnStyles);
+drawColumnsInMultipleMatrices(matrices, fileLabels, {'x (m/s)', 'y (m/s)', 'z (m/s)'}, ...
+    indices, 0, fileColumnStyles, matrixColumnLineWidths, 1.0, subPlot);
 estAvg = probeRmse(matrices, fileLabels, indices, 'velocity', epochIndexList);
 recordRmse(estAvg, 'velocity');
 formatList{componentIndex} = '%.3f';
+if ~subPlot
 ylabel('$\delta \mathbf{v}_{WB} (m/s)$', 'Interpreter', 'latex');
+end
 set(gcf, 'Color', backgroundColor);
 grid on;
 outputfig = [result_dir, '/', 'rmse_v_WB.eps'];
@@ -110,12 +118,14 @@ export_fig(outputfig);
 figure;
 indices = 11:13;
 scale = 180/pi;
-drawColumnsInMultipleMatrices(matrices, fileLabels, {'x', 'y', 'z'}, ...
-    indices, 0, fileColumnStyles, scale);
+drawColumnsInMultipleMatrices(matrices, fileLabels, {['x (', char(176), '/s)'], ['y (', char(176), '/s)'], ['z (', char(176), '/s)']}, ...
+    indices, 0, fileColumnStyles, matrixColumnLineWidths, scale, subPlot);
 estAvg = probeRmse(matrices, fileLabels, indices, 'bg (deg/s)', epochIndexList, scale);
 recordRmse(estAvg, 'bg (deg/s)');
 formatList{componentIndex} = '%.2f';
+if ~subPlot
 ylabel('$\delta \mathbf{b}_{g} (^{\circ}/s)$', 'Interpreter', 'latex');
+end
 set(gcf, 'Color', backgroundColor);
 grid on;
 outputfig = [result_dir, '/', 'rmse_b_g.eps'];
@@ -126,12 +136,14 @@ export_fig(outputfig);
 
 figure;
 indices = 14:16;
-drawColumnsInMultipleMatrices(matrices, fileLabels, {'x', 'y', 'z'}, ...
-    indices, 0, fileColumnStyles);
+drawColumnsInMultipleMatrices(matrices, fileLabels, {'x (m/s^2)', 'y (m/s^2)', 'z (m/s^2)'}, ...
+    indices, 0, fileColumnStyles, matrixColumnLineWidths, 1.0, subPlot);
 estAvg = probeRmse(matrices, fileLabels, indices, 'ba', epochIndexList);
 recordRmse(estAvg, 'ba');
 formatList{componentIndex} = '%.3f';
+if ~subPlot
 ylabel('$\delta \mathbf{b}_{a} (m/s^2)$', 'Interpreter', 'latex');
+end
 set(gcf, 'Color', backgroundColor);
 grid on;
 outputfig = [result_dir, '/', 'rmse_b_a.eps'];
@@ -144,7 +156,7 @@ figure;
 indices = 17 + (0:8);
 scale = 1000;
 drawColumnsInMultipleMatrices(matrices, fileLabels, {'x', 'y', 'z'}, ...
-    indices, 0, fileColumnStyles, scale);
+    indices, 0, fileColumnStyles, matrixColumnLineWidths, scale);
 estAvg = probeRmse(matrices, fileLabels, indices, 'Tg (0.001)', epochIndexList, scale);
 recordRmse(estAvg, 'Tg (0.001)');
 formatList{componentIndex} = '%.2f';
@@ -161,7 +173,7 @@ figure;
 indices = 26 + (0:8);
 scale = 1000;
 drawColumnsInMultipleMatrices(matrices, fileLabels, {'x', 'y', 'z'}, ...
-    indices, 0, fileColumnStyles, scale);
+    indices, 0, fileColumnStyles, matrixColumnLineWidths, scale);
 estAvg = probeRmse(matrices, fileLabels, indices, 'Ts (0.001)', epochIndexList, scale);
 recordRmse(estAvg, 'Ts (0.001)');
 formatList{componentIndex} = '%.2f';
@@ -178,7 +190,7 @@ figure;
 indices = 35 + (0:8);
 scale = 1000;
 drawColumnsInMultipleMatrices(matrices, fileLabels, {'x', 'y', 'z'}, ...
-    indices, 0, fileColumnStyles, scale);
+    indices, 0, fileColumnStyles, matrixColumnLineWidths, scale);
 estAvg = probeRmse(matrices, fileLabels, indices, 'Ta (0.001)', epochIndexList, scale);
 recordRmse(estAvg, 'Ta (0.001)');
 formatList{componentIndex} = '%.2f';
@@ -195,7 +207,7 @@ figure;
 indices = 44:46;
 scale = 100;
 drawColumnsInMultipleMatrices(matrices, fileLabels, {'x', 'y', 'z'}, ...
-    indices, 0, fileColumnStyles, scale);
+    indices, 0, fileColumnStyles, matrixColumnLineWidths, scale);
 estAvg = probeRmse(matrices, fileLabels, indices, 'p_CB (cm)', epochIndexList, scale);
 recordRmse(estAvg, 'p_CB (cm)');
 formatList{componentIndex} = '%.2f';
@@ -244,7 +256,7 @@ figure;
 indices = 51:52;
 scale = 1000;
 drawColumnsInMultipleMatrices(matrices, fileLabels, {'k1', 'k2'}, ...
-    indices, 0, fileColumnStyles, scale);
+    indices, 0, fileColumnStyles, matrixColumnLineWidths, scale);
 estAvg = probeRmse(matrices, fileLabels, indices, 'k12 (0.001)', epochIndexList, scale);
 recordRmse(estAvg, 'k12 (0.001)');
 formatList{componentIndex} = '%.2f';
@@ -261,7 +273,7 @@ figure;
 indices = 53:54;
 scale = 1000;
 drawColumnsInMultipleMatrices(matrices, fileLabels, {'p1', 'p2'}, ...
-    indices, 0, fileColumnStyles, scale);
+    indices, 0, fileColumnStyles, matrixColumnLineWidths, scale);
 estAvg = probeRmse(matrices, fileLabels, indices, 'p12 (0.001)', epochIndexList, scale);
 recordRmse(estAvg, 'p12 (0.001)');
 formatList{componentIndex} = '%.2f';
@@ -278,7 +290,7 @@ figure;
 indices = 55:56;
 scale = 1000;
 drawColumnsInMultipleMatrices(matrices, fileLabels, {'t_d', 't_r'}, ...
-    indices, 0, fileColumnStyles, scale);
+    indices, 0, fileColumnStyles, matrixColumnLineWidths, scale);
 estAvg = probeRmse(matrices, fileLabels, indices(1), 'td (ms)', epochIndexList, scale);
 recordRmse(estAvg, 'td (ms)');
 formatList{componentIndex} = '%.2f';
