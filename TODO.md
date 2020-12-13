@@ -41,13 +41,6 @@ For MSCKF2, pointHomog and parameter block stores position in the global frame, 
 they stores position in the anchor camera frame. So need to double check their usage, although
 positions are only relevant in frontend matching.
 
-24. Do we fix p_BA_G and q_GA after a feature is initialized into the States?
-If fixed, we need to modify slamFeatureJacobian to make it consistent,
-if not fixed, we need to modify slamFeatureJacobian (primarily) and other places related to these two parameters(trivia).
-
-25. compare the performance of msckf2 against Kalibr with multiple IMUs and multiple cameras for a publication.
-Does Kalibr output the trajectory of the camera-IMU system? If so, this serves for better comparison.
-
 29. implement observability constrained EKF for calibration, this is similar in spirit to first estimate
 Jacobians in that it modifies the computed Jacobians only.
 Answer: This requires deriving the observability constraint from scratch.
@@ -134,6 +127,7 @@ Refer to Basalt and GTSAM for alternate margialization strategies.
 52. ThreadedKFVio mock test failed in MockVioBackendInterface even with the github okvis master branch.
 
 53. The deadreckoning in okvis and that in MSCKF give different results, see testHybridFilter DeadreckoningM and DeadreckoningO.
+Answer: Disabling marginalization in OKVIS deadreckoning makes its result similar to MSCKF deadreckoning.
 
 54. Vector access over the boundary when running command:
 /media/jhuai/Seagate/jhuai/temp/msckf_ws_rel/devel/lib/msckf/okvis_node_synchronous
@@ -175,7 +169,7 @@ To reproduce,
 ```
 Also check the impact of initWithoutEnoughParallax.
 
-55. *** Error in `/home/jhuai/Documents/docker/msckf_ws/devel/lib/msckf/okvis_node_synchronous': malloc(): smallbin double linked list corrupted: 0x0000000002028420 ***
+56. *** Error in `/home/jhuai/Documents/docker/msckf_ws/devel/lib/msckf/okvis_node_synchronous': malloc(): smallbin double linked list corrupted: 0x0000000002028420 ***
 ======= Backtrace: =========
 /lib/x86_64-linux-gnu/libc.so.6(+0x777e5)[0x7ff5ecf407e5]
 /lib/x86_64-linux-gnu/libc.so.6(+0x82651)[0x7ff5ecf4b651]
@@ -228,5 +222,14 @@ KSF_n_fix_all_room3
 KSF_n_loose_intrinsics_room3
 KSF_n_loose_extrinsics_room3
 They all fixed Tg Ts Ta and had a huge drift and possibly tracking failures.
+
+
+57. On EuRoC MH_04, RI-FLS throws gtsam::IndeterminantLinearSystemException working near a pose variable because of significant drift.
+
+
+58. Will marginalization cause the observable parameters, e.g., calibration parameters, to have wrongly optimistic covariance? 
+I believe that marginalization will not cause overconfident covariance for these parameters.
+To test, run MSCKF in simulation to estimate camera extrinsic parameters, and compute their NEES.
+
 
 
