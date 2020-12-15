@@ -11,8 +11,8 @@ std::pair<double, double> computeRotationAndTranslationErrors(
   gtsam::Vector3 rotErrorVector = gtsam::Rot3::Logmap(rotErrorMat);
   double rotError = rotErrorVector.norm();
 
-  gtsam::Vector3 actualTranslation = actualPose.translation().vector();
-  gtsam::Vector3 expectedTranslation = expectedPose.translation().vector();
+  gtsam::Vector3 actualTranslation = actualPose.translation();
+  gtsam::Vector3 expectedTranslation = expectedPose.translation();
   if (upToScale) {
     double normExpected = expectedTranslation.norm();
     double normActual = actualTranslation.norm();

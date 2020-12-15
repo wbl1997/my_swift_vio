@@ -175,7 +175,7 @@ TEST(RobustNoiseModel, sqrtInfoR) {
 
     gtsam::Pose3 pose = castFactor.measured();
     auto castNoiseModel = boost::dynamic_pointer_cast<gtsam::noiseModel::Gaussian>(
-        castFactor.get_noiseModel());
+        castFactor.noiseModel());
     EXPECT_EQ(castNoiseModel.get(), nullptr);
 //    gtsam::Matrix covar = castNoiseModel->covariance();
 

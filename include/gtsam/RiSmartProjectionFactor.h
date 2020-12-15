@@ -379,7 +379,7 @@ public:
       computeJacobians(Fblocks, E, b, stateList, abrho);
       E = E.leftCols(2);
     } else {
-      Eigen::Vector3d pW = result_->vector();
+      Eigen::Vector3d pW = *result_;
       gtsam::Pose3 T_WB(stateList.at(anchorIndex_).rotation(), stateList.at(anchorIndex_).position());
       gtsam::Pose3 T_WC = T_WB * *Base::body_P_sensor_;
       Eigen::Vector3d pC = T_WC.transformTo(pW);

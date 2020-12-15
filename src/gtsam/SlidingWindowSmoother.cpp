@@ -12,6 +12,9 @@
 #include <gtsam/nonlinear/Marginals.h>
 #include <gtsam/slam/ProjectionFactor.h>
 
+#include <gtsam/geometry/Cal3_S2.h>
+#include <gtsam/geometry/PinholeCamera.h>
+
 #include <loop_closure/GtsamWrap.hpp>
 
 #include <msckf/FeatureTriangulation.hpp>
@@ -46,6 +49,10 @@ DEFINE_double(time_horizon, 1.0, "Time horizon in secs");
 
 DEFINE_double(ray_sigma_scalar, 6.0,
               "below how many sigmas do we consider rays have low disparity?");
+
+namespace gtsam {
+  using PinholeCameraCal3_S2 = gtsam::PinholeCamera<gtsam::Cal3_S2>;
+}
 
 /// \brief okvis Main namespace of this package.
 namespace okvis {
@@ -1233,7 +1240,7 @@ bool SlidingWindowSmoother::triangulateSafe(uint64_t lmkId, Eigen::Vector4d* hpW
   double landmarkDistanceThreshold = 50;  // Ignore points farther than this.
   gtsam::TriangulationParameters params(
       1.0, false, landmarkDistanceThreshold);
-  gtsam::CameraSet<gtsam::SimpleCamera> cameras;
+  gtsam::CameraSet<gtsam::PinholeCameraCal3_S2> cameras;
   gtsam::Point2Vector measurements;
 
   for (auto itObs = mp.observations.begin(), iteObs = mp.observations.end();
@@ -1261,7 +1268,7 @@ bool SlidingWindowSmoother::triangulateSafe(uint64_t lmkId, Eigen::Vector4d* hpW
     okvis::kinematics::Transformation T_WB;
     get_T_WS(poseId, T_WB);
     gtsam::Pose3 W_T_B = VIO::GtsamWrap::toPose3(T_WB);
-    gtsam::SimpleCamera camera(W_T_B.compose(body_P_cam0_), cal);
+    gtsam::PinholeCameraCal3_S2 camera(W_T_B.compose(body_P_cam0_), cal);
 
     cameras.push_back(camera);
     measurements.push_back(gtsam::Point2(backProjectionDirection.head<2>()));

@@ -11,7 +11,7 @@
 namespace gtsam {
 gtsam::Vector RiProjectionFactorIDPAnchor::evaluateError(
     const Point3& state_p, boost::optional<Matrix&> H1) const {
-  const Eigen::Vector3d& abrho = state_p.vector();
+  const Eigen::Vector3d& abrho = state_p;
   Eigen::Matrix<double, 4, 1> ab1rho(abrho[0], abrho[1], 1, abrho[2]);
 
   okvis::kinematics::Transformation T_CjCa = T_BCj_.inverse() * T_BCa_;

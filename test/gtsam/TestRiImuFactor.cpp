@@ -169,9 +169,9 @@ TEST_F(RiImuFactorTest, predict) {
   EXPECT_TRUE(gtsam::assert_equal(predictedState_j.pose().rotation(),
                                   extendedPosej.rotation()));
   checkSelectiveRatio(predictedState_j.velocity(),
-                      extendedPosej.velocity().vector(), 8e-2, 1e-4, 1e-3);
+                      extendedPosej.velocity(), 8e-2, 1e-4, 1e-3);
   Eigen::Vector3d predictedPosition_j = predictedState_j.position();
-  checkSelectiveRatio(predictedPosition_j, extendedPosej.position().vector(),
+  checkSelectiveRatio(predictedPosition_j, extendedPosej.position(),
                       8e-2, 1e-3, 1e-3);
 }
 

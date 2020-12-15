@@ -81,7 +81,8 @@ sudo apt-get install libtbb-dev
 cd $HOME/Documents/slam_src
 git clone https://github.com/borglab/gtsam.git --recursive
 cd gtsam
-git checkout 342f30d148fae84c92ff71705c9e50e0a3683bda
+git checkout 6c85850147751d45cf9c595f1a7e623d239305fc
+# 342f30d148fae84c92ff71705c9e50e0a3683bda(previously tested commit)
 mkdir build
 cd build
 
