@@ -1604,6 +1604,10 @@ void printSelectedFactors(
       printLinearContainerFactor(lcf);
     }
   }
+
+  std::cout << "\tSlot # " << slot << ": ";
+  std::cout << "IMU Related Factor: \t";
+  g->printKeys();
 }
 
 void printSelectedGraph(

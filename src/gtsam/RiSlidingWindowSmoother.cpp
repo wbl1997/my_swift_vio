@@ -380,7 +380,11 @@ void RiSlidingWindowSmoother::updateLandmarkSmartFactorInGraph(
 }
 
 void RiSlidingWindowSmoother::updateStates() {
+  // TODO(jhuai): calculateEstimate often throws std::out_of_range exception
+  // when the time_horizon is large say 4 with MH_04 EuRoC,
+  // Requested variable 'b8736' is not in this VectorValues.
   gtsam::Values estimates = smoother_->calculateEstimate();
+
   state_ = estimates;
 
   // update poses, velocities, and biases from isam2 estimates.
