@@ -34,6 +34,11 @@
 // world Euclidean coordinates because smart factors depends on camera poses
 // that are expressed in the world frame.
 
+DEFINE_bool(debug_graph_before_opt,
+            false,
+            "Store factor graph before optimization for later printing if the "
+            "optimization fails.");
+
 DEFINE_bool(process_cheirality,
             false,
             "Handle cheirality exception by removing problematic landmarks and "
@@ -1213,6 +1218,24 @@ bool SlidingWindowSmoother::updateSmoother(gtsam::FixedLagSmoother::Result* resu
                          delete_slots);
       VLOG(10) << "Finished cleanCheiralityLmk.";
 
+      if (FLAGS_debug_graph_before_opt) {
+        debug_info_.graphBeforeOpt = graph;
+        debug_info_.graphToBeDeleted = gtsam::NonlinearFactorGraph();
+        debug_info_.graphToBeDeleted.resize(delete_slots_cheirality.size());
+        for (size_t i = 0; i < delete_slots_cheirality.size(); i++) {
+          // If the factor is to be deleted, store it as graph to be
+          // deleted.
+          CHECK(graph.exists(delete_slots_cheirality.at(i)))
+              << "Slot # " << delete_slots_cheirality.at(i)
+              << "does not exist in smoother graph.";
+          // TODO here we can get the right slot that we are going to
+          // delete, extend graphToBeDeleted to have both the factor and the
+          // slot.
+          debug_info_.graphToBeDeleted.at(i) =
+              graph.at(delete_slots_cheirality.at(i));
+        }
+      }
+
       // Try again to optimize. This is a recursive call.
       LOG(WARNING) << "Starting updateSmoother after handling "
                       "cheirality exception.";
@@ -1375,6 +1398,18 @@ void SlidingWindowSmoother::optimize(size_t /*numIter*/, size_t /*numThreads*/,
   std::vector<LandmarkId> lmk_ids_of_new_smart_factors_tmp;
   assembleNewFactorsAndDeleteSlots(&new_factors_tmp, &delete_slots,
                                    &lmk_ids_of_new_smart_factors_tmp);
+
+  if (FLAGS_debug_graph_before_opt) {
+     debug_info_.graphBeforeOpt = smoother_->getFactors();
+     debug_info_.graphToBeDeleted = gtsam::NonlinearFactorGraph();
+     debug_info_.graphToBeDeleted.resize(delete_slots.size());
+     for (size_t i = 0u; i < delete_slots.size(); i++) {
+       // If the factor is to be deleted, store it as graph to be deleted.
+       CHECK(smoother_->getFactors().exists(delete_slots.at(i)));
+       debug_info_.graphToBeDeleted.at(i) =
+           smoother_->getFactors().at(delete_slots.at(i));
+     }
+   }
 
   // Use current timestamp for each new value. This timestamp will be used
   // to determine if the variable should be marginalized.
@@ -1575,6 +1610,7 @@ void printSelectedFactors(
     if (gpf) {
       std::cout << "\tSlot # " << slot << ": ";
       printReprojectionFactor(gpf);
+      return;
     }
   }
 
@@ -1584,6 +1620,7 @@ void printSelectedFactors(
     if (gsf) {
       std::cout << "\tSlot # " << slot << ": ";
       printSmartFactor(gsf);
+      return;
     }
   }
 
@@ -1593,6 +1630,7 @@ void printSelectedFactors(
     if (ppp) {
       std::cout << "\tSlot # " << slot << ": ";
       printPointPrior(ppp);
+      return;
     }
   }
 
@@ -1602,6 +1640,7 @@ void printSelectedFactors(
     if (lcf) {
       std::cout << "\tSlot # " << slot << ": ";
       printLinearContainerFactor(lcf);
+      return;
     }
   }
 
@@ -1658,6 +1697,7 @@ void SlidingWindowSmoother::printSmootherInfo(
   static constexpr bool print_smart_factors = true;  // There a lot of these!
   static constexpr bool print_point_priors = true;
   static constexpr bool print_linear_container_factors = true;
+  static constexpr bool print_point_plane_factors = false;
 //  ////////////////////// Print all factors.
 //  ///////////////////////////////////////
 //  LOG(INFO) << "Nr of factors in graph " + *which_graph << ": " << graph->size()
@@ -1685,34 +1725,33 @@ void SlidingWindowSmoother::printSmootherInfo(
 //  ////////////////////////////// Print deleted /// slots.///////////////////////
   LOG(INFO) << "Nr deleted slots: " << delete_slots.size()
             << ", with slots:" << std::endl;
-//  LOG(INFO) << "[\n\t";
-//  if (debug_info_.graphToBeDeleted.size() != 0) {
-//    // If we are storing the graph to be deleted, then print extended info
-//    // besides the slot to be deleted.
-//    CHECK_GE(debug_info_.graphToBeDeleted.size(), delete_slots.size());
-//    for (size_t i = 0u; i < delete_slots.size(); ++i) {
-//      CHECK(debug_info_.graphToBeDeleted.at(i));
-//      if (print_point_plane_factors) {
-//        printSelectedFactors(debug_info_.graphToBeDeleted.at(i),
-//                             delete_slots.at(i),
-//                             false,
-//                             print_point_plane_factors,
-//                             false,
-//                             false,
-//                             false);
-//      } else {
-//        std::cout << "\tSlot # " << delete_slots.at(i) << ":";
-//        std::cout << "\t";
-//        debug_info_.graphToBeDeleted.at(i)->printKeys();
-//      }
-//    }
-//  } else {
-//    for (size_t i = 0; i < delete_slots.size(); ++i) {
-//      std::cout << delete_slots.at(i) << " ";
-//    }
-//  }
-//  std::cout << std::endl;
-//  LOG(INFO) << " ]" << std::endl;
+  LOG(INFO) << "[\n\t";
+  if (debug_info_.graphToBeDeleted.size() != 0) {
+    // If we are storing the graph to be deleted, then print extended info
+    // besides the slot to be deleted.
+    CHECK_GE(debug_info_.graphToBeDeleted.size(), delete_slots.size());
+    for (size_t i = 0u; i < delete_slots.size(); ++i) {
+      CHECK(debug_info_.graphToBeDeleted.at(i));
+      if (print_point_plane_factors) {
+        printSelectedFactors(debug_info_.graphToBeDeleted.at(i),
+                             delete_slots.at(i),
+                             false,
+                             false,
+                             false,
+                             false);
+      } else {
+        std::cout << "\tSlot # " << delete_slots.at(i) << ":";
+        std::cout << "\t";
+        debug_info_.graphToBeDeleted.at(i)->printKeys();
+      }
+    }
+  } else {
+    for (size_t i = 0; i < delete_slots.size(); ++i) {
+      std::cout << delete_slots.at(i) << " ";
+    }
+  }
+  std::cout << std::endl;
+  LOG(INFO) << " ]" << std::endl;
 
 //  //////////////////////// Print all values in state. ////////////////////////
 //  LOG(INFO) << "Nr of values in state_ : " << state_.size() << ", with keys:";

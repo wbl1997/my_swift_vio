@@ -69,6 +69,23 @@ void setFactorsParams(
     gtsam::SharedNoiseModel* zero_velocity_prior_noise,
     gtsam::SharedNoiseModel* constant_velocity_prior_noise);
 
+class DebugVioInfo {
+ public:
+  int numSF_;
+  int numValid_;
+  int numDegenerate_;
+  int numFarPoints_;
+  int numOutliers_;
+  int numCheirality_;
+  int numNonInitialized_;
+
+  gtsam::Rot3 imuR_lkf_kf = gtsam::Rot3();
+
+  gtsam::Values stateBeforeOpt;
+  gtsam::NonlinearFactorGraph graphBeforeOpt;
+  gtsam::NonlinearFactorGraph graphToBeDeleted;
+};
+
 /**
  * SlidingWindowSmoother builds upon gtsam FixedLagSmoother.
  */
@@ -371,6 +388,8 @@ class SlidingWindowSmoother : public Estimator {
   // what percentage of landmarks in the landmarksMap_ are observed in the
   // current frame?
   double trackingRate_;
+
+  DebugVioInfo debug_info_;
 };
 
 
