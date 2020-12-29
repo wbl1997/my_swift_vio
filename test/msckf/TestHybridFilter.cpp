@@ -92,8 +92,8 @@ inline bool isFilteringMethod(okvis::EstimatorAlgorithm algorithmId) {
  * @param estimator
  * @param T_WS
  * @param v_WS_true
- * @param ref_measurement
- * @param ref_camera_geometry
+ * @param refMeasurement
+ * @param refCameraGeometry
  * @param normalizedSquaredError normalized squared error in position, orientation, and pose
  * @param squaredError squared error in xyz, \alpha, v_WS, bg, ba, Tg, Ts, Ta, p_CB,
  *  (fx, fy), (cx, cy), k1, k2, p1, p2, td, tr
@@ -103,13 +103,10 @@ void computeErrors(
     okvis::EstimatorAlgorithm estimatorAlgorithm,
     const okvis::kinematics::Transformation& T_WS,
     const Eigen::Vector3d& v_WS_true,
-    const okvis::ImuSensorReadings& ref_measurement,
-    std::shared_ptr<const okvis::cameras::CameraBase> ref_camera_geometry,
-    const int projOptModelId, Eigen::Vector3d* normalizedSquaredError,
+    const okvis::ImuSensorReadings& refMeasurement,
+    std::shared_ptr<const okvis::cameras::CameraBase> refCameraGeometry,
+    const int projOptModelId, Eigen::VectorXd* normalizedSquaredError,
     Eigen::VectorXd* squaredError) {
-  int projOptModelDim = okvis::ProjectionOptGetMinimalDim(projOptModelId);
-  squaredError->resize(51 + projOptModelDim);
-
   okvis::kinematics::Transformation T_WS_est;
   uint64_t currFrameId = estimator->currentFrameId();
   estimator->get_T_WS(currFrameId, T_WS_est);
@@ -118,9 +115,17 @@ void computeErrors(
                                         Eigen::Matrix3d::Identity());
   Eigen::Matrix<double, 6, 1> deltaPose;
   deltaPose << delta, alpha;
+
+  okvis::SpeedAndBias speedAndBiasEstimate;
+  estimator->getSpeedAndBias(currFrameId, 0, speedAndBiasEstimate);
+  Eigen::Vector3d deltaV = speedAndBiasEstimate.head<3>() - v_WS_true;
+  Eigen::Vector3d deltaBg = speedAndBiasEstimate.segment<3>(3) - refMeasurement.gyroscopes;
+  Eigen::Vector3d deltaBa = speedAndBiasEstimate.tail<3>() - refMeasurement.accelerometers;
+
   Eigen::MatrixXd covariance;
   estimator->computeCovariance(&covariance);
 
+  normalizedSquaredError->resize(3 + 3);
   (*normalizedSquaredError)[0] =
       delta.transpose() * covariance.topLeftCorner<3, 3>().inverse() * delta;
   (*normalizedSquaredError)[1] =
@@ -129,23 +134,27 @@ void computeErrors(
       covariance.topLeftCorner<6, 6>().ldlt().solve(deltaPose);
   (*normalizedSquaredError)[2] = deltaPose.transpose() * tempPoseError;
 
+  (*normalizedSquaredError)[3] =
+      deltaV.transpose() * covariance.block<3, 3>(6, 6).inverse() * deltaV;
+  (*normalizedSquaredError)[4] =
+      deltaBg.transpose() * covariance.block<3, 3>(9, 9).inverse() * deltaBg;
+  (*normalizedSquaredError)[5] =
+      deltaBa.transpose() * covariance.block<3, 3>(12, 12).inverse() * deltaBa;
+
   Eigen::Matrix<double, 9, 1> eye;
   eye << 1, 0, 0, 0, 1, 0, 0, 0, 1;
+  int projOptModelDim = okvis::ProjectionOptGetMinimalDim(projOptModelId);
+  squaredError->resize(51 + projOptModelDim);
   int index = 0;
   squaredError->head<3>() = delta.cwiseAbs2();
   index += 3;
   squaredError->segment<3>(index) = alpha.cwiseAbs2();
   index += 3;
-  okvis::SpeedAndBias speedAndBias_est;
-  estimator->getSpeedAndBias(currFrameId, 0, speedAndBias_est);
-  Eigen::Vector3d deltaV = speedAndBias_est.head<3>() - v_WS_true;
   squaredError->segment<3>(index) = deltaV.cwiseAbs2();
   index += 3;
-  squaredError->segment<3>(index) =
-      (speedAndBias_est.segment<3>(3) - ref_measurement.gyroscopes).cwiseAbs2();
+  squaredError->segment<3>(index) = deltaBg.cwiseAbs2();
   index += 3;
-  squaredError->segment<3>(index) =
-      (speedAndBias_est.tail<3>() - ref_measurement.accelerometers).cwiseAbs2();
+  squaredError->segment<3>(index) = deltaBa.cwiseAbs2();
   index += 3;
 
   bool isFilter = isFilteringMethod(estimatorAlgorithm);
@@ -167,7 +176,7 @@ void computeErrors(
   squaredError->segment<3>(index) = p_CB_est.cwiseAbs2();
   index += 3;
   Eigen::VectorXd intrinsics_true;
-  ref_camera_geometry->getIntrinsics(intrinsics_true);
+  refCameraGeometry->getIntrinsics(intrinsics_true);
   const int nDistortionCoeffDim =
       okvis::cameras::RadialTangentialDistortion::NumDistortionIntrinsics;
   Eigen::VectorXd distIntrinsic_true =
@@ -198,19 +207,19 @@ void computeErrors(
         (cameraDistortion_est - distIntrinsic_true).cwiseAbs2();
     index += nDistortionCoeffDim;
 
-    double td_est(0.0), tr_est(0.0);
+    double timeDelayEstimate(0.0), readoutTimeEstimate(0.0);
     estimator->getSensorStateEstimateAs<okvis::ceres::CameraTimeParamBlock>(
         currFrameId, 0, okvis::HybridFilter::SensorStates::Camera,
-        okvis::HybridFilter::CameraSensorStates::TD, td_est);
-    double delta_td = ref_camera_geometry->imageDelay() - td_est;
+        okvis::HybridFilter::CameraSensorStates::TD, timeDelayEstimate);
+    double delta_td = refCameraGeometry->imageDelay() - timeDelayEstimate;
     (*squaredError)[index] = delta_td * delta_td;
     ++index;
 
     estimator->getSensorStateEstimateAs<okvis::ceres::CameraTimeParamBlock>(
         currFrameId, 0, okvis::HybridFilter::SensorStates::Camera,
-        okvis::HybridFilter::CameraSensorStates::TR, tr_est);
-    double delta_tr = ref_camera_geometry->readoutTime() - tr_est;
-    (*squaredError)[index] = delta_tr * delta_tr;
+        okvis::HybridFilter::CameraSensorStates::TR, readoutTimeEstimate);
+    double deltaReadoutTime = refCameraGeometry->readoutTime() - readoutTimeEstimate;
+    (*squaredError)[index] = deltaReadoutTime * deltaReadoutTime;
     ++index;
   } else {
     squaredError->segment(index, projOptModelDim + nDistortionCoeffDim + 2)
@@ -254,6 +263,64 @@ void check_tail_nees(const Eigen::Vector3d &nees_tail) {
   EXPECT_LT(nees_tail[2], 10) << "Pose NEES";
 }
 
+class StatAccumulator {
+public:
+  StatAccumulator() : numSucceededRuns(0) {}
+
+  void refreshBuffer(int expectedNumEntries) {
+    stat.clear();
+    stat.reserve(expectedNumEntries);
+  }
+
+  void push_back(okvis::Time time, const Eigen::VectorXd &value) {
+    stat.emplace_back(time, value);
+  }
+
+  void accumulate() {
+    if (cumulativeStat.empty()) {
+      cumulativeStat = stat;
+    } else {
+      for (size_t j = 0u; j < cumulativeStat.size(); ++j) {
+        cumulativeStat[j].measurement += stat[j].measurement;
+      }
+    }
+    ++numSucceededRuns;
+  }
+
+  Eigen::VectorXd lastValue() const { return stat.back().measurement; }
+
+  void computeMean() {
+    for (AlignedVector<okvis::Measurement<Eigen::VectorXd>>::iterator it =
+             cumulativeStat.begin();
+         it != cumulativeStat.end(); ++it)
+      it->measurement /= numSucceededRuns;
+  }
+
+  void computeRootMean() {
+    for (AlignedVector<okvis::Measurement<Eigen::VectorXd>>::iterator it =
+             cumulativeStat.begin();
+         it != cumulativeStat.end(); ++it)
+      it->measurement = ((it->measurement) / numSucceededRuns).cwiseSqrt();
+  }
+
+  void dump(const std::string statFile, const std::string &headerLine) const {
+    std::ofstream stream;
+    stream.open(statFile, std::ofstream::out);
+    stream << headerLine << std::endl;
+    for (auto it = cumulativeStat.begin(); it != cumulativeStat.end(); ++it)
+      stream << it->timeStamp << " " << it->measurement.transpose()
+             << std::endl;
+    stream.close();
+  }
+
+  int succeededRuns() const { return numSucceededRuns; }
+
+private:
+  // stat for one run, cumulativeStat for multiple runs
+  AlignedVector<okvis::Measurement<Eigen::VectorXd>> stat, cumulativeStat;
+  int numSucceededRuns;
+};
+
 /**
  * @brief testHybridFilterSinusoid
  * @param testSetting
@@ -268,20 +335,8 @@ void testHybridFilterSinusoid(
     const okvis::BackendParams& backendParams = okvis::BackendParams()) {
   okvis::EstimatorAlgorithm estimatorAlgorithm = testSetting.estimator_algorithm;
 
-  // definition of NEES in Huang et al. 2007 Generalized Analysis and
-  // Improvement of the consistency of EKF-based SLAM
-  // https://pdfs.semanticscholar.org/4881/2a9d4a2ae5eef95939cbee1119e9f15633e8.pdf
-  // each entry, timestamp, nees in position, orientation, and pose, the
-  // expected NEES is 6 for pose error, see Li ijrr high precision
-  // nees for one run, neesSum for multiple runs
-  std::vector<std::pair<okvis::Time, Eigen::Vector3d>> nees, neesSum;
-
-  // each entry state timestamp, rmse in xyz, \alpha, v_WS, bg, ba, Tg, Ts, Ta,
-  // p_CB, fx, fy, cx, cy, k1, k2, p1, p2, td, tr
-  // rmse for one run, rmseSum for multiple runs
-  std::vector<std::pair<okvis::Time, Eigen::VectorXd>,
-      Eigen::aligned_allocator<std::pair<okvis::Time, Eigen::VectorXd>>>
-      rmse, rmseSum;
+  StatAccumulator neesAccumulator;
+  StatAccumulator rmseAccumulator;
 
   std::string truthFile = outputPath + "/" + trajLabel + ".txt";
   std::ofstream truthStream;
@@ -307,8 +362,7 @@ void testHybridFilterSinusoid(
   metaStream.open(metadataFile, std::ofstream::out);
 
   // only output the ground truth and data for the first successful trial
-  bool bVerbose = false;
-  int successRuns = 0;
+  bool verbose = false;
 
   std::string projOptModelName = "FIXED";
   std::string extrinsicModelName = "FIXED";
@@ -317,7 +371,7 @@ void testHybridFilterSinusoid(
     extrinsicModelName = "P_CB";
   }
   for (int run = 0; run < numRuns; ++run) {
-    bVerbose = successRuns == 0;
+    verbose = neesAccumulator.succeededRuns() == 0;
     filterTimer.start();
 
     srand((unsigned int)time(0)); // comment out to make tests deterministic
@@ -327,7 +381,7 @@ void testHybridFilterSinusoid(
     std::string pointFile = outputPath + "/" + trajLabel + "_Points.txt";
     std::string imuSampleFile = outputPath + "/" + trajLabel + "_IMU.txt";
     
-    if (bVerbose) {
+    if (verbose) {
       truthStream.open(truthFile, std::ofstream::out);
       truthStream << "%state timestamp, frameIdInSource, T_WS(xyz, xyzw), "
                      "v_WS, bg, ba, Tg, Ts, Ta, "
@@ -349,8 +403,8 @@ void testHybridFilterSinusoid(
     vioSystemBuilder.createVioSystem(testSetting, backendParams, trajectoryId,
                                      projOptModelName, extrinsicModelName,
                                      timeOffset, readoutTime,
-                                     bVerbose ? imuSampleFile : "",
-                                     bVerbose ? pointFile : "");
+                                     verbose ? imuSampleFile : "",
+                                     verbose ? pointFile : "");
     int projOptModelId = okvis::ProjectionOptNameToId(projOptModelName);
     int extrinsicModelId = okvis::ExtrinsicModelNameToId(extrinsicModelName);
 
@@ -386,11 +440,10 @@ void testHybridFilterSinusoid(
         vioSystemBuilder.trueCameraSystem();
     std::shared_ptr<const okvis::cameras::CameraBase> cameraGeometry0 =
         cameraSystem0->cameraGeometry(0);
-    nees.clear();
-    rmse.clear();
+
     int expectedNumFrames = times.size() / cameraIntervalRatio + 1;
-    nees.reserve(expectedNumFrames);
-    rmse.reserve(expectedNumFrames);
+    neesAccumulator.refreshBuffer(expectedNumFrames);
+    rmseAccumulator.refreshBuffer(expectedNumFrames);
     try {
       for (auto iter = times.begin(), iterEnd = times.end(); iter != iterEnd;
            iter += cameraIntervalRatio, poseIndex += cameraIntervalRatio,
@@ -472,7 +525,7 @@ void testHybridFilterSinusoid(
 
         Eigen::Vector3d v_WS_true = vioSystemBuilder.sinusoidalTrajectory()
                                         ->computeGlobalLinearVelocity(*iter);
-        if (bVerbose) {
+        if (verbose) {
           Eigen::VectorXd allIntrinsics;
           cameraGeometry0->getIntrinsics(allIntrinsics);
           std::shared_ptr<const okvis::kinematics::Transformation> T_SC_0
@@ -492,29 +545,21 @@ void testHybridFilterSinusoid(
                       << " " << cameraGeometry0->readoutTime() << std::endl;
         }
 
-        Eigen::Vector3d normalizedSquaredError;
+        Eigen::VectorXd normalizedSquaredError;
         Eigen::VectorXd squaredError;
         computeErrors(estimator.get(), estimatorAlgorithm, T_WS, v_WS_true,
                       trueBiasIter->measurement, cameraGeometry0,
                       projOptModelId, &normalizedSquaredError, &squaredError);
 
-        nees.push_back(std::make_pair(*iter, normalizedSquaredError));
-        rmse.push_back(std::make_pair(*iter, squaredError));
+        neesAccumulator.push_back(*iter, normalizedSquaredError);
+        rmseAccumulator.push_back(*iter, squaredError);
         lastKFTime = currentKFTime;
       }  // every frame
 
-      if (neesSum.empty()) {
-        neesSum = nees;
-        rmseSum = rmse;
-      } else {
-        for (size_t jack = 0; jack < neesSum.size(); ++jack) {
-          neesSum[jack].second += nees[jack].second;
-          rmseSum[jack].second += rmse[jack].second;
-        }
-      }
-
-      check_tail_mse(rmse.back().second, projOptModelId);
-      check_tail_nees(nees.back().second);
+      neesAccumulator.accumulate();
+      rmseAccumulator.accumulate();
+      check_tail_mse(rmseAccumulator.lastValue(), projOptModelId);
+      check_tail_nees(neesAccumulator.lastValue());
       std::stringstream messageStream;
       messageStream << "Run " << run << " finishes with last added frame "
                     << frameCount << " of tracked features " << trackedFeatures;
@@ -528,12 +573,10 @@ void testHybridFilterSinusoid(
       if (truthStream.is_open())
         truthStream.close();
 
-      ++successRuns;
     } catch (std::exception &e) {
       if (truthStream.is_open()) truthStream.close();
       LOG(INFO) << "Run and last added frame " << run << " " << frameCount << " "
                 << e.what();
-      // revert the accumulated errors and delete the corresponding file
       if (debugStream.is_open()) {
           debugStream.close();
       }
@@ -549,34 +592,21 @@ void testHybridFilterSinusoid(
   HistogramType hist = boost::accumulators::density(frameFeatureTally);
   outputFeatureHistogram(featureHistFile, hist);
 
-  for (auto it = neesSum.begin(); it != neesSum.end(); ++it)
-    (it->second) /= successRuns;
-  std::ofstream neesStream;
-  neesStream.open(neesFile, std::ofstream::out);
-  neesStream << "%state timestamp, NEES of p_WS, \\alpha_WS, T_WS "
-             << std::endl;
-  for (auto it = neesSum.begin(); it != neesSum.end(); ++it)
-    neesStream << it->first << " " << it->second.transpose() << std::endl;
-  neesStream.close();
-
-  EXPECT_GT(successRuns, 0)
-      << "number of successful runs " << successRuns << " out of runs " << numRuns;
-  for (auto it = rmseSum.begin(); it != rmseSum.end(); ++it)
-    it->second = ((it->second) / successRuns).cwiseSqrt();
-
-  std::ofstream rmseStream;
-  rmseStream.open(rmseFile, std::ofstream::out);
-  std::string headerLine;
+  int numSucceededRuns = neesAccumulator.succeededRuns();
+  EXPECT_GT(numSucceededRuns, 0)
+      << "number of successful runs " << numSucceededRuns << " out of runs " << numRuns;
+  std::string neesHeaderLine = "%state timestamp, NEES of p_WS, \\alpha_WS, T_WS";
+  neesAccumulator.computeMean();
+  neesAccumulator.dump(neesFile, neesHeaderLine);
+  std::string rmseHeaderLine;
   okvis::StreamHelper::composeHeaderLine(
       "BG_BA_TG_TS_TA", {extrinsicModelName}, {projOptModelName},
       {"RadialTangentialDistortion"}, okvis::FULL_STATE_WITH_ALL_CALIBRATION,
-      &headerLine, false);
-  rmseStream << headerLine << std::endl;
-  for (auto it = rmseSum.begin(); it != rmseSum.end(); ++it)
-    rmseStream << it->first << " " << it->second.transpose() << std::endl;
-  rmseStream.close();
+      &rmseHeaderLine, false);
+  rmseAccumulator.computeRootMean();
+  rmseAccumulator.dump(rmseFile, rmseHeaderLine);
 
-  metaStream << "#successful runs " << successRuns << " out of runs " << numRuns << std::endl;
+  metaStream << "#successful runs " << numSucceededRuns << " out of runs " << numRuns << std::endl;
   metaStream.close();
 }
 
@@ -716,6 +746,11 @@ TEST(General, TrajectoryLabel) {
                            FLAGS_sim_trajectory_label, FLAGS_num_runs);
 }
 
+// It is also possible to test OKVIS with an infinity time horizon by
+// disabling the applyMarginalizationStrategy line in testHybridFilterSinusoid.
+// That setting has been shown to output consistent covariance to the actual
+// errors up to 10 secs simulation, however, it is very time-consuming,
+// much slower than iSAM2.
 TEST(OKVIS, TrajectoryLabel) {
   bool addImageNoise = true;
   bool useImageObservation = true;
