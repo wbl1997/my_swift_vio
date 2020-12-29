@@ -216,6 +216,7 @@ LIST(APPEND SOURCEFILES
     src/msckf/PointLandmarkSimulationRS.cpp
     src/msckf/PreconditionedEkfUpdater.cpp
     src/msckf/SimulationFrontend.cpp
+    src/msckf/StatAccumulator.cpp
 
     src/msckf/TFVIO.cpp
     src/msckf/TwoViewPair.cpp

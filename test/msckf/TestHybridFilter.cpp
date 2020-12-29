@@ -28,6 +28,7 @@
 
 #include <msckf/PointLandmarkModels.hpp>
 #include <msckf/ProjParamOptModels.hpp>
+#include <msckf/StatAccumulator.h>
 #include <msckf/VioTestSystemBuilder.hpp>
 
 #include <vio/eigen_utils.h>
@@ -263,64 +264,6 @@ void check_tail_nees(const Eigen::Vector3d &nees_tail) {
   EXPECT_LT(nees_tail[2], 10) << "Pose NEES";
 }
 
-class StatAccumulator {
-public:
-  StatAccumulator() : numSucceededRuns(0) {}
-
-  void refreshBuffer(int expectedNumEntries) {
-    stat.clear();
-    stat.reserve(expectedNumEntries);
-  }
-
-  void push_back(okvis::Time time, const Eigen::VectorXd &value) {
-    stat.emplace_back(time, value);
-  }
-
-  void accumulate() {
-    if (cumulativeStat.empty()) {
-      cumulativeStat = stat;
-    } else {
-      for (size_t j = 0u; j < cumulativeStat.size(); ++j) {
-        cumulativeStat[j].measurement += stat[j].measurement;
-      }
-    }
-    ++numSucceededRuns;
-  }
-
-  Eigen::VectorXd lastValue() const { return stat.back().measurement; }
-
-  void computeMean() {
-    for (AlignedVector<okvis::Measurement<Eigen::VectorXd>>::iterator it =
-             cumulativeStat.begin();
-         it != cumulativeStat.end(); ++it)
-      it->measurement /= numSucceededRuns;
-  }
-
-  void computeRootMean() {
-    for (AlignedVector<okvis::Measurement<Eigen::VectorXd>>::iterator it =
-             cumulativeStat.begin();
-         it != cumulativeStat.end(); ++it)
-      it->measurement = ((it->measurement) / numSucceededRuns).cwiseSqrt();
-  }
-
-  void dump(const std::string statFile, const std::string &headerLine) const {
-    std::ofstream stream;
-    stream.open(statFile, std::ofstream::out);
-    stream << headerLine << std::endl;
-    for (auto it = cumulativeStat.begin(); it != cumulativeStat.end(); ++it)
-      stream << it->timeStamp << " " << it->measurement.transpose()
-             << std::endl;
-    stream.close();
-  }
-
-  int succeededRuns() const { return numSucceededRuns; }
-
-private:
-  // stat for one run, cumulativeStat for multiple runs
-  AlignedVector<okvis::Measurement<Eigen::VectorXd>> stat, cumulativeStat;
-  int numSucceededRuns;
-};
-
 /**
  * @brief testHybridFilterSinusoid
  * @param testSetting
@@ -335,8 +278,8 @@ void testHybridFilterSinusoid(
     const okvis::BackendParams& backendParams = okvis::BackendParams()) {
   okvis::EstimatorAlgorithm estimatorAlgorithm = testSetting.estimator_algorithm;
 
-  StatAccumulator neesAccumulator;
-  StatAccumulator rmseAccumulator;
+  okvis::StatAccumulator neesAccumulator;
+  okvis::StatAccumulator rmseAccumulator;
 
   std::string truthFile = outputPath + "/" + trajLabel + ".txt";
   std::ofstream truthStream;
