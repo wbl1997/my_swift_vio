@@ -187,6 +187,10 @@ class MSCKF2 : public HybridFilter {
                   Eigen::MatrixXd& R_oi,
                   std::vector<uint64_t>* involved_frame_ids=nullptr) const;
 
+  int computeStackedJacobianAndResidual(
+      Eigen::MatrixXd* T_H, Eigen::Matrix<double, Eigen::Dynamic, 1>* r_q,
+      Eigen::MatrixXd* R_q) const final;
+
   void setKeyframeRedundancyThresholds(double dist, double angle,
                                        double trackingRate,
                                        size_t minTrackLength,
@@ -194,10 +198,6 @@ class MSCKF2 : public HybridFilter {
                                        size_t numImuFrames) final;
 
  private:
-  int computeStackedJacobianAndResidual(
-      Eigen::MatrixXd* T_H, Eigen::Matrix<double, Eigen::Dynamic, 1>* r_q,
-      Eigen::MatrixXd* R_q) const;
-
   void findRedundantCamStates(
       std::vector<uint64_t>* rm_cam_state_ids,
       size_t numImuFrames);

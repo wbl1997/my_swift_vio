@@ -25,6 +25,7 @@
 #include <okvis/Estimator.hpp>
 #include <okvis/timing/Timer.hpp>
 
+#include <msckf/BaseFilter.h>
 #include <msckf/CameraRig.hpp>
 #include <msckf/MotionAndStructureStats.h>
 #include <msckf/PointLandmark.hpp>
@@ -41,20 +42,6 @@ enum RetrieveObsSeqType {
     HEAD_TAIL,
 };
 
-struct StatePointerAndEstimate {
-  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
-  StatePointerAndEstimate(
-      std::shared_ptr<const okvis::ceres::ParameterBlock> _parameterBlockPtr,
-      const Eigen::VectorXd &_parameterEstimate)
-      : parameterBlockPtr(_parameterBlockPtr),
-        parameterEstimate(_parameterEstimate) {}
-  std::shared_ptr<const okvis::ceres::ParameterBlock> parameterBlockPtr;
-  Eigen::VectorXd parameterEstimate; // This records an earlier estimate.
-};
-
-typedef std::vector<StatePointerAndEstimate,
-                    Eigen::aligned_allocator<StatePointerAndEstimate>>
-    StatePointerAndEstimateList;
 
 //! The HybridFilter that uses short feature track observations in the MSCKF
 //!  manner and long feature track observations in the SLAM manner, i.e.,
@@ -68,7 +55,7 @@ typedef std::vector<StatePointerAndEstimate,
  B: Body, defined by the IMU model, e.g., Imu_BG_BA, usually defined close to S.
  Its relation to the camera frame is modeled by the extrinsic model, e.g., Extrinsic_p_CB.
  */
-class HybridFilter : public Estimator {
+class HybridFilter : public Estimator, public BaseFilter {
  public:
   OKVIS_DEFINE_EXCEPTION(Exception, std::runtime_error)
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
@@ -263,11 +250,13 @@ class HybridFilter : public Estimator {
       Eigen::Matrix<double, Eigen::Dynamic, 3> *pH_fi =
           (Eigen::Matrix<double, Eigen::Dynamic, 3> *)(NULL)) const;
 
-  void cloneFilterStates(StatePointerAndEstimateList *currentStates) const;
+  void cloneFilterStates(StatePointerAndEstimateList *currentStates) const override;
 
   void boxminusFromInput(
       const StatePointerAndEstimateList& refState,
-      Eigen::Matrix<double, Eigen::Dynamic, 1>* deltaX) const;
+      Eigen::Matrix<double, Eigen::Dynamic, 1>* deltaX) const override;
+
+  void updateStates(const Eigen::Matrix<double, Eigen::Dynamic, 1> &deltaX) override;
 
   /// print out the most recent state vector and the stds of its elements.
   /// It can be called in the optimizationLoop, but a better way to save
@@ -461,8 +450,6 @@ class HybridFilter : public Estimator {
       StatePointerAndEstimateList *currentStates,
       size_t camIdx) const;
 
-  void updateStates(const Eigen::Matrix<double, Eigen::Dynamic, 1> &deltaX);
-
   uint64_t getMinValidStateId() const;
 
   void addImuAugmentedStates(const okvis::Time stateTime, int imu_id,
@@ -596,9 +583,7 @@ class HybridFilter : public Estimator {
       Eigen::Matrix<double, Eigen::Dynamic, 2>* J_n,
       Eigen::VectorXd* residual) const;
 
-  Eigen::MatrixXd
-      covariance_;  ///< covariance of the error vector of all states, error is
-                    ///< defined as \tilde{x} = x - \hat{x} except for rotations
+
   /// the error vector corresponds to states x_B | x_imu | x_c | \pi{B_{N-m}}
   /// ... \pi{B_{N-1}} following Li icra 2014 x_B = [^{G}p_B] ^{G}q_B ^{G}v_B
   /// b_g b_a]
@@ -608,9 +593,6 @@ class HybridFilter : public Estimator {
 
   mutable okvis::timing::Timer triangulateTimer;
   mutable okvis::timing::Timer computeHTimer;
-  okvis::timing::Timer computeKalmanGainTimer;
-  okvis::timing::Timer updateStatesTimer;
-  okvis::timing::Timer updateCovarianceTimer;
   okvis::timing::Timer updateLandmarksTimer;
 
   // for each point in the state vector/covariance,
@@ -632,8 +614,7 @@ class HybridFilter : public Estimator {
   double translationThreshold_;
   double rotationThreshold_;
   double trackingRateThreshold_;
-  double updateVecNormTermination_;
-  int maxNumIteration_;
+
   size_t numImuFrames_;
   size_t numKeyframes_;
 };

@@ -71,13 +71,8 @@ HybridFilter::HybridFilter(std::shared_ptr<okvis::ceres::Map> mapPtr)
       minValidStateId_(0),
       triangulateTimer("3.1.1.1 triangulateAMapPoint", true),
       computeHTimer("3.1.1 featureJacobian", true),
-      computeKalmanGainTimer("3.1.2 computeKalmanGain", true),
-      updateStatesTimer("3.1.3 updateStates", true),
-      updateCovarianceTimer("3.1.4 updateCovariance", true),
       updateLandmarksTimer("3.1.5 updateLandmarks", true),
       mTrackLengthAccumulator(100, 0u),
-      updateVecNormTermination_(1e-4),
-      maxNumIteration_(6),
       numImuFrames_(3u),
       numKeyframes_(5u) {
   // reset the default to AIDP.
@@ -92,13 +87,8 @@ HybridFilter::HybridFilter()
       minValidStateId_(0),
       triangulateTimer("3.1.1.1 triangulateAMapPoint", true),
       computeHTimer("3.1.1 featureJacobian", true),
-      computeKalmanGainTimer("3.1.2 computeKalmanGain", true),
-      updateStatesTimer("3.1.3 updateStates", true),
-      updateCovarianceTimer("3.1.4 updateCovariance", true),
       updateLandmarksTimer("3.1.5 updateLandmarks", true),
       mTrackLengthAccumulator(100, 0u),
-      updateVecNormTermination_(1e-4),
-      maxNumIteration_(6),
       numImuFrames_(3u),
       numKeyframes_(5u) {
   // reset the default to AIDP.
@@ -1931,7 +1921,6 @@ void HybridFilter::boxminusFromInput(
 
 void HybridFilter::updateStates(
     const Eigen::Matrix<double, Eigen::Dynamic, 1>& deltaX) {
-  updateStatesTimer.start();
   const size_t numNavImuCamStates = startIndexOfClonedStatesFast();
   // number of navigation, imu, and camera states in the covariance
   const size_t numNavImuCamPoseStates =
@@ -2033,7 +2022,6 @@ void HybridFilter::updateStates(
   }
   OKVIS_ASSERT_EQ_DBG(Exception, aStart + 3, (size_t)deltaX.rows(),
                       "deltaX size not equal to what's' expected.");
-  updateStatesTimer.stop();
 
   updateSensorRigs();
 }

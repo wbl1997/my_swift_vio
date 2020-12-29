@@ -200,6 +200,7 @@ LIST(APPEND SOURCEFILES
     src/loop_closure/LcdThirdPartyWrapper.cpp
     src/loop_closure/LoopClosureDetectorParams.cpp
 
+    src/msckf/BaseFilter.cpp
     src/msckf/CameraSystemCreator.cpp
     src/msckf/ConsistentEstimator.cpp
     src/msckf/GeneralEstimator.cpp
@@ -324,6 +325,7 @@ list(APPEND TEST_SRC_FILES
 
     test/msckf/TestBoundedImuDeque.cpp
     test/msckf/TestCovarianceEstimation.cpp
+    test/msckf/TestEkf.cpp
     test/msckf/TestEpipolarFactor.cpp
     test/msckf/TestEpipolarJacobian.cpp
     test/msckf/TestEuclideanParamError.cpp

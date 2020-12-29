@@ -184,50 +184,13 @@ void TFVIO::optimize(size_t /*numIter*/, size_t /*numThreads*/, bool verbose) {
                   static_cast<double>(landmarksMap_.size());
 
   if (FLAGS_use_IEKF) {
-      StatePointerAndEstimateList initialStates;
-      cloneFilterStates(&initialStates);
-      int numIteration = 0;
-      DefaultEkfUpdater pceu(covariance_, navAndImuParamsDim, featureVariableDimen);
-      while (numIteration < maxNumIteration_) {
-        Eigen::MatrixXd T_H, R_q;
-        Eigen::Matrix<double, Eigen::Dynamic, 1> r_q;
-        int numResiduals = computeStackedJacobianAndResidual(&T_H, &r_q, &R_q);
-        if (numResiduals == 0) {
-          minValidStateId_ = getMinValidStateId();
-          return;  // no need to optimize
-        }
-        computeKalmanGainTimer.start();
-        Eigen::VectorXd totalCorrection;
-        boxminusFromInput(initialStates, &totalCorrection);
-        Eigen::VectorXd deltax =
-            pceu.computeCorrection(T_H, r_q, R_q, &totalCorrection);
-        computeKalmanGainTimer.stop();
-        updateStates(deltax);
-        double deltaNorm = deltax.lpNorm<Eigen::Infinity>();
-        if (deltaNorm < updateVecNormTermination_)
-          break;
-        ++numIteration;
-      }
-      updateCovarianceTimer.start();
-      pceu.updateCovariance(&covariance_);
-      updateCovarianceTimer.stop();
+    updateIekf(navAndImuParamsDim, featureVariableDimen);
   } else {
-    Eigen::MatrixXd T_H, R_q;
-    Eigen::Matrix<double, Eigen::Dynamic, 1> r_q;
-    int numResiduals = computeStackedJacobianAndResidual(&T_H, &r_q, &R_q);
-    if (numResiduals == 0) {
-      minValidStateId_ = getMinValidStateId();
-      return;  // no need to optimize
-    }
-    DefaultEkfUpdater pceu(covariance_, navAndImuParamsDim, featureVariableDimen);
-    computeKalmanGainTimer.start();
-    Eigen::Matrix<double, Eigen::Dynamic, 1> deltaX =
-        pceu.computeCorrection(T_H, r_q, R_q);
-    computeKalmanGainTimer.stop();
-    updateStates(deltaX);
-    updateCovarianceTimer.start();
-    pceu.updateCovariance(&covariance_);
-    updateCovarianceTimer.stop();
+    updateEkf(navAndImuParamsDim, featureVariableDimen);
+  }
+  if (numResiduals_ == 0) {
+    minValidStateId_ = getMinValidStateId();
+    return;
   }
 
   // update landmarks that are tracked in the current frame(the newly inserted

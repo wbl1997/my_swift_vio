@@ -39,12 +39,6 @@ void FilterHelper::shrinkResidual(const Eigen::MatrixXd& H_o,
     *r_q = r_o;
     *T_H = H_o;
     *R_q = R_o;
-
-    // make T_H compatible with covariance dimension by expanding T_H with
-    // zeros corresponding to the rest states besides nVariableDim
-    //        Eigen::MatrixXd expandedT_H(dimH_o[0], cov.rows());
-    //        expandedT_H<< Eigen::MatrixXd::Zero(dimH_o[0], 42), *T_H,
-    //        Eigen::MatrixXd::Zero(dimH_o[0], 9); *T_H = expandedT_H;
   } else {  // project H_o, reduce the residual dimension
     // TODO(jhuai): use SPQR instead for computing T_H, refer to MSCKF_stereo
     // https://github.com/KumarRobotics/msckf_vio/blob/master/src/msckf_vio.cpp#L930-L950

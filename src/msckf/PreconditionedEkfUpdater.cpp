@@ -16,8 +16,8 @@ DEFINE_double(max_inc_tol, 2,
 namespace okvis {
 PreconditionedEkfUpdater::PreconditionedEkfUpdater(const Eigen::MatrixXd &cov,
                                                    int obsVarStartIndex,
-                                                   int variable_dim)
-    : DefaultEkfUpdater(cov, obsVarStartIndex, variable_dim) {}
+                                                   int variableDim)
+    : DefaultEkfUpdater(cov, obsVarStartIndex, variableDim) {}
 
 PreconditionedEkfUpdater::~PreconditionedEkfUpdater() {}
 
@@ -28,9 +28,9 @@ PreconditionedEkfUpdater::computeCorrection(
     const Eigen::MatrixXd &R_q,
     const Eigen::Matrix<double, Eigen::Dynamic, 1> *totalCorrection) {
   Eigen::MatrixXd Py = T_H *
-                           cov_ref_.block(observationVariableStartIndex_,
+                           covRef_.block(observationVariableStartIndex_,
                                           observationVariableStartIndex_,
-                                          variable_dim_, variable_dim_) *
+                                          variableDim_, variableDim_) *
                            T_H.transpose() +
                        R_q;
 
@@ -58,17 +58,17 @@ PreconditionedEkfUpdater::computeCorrection(
   //  PyScaledInv.setIdentity();
   //  llt_py.solveInPlace(PyScaledInv);
   //  Eigen::MatrixXd KScaled =
-  //      (cov_ref_.block(0, observationVariableStartIndex_, cov_dim_,
-  //                         variable_dim_) *
+  //      (covRef_.block(0, observationVariableStartIndex_, covDim_,
+  //                         variableDim_) *
   //       T_H.transpose()) *
   //      SVecI.asDiagonal() * PyScaledInv;
 
   // There is not much difference between the above and the below approach
   Eigen::MatrixXd KScaled_transpose =
       llt_py.solve(SVecI.asDiagonal() *
-                   (T_H * cov_ref_
+                   (T_H * covRef_
                               .block(0, observationVariableStartIndex_,
-                                     cov_dim_, variable_dim_)
+                                     covDim_, variableDim_)
                               .transpose()));
   KScaled_ = KScaled_transpose.transpose();
 
@@ -80,25 +80,25 @@ PreconditionedEkfUpdater::computeCorrection(
     deltaX = KScaled_ * (rqScaled - SVecI.asDiagonal() * T_H *
                                         totalCorrection->segment(
                                             observationVariableStartIndex_,
-                                            variable_dim_)) + (*totalCorrection);
+                                            variableDim_)) + (*totalCorrection);
   }
   if (!deltaX.allFinite()) {
     std::cout << "allfinite? KScaled " << KScaled_.allFinite() << " rqScaled "
               << rqScaled.allFinite() << " SVec1 " << SVecI.allFinite()
               << " T_H " << T_H.allFinite() << " cov_ref block a "
-              << cov_ref_
-                     .block(0, observationVariableStartIndex_, cov_dim_,
-                            variable_dim_)
+              << covRef_
+                     .block(0, observationVariableStartIndex_, covDim_,
+                            variableDim_)
                      .allFinite()
               << " block b "
-              << cov_ref_.block(observationVariableStartIndex_,
+              << covRef_.block(observationVariableStartIndex_,
                                 observationVariableStartIndex_,
-                                variable_dim_, variable_dim_).allFinite()
+                                variableDim_, variableDim_).allFinite()
               << " R_q " << R_q.allFinite() << std::endl;
     OKVIS_ASSERT_TRUE(Exception, false, "nan in kalman filter");
   }
 
-  double incNorm = deltaX.head<15>().lpNorm<Eigen::Infinity>();
+  double incNorm = deltaX.head(std::min(15, covDim_)).lpNorm<Eigen::Infinity>();
   if (incNorm > FLAGS_max_inc_tol) {
     LOG(WARNING) << "Correction in norm " << incNorm << " is greater than "
                  << FLAGS_max_inc_tol << ".\nPyScaled of condition number: "
@@ -125,12 +125,12 @@ void PreconditionedEkfUpdater::updateCovariance(
 }
 
 DefaultEkfUpdater::DefaultEkfUpdater(const Eigen::MatrixXd &cov,
-                                     int obsVarStartIndex, int variable_dim)
-    : cov_ref_(cov),
-      cov_dim_(cov_ref_.rows()),
+                                     int obsVarStartIndex, int variableDim)
+    : covRef_(cov),
+      covDim_(covRef_.rows()),
       observationVariableStartIndex_(obsVarStartIndex),
-      variable_dim_(variable_dim) {
-  if (!cov_ref_.allFinite()) {
+      variableDim_(variableDim) {
+  if (!covRef_.allFinite()) {
     std::cout << "Input cov not finite\n";
   }
 }
@@ -143,9 +143,9 @@ Eigen::Matrix<double, Eigen::Dynamic, 1> DefaultEkfUpdater::computeCorrection(
     const Eigen::MatrixXd &R_q,
     const Eigen::Matrix<double, Eigen::Dynamic, 1> *totalCorrection) {
   PyScaled_ = T_H *
-                  cov_ref_.block(observationVariableStartIndex_,
+                  covRef_.block(observationVariableStartIndex_,
                                  observationVariableStartIndex_,
-                                 variable_dim_, variable_dim_) *
+                                 variableDim_, variableDim_) *
                   T_H.transpose() +
               R_q;
 
@@ -163,9 +163,9 @@ Eigen::Matrix<double, Eigen::Dynamic, 1> DefaultEkfUpdater::computeCorrection(
     OKVIS_ASSERT_TRUE(Exception, false, "LLT failed for PyScaled!");
   }
   Eigen::MatrixXd KScaled_transpose =
-      llt_py.solve((T_H * cov_ref_
+      llt_py.solve((T_H * covRef_
                               .block(0, observationVariableStartIndex_,
-                                     cov_dim_, variable_dim_)
+                                     covDim_, variableDim_)
                               .transpose()));
   KScaled_ = KScaled_transpose.transpose();
 
@@ -177,27 +177,27 @@ Eigen::Matrix<double, Eigen::Dynamic, 1> DefaultEkfUpdater::computeCorrection(
     deltaX =
         KScaled_ * (rqScaled - T_H * totalCorrection->segment(
                                          observationVariableStartIndex_,
-                                         variable_dim_)) + (*totalCorrection);
+                                         variableDim_)) + (*totalCorrection);
   }
   if (!deltaX.allFinite()) {
     std::cout << "allfinite? KScaled " << KScaled_.allFinite() << " rqScaled "
               << rqScaled.allFinite() << " T_H " << T_H.allFinite()
               << " cov_ref block a "
-              << cov_ref_
-                     .block(0, observationVariableStartIndex_, cov_dim_,
-                            variable_dim_)
+              << covRef_
+                     .block(0, observationVariableStartIndex_, covDim_,
+                            variableDim_)
                      .allFinite()
               << " block b "
-              << cov_ref_
+              << covRef_
                      .block(observationVariableStartIndex_,
-                            observationVariableStartIndex_, variable_dim_,
-                            variable_dim_)
+                            observationVariableStartIndex_, variableDim_,
+                            variableDim_)
                      .allFinite()
               << " R_q " << R_q.allFinite() << std::endl;
     OKVIS_ASSERT_TRUE(Exception, false, "nan in kalman filter");
   }
 
-  double incNorm = deltaX.head<15>().lpNorm<Eigen::Infinity>();
+  double incNorm = deltaX.head(std::min(15, covDim_)).lpNorm<Eigen::Infinity>();
   if (incNorm > FLAGS_max_inc_tol) {
     LOG(WARNING) << "Correction in norm " << incNorm << " is greater than "
                  << FLAGS_max_inc_tol << ".\nPyScaled of condition number: "

@@ -11,22 +11,22 @@ class DefaultEkfUpdater {
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
  protected:
-  const Eigen::MatrixXd &cov_ref_;
-  const int cov_dim_; /// rows or cols of covariance matrix.
-  const int observationVariableStartIndex_; /// start index in covariance matrix of variables involved in camera observations.
-  const int variable_dim_; /// dim of variables involved in camera observations.
+  const Eigen::MatrixXd &covRef_;
+  const int covDim_; /// rows or cols of covariance matrix.
+  const int observationVariableStartIndex_; /// start index in covariance matrix of variables involved in observations.
+  const int variableDim_; /// dim of variables involved in observations.
   Eigen::MatrixXd KScaled_;
   Eigen::MatrixXd PyScaled_;
 
  public:
   DefaultEkfUpdater(const Eigen::MatrixXd &cov, int obsVarStartIndex,
-                    int variable_dim);
+                    int variableDim);
 
   virtual ~DefaultEkfUpdater();
 
   /**
    * @brief computeCorrection
-   * @param T_H
+   * @param T_H has variableDim_ columns.
    * @param r_q
    * @param R_q
    * @param totalCorrection $x_{k|k-1} \boxminus x_k^i$ where $x_{k|k-1} :=
@@ -48,7 +48,7 @@ class PreconditionedEkfUpdater : public DefaultEkfUpdater {
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
   PreconditionedEkfUpdater(const Eigen::MatrixXd &cov, int obsVarStartIndex,
-                           int variable_dim);
+                           int variableDim);
 
   virtual ~PreconditionedEkfUpdater();
 
