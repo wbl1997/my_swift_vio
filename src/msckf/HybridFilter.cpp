@@ -72,9 +72,7 @@ HybridFilter::HybridFilter(std::shared_ptr<okvis::ceres::Map> mapPtr)
       triangulateTimer("3.1.1.1 triangulateAMapPoint", true),
       computeHTimer("3.1.1 featureJacobian", true),
       updateLandmarksTimer("3.1.5 updateLandmarks", true),
-      mTrackLengthAccumulator(100, 0u),
-      numImuFrames_(3u),
-      numKeyframes_(5u) {
+      mTrackLengthAccumulator(100, 0u) {
   // reset the default to AIDP.
   PointLandmarkOptions plOptions;
   plOptions.landmarkModelId = msckf::InverseDepthParameterization::kModelId;
@@ -88,9 +86,7 @@ HybridFilter::HybridFilter()
       triangulateTimer("3.1.1.1 triangulateAMapPoint", true),
       computeHTimer("3.1.1 featureJacobian", true),
       updateLandmarksTimer("3.1.5 updateLandmarks", true),
-      mTrackLengthAccumulator(100, 0u),
-      numImuFrames_(3u),
-      numKeyframes_(5u) {
+      mTrackLengthAccumulator(100, 0u) {
   // reset the default to AIDP.
   PointLandmarkOptions plOptions;
   plOptions.landmarkModelId = msckf::InverseDepthParameterization::kModelId;
@@ -1322,7 +1318,7 @@ bool HybridFilter::featureJacobian(
         "anchor frame of to be included points should be the current frame");
   }
   pointDataPtr->computePoseAndVelocityForJacobians(FLAGS_use_first_estimate);
-  pointDataPtr->computeSharedJacobians(cameraObservationModelId_);
+  pointDataPtr->computeSharedJacobians(optimizationOptions_.cameraObservationModelId);
   // compute Jacobians for a measurement in image j of the current feature i
   // C_j is the current frame, Bj refers to the body frame associated with the
   // current frame, Ba refers to body frame associated with the anchor frame,
@@ -1507,7 +1503,7 @@ bool HybridFilter::featureJacobian(
     itRoi += 2;
   }
   // What if the Jacobians of the anchor frame is invalid? It should be safe to ignore it.
-  if (numValidObs < minTrackLength_) {
+  if (numValidObs < optimizationOptions_.minTrackLength) {
     computeHTimer.stop();
     return false;
   }
@@ -2118,7 +2114,7 @@ void HybridFilter::optimize(size_t /*numIter*/, size_t /*numThreads*/,
     it->second.residualizeCase = toResidualize;
 
     if (toResidualize == NotInState_NotTrackedNow &&
-        nNumObs >= minTrackLength_) {
+        nNumObs >= optimizationOptions_.minTrackLength) {
       Eigen::MatrixXd H_oi;                           //(2n-3, dimH_o[1])
       Eigen::Matrix<double, Eigen::Dynamic, 1> r_oi;  //(2n-3, 1)
       Eigen::MatrixXd R_oi;                           //(2n-3, 2n-3)
@@ -2737,7 +2733,7 @@ msckf::TriangulationStatus HybridFilter::triangulateAMapPoint(
       &imageNoiseStd, &badObservationIdentifiers);
 
   msckf::TriangulationStatus status;
-  if (numObs < minTrackLength_) {
+  if (numObs < optimizationOptions_.minTrackLength) {
       triangulateTimer.stop();
       status.lackObservations = true;
       return status;
@@ -2967,19 +2963,6 @@ bool HybridFilter::getStateStd(
   const int dim = startIndexOfClonedStatesFast();
   *stateStd = covariance_.topLeftCorner(dim, dim).diagonal().cwiseSqrt();
   return true;
-}
-
-void HybridFilter::setKeyframeRedundancyThresholds(double dist, double angle,
-                                                   double trackingRate,
-                                                   size_t minTrackLength,
-                                                   size_t numKeyframes,
-                                                   size_t numImuFrames) {
-  translationThreshold_ = dist;
-  rotationThreshold_ = angle;
-  trackingRateThreshold_ = trackingRate;
-  minTrackLength_ = minTrackLength;
-  numKeyframes_ = numKeyframes;
-  numImuFrames_ = numImuFrames;
 }
 
 HybridFilter::EpipolarMeasurement::EpipolarMeasurement(
@@ -3233,7 +3216,7 @@ bool HybridFilter::featureJacobianEpipolar(
 
   propagatePoseAndVelocityForMapPoint(pointDataPtr.get());
   pointDataPtr->computePoseAndVelocityForJacobians(FLAGS_use_first_estimate);
-  pointDataPtr->computeSharedJacobians(cameraObservationModelId_);
+  pointDataPtr->computeSharedJacobians(optimizationOptions_.cameraObservationModelId);
 
   // enlarge cov of the head obs to counteract the noise reduction
   // due to correlation in head_tail scheme
@@ -3241,7 +3224,7 @@ bool HybridFilter::featureJacobianEpipolar(
   double headObsCovModifier[2] = {1.0, 1.0};
   headObsCovModifier[0] =
       seqType == HEAD_TAIL
-          ? (static_cast<double>(trackLength - minTrackLength_ + 2u))
+          ? (static_cast<double>(trackLength - optimizationOptions_.minTrackLength + 2u))
           : 1.0;
 
   std::vector<std::pair<int, int>> featurePairs =
@@ -3315,7 +3298,7 @@ uint64_t HybridFilter::getMinValidStateId() const {
   // Also keep at least numImuFrames frames.
   uint64_t keepFrameId(0u);
   size_t i = 0u;
-  size_t numFrameToKeep = numImuFrames_ + numKeyframes_;
+  size_t numFrameToKeep = optimizationOptions_.numImuFrames + optimizationOptions_.numKeyframes;
   for (std::map<uint64_t, States>::const_reverse_iterator rit = statesMap_.rbegin();
        rit != statesMap_.rend(); ++rit) {
     keepFrameId = rit->first;

@@ -833,7 +833,7 @@ void SlidingWindowSmoother::addLandmarkSmartFactorToGraph(const LandmarkId& lmkI
   okvis::MapPoint& mp = landmarksMap_.at(lmkId);
   auto obsIt = mp.observations.lower_bound(okvis::KeypointIdentifier(minValidStateId, 0u, 0u));
   size_t numValidObs = std::distance(obsIt, mp.observations.end());
-  if (numValidObs < minTrackLength_) {
+  if (numValidObs < optimizationOptions_.minTrackLength) {
       return;
   }
   std::shared_ptr<okvis::ceres::HomogeneousPointParameterBlock>
@@ -1315,7 +1315,7 @@ bool SlidingWindowSmoother::triangulateWithDisparityCheck(
   AlignedVector<okvis::kinematics::Transformation> T_CWs;
   std::vector<double> imageNoiseStd;
   size_t numObs = gatherMapPointObservations(mp, &obsDirections, &T_CWs, &imageNoiseStd);
-  if (numObs < minTrackLength_) {
+  if (numObs < optimizationOptions_.minTrackLength) {
     return false;
   }
   if (msckf::hasLowDisparity(obsDirections, T_CWs, imageNoiseStd, focalLength, raySigmaScalar))

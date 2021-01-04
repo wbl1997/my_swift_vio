@@ -828,7 +828,7 @@ bool MSCKF2::featureJacobianGeneric(
   int featureVariableDimen = minimalDimOfAllCameraParams() +
                              kClonedStateMinimalDimen * (statesMap_.size() - 1);
   int residualBlockDim = okvis::cameras::CameraObservationModelResidualDim(
-        cameraObservationModelId_);
+        optimizationOptions_.cameraObservationModelId);
   // all observations for this feature point
   std::vector<Eigen::Vector2d, Eigen::aligned_allocator<Eigen::Vector2d>>
       obsInPixel;
@@ -839,7 +839,7 @@ bool MSCKF2::featureJacobianGeneric(
   std::shared_ptr<msckf::PointSharedData> pointDataPtr(new msckf::PointSharedData());
   msckf::TriangulationStatus status = triangulateAMapPoint(
       mp, obsInPixel, pointLandmark, vRi,
-      pointDataPtr.get(), orderedCulledFrameIds, useEpipolarConstraint_);
+      pointDataPtr.get(), orderedCulledFrameIds, optimizationOptions_.useEpipolarConstraint);
   if (!status.triangulationOk) {
     computeHTimer.stop();
     return false;
@@ -848,7 +848,7 @@ bool MSCKF2::featureJacobianGeneric(
     pointDataPtr->removeExtraObservations(*orderedCulledFrameIds, &vRi);
   }
   pointDataPtr->computePoseAndVelocityForJacobians(FLAGS_use_first_estimate);
-  pointDataPtr->computeSharedJacobians(cameraObservationModelId_);
+  pointDataPtr->computeSharedJacobians(optimizationOptions_.cameraObservationModelId);
   CHECK_NE(statesMap_.rbegin()->first, pointDataPtr->lastFrameId())
       << "The landmark should not be observed by the latest frame in MSCKF.";
 
@@ -906,7 +906,7 @@ bool MSCKF2::featureJacobianGeneric(
     ++itFrameIds;
     itRoi += 2;
   }
-  if (numValidObs < minTrackLength_) {
+  if (numValidObs < optimizationOptions_.minTrackLength) {
     computeHTimer.stop();
     return false;
   }
@@ -927,7 +927,7 @@ bool MSCKF2::featureJacobianGeneric(
     Ri.block(sagax, sagax, residualBlockDim, residualBlockDim).setIdentity();
   }
 
-  if (cameraObservationModelId_ != okvis::cameras::kEpipolarFactorId) {
+  if (optimizationOptions_.cameraObservationModelId != okvis::cameras::kEpipolarFactorId) {
     int columnRankHf = status.raysParallel ? 2 : 3;
     // (rDim * n) x ((rDim * n)-columnRankHf), n==numValidObs
     Eigen::MatrixXd nullQ =
@@ -986,7 +986,7 @@ bool MSCKF2::featureJacobian(const MapPoint &mp, Eigen::MatrixXd &H_oi,
                         Eigen::MatrixXd &R_oi,
                         std::vector<uint64_t>* orderedCulledFrameIds) const {
   if (pointLandmarkOptions_.landmarkModelId == msckf::ParallaxAngleParameterization::kModelId ||
-      cameraObservationModelId_ != okvis::cameras::kReprojectionErrorId) {
+      optimizationOptions_.cameraObservationModelId != okvis::cameras::kReprojectionErrorId) {
     return featureJacobianGeneric(mp, H_oi, r_oi, R_oi, orderedCulledFrameIds);
   }
 
@@ -1006,7 +1006,7 @@ bool MSCKF2::featureJacobian(const MapPoint &mp, Eigen::MatrixXd &H_oi,
 
   msckf::TriangulationStatus status = triangulateAMapPoint(
       mp, obsInPixel, pointLandmark, vRi,
-      pointDataPtr.get(), orderedCulledFrameIds, useEpipolarConstraint_);
+      pointDataPtr.get(), orderedCulledFrameIds, optimizationOptions_.useEpipolarConstraint);
   if (!status.triangulationOk) {
     computeHTimer.stop();
     return false;
@@ -1016,7 +1016,7 @@ bool MSCKF2::featureJacobian(const MapPoint &mp, Eigen::MatrixXd &H_oi,
   }
 
   pointDataPtr->computePoseAndVelocityForJacobians(FLAGS_use_first_estimate);
-  pointDataPtr->computeSharedJacobians(cameraObservationModelId_);
+  pointDataPtr->computeSharedJacobians(optimizationOptions_.cameraObservationModelId);
   CHECK_NE(statesMap_.rbegin()->first, pointDataPtr->lastFrameId())
       << "The landmark should not be observed by the latest frame in MSCKF.";
 
@@ -1084,7 +1084,7 @@ bool MSCKF2::featureJacobian(const MapPoint &mp, Eigen::MatrixXd &H_oi,
     ++itFrameIds;
     itRoi += 2;
   }
-  if (numValidObs < minTrackLength_) {
+  if (numValidObs < optimizationOptions_.minTrackLength) {
     computeHTimer.stop();
     return false;
   }
@@ -1119,13 +1119,8 @@ bool MSCKF2::featureJacobian(const MapPoint &mp, Eigen::MatrixXd &H_oi,
   return true;
 }
 
-void MSCKF2::setKeyframeRedundancyThresholds(double dist, double angle,
-                                             double trackingRate,
-                                             size_t minTrackLength,
-                                             size_t numKeyframes,
-                                             size_t numImuFrames) {
-  HybridFilter::setKeyframeRedundancyThresholds(
-      dist, angle, trackingRate, minTrackLength, numKeyframes, numImuFrames);
+void MSCKF2::addCameraSystem(const okvis::cameras::NCameraSystem &cameras) {
+  Estimator::addCameraSystem(cameras);
   minCulledFrames_ = 4u - camera_rig_.numberCameras();
 }
 
@@ -1151,7 +1146,7 @@ int MSCKF2::computeStackedJacobianAndResidual(
     const size_t nNumObs = it->second.observations.size();
     if (it->second.residualizeCase !=
             NotInState_NotTrackedNow ||
-        nNumObs < minTrackLength_) {
+        nNumObs < optimizationOptions_.minTrackLength) {
       continue;
     }
 
@@ -1161,7 +1156,7 @@ int MSCKF2::computeStackedJacobianAndResidual(
     Eigen::MatrixXd R_oi;                           //(nObsDim, nObsDim)
     bool isValidJacobian = featureJacobian(it->second, H_oi, r_oi, R_oi);
     if (!isValidJacobian) {
-      isValidJacobian = useEpipolarConstraint_
+      isValidJacobian = optimizationOptions_.useEpipolarConstraint
                             ? featureJacobianEpipolar(it->second, &H_oi, &r_oi,
                                                       &R_oi, ENTIRE_TRACK)
                             : isValidJacobian;

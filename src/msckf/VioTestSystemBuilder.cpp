@@ -187,17 +187,17 @@ void VioTestSystemBuilder::createVioSystem(
   if (testSetting.estimator_algorithm == okvis::EstimatorAlgorithm::General) {
     constraintScheme = okvis::OnlyTwoViewConstraints;
   }
+  okvis::Optimization optimOptions;
+  optimOptions.useEpipolarConstraint = testSetting.useEpipolarConstraint;
+  optimOptions.cameraObservationModelId = testSetting.cameraObservationModelId;
+  estimator->setOptimizationOptions(optimOptions);
 
-  estimator->setUseEpipolarConstraint(testSetting.useEpipolarConstraint);
-  estimator->setCameraObservationModel(testSetting.cameraObservationModelId);
   okvis::PointLandmarkOptions plOptions;
   plOptions.landmarkModelId = testSetting.landmarkModelId;
   estimator->setPointLandmarkOptions(plOptions);
 
-  int insideLandmarkModelId = estimator->landmarkModelId();
-  int insideCameraObservationModelId = estimator->cameraObservationModelId();
-  LOG(INFO) << "Present landmark model " << insideLandmarkModelId
-            << " camera model " << insideCameraObservationModelId;
+  LOG(INFO) << "Present landmark model " << testSetting.landmarkModelId
+            << " camera model " << testSetting.cameraObservationModelId;
 
   frontend.reset(new okvis::SimulationFrontend(trueCameraSystem_->numCameras(),
                                                testSetting.addImageNoise, 60,

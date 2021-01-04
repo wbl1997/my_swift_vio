@@ -208,7 +208,7 @@ void CameraMeasurementJacobianTest::initialize() {
   estimator_.setLandmarkInitialized(landmarkId_, true);
 
   // We have 3 observations in 3 frames.
-  int numObservations = 3;  // Warn: This should be at least minTrackLength_.
+  int numObservations = 3;
   int numStates = numObservations + 1;
   for (int k = 0; k < numStates; ++k) {
     okvis::Time currentKFTime = t0_ + okvis::Duration(0.5 * k + 0.5);

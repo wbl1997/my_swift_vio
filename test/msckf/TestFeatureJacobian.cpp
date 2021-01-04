@@ -228,17 +228,13 @@ public:
       size_t numThreads = 2u;
       estimator->optimize(maxIterations, numThreads, false);
       okvis::Optimization sharedOptConfig;
-      size_t numKeyFrames = 5u;
-      size_t numImuFrames = 3u;
-      estimator->setKeyframeRedundancyThresholds(
-          sharedOptConfig.translationThreshold,
-          sharedOptConfig.rotationThreshold,
-          sharedOptConfig.trackingRateThreshold, sharedOptConfig.minTrackLength,
-          numKeyFrames, numImuFrames);
-      okvis::MapPointVector removedLandmarks;
+      sharedOptConfig.numKeyframes = 5;
+      sharedOptConfig.numImuFrames = 3;
+      estimator->setOptimizationOptions(sharedOptConfig);
 
-      estimator->applyMarginalizationStrategy(numKeyFrames, numImuFrames,
-                                              removedLandmarks);
+      okvis::MapPointVector removedLandmarks;
+      estimator->applyMarginalizationStrategy(sharedOptConfig.numKeyframes,
+          sharedOptConfig.numImuFrames, removedLandmarks);
       estimator->print(debugStream);
       debugStream << std::endl;
 

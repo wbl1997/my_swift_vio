@@ -282,12 +282,6 @@ class HybridFilter : public Estimator, public BaseFilter {
 
   bool getStateStd(Eigen::Matrix<double, Eigen::Dynamic, 1>* stateStd) const final;
 
-  void setKeyframeRedundancyThresholds(double dist, double angle,
-                                       double trackingRate,
-                                       size_t minTrackLength,
-                                       size_t numKeyframes,
-                                       size_t numImuFrames) override;
-
   void initCovariance();
 
   void initCameraParamCovariance(int camIdx);
@@ -610,13 +604,7 @@ class HybridFilter : public Estimator, public BaseFilter {
                                 // 0,1,2, to a fixed number
   msckf::MotionAndStructureStats slamStats_;
   double trackingRate_;
-  // Threshold for determine keyframes
-  double translationThreshold_;
-  double rotationThreshold_;
-  double trackingRateThreshold_;
 
-  size_t numImuFrames_;
-  size_t numKeyframes_;
 };
 }  // namespace okvis
 #include <msckf/implementation/HybridFilter.hpp>

@@ -50,7 +50,7 @@ bool ConsistentEstimator::triangulateWithDisparityCheck(
   AlignedVector<okvis::kinematics::Transformation> T_CWs;
   std::vector<double> imageNoiseStd;
   size_t numObs = gatherMapPointObservations(mp, &obsDirections, &T_CWs, &imageNoiseStd);
-  if (numObs < minTrackLength_) {
+  if (numObs < optimizationOptions_.minTrackLength) {
     return false;
   }
   if (msckf::hasLowDisparity(obsDirections, T_CWs, imageNoiseStd, focalLength, raySigmaScalar))

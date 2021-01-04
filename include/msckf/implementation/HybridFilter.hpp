@@ -69,7 +69,7 @@ HybridFilter::computeCameraObservationJacobians(
   std::shared_ptr<const CameraGeometry> argCameraGeometry =
       std::static_pointer_cast<const CameraGeometry>(baseCameraGeometry);
 
-  switch (cameraObservationModelId_) {
+  switch (optimizationOptions_.cameraObservationModelId) {
     case okvis::cameras::kReprojectionErrorId: {
       typedef okvis::ceres::RsReprojectionError<
           CameraGeometry, ProjectionIntrinsicModel, ExtrinsicModel,

@@ -191,11 +191,7 @@ class MSCKF2 : public HybridFilter {
       Eigen::MatrixXd* T_H, Eigen::Matrix<double, Eigen::Dynamic, 1>* r_q,
       Eigen::MatrixXd* R_q) const final;
 
-  void setKeyframeRedundancyThresholds(double dist, double angle,
-                                       double trackingRate,
-                                       size_t minTrackLength,
-                                       size_t numKeyframes,
-                                       size_t numImuFrames) final;
+  void addCameraSystem(const okvis::cameras::NCameraSystem& cameras) final;
 
  private:
   void findRedundantCamStates(

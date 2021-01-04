@@ -117,11 +117,11 @@ int TFVIO::computeStackedJacobianAndResidual(
     ResidualizeCase rc = it->second.residualizeCase;
     const size_t nNumObs = it->second.observations.size();
     if (seqType == ENTIRE_TRACK) {
-      if (rc != NotInState_NotTrackedNow || nNumObs < minTrackLength_) {
+      if (rc != NotInState_NotTrackedNow || nNumObs < optimizationOptions_.minTrackLength) {
         continue;
       }
     } else {
-      if (rc != NotToAdd_TrackedNow || nNumObs < minTrackLength_) {
+      if (rc != NotToAdd_TrackedNow || nNumObs < optimizationOptions_.minTrackLength) {
         continue;
       }
     }

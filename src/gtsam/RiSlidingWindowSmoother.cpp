@@ -291,7 +291,7 @@ void RiSlidingWindowSmoother::addLandmarkSmartFactorToGraph(const LandmarkId& lm
   okvis::MapPoint& mp = landmarksMap_.at(lmkId);
   auto obsIt = mp.observations.lower_bound(okvis::KeypointIdentifier(minValidStateId, 0u, 0u));
   size_t numValidObs = std::distance(obsIt, mp.observations.end());
-  if (numValidObs < minTrackLength_) {
+  if (numValidObs < optimizationOptions_.minTrackLength) {
       return;
   }
   std::shared_ptr<okvis::ceres::HomogeneousPointParameterBlock>
