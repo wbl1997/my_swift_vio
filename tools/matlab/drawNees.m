@@ -24,8 +24,8 @@ line_widths = {{2, 2, 2}, {2, 2, 2}, {1, 1, 1}, {2, 2, 2}};
 downsamplefactor = 10; % 1 original data.
 backgroundColor = 'None'; % 'w' for debugging, 'None' for production.
 drawOnlyPose = 1; % 0 draw position, orientation, and pose.
-single_line_styles={'r--', 'k-.', 'b-', 'g:'};
-single_line_widths={2, 2, 1, 2};
+single_line_styles={'r-', 'k-.', 'g--', 'b:'};
+single_line_widths={1, 1, 1, 1.5};
 indices = 2:4;
 Q = 0.05;
 [Tl, Tr] = two_sided_prob_region_nees(Q, 6, num_runs);
@@ -67,8 +67,8 @@ if drawOnlyPose == 1
 else
     label_list = cell(1, length(est_files) * 3);
     for i = 1:length(est_files)
-        label_list(1, (i-1) * 3 + (1:3)) = {[labels{i}, '-Position'], ...
-            [labels{i}, '-Orientation'], [labels{i}, '-Pose']};
+        label_list(1, (i-1) * 3 + (1:3)) = {[labels{i}, ' Position'], ...
+            [labels{i}, ' Orientation'], [labels{i}, ' Pose']};
     end
 end
 leg = legend(label_list, 'Location', 'Best');

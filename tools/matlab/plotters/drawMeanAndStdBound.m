@@ -44,7 +44,11 @@ end
 
 legendLabels = cell(dimen * 2, 1);
 if dimen <= 3
-    candidateLegendLabels = {'x', 'y', 'z'};
+    if dimen == 1
+        candidateLegendLabels = {'z'};
+    else
+        candidateLegendLabels = {'x', 'y', 'z'};
+    end
 else
     candidateLegendLabels = {'1', '2', '3', '4', '5', '6', '7', '8', '9'};   
 end
@@ -52,7 +56,7 @@ for i = 1:dimen
     legendLabels{i} = candidateLegendLabels{i};
     legendLabels{dimen + i} = ['3\sigma_', candidateLegendLabels{i}];
 end
-legend(legendLabels);
+legend(line_handles(1:dimen*2), legendLabels);
 
 xlabel('time (sec)');
 grid on;
