@@ -50,7 +50,7 @@ gtsam::Vector RiProjectionFactorIDP::evaluateError(
   Eigen::Vector2d error;
   Eigen::Matrix<double, 4, 1> ab1rho(abrho[0], abrho[1], 1, abrho[2]);
 
-  AlignedVector<okvis::kinematics::Transformation> transformList(4);
+  Eigen::AlignedVector<okvis::kinematics::Transformation> transformList(4);
   transformList[0] = T_BCj_;
   transformList[3] = T_BCa_;
 

@@ -96,8 +96,8 @@ class CameraObservationJacobianTest {
 
   std::vector<uint64_t> frameIds() const { return frameIds_; }
 
-  AlignedVector<okvis::kinematics::Transformation> truePoses() const {
-    AlignedVector<okvis::kinematics::Transformation> T_WB_list;
+  Eigen::AlignedVector<okvis::kinematics::Transformation> truePoses() const {
+    Eigen::AlignedVector<okvis::kinematics::Transformation> T_WB_list;
     T_WB_list.reserve(3);
     for (int j = 0; j < 3; ++j) {
         T_WB_list.push_back(poseBlocks_[j]->estimate());
@@ -844,14 +844,14 @@ void CameraObservationJacobianTest::verifyJacobians(
   const int krd = okvis::cameras::CameraObservationModelResidualDim(
       coo_.cameraObservationModelId);
   Eigen::VectorXd residuals(krd);
-  AlignedVector<Eigen::Matrix<double, -1, 7, Eigen::RowMajor>> de_deltaTWB(
+  Eigen::AlignedVector<Eigen::Matrix<double, -1, 7, Eigen::RowMajor>> de_deltaTWB(
       3, Eigen::Matrix<double, -1, 7, Eigen::RowMajor>(krd, 7));
-  AlignedVector<Eigen::Matrix<double, -1, 9, Eigen::RowMajor>> de_dSpeedAndBias(
+  Eigen::AlignedVector<Eigen::Matrix<double, -1, 9, Eigen::RowMajor>> de_dSpeedAndBias(
       3, Eigen::Matrix<double, -1, 9, Eigen::RowMajor>(krd, 9));
-  AlignedVector<Eigen::Matrix<double, -1, 6, Eigen::RowMajor>>
+  Eigen::AlignedVector<Eigen::Matrix<double, -1, 6, Eigen::RowMajor>>
       de_deltaTWB_minimal(
           3, Eigen::Matrix<double, -1, 6, Eigen::RowMajor>(krd, 6));
-  AlignedVector<Eigen::Matrix<double, -1, 9, Eigen::RowMajor>>
+  Eigen::AlignedVector<Eigen::Matrix<double, -1, 9, Eigen::RowMajor>>
       de_dSpeedAndBias_minimal(
           3, Eigen::Matrix<double, -1, 9, Eigen::RowMajor>(krd, 9));
 
@@ -929,17 +929,17 @@ void CameraObservationJacobianTest::verifyJacobians(
       de_dSpeedAndBias[0].topRightCorner(krd, 3);
 
   // compute the numeric diff and check
-  AlignedVector<
+  Eigen::AlignedVector<
       Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>>
       de_deltaTWB_numeric(3,
                           Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic,
                                         Eigen::RowMajor>(krd, 7));
-  AlignedVector<
+  Eigen::AlignedVector<
       Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>>
       de_deltaTWB_minimal_numeric(
           3, Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic,
                            Eigen::RowMajor>(krd, 6));
-  AlignedVector<
+  Eigen::AlignedVector<
       Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>>
       de_dSpeedAndBias_numeric(
           3, Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic,
@@ -1107,11 +1107,11 @@ void setupPoseOptProblem(bool perturbPose, bool rollingShutter,
 
   const size_t numberTrials = 100;
   std::vector<std::shared_ptr<msckf::PointLandmark>> visibleLandmarks;
-  AlignedVector<AlignedVector<Eigen::Vector2d>> pointObservationList;
+  Eigen::AlignedVector<Eigen::AlignedVector<Eigen::Vector2d>> pointObservationList;
   visibleLandmarks.reserve(numberTrials);
   pointObservationList.reserve(numberTrials);
 
-  AlignedVector<okvis::kinematics::Transformation> true_T_WB_list =
+  Eigen::AlignedVector<okvis::kinematics::Transformation> true_T_WB_list =
       jacTest.truePoses();
   okvis::kinematics::Transformation T_BC = jacTest.extrinsicBlock()->estimate();
 
@@ -1119,9 +1119,9 @@ void setupPoseOptProblem(bool perturbPose, bool rollingShutter,
     Eigen::Vector4d pCm = cameraGeometry->createRandomVisibleHomogeneousPoint(
         double(i % 10) * 3 + 2.0);
     okvis::kinematics::Transformation T_WBm = true_T_WB_list[0];
-    AlignedVector<Eigen::Vector3d> observationsxy1;
+    Eigen::AlignedVector<Eigen::Vector3d> observationsxy1;
     observationsxy1.reserve(3);
-    AlignedVector<Eigen::Vector2d> imageObservations;
+    Eigen::AlignedVector<Eigen::Vector2d> imageObservations;
     imageObservations.reserve(3);
     std::vector<size_t> anchorObsIndices{0, 1};
 
@@ -1154,9 +1154,9 @@ void setupPoseOptProblem(bool perturbPose, bool rollingShutter,
     }
     std::shared_ptr<msckf::PointLandmark> pl(new msckf::PointLandmark(
         msckf::ParallaxAngleParameterization::kModelId));
-    AlignedVector<okvis::kinematics::Transformation> T_BCs{T_BC};
+    Eigen::AlignedVector<okvis::kinematics::Transformation> T_BCs{T_BC};
     std::vector<size_t> camIndices(true_T_WB_list.size(), 0u);
-    AlignedVector<okvis::kinematics::Transformation> T_WCa_list{
+    Eigen::AlignedVector<okvis::kinematics::Transformation> T_WCa_list{
       true_T_WB_list[anchorObsIndices[0]] * T_BC};
     msckf::TriangulationStatus status = pl->initialize(
         true_T_WB_list, observationsxy1, T_BCs, T_WCa_list,

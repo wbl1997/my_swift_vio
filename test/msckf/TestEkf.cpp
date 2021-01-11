@@ -41,7 +41,7 @@ public:
     R_q->setIdentity();
     int validObservations = 0;
     okvis::kinematics::Transformation T_WC_est = poseParameterBlock->estimate();
-    AlignedVector<okvis::kinematics::Transformation> transformList{T_WC_est};
+    Eigen::AlignedVector<okvis::kinematics::Transformation> transformList{T_WC_est};
 
     for (size_t j = 0u; j < observations.size(); ++j) {
       Eigen::Vector2d imagePoint;
@@ -110,9 +110,9 @@ public:
   }
 
   void
-  setObservations(const AlignedVector<Eigen::Vector4d> &observedCorners,
-                  const AlignedVector<Eigen::Vector2d> &observations,
-                  const AlignedVector<Eigen::Vector2d> &observationStddev) {
+  setObservations(const Eigen::AlignedVector<Eigen::Vector4d> &observedCorners,
+                  const Eigen::AlignedVector<Eigen::Vector2d> &observations,
+                  const Eigen::AlignedVector<Eigen::Vector2d> &observationStddev) {
     this->observedCorners = observedCorners;
     this->observations = observations;
     this->observationStddev = observationStddev;
@@ -121,9 +121,9 @@ public:
   std::shared_ptr<okvis::ceres::PoseParameterBlock> poseParameterBlock;
   std::shared_ptr<okvis::cameras::NCameraSystem> cameraSystem;
 
-  AlignedVector<Eigen::Vector4d> observedCorners;
-  AlignedVector<Eigen::Vector2d> observations;
-  AlignedVector<Eigen::Vector2d> observationStddev;
+  Eigen::AlignedVector<Eigen::Vector4d> observedCorners;
+  Eigen::AlignedVector<Eigen::Vector2d> observations;
+  Eigen::AlignedVector<Eigen::Vector2d> observationStddev;
 };
 } // namespace okvis
 
@@ -216,12 +216,12 @@ protected:
   int rows = 7;
   double spacing = 0.06;
   double imageNoiseStd = 1.0;
-  AlignedVector<Eigen::Vector4d> corners;
+  Eigen::AlignedVector<Eigen::Vector4d> corners;
   std::shared_ptr<okvis::cameras::NCameraSystem> cameraSystem;
 
-  AlignedVector<Eigen::Vector2d> observations;
-  AlignedVector<Eigen::Vector2d> observationStddev;
-  AlignedVector<Eigen::Vector4d> observedCorners;
+  Eigen::AlignedVector<Eigen::Vector2d> observations;
+  Eigen::AlignedVector<Eigen::Vector2d> observationStddev;
+  Eigen::AlignedVector<Eigen::Vector4d> observedCorners;
 
   okvis::kinematics::Transformation T_WS_init;
   Eigen::Matrix<double, 6, 6> covInitial;

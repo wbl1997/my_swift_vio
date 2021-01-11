@@ -19,14 +19,14 @@ void StatAccumulator::accumulate() {
 }
 
 void StatAccumulator::computeMean() {
-  for (AlignedVector<okvis::Measurement<Eigen::VectorXd>>::iterator it =
+  for (Eigen::AlignedVector<okvis::Measurement<Eigen::VectorXd>>::iterator it =
            cumulativeStat.begin();
        it != cumulativeStat.end(); ++it)
     it->measurement /= numSucceededRuns;
 }
 
 void StatAccumulator::computeRootMean() {
-  for (AlignedVector<okvis::Measurement<Eigen::VectorXd>>::iterator it =
+  for (Eigen::AlignedVector<okvis::Measurement<Eigen::VectorXd>>::iterator it =
            cumulativeStat.begin();
        it != cumulativeStat.end(); ++it)
     it->measurement = ((it->measurement) / numSucceededRuns).cwiseSqrt();

@@ -57,7 +57,7 @@ void PointLandmarkSimulationRS::projectLandmarksToNFrame(
             double f_of_t = projection[1] - (relativeFeatureTime / tr + 0.5) * height;
 
             // compute Jacobians required by Newton Raphson method.
-            AlignedVector<okvis::kinematics::Transformation> transformList{*cameraSystemRef->T_SC(i), T_WBt};
+            Eigen::AlignedVector<okvis::kinematics::Transformation> transformList{*cameraSystemRef->T_SC(i), T_WBt};
             std::vector<int> exponentList{-1, -1};
             okvis::MultipleTransformPointJacobian mtpj(transformList, exponentList, homogeneousPoints[j]);
             Eigen::Matrix<double, 4, 6> dpC_dT_WB = mtpj.dp_dT(0);

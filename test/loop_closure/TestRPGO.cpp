@@ -265,16 +265,16 @@ class RobustSolverTest {
   }
 
  protected:
-  AlignedVector<Eigen::Vector3d>
+  Eigen::AlignedVector<Eigen::Vector3d>
       corners_;  ///< coordinates of cube corners in the world frame.
   std::string
       visitedCornerIndices_;  ///< indices of visited corners in corners_
   std::vector<std::string>
       neighborCornerIndices_;  ///< indices of neighboring X, Y, Z corners
 
-  AlignedVector<okvis::kinematics::Transformation>
+  Eigen::AlignedVector<okvis::kinematics::Transformation>
       T_WB_list_;  ///< body to world transforms at every visited corner.
-  AlignedVector<okvis::kinematics::Transformation> perturbed_T_WB_list_;
+  Eigen::AlignedVector<okvis::kinematics::Transformation> perturbed_T_WB_list_;
   const double kTranslationStd;
   const double kRotationStd;
   Eigen::Matrix<double, 6, 1> diagonalSigmas_;

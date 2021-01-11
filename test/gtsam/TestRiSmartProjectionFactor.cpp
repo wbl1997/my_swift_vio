@@ -179,7 +179,7 @@ TEST(RiSmartProjectionFactor, noiseless) {
       Z_4x1, factor1->reprojectionErrorAfterTriangulation(values), 1e-7));
 
   factor1->setAnchorIndex(0u);
-  AlignedVector<RiExtendedPose3> stateList{RiExtendedPose3(T_WB1.rotation(), gtsam::Point3(), T_WB1.translation()),
+  Eigen::AlignedVector<RiExtendedPose3> stateList{RiExtendedPose3(T_WB1.rotation(), gtsam::Point3(), T_WB1.translation()),
         RiExtendedPose3(T_WB2.rotation(), gtsam::Point3(), T_WB2.translation())};
   Eigen::Vector3d pC = level_pose.transformTo(landmark1);
   double zinv = 1.0 / pC[2];
@@ -565,7 +565,7 @@ TEST(RiSmartProjectionFactor, computeImplicitJacobian) {
   Matrix expectedE;
   Vector expectedb;
 
-  AlignedVector<RiExtendedPose3> stateList;
+  Eigen::AlignedVector<RiExtendedPose3> stateList;
   stateList.emplace_back(T_WB1.rotation(), gtsam::Point3(), T_WB1.translation());
   stateList.emplace_back(T_WB2.rotation(), gtsam::Point3(), T_WB2.translation());
 

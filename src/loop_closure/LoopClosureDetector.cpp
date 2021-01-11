@@ -528,8 +528,8 @@ bool LoopClosureDetector::geometricVerificationCheck(
           okvis::kinematics::Transformation T_BlBq(T_BlBq_mat);
 
           // collect inliers
-          AlignedVector<Eigen::Vector3d> pointInliers;
-          AlignedVector<Eigen::Vector3d> bearingInliers;
+          Eigen::AlignedVector<Eigen::Vector3d> pointInliers;
+          Eigen::AlignedVector<Eigen::Vector3d> bearingInliers;
           adapter.getInlierPoints(ransac.inliers_, &pointInliers);
           adapter.getInlierBearings(ransac.inliers_, &bearingInliers);
           std::vector<double> rayVariances;

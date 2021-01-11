@@ -214,8 +214,8 @@ class StackedProjectionFactorDynamic {
    * @param T_BC
    * @param T_WB
    */
-  StackedProjectionFactorDynamic(const AlignedVector<Eigen::Vector3d>& pointList,
-                                const AlignedVector<Eigen::Vector3d>& rayList,
+  StackedProjectionFactorDynamic(const Eigen::AlignedVector<Eigen::Vector3d>& pointList,
+                                const Eigen::AlignedVector<Eigen::Vector3d>& rayList,
                                 const okvis::kinematics::Transformation& T_BC) :
     pointList_(pointList), rayList_(rayList),
     T_BC_(T_BC), kNumResiduals((int)pointList_.size() * 2),
@@ -237,7 +237,7 @@ class StackedProjectionFactorDynamic {
     Eigen::Vector3d t_CW =
         T_BC_.q().conjugate() * (-(q_WB.conjugate() * t_WB) - T_BC_.r());
     std::vector<bool> status(pointList_.size(), true);
-    AlignedVector<Eigen::Vector3d> predictedKeypointList;
+    Eigen::AlignedVector<Eigen::Vector3d> predictedKeypointList;
     predictedKeypointList.resize(pointList_.size());
     for (size_t index = 0u; index < pointList_.size(); ++index) {
       Eigen::Vector3d pC = q_CW * pointList_[index] + t_CW;
@@ -278,8 +278,8 @@ class StackedProjectionFactorDynamic {
     return true;
   }
 
-  const AlignedVector<Eigen::Vector3d>& pointList_;
-  const AlignedVector<Eigen::Vector3d>& rayList_;
+  const Eigen::AlignedVector<Eigen::Vector3d>& pointList_;
+  const Eigen::AlignedVector<Eigen::Vector3d>& rayList_;
   const okvis::kinematics::Transformation T_BC_;
   int kNumResiduals;
   const double kEpsilon; ///< minimum depth of point in the camera frame to consider a correspondence to be valid.

@@ -46,8 +46,8 @@ bool ConsistentEstimator::triangulateWithDisparityCheck(
     uint64_t lmkId, Eigen::Matrix<double, 4, 1>* hpW,
     double focalLength, double raySigmaScalar) const {
   const MapPoint& mp = landmarksMap_.at(lmkId);
-  AlignedVector<Eigen::Vector3d> obsDirections;
-  AlignedVector<okvis::kinematics::Transformation> T_CWs;
+  Eigen::AlignedVector<Eigen::Vector3d> obsDirections;
+  Eigen::AlignedVector<okvis::kinematics::Transformation> T_CWs;
   std::vector<double> imageNoiseStd;
   size_t numObs = gatherMapPointObservations(mp, &obsDirections, &T_CWs, &imageNoiseStd);
   if (numObs < optimizationOptions_.minTrackLength) {

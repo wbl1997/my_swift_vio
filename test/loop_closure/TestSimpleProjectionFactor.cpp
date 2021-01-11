@@ -32,7 +32,7 @@ TEST(GtsamWrap, StackedProjectionFactorDynamic) {
   const size_t N = 100;
   LOG(INFO) << "create N=" << N
             << " visible points and add respective reprojection error terms... ";
-  AlignedVector<Eigen::Vector3d> pointList, rayList;
+  Eigen::AlignedVector<Eigen::Vector3d> pointList, rayList;
   pointList.reserve(N);
   rayList.reserve(N);
 

@@ -161,7 +161,7 @@ class HybridFilter : public Estimator, public BaseFilter {
       const std::vector<
           okvis::kinematics::Transformation,
           Eigen::aligned_allocator<okvis::kinematics::Transformation>> &T_WSs,
-      const AlignedVector<okvis::kinematics::Transformation>& T_BCs,
+      const Eigen::AlignedVector<okvis::kinematics::Transformation>& T_BCs,
       const std::vector<size_t>& camIndices) const;
 
   bool isPureRotation(const MapPoint& mp) const;

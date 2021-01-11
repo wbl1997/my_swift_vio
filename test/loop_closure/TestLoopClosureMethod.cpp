@@ -173,7 +173,7 @@ class LCDFixture :public ::testing::Test {
    * @param i_indices
    * @param j_indices
    */
-  AlignedVector<Eigen::Vector4d> initializeKeyframeLandmarks(
+  Eigen::AlignedVector<Eigen::Vector4d> initializeKeyframeLandmarks(
       std::shared_ptr<okvis::MultiFrame> nframe, size_t camIdi, size_t camIdj,
       std::vector<int>* i_indices, std::vector<int>* j_indices) const {
     okvis::kinematics::Transformation T_CiCj =
@@ -181,7 +181,7 @@ class LCDFixture :public ::testing::Test {
     okvis::triangulation::ProbabilisticStereoTriangulator<CAMERA_GEOMETRY_T>
         probabilisticStereoTriangulator(nframe, nframe, camIdi, camIdj, T_CiCj);
     std::vector<bool> status(i_indices->size(), true);
-    AlignedVector<Eigen::Vector4d> triangulatedLandmarks;
+    Eigen::AlignedVector<Eigen::Vector4d> triangulatedLandmarks;
     Eigen::Vector4d hP_Ci;
     bool canBeInitialized;  // It is essentially if two rays are NOT parallel.
 
@@ -394,7 +394,7 @@ class LCDFixture :public ::testing::Test {
   gtsam::Pose3 T_WB_list_[4]; // ref1, cur1. ref2, cur2
   gtsam::Pose3 ref1_to_cur1_pose_, ref2_to_cur2_pose_;
   std::shared_ptr<okvis::MultiFrame> stereo_frames_[4]; // ref1, cur1. ref2, cur2
-  AlignedVector<Eigen::Vector4d> triangulatedLandmarks_[4]; // ref1, cur1, ref2, cur2, triangulated landmark positions in the body frame.
+  Eigen::AlignedVector<Eigen::Vector4d> triangulatedLandmarks_[4]; // ref1, cur1, ref2, cur2, triangulated landmark positions in the body frame.
   std::vector<int> matchedLeftKeypointIndices_[4]; // ref1, cur1, ref2, cur2
 
   const FrameId id_ref1_;

@@ -40,9 +40,9 @@ class PointLandmarkSimulationRSTest : public ::testing::Test {
     mf->setTimestamp(0u, mf->timestamp());
 
     size_t totalLandmarks = 5u;
-    AlignedVector<Eigen::Vector4d> homogeneousPoints;
+    Eigen::AlignedVector<Eigen::Vector4d> homogeneousPoints;
     homogeneousPoints.reserve(totalLandmarks);
-    AlignedVector<Eigen::Vector2d> imagePoints;
+    Eigen::AlignedVector<Eigen::Vector2d> imagePoints;
     imagePoints.reserve(totalLandmarks);
     for (size_t j = 0; j < totalLandmarks; ++j) {
       // backproject to get the landmark position

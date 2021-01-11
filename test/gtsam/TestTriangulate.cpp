@@ -9,8 +9,8 @@
 
 TEST(gtsam, TriangulateHomogeneousDLT) {
   Eigen::Vector3d point = Eigen::Vector3d(1.5, 3, 25);
-  AlignedVector<okvis::kinematics::Transformation> vse3CFromW(3);
-  AlignedVector<Eigen::Vector3d> vV3ImPlane(3);
+  Eigen::AlignedVector<okvis::kinematics::Transformation> vse3CFromW(3);
+  Eigen::AlignedVector<Eigen::Vector3d> vV3ImPlane(3);
   Eigen::Quaterniond so3M = Eigen::Quaterniond::FromTwoVectors(
       Eigen::Vector3d(0.0, 0.0, 1.0), Eigen::Vector3d(0.3, 0.05, 2.5));
   vse3CFromW[0] =
@@ -41,7 +41,7 @@ TEST(gtsam, TriangulateHomogeneousDLT) {
   EXPECT_LT(rms, 1e-3);
 
   // Show that normalized image coordinates do not work.
-  AlignedVector<Eigen::Vector3d> normalRays = vV3ImPlane;
+  Eigen::AlignedVector<Eigen::Vector3d> normalRays = vV3ImPlane;
   for (size_t j = 0u; j < normalRays.size(); ++j) {
     normalRays.at(j).normalize();
   }

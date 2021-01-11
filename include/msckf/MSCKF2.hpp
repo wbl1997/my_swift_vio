@@ -230,7 +230,7 @@ void computeExtrinsicJacobians(
     const okvis::kinematics::Transformation& T_BCi,
     const okvis::kinematics::Transformation& T_BC0,
     int cameraExtrinsicModelId, int mainCameraExtrinsicModelId,
-    AlignedVector<Eigen::MatrixXd>* dT_BCi_dExtrinsics,
+    Eigen::AlignedVector<Eigen::MatrixXd>* dT_BCi_dExtrinsics,
     std::vector<size_t>* involvedCameraIndices,
     size_t mainCameraIndex);
 

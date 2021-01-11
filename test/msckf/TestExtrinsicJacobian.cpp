@@ -88,7 +88,7 @@ class ExtrinsicJacobianTest : public ::testing::Test {
   void checkJacobian(size_t mainCamExtModelId, size_t secondCamExtModelId, size_t mainCamExtDim) {
     {
       std::vector<size_t> involvedCameraIndices{0u};
-      AlignedVector<Eigen::MatrixXd> dT_BCi_dExtrinsics;
+      Eigen::AlignedVector<Eigen::MatrixXd> dT_BCi_dExtrinsics;
       okvis::computeExtrinsicJacobians(
           T_BC_list_[0], T_BC_list_[0], mainCamExtModelId, mainCamExtModelId,
           &dT_BCi_dExtrinsics, &involvedCameraIndices, kMainCameraIndex);
@@ -108,7 +108,7 @@ class ExtrinsicJacobianTest : public ::testing::Test {
     }
     {
       std::vector<size_t> involvedCameraIndices{1u};
-      AlignedVector<Eigen::MatrixXd> dT_BCi_dExtrinsics;
+      Eigen::AlignedVector<Eigen::MatrixXd> dT_BCi_dExtrinsics;
       okvis::computeExtrinsicJacobians(
           T_BC_list_[1], T_BC_list_[0], secondCamExtModelId, mainCamExtModelId,
           &dT_BCi_dExtrinsics, &involvedCameraIndices, kMainCameraIndex);
@@ -148,7 +148,7 @@ class ExtrinsicJacobianTest : public ::testing::Test {
  protected:
   const size_t numCameras_ = 2u;
   const size_t kMainCameraIndex = 0u;
-  AlignedVector<okvis::kinematics::Transformation> T_BC_list_;
+  Eigen::AlignedVector<okvis::kinematics::Transformation> T_BC_list_;
   okvis::kinematics::Transformation T_C0C_list_;
   const double eps_ = 1e-6;
   const double h_ = 1e-6;

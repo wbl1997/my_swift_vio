@@ -46,8 +46,8 @@ class RiProjectionFactorIDPTest : public ::testing::Test {
     simul::SimulationTwoView snv(0, 1.0, 0.0);
 //    simul::SimulationNViewSphere snv(0.0);
 
-    AlignedVector<Eigen::Vector3d> rayList = snv.obsDirections();
-    AlignedVector<Eigen::Vector2d> imagePointList;
+    Eigen::AlignedVector<Eigen::Vector3d> rayList = snv.obsDirections();
+    Eigen::AlignedVector<Eigen::Vector2d> imagePointList;
     for (auto ray : rayList) {
       Eigen::Vector2d imagePoint;
       okvis::cameras::CameraBase::ProjectionStatus status =
@@ -57,7 +57,7 @@ class RiProjectionFactorIDPTest : public ::testing::Test {
       imagePointList.emplace_back(imagePoint);
     }
 
-    AlignedVector<okvis::kinematics::Transformation> T_WC_list =
+    Eigen::AlignedVector<okvis::kinematics::Transformation> T_WC_list =
         snv.camStates();
     okvis::kinematics::Transformation T_CB = T_BC.inverse();
     for (auto T_WC : T_WC_list) {
@@ -81,7 +81,7 @@ class RiProjectionFactorIDPTest : public ::testing::Test {
 
   gtsam::RiProjectionFactorIDP factor_;
   gtsam::RiProjectionFactorIDPAnchor factorAnchor_;
-  AlignedVector<gtsam::RiExtendedPose3> state_list_;
+  Eigen::AlignedVector<gtsam::RiExtendedPose3> state_list_;
   gtsam::Point3 abrho_;
   const size_t kAnchorIndex = 0u;
   const size_t kObservingIndex = 1u;

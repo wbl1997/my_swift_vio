@@ -29,7 +29,7 @@ public:
 
 private:
   // stat for one run, cumulativeStat for multiple runs
-  AlignedVector<okvis::Measurement<Eigen::VectorXd>> stat, cumulativeStat;
+  Eigen::AlignedVector<okvis::Measurement<Eigen::VectorXd>> stat, cumulativeStat;
   int numSucceededRuns;
 };
 }  // namespace okvis

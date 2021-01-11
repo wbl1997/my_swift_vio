@@ -186,8 +186,8 @@ bool Feature::initializePosition() {
 }
 
 Eigen::Vector4d triangulateHomogeneousDLT(
-    const AlignedVector<Eigen::Vector3d>& obsDirections,
-    const AlignedVector<okvis::kinematics::Transformation>& T_CWs) {
+    const Eigen::AlignedVector<Eigen::Vector3d>& obsDirections,
+    const Eigen::AlignedVector<okvis::kinematics::Transformation>& T_CWs) {
   size_t K = obsDirections.size();
   Eigen::MatrixXd A(2 * K, 4);
   for (size_t k = 0; k < K; ++k) {
@@ -209,8 +209,8 @@ Eigen::Vector4d triangulateHomogeneousDLT(
 }
 
 bool hasLowDisparity(
-    const AlignedVector<Eigen::Vector3d>& obsDirections,
-    const AlignedVector<okvis::kinematics::Transformation>& T_CWs,
+    const Eigen::AlignedVector<Eigen::Vector3d>& obsDirections,
+    const Eigen::AlignedVector<okvis::kinematics::Transformation>& T_CWs,
     const std::vector<double>& imageNoiseStd,
     double focalLength, double raySigmaScalar) {
   double keypointAStdDev = (imageNoiseStd.front() + imageNoiseStd.back()) * 0.5;

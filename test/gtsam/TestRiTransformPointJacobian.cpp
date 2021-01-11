@@ -122,7 +122,7 @@ TEST(RiMultipleTransformPointJacobian, random) {
   hpCa.setRandom();
   okvis::MultipleTransformPointJacobian mtpj;
 
-  AlignedVector<okvis::kinematics::Transformation> transforms{
+  Eigen::AlignedVector<okvis::kinematics::Transformation> transforms{
       toOkvisTransform(state_BC), toOkvisTransform(state_WBj),
       toOkvisTransform(state_WBa), toOkvisTransform(state_BC)};
   std::vector<int> exponents{-1, -1, 1, 1};
@@ -133,7 +133,7 @@ TEST(RiMultipleTransformPointJacobian, random) {
 
   mtpj.initialize(transforms, exponents, hpCa, tpj, itpj);
   Eigen::Matrix<double, 4, 4> jp = mtpj.dp_dpoint();
-  AlignedVector<Eigen::Matrix<double, 4, 6>> jTList(4);
+  Eigen::AlignedVector<Eigen::Matrix<double, 4, 6>> jTList(4);
   for (size_t i = 0; i < transforms.size(); ++i) {
     jTList[i] = mtpj.dp_dT(i);
   }
@@ -148,7 +148,7 @@ TEST(RiMultipleTransformPointJacobian, random) {
                  const Eigen::Matrix<double, 4, 1>& hpCa) {
         okvis::MultipleTransformPointJacobian mtpj;
 
-        AlignedVector<okvis::kinematics::Transformation> transforms{
+        Eigen::AlignedVector<okvis::kinematics::Transformation> transforms{
             toOkvisTransform(state_BC), toOkvisTransform(state_WBj),
             toOkvisTransform(state_WBa), toOkvisTransform(state_BC)};
         std::vector<int> exponents{-1, -1, 1, 1};
@@ -159,7 +159,7 @@ TEST(RiMultipleTransformPointJacobian, random) {
         mtpj.initialize(transforms, exponents, hpCa, tpj, itpj);
         return mtpj.evaluate();
       };
-  AlignedVector<Eigen::Matrix<double, 4, 6>> njList(3);
+  Eigen::AlignedVector<Eigen::Matrix<double, 4, 6>> njList(3);
 
   njList[0] = cutoutVelocityPart(
       gtsam::numericalDerivative41(hpCj, state_BC, state_WBj, state_WBa, hpCa));

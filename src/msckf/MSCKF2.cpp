@@ -522,14 +522,14 @@ bool MSCKF2::measurementJacobian(
   okvis::kinematics::Transformation T_BC0 =
       camera_rig_.getCameraExtrinsic(kMainCameraIndex);
 
-  AlignedVector<okvis::kinematics::Transformation> transformList;
+  Eigen::AlignedVector<okvis::kinematics::Transformation> transformList;
   std::vector<int> exponentList;
   transformList.reserve(4);
   exponentList.reserve(4);
   // transformations from left to right.
   transformList.push_back(T_BCj);
   exponentList.push_back(-1);
-  AlignedVector<okvis::kinematics::Transformation> lP_transformList = transformList;
+  Eigen::AlignedVector<okvis::kinematics::Transformation> lP_transformList = transformList;
   lP_transformList.reserve(4);
   kinematics::Transformation lP_T_WBtj =
       pointDataPtr->T_WBtij_ForJacobian(observationIndex);
@@ -540,14 +540,14 @@ bool MSCKF2::measurementJacobian(
   std::vector<size_t> camIndices{camIdx};
   std::vector<size_t> mtpjExtrinsicIndices{0u};
   std::vector<size_t> mtpjPoseIndices{1u};
-  AlignedVector<okvis::kinematics::Transformation> T_BC_list{T_BCj};
+  Eigen::AlignedVector<okvis::kinematics::Transformation> T_BC_list{T_BCj};
   int extrinsicModelId = camera_rig_.getExtrinsicOptMode(camIdx);
   std::vector<int> extrinsicModelIdList{extrinsicModelId};
 
   std::vector<size_t> observationIndices{observationIndex};
   uint64_t poseId = pointDataPtr->frameId(observationIndex);
   std::vector<uint64_t> frameIndices{poseId};
-  AlignedVector<okvis::kinematics::Transformation> T_WBt_list{T_WBtj};
+  Eigen::AlignedVector<okvis::kinematics::Transformation> T_WBt_list{T_WBtj};
 
   Eigen::Matrix<double, 4, 3> dhomo_dparams; // dHomogeneousPoint_dParameters.
   dhomo_dparams.setZero();
@@ -624,7 +624,7 @@ bool MSCKF2::measurementJacobian(
   okvis::MultipleTransformPointJacobian lP_mtpj(lP_transformList, exponentList, homogeneousPoint);
   okvis::MultipleTransformPointJacobian mtpj(transformList, exponentList, homogeneousPoint);
   std::vector<std::pair<size_t, size_t>> startIndexToMinDim;
-  AlignedVector<Eigen::MatrixXd> dpoint_dX; // drhoxpCtj_dParameters
+  Eigen::AlignedVector<Eigen::MatrixXd> dpoint_dX; // drhoxpCtj_dParameters
   // compute drhoxpCtj_dParameters
   size_t startIndexCameraParams = startIndexOfCameraParams(kMainCameraIndex);
   for (size_t ja = 0; ja < camIndices.size(); ++ja) { // observing camera and/or anchor camera.
@@ -637,7 +637,7 @@ bool MSCKF2::measurementJacobian(
       involvedCameraIndices.reserve(2);
       involvedCameraIndices.push_back(camIndices[ja]);
       std::vector<std::pair<size_t, size_t>> startIndexToMinDimExtrinsics;
-      AlignedVector<Eigen::MatrixXd> dT_BC_dExtrinsics;
+      Eigen::AlignedVector<Eigen::MatrixXd> dT_BC_dExtrinsics;
       computeExtrinsicJacobians(T_BC_list[ja], T_BC0, extrinsicModelIdList[ja],
                                mainExtrinsicModelId, &dT_BC_dExtrinsics,
                                &involvedCameraIndices, kMainCameraIndex);
@@ -1021,8 +1021,8 @@ bool MSCKF2::featureJacobian(const MapPoint &mp, Eigen::MatrixXd &H_oi,
       << "The landmark should not be observed by the latest frame in MSCKF.";
 
   size_t numPoses = pointDataPtr->numObservations();
-  AlignedVector<Eigen::Matrix<double, 2, 3>> vJ_pfi;
-  AlignedVector<Eigen::Matrix<double, 2, 1>> vri;  // residuals for feature i
+  Eigen::AlignedVector<Eigen::Matrix<double, 2, 3>> vJ_pfi;
+  Eigen::AlignedVector<Eigen::Matrix<double, 2, 1>> vri;  // residuals for feature i
   vJ_pfi.reserve(numPoses);
   vri.reserve(numPoses);
 
@@ -1054,7 +1054,7 @@ bool MSCKF2::featureJacobian(const MapPoint &mp, Eigen::MatrixXd &H_oi,
     homogeneousPoint /= homogeneousPoint[3];  //[X, Y, Z, 1] in world frame.
   }
   // containers of the above Jacobians for all observations of a mappoint
-  AlignedVector<Eigen::Matrix<double, 2, Eigen::Dynamic>> vJ_X;
+  Eigen::AlignedVector<Eigen::Matrix<double, 2, Eigen::Dynamic>> vJ_X;
   vJ_X.reserve(numPoses);
 
   size_t numValidObs = 0u;
@@ -1293,7 +1293,7 @@ void computeExtrinsicJacobians(
     const okvis::kinematics::Transformation& T_BC0,
     int cameraExtrinsicModelId,
     int mainCameraExtrinsicModelId,
-    AlignedVector<Eigen::MatrixXd>* dT_BCi_dExtrinsics,
+    Eigen::AlignedVector<Eigen::MatrixXd>* dT_BCi_dExtrinsics,
     std::vector<size_t>* involvedCameraIndices,
     size_t mainCameraIndex) {
   dT_BCi_dExtrinsics->reserve(2);

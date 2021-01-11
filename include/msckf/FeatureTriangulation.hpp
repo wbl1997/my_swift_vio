@@ -328,8 +328,8 @@ void Feature::setMaxDepth(double maxDepth) {
  * @return
  */
 Eigen::Vector4d triangulateHomogeneousDLT(
-    const AlignedVector<Eigen::Vector3d>& obsDirections,
-    const AlignedVector<okvis::kinematics::Transformation>& T_CWs);
+    const Eigen::AlignedVector<Eigen::Vector3d>& obsDirections,
+    const Eigen::AlignedVector<okvis::kinematics::Transformation>& T_CWs);
 
 /**
  * @brief hasLowDisparity check if a feature track has low disparity at its endpoints
@@ -338,8 +338,8 @@ Eigen::Vector4d triangulateHomogeneousDLT(
  * @return true if low disparity at its endpoints
  */
 bool hasLowDisparity(
-    const AlignedVector<Eigen::Vector3d>& obsDirections,
-    const AlignedVector<okvis::kinematics::Transformation>& T_CWs,
+    const Eigen::AlignedVector<Eigen::Vector3d>& obsDirections,
+    const Eigen::AlignedVector<okvis::kinematics::Transformation>& T_CWs,
     const std::vector<double>& imageNoiseStd,
     double focalLength, double raySigmaScalar);
 
