@@ -59,42 +59,16 @@ class MSCKF2 : public HybridFilter {
    * numKeyframes+numImuFrames.
    * @return True if successful.
    */
-  virtual bool applyMarginalizationStrategy(
-      size_t numKeyframes, size_t numImuFrames,
-      okvis::MapPointVector& removedLandmarks) final;
+  bool
+  applyMarginalizationStrategy(size_t numKeyframes, size_t numImuFrames,
+                               okvis::MapPointVector &removedLandmarks) final;
 
-  virtual void optimize(size_t numIter, size_t numThreads = 1,
-                        bool verbose = false) final;
-
-  /**
-   * @brief measurementJacobian
-   * @warning Both poseId and anchorId should be older than the latest frame Id.
-   * @param homogeneousPoint, if landmarkModel is AIDP,
-   * \f$[\alpha, \beta, 1, \rho] = [X, Y, Z, 1]^C_a / Z^C_a\f$,
-   * if landmarkModel is HPP, \f$[X,Y,Z,1]^W\f$.
-   * \f $[\alpha, \beta, 1]^T = \rho p_{C{t(i, a)}} \f$ or
-   * \f $[\alpha, \beta, 1]^T = \rho p_{C{t(a)}} \f$
-   * @param obs
-   * @param observationIndex index of the observation inside the point's shared data.
-   * @param pointDataPtr shared data of the point.
-   * @param anchorId
-   * @param T_WBa
-   * @param J_x Jacobians of the image observation relative to the camera parameters and cloned states.
-   *     It ought to be allocated in advance.
-   * @param J_pfi Jacobian of the image observation relative to [\alpha, \beta, \rho].
-   * @param residual
-   * @return
-   */
-  bool measurementJacobian(
-      const Eigen::Vector4d& homogeneousPoint,
-      const Eigen::Vector2d& obs, size_t observationIndex,
-      std::shared_ptr<const msckf::PointSharedData> pointDataPtr,
-      Eigen::Matrix<double, 2, Eigen::Dynamic>* J_x,
-      Eigen::Matrix<double, 2, 3>* J_pfi, Eigen::Vector2d* residual) const;
+  void optimize(size_t numIter, size_t numThreads = 1,
+                bool verbose = false) final;
 
   /**
    * @brief measurementJacobianAIDPMono
-   * @warning legacy method to check measurementJacobian in monocular case
+   * @obsolete legacy method to check measurementJacobian in monocular case
    * with anchored inverse depth parameterization.
    * @param ab1rho
    * @param obs
@@ -114,7 +88,7 @@ class MSCKF2 : public HybridFilter {
 
   /**
    * @brief measurementJacobianHPPMono
-   * @warning legacy method to check measurementJacobian
+   * @obsolete legacy method to check measurementJacobian
    * in monocular homogeneous parameterization case.
    * @param v4Xhomog
    * @param obs
@@ -162,30 +136,16 @@ class MSCKF2 : public HybridFilter {
       Eigen::Matrix<double, Eigen::Dynamic, 2>* J_n,
       Eigen::VectorXd* residual) const;
 
+  bool featureJacobian(
+      const MapPoint &mp, Eigen::MatrixXd &H_oi,
+      Eigen::Matrix<double, Eigen::Dynamic, 1> &r_oi, Eigen::MatrixXd &R_oi,
+      Eigen::Matrix<double, Eigen::Dynamic, 3> *pH_fi = nullptr,
+      std::vector<uint64_t> *involved_frame_ids = nullptr) const override;
+
   bool featureJacobianGeneric(
       const MapPoint& mp, Eigen::MatrixXd& H_oi,
       Eigen::Matrix<double, Eigen::Dynamic, 1>& r_oi, Eigen::MatrixXd& R_oi,
       std::vector<uint64_t>* involved_frame_ids) const;
-
-  /**
-   * @brief compute the marginalized Jacobian for a feature i's track.
-   * @warning The map point is not observed in the latest frame.
-   * @warning The number of observations of the map points is at least two.
-   * @param hpbid homogeneous point parameter block id of the map point
-   * @param mp mappoint
-   * @param r_oi residuals
-   * @param H_oi Jacobians of feature observations w.r.t variables related to
-   * camera intrinsics, camera poses (13+9(m-1))
-   * @param R_oi covariance matrix of these observations
-   * r_oi H_oi and R_oi are values after marginalizing H_fi
-   * @param involved_frame_ids if not null, all the included frames must observe mp
-   * @return true if succeeded in computing the residual and Jacobians
-   */
-  bool featureJacobian(const MapPoint& mp,
-                  Eigen::MatrixXd& H_oi,
-                  Eigen::Matrix<double, Eigen::Dynamic, 1>& r_oi,
-                  Eigen::MatrixXd& R_oi,
-                  std::vector<uint64_t>* involved_frame_ids=nullptr) const;
 
   int computeStackedJacobianAndResidual(
       Eigen::MatrixXd* T_H, Eigen::Matrix<double, Eigen::Dynamic, 1>* r_q,
@@ -214,25 +174,6 @@ class MSCKF2 : public HybridFilter {
   size_t minCulledFrames_;
 };
 
-/**
- * @brief compute the Jacobians of T_BC relative to extrinsic parameters.
- * Perturbation in T_BC is defined by kinematics::oplus.
- * Perturbation in extrinsic parameters are defined by extrinsic models.
- * @param T_BCi Transform from i camera frame to body frame.
- * @param T_BC0 Transform from main camera frame to body frame.
- * @param cameraExtrinsicModelId
- * @param mainCameraExtrinsicModelId
- * @param[out] dT_BCi_dExtrinsics list of Jacobians for T_BC.
- * @param[in, out] involvedCameraIndices observation camera index, and main camera index if T_C0Ci extrinsic model is used.
- * @pre involvedCameraIndices has exactly one camera index for i camera frame.
- */
-void computeExtrinsicJacobians(
-    const okvis::kinematics::Transformation& T_BCi,
-    const okvis::kinematics::Transformation& T_BC0,
-    int cameraExtrinsicModelId, int mainCameraExtrinsicModelId,
-    Eigen::AlignedVector<Eigen::MatrixXd>* dT_BCi_dExtrinsics,
-    std::vector<size_t>* involvedCameraIndices,
-    size_t mainCameraIndex);
 
 }  // namespace okvis
 

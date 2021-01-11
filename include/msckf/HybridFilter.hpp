@@ -86,31 +86,28 @@ class HybridFilter : public Estimator, public BaseFilter {
    * gravity direction which is assumed in the IMU propagation Only one IMU is
    * supported for now
    */
-  virtual bool addStates(okvis::MultiFramePtr multiFrame,
-                         const okvis::ImuMeasurementDeque &imuMeasurements,
-                         bool asKeyframe) final;
-
+  bool addStates(okvis::MultiFramePtr multiFrame,
+                 const okvis::ImuMeasurementDeque &imuMeasurements,
+                 bool asKeyframe) final;
 
   /**
-   * @obsolete the Jacobians only supports one camera.
    * @brief Applies the dropping/marginalization strategy according to the
    * RSS'13/IJRR'14 paper. The new number of frames in the window will be
    * numKeyframes+numImuFrames.
    * @return True if successful.
    */
-  virtual bool applyMarginalizationStrategy(
+  bool applyMarginalizationStrategy(
       size_t numKeyframes, size_t numImuFrames,
-      okvis::MapPointVector &removedLandmarks);
+      okvis::MapPointVector &removedLandmarks) override;
 
   /**
-   * @obsolete the Jacobians only supports one camera.
    * @brief optimize
    * @param numIter
    * @param numThreads
    * @param verbose
    */
-  virtual void optimize(size_t numIter, size_t numThreads = 1,
-                        bool verbose = false);
+  void optimize(size_t numIter, size_t numThreads = 1,
+                bool verbose = false) override;
 
   /// @name Getters
   ///\{
@@ -206,49 +203,78 @@ class HybridFilter : public Estimator, public BaseFilter {
       std::vector<uint64_t>* orderedCulledFrameIds,
       bool checkDisparity = false) const;
 
-  /**
-   * @obsolete the Jacobians only supports one camera.
-   * @brief slamFeatureJacobian, compute the residual and Jacobians for a SLAM feature i
-   * observed in current frame
-   * @param hpbid homogeneous point parameter block id of the map point
-   * @param mp mappoint
-   * @param r_i residual of the observation of the map point in the latest frame
-   * @param H_x Jacobian w.r.t variables related to camera intrinsics, camera
-   * poses (13+9m)
-   * @param H_f Jacobian w.r.t variables of features (3s_k)
-   * @param R_i covariance matrix of this observation (2x2)
-   * @return true if succeeded in computing the residual and Jacobians
-   */
-  bool slamFeatureJacobian(const uint64_t hpbid, const MapPoint &mp,
-                           Eigen::Matrix<double, 2, 1> &r_i,
-                           Eigen::Matrix<double, 2, Eigen::Dynamic> &H_x,
-                           Eigen::Matrix<double, 2, Eigen::Dynamic> &H_f,
-                           Eigen::Matrix2d &R_i);
 
   /**
-   * @obsolete The jacobians do not support ncameras.
-   * @brief compute the marginalized Jacobian for a feature i's track
-   * assume the number of observations of the map points is at least two
+   * @brief measurementJacobian compute Jacobians for a reprojection residual error.
+   * @warning Both poseId and anchorId should be older than the latest frame Id.
+   * @param homogeneousPoint, if landmarkModel is AIDP,
+   * \f$[\alpha, \beta, 1, \rho] = [X, Y, Z, 1]^C_a / Z^C_a\f$,
+   * if landmarkModel is HPP, \f$[X,Y,Z,1]^W\f$.
+   * \f $[\alpha, \beta, 1]^T = \rho p_{C{t(i, a)}} \f$ or
+   * \f $[\alpha, \beta, 1]^T = \rho p_{C{t(a)}} \f$
+   * \f $t(a) \f$ is the epoch of the anchor state/frame.
+   * \f $t(i, a) \f$ is the observation epoch of feature i in anchor frame a.
+   * @param obs image observation in pixels.
+   * @param observationIndex index of the observation inside the point's shared data.
+   * @param pointDataPtr shared data of the point.
+   * @param J_x Jacobians of the image observation relative to the camera parameters and cloned states.
+   *     It ought to be allocated in advance.
+   * @param J_pfi Jacobian of the image observation relative to landmark parameters, e.g., [\alpha, \beta, \rho].
+   * @param residual
+   * @return true if Jacobians are computed successfully.
+   */
+  virtual bool measurementJacobian(
+      const Eigen::Vector4d& homogeneousPoint,
+      const Eigen::Vector2d& obs, size_t observationIndex,
+      std::shared_ptr<const msckf::PointSharedData> pointDataPtr,
+      Eigen::Matrix<double, 2, Eigen::Dynamic>* J_x,
+      Eigen::Matrix<double, 2, 3>* J_pfi, Eigen::Vector2d* residual) const;
+
+  /**
+   * @brief slamFeatureJacobian, compute the residual and Jacobians for a SLAM
+   * feature i observed in the current frame which may have multiple cameras.
+   * @param mp mappoint
+   * @param H_x Jacobian w.r.t variables related to camera intrinsics, camera
+   * poses, with e.g. (13+9m) columns where m is the number of cloned nav
+   * states.
+   * @param r_i residual of the observation of the map point in the latest
+   * frame.
+   * @param R_i covariance matrix of this observation.
+   * @param H_f Jacobian w.r.t variables of features, of columns 3k
+   * where k is the number of features in the state vector.
+   * @return true if succeeded in computing the residual and Jacobians.
+   */
+  bool slamFeatureJacobian(const MapPoint &mp,
+                           Eigen::MatrixXd &H_x,
+                           Eigen::Matrix<double, -1, 1> &r_i,
+                           Eigen::MatrixXd &R_i,
+                           Eigen::MatrixXd &H_f) const;
+
+  /**
+   * @brief compute the marginalized Jacobian for a feature i's track.
+   * A landmark is first triangulated with the feature track, then Jacobians for
+   * the list of observations are computed. The landmark Jacobian is optionally marginalized.
+   * @warning The number of observations of the map points is at least two.
    * @param mp mappoint
    * @param H_oi Jacobians of feature observations w.r.t variables related to
-   camera intrinsics, camera poses (13+9(m-1)-3)
+   * camera intrinsics, camera poses, e.g., (13+9(m-1)), where m is the number
+   * of cloned nav states.
    * @param r_oi residuals
-   * @param R_oi covariance matrix of these observations
-   * @param ab1rho [\alpha, \beta, 1, \rho] of the point in the anchor frame,
-   representing either an ordinary point or a ray
+   * @param R_oi covariance matrix of these observations.
    * @param pH_fi pointer to the Jacobian of feature observations w.r.t the
-   feature parameterization,[\alpha, \beta, \rho]
+   * feature parameterization, e.g., [\alpha, \beta, \rho].
    * if pH_fi is NULL, r_oi H_oi and R_oi are values after marginalizing H_fi,
-   H_oi is of size (2n-3)x(13+9(m-1)-3);
-   * otherwise, H_oi is of size 2nx(13+9(m-1)-3)
+   * H_oi is of size e.g., (2n-3)x(13+9(m-1)-3);
+   * otherwise, H_oi is of size 2nx(13+9(m-1)-3).
+   * @param involved_frame_ids frames for which to compute Jacobians.
    * @return true if succeeded in computing the residual and Jacobians
    */
-  bool featureJacobian(
-      const MapPoint &mp, Eigen::MatrixXd &H_oi,
-      Eigen::Matrix<double, Eigen::Dynamic, 1> &r_oi, Eigen::MatrixXd &R_oi,
-      Eigen::Vector4d &ab1rho,
-      Eigen::Matrix<double, Eigen::Dynamic, 3> *pH_fi =
-          (Eigen::Matrix<double, Eigen::Dynamic, 3> *)(NULL)) const;
+  virtual bool
+  featureJacobian(const MapPoint &mp, Eigen::MatrixXd &H_oi,
+                  Eigen::Matrix<double, Eigen::Dynamic, 1> &r_oi,
+                  Eigen::MatrixXd &R_oi,
+                  Eigen::Matrix<double, Eigen::Dynamic, 3> *pH_fi = nullptr,
+                  std::vector<uint64_t> *involved_frame_ids = nullptr) const;
 
   void cloneFilterStates(StatePointerAndEstimateList *currentStates) const override;
 
@@ -261,9 +287,9 @@ class HybridFilter : public Estimator, public BaseFilter {
   /// print out the most recent state vector and the stds of its elements.
   /// It can be called in the optimizationLoop, but a better way to save
   /// results is to save in the publisher loop
-  virtual bool print(std::ostream &stream) const final;
+  bool print(std::ostream &stream) const final;
 
-  virtual void printTrackLengthHistogram(std::ostream &stream) const final;
+  void printTrackLengthHistogram(std::ostream &stream) const final;
 
   void getCameraTimeParameterPtrs(
       std::vector<std::shared_ptr<const okvis::ceres::ParameterBlock>>
@@ -274,10 +300,10 @@ class HybridFilter : public Estimator, public BaseFilter {
   std::vector<std::shared_ptr<const okvis::ceres::ParameterBlock>>
       getImuAugmentedParameterPtrs() const;
 
-  virtual void getCameraCalibrationEstimate(
+  void getCameraCalibrationEstimate(
       Eigen::Matrix<double, Eigen::Dynamic, 1>* cameraParams) const final;
 
-  virtual void getImuAugmentedStatesEstimate(
+  void getImuAugmentedStatesEstimate(
       Eigen::Matrix<double, Eigen::Dynamic, 1>* extraParams) const final;
 
   bool getStateStd(Eigen::Matrix<double, Eigen::Dynamic, 1>* stateStd) const final;
@@ -428,7 +454,7 @@ class HybridFilter : public Estimator, public BaseFilter {
   static const int kClonedStateMinimalDimen = 9;
 
  protected:
-  virtual bool getOdometryConstraintsForKeyframe(
+  bool getOdometryConstraintsForKeyframe(
       std::shared_ptr<okvis::LoopQueryKeyframeMessage> queryKeyframe) const final;
 
   // using latest state estimates set imu_rig_ and camera_rig_ which are then
@@ -591,7 +617,7 @@ class HybridFilter : public Estimator, public BaseFilter {
 
   // for each point in the state vector/covariance,
   // its landmark id which points to the parameter block
-  std::deque<uint64_t> mInCovLmIds;
+  Eigen::AlignedDeque<okvis::ceres::HomogeneousPointParameterBlock> mInCovLmIds;
 
   // maximum number of consecutive observations until a landmark is added as a
   // state, but can be set dynamically as done in
@@ -606,6 +632,27 @@ class HybridFilter : public Estimator, public BaseFilter {
   double trackingRate_;
 
 };
+
+/**
+ * @brief compute the Jacobians of T_BC relative to extrinsic parameters.
+ * Perturbation in T_BC is defined by kinematics::oplus.
+ * Perturbation in extrinsic parameters are defined by extrinsic models.
+ * @param T_BCi Transform from i camera frame to body frame.
+ * @param T_BC0 Transform from main camera frame to body frame.
+ * @param cameraExtrinsicModelId
+ * @param mainCameraExtrinsicModelId
+ * @param[out] dT_BCi_dExtrinsics list of Jacobians for T_BC.
+ * @param[in, out] involvedCameraIndices observation camera index, and main camera index if T_C0Ci extrinsic model is used.
+ * @pre involvedCameraIndices has exactly one camera index for i camera frame.
+ */
+void computeExtrinsicJacobians(
+    const okvis::kinematics::Transformation& T_BCi,
+    const okvis::kinematics::Transformation& T_BC0,
+    int cameraExtrinsicModelId, int mainCameraExtrinsicModelId,
+    Eigen::AlignedVector<Eigen::MatrixXd>* dT_BCi_dExtrinsics,
+    std::vector<size_t>* involvedCameraIndices,
+    size_t mainCameraIndex);
+
 }  // namespace okvis
 #include <msckf/implementation/HybridFilter.hpp>
 #endif /* INCLUDE_OKVIS_HYBRID_FILTER_HPP_ */
