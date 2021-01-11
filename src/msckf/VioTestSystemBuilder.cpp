@@ -3,7 +3,7 @@
 #include <msckf/CameraSystemCreator.hpp>
 #include <msckf/ConsistentEstimator.hpp>
 #include <msckf/GeneralEstimator.hpp>
-#include <msckf/InvariantEKF.hpp>
+
 #include <gtsam/SlidingWindowSmoother.hpp>
 #include <msckf/TFVIO.hpp>
 #include <msckf/VioEvaluationCallback.hpp>

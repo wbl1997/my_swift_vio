@@ -209,7 +209,6 @@ LIST(APPEND SOURCEFILES
     src/msckf/HybridFilter.cpp
     src/msckf/HybridFrontend.cpp
     src/msckf/ImuSimulator.cpp
-    src/msckf/InvariantEKF.cpp
     src/msckf/MotionAndStructureStats.cpp
     src/msckf/MSCKF2.cpp
     src/msckf/PointLandmark.cpp

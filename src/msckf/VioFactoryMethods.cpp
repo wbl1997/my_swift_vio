@@ -4,7 +4,6 @@
 #include <msckf/GeneralEstimator.hpp>
 #include <msckf/HybridFrontend.hpp>
 #include <msckf/MSCKF2.hpp>
-#include <msckf/InvariantEKF.hpp>
 #include <gtsam/RiSlidingWindowSmoother.hpp>
 #include <gtsam/SlidingWindowSmoother.hpp>
 #include <msckf/TFVIO.hpp>
@@ -64,7 +63,7 @@ std::shared_ptr<okvis::Estimator> createBackend(
       return std::shared_ptr<okvis::Estimator>(new okvis::TFVIO(mapPtr));
 
     case okvis::EstimatorAlgorithm::InvariantEKF:
-      return std::shared_ptr<okvis::Estimator>(new okvis::InvariantEKF(mapPtr));
+      return std::shared_ptr<okvis::Estimator>(new okvis::MSCKF2(mapPtr));
 
     default:
       LOG(ERROR) << "Unknown Estimator type!";
