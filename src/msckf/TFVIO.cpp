@@ -108,9 +108,9 @@ int TFVIO::computeStackedJacobianAndResidual(
       camParamStartIndex, camParamStartIndex, dimH[1], dimH[1]);
 
   // containers of Jacobians of measurements
-  std::vector<Eigen::MatrixXd, Eigen::aligned_allocator<Eigen::MatrixXd>> vr;
-  std::vector<Eigen::MatrixXd, Eigen::aligned_allocator<Eigen::MatrixXd>> vH;
-  std::vector<Eigen::MatrixXd, Eigen::aligned_allocator<Eigen::MatrixXd>> vR;
+  Eigen::AlignedVector<Eigen::Matrix<double, -1, 1>> vr;
+  Eigen::AlignedVector<Eigen::MatrixXd> vH;
+  Eigen::AlignedVector<Eigen::MatrixXd> vR;
   RetrieveObsSeqType seqType =
       static_cast<RetrieveObsSeqType>(FLAGS_two_view_obs_seq_type);
   for (auto it = landmarksMap_.begin(); it != landmarksMap_.end(); ++it) {
@@ -148,7 +148,7 @@ int TFVIO::computeStackedJacobianAndResidual(
     return 0;
   }
   Eigen::MatrixXd H = Eigen::MatrixXd::Zero(dimH[0], featureVariableDimen);
-  Eigen::MatrixXd r(dimH[0], 1);
+  Eigen::Matrix<double, -1, 1> r(dimH[0], 1);
   Eigen::MatrixXd R = Eigen::MatrixXd::Zero(dimH[0], dimH[0]);
   FilterHelper::stackJacobianAndResidual(vH, vr, vR, &H, &r, &R);
   FilterHelper::shrinkResidual(H, r, R, T_H, r_q, R_q);

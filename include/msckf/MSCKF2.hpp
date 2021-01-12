@@ -125,31 +125,33 @@ class MSCKF2 : public HybridFilter {
    * @return
    */
   msckf::MeasurementJacobianStatus measurementJacobianGeneric(
-      const msckf::PointLandmark& pointLandmark,
+      const msckf::PointLandmark &pointLandmark,
       std::shared_ptr<const okvis::cameras::CameraBase> tempCameraGeometry,
-      const Eigen::Vector2d& obs,
-      const Eigen::Matrix2d& obsCovariance,
+      const Eigen::Vector2d &obs, const Eigen::Matrix2d &obsCovariance,
       int observationIndex,
       std::shared_ptr<const msckf::PointSharedData> pointDataPtr,
-      Eigen::MatrixXd* J_X,
-      Eigen::Matrix<double, Eigen::Dynamic, 3>* J_pfi,
-      Eigen::Matrix<double, Eigen::Dynamic, 2>* J_n,
-      Eigen::VectorXd* residual) const;
+      Eigen::MatrixXd *J_X, Eigen::Matrix<double, Eigen::Dynamic, 3> *J_pfi,
+      Eigen::Matrix<double, Eigen::Dynamic, 2> *J_n,
+      Eigen::VectorXd *residual) const;
 
-  bool featureJacobian(
+  bool
+  featureJacobian(const MapPoint &mp, Eigen::MatrixXd &H_oi,
+                  Eigen::Matrix<double, Eigen::Dynamic, 1> &r_oi,
+                  Eigen::MatrixXd &R_oi,
+                  Eigen::Matrix<double, Eigen::Dynamic, 3> *pH_fi = nullptr,
+                  std::vector<uint64_t> *involved_frame_ids = nullptr,
+                  msckf::PointLandmark *pointLandmark = nullptr) const override;
+
+  bool featureJacobianGeneric(
       const MapPoint &mp, Eigen::MatrixXd &H_oi,
       Eigen::Matrix<double, Eigen::Dynamic, 1> &r_oi, Eigen::MatrixXd &R_oi,
       Eigen::Matrix<double, Eigen::Dynamic, 3> *pH_fi = nullptr,
-      std::vector<uint64_t> *involved_frame_ids = nullptr) const override;
-
-  bool featureJacobianGeneric(
-      const MapPoint& mp, Eigen::MatrixXd& H_oi,
-      Eigen::Matrix<double, Eigen::Dynamic, 1>& r_oi, Eigen::MatrixXd& R_oi,
-      std::vector<uint64_t>* involved_frame_ids) const;
+      std::vector<uint64_t> *involved_frame_ids = nullptr,
+      msckf::PointLandmark *pointLandmark = nullptr) const;
 
   int computeStackedJacobianAndResidual(
-      Eigen::MatrixXd* T_H, Eigen::Matrix<double, Eigen::Dynamic, 1>* r_q,
-      Eigen::MatrixXd* R_q) const final;
+      Eigen::MatrixXd *T_H, Eigen::Matrix<double, Eigen::Dynamic, 1> *r_q,
+      Eigen::MatrixXd *R_q) const final;
 
   void addCameraSystem(const okvis::cameras::NCameraSystem& cameras) final;
 

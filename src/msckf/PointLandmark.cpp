@@ -134,6 +134,13 @@ TriangulationStatus PointLandmark::initialize(
   parameters_.insert(parameters_.end(), feature.position.data(),
                      feature.position.data() + 3);
   parameters_.push_back(1.0);
+  if (modelId_ == InverseDepthParameterization::kModelId) {
+    double inverseDepth = 1.0 / parameters_[2];
+    parameters_[0] *= inverseDepth;
+    parameters_[1] *= inverseDepth;
+    parameters_[2] = 1.0;
+    parameters_[3] = inverseDepth;
+  }
   TriangulationStatus status;
   status.triangulationOk = feature.is_initialized;
   status.chi2Small = feature.is_chi2_small;

@@ -29,8 +29,8 @@ class DefaultEkfUpdater {
    * @param T_H has variableDim_ columns.
    * @param r_q
    * @param R_q
-   * @param totalCorrection $x_{k|k-1} \boxminus x_k^i$ where $x_{k|k-1} :=
-   * x_k^0$
+   * @param totalCorrection used for iterative EKF.
+   * \f $x_{k|k-1} \boxminus x_k^i$ where $x_{k|k-1} := x_k^0 \f $
    * @return
    */
   virtual Eigen::Matrix<double, Eigen::Dynamic, 1> computeCorrection(

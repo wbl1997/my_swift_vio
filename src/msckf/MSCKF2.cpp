@@ -95,9 +95,9 @@ int MSCKF2::marginalizeRedundantFrames(size_t numKeyframes, size_t numImuFrames)
                         featureVariableDimen, featureVariableDimen);
   int dimH_o[2] = {0, featureVariableDimen};
   // containers of Jacobians of measurements
-  std::vector<Eigen::MatrixXd, Eigen::aligned_allocator<Eigen::MatrixXd>> vr_o;
-  std::vector<Eigen::MatrixXd, Eigen::aligned_allocator<Eigen::MatrixXd>> vH_o;
-  std::vector<Eigen::MatrixXd, Eigen::aligned_allocator<Eigen::MatrixXd>> vR_o;
+  Eigen::AlignedVector<Eigen::Matrix<double, -1, 1>> vr_o;
+  Eigen::AlignedVector<Eigen::MatrixXd> vH_o;
+  Eigen::AlignedVector<Eigen::MatrixXd> vR_o;
 
   // for each map point in the landmarksMap_,
   // see if the landmark is observed in the redundant frames
@@ -155,23 +155,22 @@ int MSCKF2::marginalizeRedundantFrames(size_t numKeyframes, size_t numImuFrames)
   if (nMarginalizedFeatures > 0u) {
     Eigen::MatrixXd H_o =
         Eigen::MatrixXd::Zero(dimH_o[0], featureVariableDimen);
-    Eigen::MatrixXd r_o(dimH_o[0], 1);
+    Eigen::Matrix<double, -1, 1> r_o(dimH_o[0], 1);
     Eigen::MatrixXd R_o = Eigen::MatrixXd::Zero(dimH_o[0], dimH_o[0]);
     FilterHelper::stackJacobianAndResidual(vH_o, vr_o, vR_o, &H_o, &r_o, &R_o);
     Eigen::MatrixXd T_H, R_q;
     Eigen::Matrix<double, Eigen::Dynamic, 1> r_q;
     FilterHelper::shrinkResidual(H_o, r_o, R_o, &T_H, &r_q, &R_q);
 
-    // perform filter update covariance and states (EKF)
-    DefaultEkfUpdater pceu(covariance_, navAndImuParamsDim, featureVariableDimen);
+    DefaultEkfUpdater updater(covariance_, navAndImuParamsDim, featureVariableDimen);
     computeKalmanGainTimer.start();
     Eigen::Matrix<double, Eigen::Dynamic, 1> deltaX =
-        pceu.computeCorrection(T_H, r_q, R_q);
+        updater.computeCorrection(T_H, r_q, R_q);
     computeKalmanGainTimer.stop();
     updateStates(deltaX);
 
     updateCovarianceTimer.start();
-    pceu.updateCovariance(&covariance_);
+    updater.updateCovariance(&covariance_);
     updateCovarianceTimer.stop();
   }
 
@@ -590,9 +589,11 @@ bool MSCKF2::measurementJacobianHPPMono(
 }
 
 bool MSCKF2::featureJacobianGeneric(
-    const MapPoint& mp, Eigen::MatrixXd& H_oi,
-    Eigen::Matrix<double, Eigen::Dynamic, 1>& r_oi, Eigen::MatrixXd& R_oi,
-    std::vector<uint64_t>* orderedCulledFrameIds) const {
+    const MapPoint &mp, Eigen::MatrixXd &H_oi,
+    Eigen::Matrix<double, Eigen::Dynamic, 1> &r_oi, Eigen::MatrixXd &R_oi,
+    Eigen::Matrix<double, Eigen::Dynamic, 3> * /*pH_fi*/,
+    std::vector<uint64_t> *orderedCulledFrameIds,
+    msckf::PointLandmark *pointLandmark) const {
   const int camIdx = 0;
   std::shared_ptr<const okvis::cameras::CameraBase> tempCameraGeometry =
       camera_rig_.getCameraGeometry(camIdx);
@@ -608,11 +609,11 @@ bool MSCKF2::featureJacobianGeneric(
       obsInPixel;
   std::vector<double> vRi;         // std noise in pixels, 2Nx1
   computeHTimer.start();
-  msckf::PointLandmark pointLandmark(pointLandmarkOptions_.landmarkModelId);
+  *pointLandmark = msckf::PointLandmark(pointLandmarkOptions_.landmarkModelId);
 
   std::shared_ptr<msckf::PointSharedData> pointDataPtr(new msckf::PointSharedData());
   msckf::TriangulationStatus status = triangulateAMapPoint(
-      mp, obsInPixel, pointLandmark, vRi,
+      mp, obsInPixel, *pointLandmark, vRi,
       pointDataPtr.get(), orderedCulledFrameIds, optimizationOptions_.useEpipolarConstraint);
   if (!status.triangulationOk) {
     computeHTimer.stop();
@@ -656,7 +657,7 @@ bool MSCKF2::featureJacobianGeneric(
     imgNoiseStd = *(itRoi + 1);
     obsCov(1, 1) = imgNoiseStd * imgNoiseStd;
     msckf::MeasurementJacobianStatus status = measurementJacobianGeneric(
-        pointLandmark, tempCameraGeometry, obsInPixel[observationIndex],
+        *pointLandmark, tempCameraGeometry, obsInPixel[observationIndex],
         obsCov, observationIndex, pointDataPtr, &J_x, &J_pfi, &J_n, &residual);
     if (status != msckf::MeasurementJacobianStatus::Successful) {
       if (status == msckf::MeasurementJacobianStatus::
@@ -756,18 +757,22 @@ msckf::MeasurementJacobianStatus MSCKF2::measurementJacobianGeneric(
 }
 
 bool MSCKF2::featureJacobian(const MapPoint &mp, Eigen::MatrixXd &H_oi,
-                        Eigen::Matrix<double, Eigen::Dynamic, 1> &r_oi,
-                        Eigen::MatrixXd &R_oi,
-                        Eigen::Matrix<double, Eigen::Dynamic, 3> *pH_fi,
-                        std::vector<uint64_t>* orderedCulledFrameIds) const {
-  if (pointLandmarkOptions_.landmarkModelId == msckf::ParallaxAngleParameterization::kModelId ||
-      optimizationOptions_.cameraObservationModelId != okvis::cameras::kReprojectionErrorId) {
-    return featureJacobianGeneric(mp, H_oi, r_oi, R_oi, orderedCulledFrameIds);
+                             Eigen::Matrix<double, Eigen::Dynamic, 1> &r_oi,
+                             Eigen::MatrixXd &R_oi,
+                             Eigen::Matrix<double, Eigen::Dynamic, 3> *pH_fi,
+                             std::vector<uint64_t> *orderedCulledFrameIds,
+                             msckf::PointLandmark *pointLandmark) const {
+  if (pointLandmarkOptions_.landmarkModelId ==
+          msckf::ParallaxAngleParameterization::kModelId ||
+      optimizationOptions_.cameraObservationModelId !=
+          okvis::cameras::kReprojectionErrorId) {
+    return featureJacobianGeneric(mp, H_oi, r_oi, R_oi, pH_fi,
+                                  orderedCulledFrameIds, pointLandmark);
   } else {
-    return HybridFilter::featureJacobian(mp, H_oi, r_oi, R_oi, pH_fi, orderedCulledFrameIds);
+    return HybridFilter::featureJacobian(mp, H_oi, r_oi, R_oi, pH_fi,
+                                         orderedCulledFrameIds, pointLandmark);
   }
 }
-
 
 void MSCKF2::addCameraSystem(const okvis::cameras::NCameraSystem &cameras) {
   Estimator::addCameraSystem(cameras);
@@ -787,9 +792,9 @@ int MSCKF2::computeStackedJacobianAndResidual(
   const Eigen::MatrixXd variableCov =
       covariance_.block(camParamStartIndex, camParamStartIndex, dimH_o[1], dimH_o[1]);
   // containers of Jacobians of measurements
-  std::vector<Eigen::MatrixXd, Eigen::aligned_allocator<Eigen::MatrixXd>> vr_o;
-  std::vector<Eigen::MatrixXd, Eigen::aligned_allocator<Eigen::MatrixXd>> vH_o;
-  std::vector<Eigen::MatrixXd, Eigen::aligned_allocator<Eigen::MatrixXd>> vR_o;
+  Eigen::AlignedVector<Eigen::Matrix<double, -1, 1>> vr_o;
+  Eigen::AlignedVector<Eigen::MatrixXd> vH_o;
+  Eigen::AlignedVector<Eigen::MatrixXd> vR_o;
 
   for (auto it = landmarksMap_.begin(); it != landmarksMap_.end();
        ++it) {
@@ -831,7 +836,7 @@ int MSCKF2::computeStackedJacobianAndResidual(
     return 0;
   }
   Eigen::MatrixXd H_o = Eigen::MatrixXd::Zero(dimH_o[0], featureVariableDimen);
-  Eigen::MatrixXd r_o(dimH_o[0], 1);
+  Eigen::Matrix<double, -1, 1> r_o(dimH_o[0], 1);
   Eigen::MatrixXd R_o = Eigen::MatrixXd::Zero(dimH_o[0], dimH_o[0]);
   FilterHelper::stackJacobianAndResidual(vH_o, vr_o, vR_o, &H_o, &r_o, &R_o);
   FilterHelper::shrinkResidual(H_o, r_o, R_o, T_H, r_q, R_q);

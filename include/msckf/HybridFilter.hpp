@@ -274,7 +274,17 @@ class HybridFilter : public Estimator, public BaseFilter {
                   Eigen::Matrix<double, Eigen::Dynamic, 1> &r_oi,
                   Eigen::MatrixXd &R_oi,
                   Eigen::Matrix<double, Eigen::Dynamic, 3> *pH_fi = nullptr,
-                  std::vector<uint64_t> *involved_frame_ids = nullptr) const;
+                  std::vector<uint64_t> *involved_frame_ids = nullptr,
+                  msckf::PointLandmark *pointLandmark = nullptr) const;
+
+  Eigen::Vector4d
+  anchoredInverseDepthToWorldCoordinates(const Eigen::Vector4d &ab1rho,
+                                         uint64_t anchorStateId,
+                                         size_t anchorCameraId) const;
+
+  int computeStackedJacobianAndResidual(
+      Eigen::MatrixXd* T_H, Eigen::Matrix<double, Eigen::Dynamic, 1>* r_q,
+      Eigen::MatrixXd* R_q) const override;
 
   void cloneFilterStates(StatePointerAndEstimateList *currentStates) const override;
 

@@ -11,12 +11,13 @@ DEFINE_bool(
 
 void FilterHelper::stackJacobianAndResidual(
     const std::vector<Eigen::MatrixXd,
-                      Eigen::aligned_allocator<Eigen::MatrixXd>>& vH_o,
+                      Eigen::aligned_allocator<Eigen::MatrixXd>> &vH_o,
+    const std::vector<Eigen::Matrix<double, -1, 1>,
+                      Eigen::aligned_allocator<Eigen::Matrix<double, -1, 1>>>
+        &vr_o,
     const std::vector<Eigen::MatrixXd,
-                      Eigen::aligned_allocator<Eigen::MatrixXd>>& vr_o,
-    const std::vector<Eigen::MatrixXd,
-                      Eigen::aligned_allocator<Eigen::MatrixXd>>& vR_o,
-    Eigen::MatrixXd* H_o, Eigen::MatrixXd* r_o, Eigen::MatrixXd* R_o) {
+                      Eigen::aligned_allocator<Eigen::MatrixXd>> &vR_o,
+    Eigen::MatrixXd *H_o, Eigen::Matrix<double, -1, 1> *r_o, Eigen::MatrixXd *R_o) {
   int startRow = 0;
   int cols = vH_o[0].cols();
   for (size_t jack = 0; jack < vH_o.size(); ++jack) {
@@ -193,24 +194,20 @@ const double FilterHelper::chi2_95percentile[] = {
     543.656319, 544.708807, 545.761243, 546.813625, 547.865954, 548.918230, 549.970453, 551.022624, 552.074743, 553.126809
 };
 
-bool FilterHelper::gatingTest(
-    const Eigen::MatrixXd& H, const Eigen::VectorXd& r,
-    const Eigen::MatrixXd& R, const Eigen::MatrixXd& cov) {
-
+bool FilterHelper::gatingTest(const Eigen::MatrixXd &H,
+                              const Eigen::VectorXd &r,
+                              const Eigen::MatrixXd &R,
+                              const Eigen::MatrixXd &cov) {
   if (FLAGS_use_mahalanobis) {
-    // cf. 1. Li ijrr2014 visual inertial navigation with rolling shutter cameras
-    // cf. 2. Li RSS12 optimization based ... eq 6
     double gamma =
-        r.transpose() *
-        (H * cov * H.transpose() + R).ldlt().solve(r);
-
+        r.transpose() * (H * cov * H.transpose() + R).ldlt().solve(r);
     if (gamma < chi2_95percentile[r.rows()]) {
       return true;
     } else {
       return false;
     }
   } else {
-      return true;
+    return true;
   }
 }
 
