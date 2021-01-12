@@ -270,12 +270,13 @@ class HybridFilter : public Estimator, public BaseFilter {
    * @return true if succeeded in computing the residual and Jacobians
    */
   virtual bool
-  featureJacobian(const MapPoint &mp, Eigen::MatrixXd &H_oi,
+  featureJacobian(const MapPoint &mp,
+                  msckf::PointLandmark *pointLandmark,
+                  Eigen::MatrixXd &H_oi,
                   Eigen::Matrix<double, Eigen::Dynamic, 1> &r_oi,
                   Eigen::MatrixXd &R_oi,
                   Eigen::Matrix<double, Eigen::Dynamic, 3> *pH_fi = nullptr,
-                  std::vector<uint64_t> *involved_frame_ids = nullptr,
-                  msckf::PointLandmark *pointLandmark = nullptr) const;
+                  std::vector<uint64_t> *involved_frame_ids = nullptr) const;
 
   Eigen::Vector4d
   anchoredInverseDepthToWorldCoordinates(const Eigen::Vector4d &ab1rho,
@@ -586,7 +587,7 @@ class HybridFilter : public Estimator, public BaseFilter {
   };
 
   /**
-   * @brief featureJacobian
+   * @brief featureJacobianEpipolar
    * @warn Number of columns of Hi equals to the required variable dimen.
    * @param mp MapPoint from which all observations are retrieved
    * @param Hi de_dX.
@@ -629,11 +630,8 @@ class HybridFilter : public Estimator, public BaseFilter {
   // its landmark id which points to the parameter block
   Eigen::AlignedDeque<okvis::ceres::HomogeneousPointParameterBlock> mInCovLmIds;
 
-  // maximum number of consecutive observations until a landmark is added as a
-  // state, but can be set dynamically as done in
-  // Li, icra14 optimization based ...
-  static const size_t maxTrackLength_ = 12;
-  // i.e., max cloned states in the cov matrix
+  // maximum number of consecutive observations until a landmark is added to the state.
+  static const size_t maxTrackLength_ = 11;
 
   std::vector<size_t>
       mTrackLengthAccumulator;  // histogram of the track lengths, start from

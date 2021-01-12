@@ -127,12 +127,13 @@ int MSCKF2::marginalizeRedundantFrames(size_t numKeyframes, size_t numImuFrames)
       continue;
     }
 
+    msckf::PointLandmark landmark;
     Eigen::MatrixXd H_oi;                           //(nObsDim, dimH_o[1])
     Eigen::Matrix<double, Eigen::Dynamic, 1> r_oi;  //(nObsDim, 1)
     Eigen::MatrixXd R_oi;                           //(nObsDim, nObsDim)
 
     bool isValidJacobian =
-        featureJacobian(it->second, H_oi, r_oi, R_oi, nullptr, &involved_cam_state_ids);
+        featureJacobian(it->second, &landmark, H_oi, r_oi, R_oi, nullptr, &involved_cam_state_ids);
     if (!isValidJacobian) {
       // Do we use epipolar constraints for the marginalized feature
       // observations when they do not exhibit enough disparity? It is probably
@@ -589,11 +590,10 @@ bool MSCKF2::measurementJacobianHPPMono(
 }
 
 bool MSCKF2::featureJacobianGeneric(
-    const MapPoint &mp, Eigen::MatrixXd &H_oi,
+    const MapPoint &mp, msckf::PointLandmark *pointLandmark, Eigen::MatrixXd &H_oi,
     Eigen::Matrix<double, Eigen::Dynamic, 1> &r_oi, Eigen::MatrixXd &R_oi,
     Eigen::Matrix<double, Eigen::Dynamic, 3> * /*pH_fi*/,
-    std::vector<uint64_t> *orderedCulledFrameIds,
-    msckf::PointLandmark *pointLandmark) const {
+    std::vector<uint64_t> *orderedCulledFrameIds) const {
   const int camIdx = 0;
   std::shared_ptr<const okvis::cameras::CameraBase> tempCameraGeometry =
       camera_rig_.getCameraGeometry(camIdx);
@@ -609,9 +609,9 @@ bool MSCKF2::featureJacobianGeneric(
       obsInPixel;
   std::vector<double> vRi;         // std noise in pixels, 2Nx1
   computeHTimer.start();
-  *pointLandmark = msckf::PointLandmark(pointLandmarkOptions_.landmarkModelId);
 
   std::shared_ptr<msckf::PointSharedData> pointDataPtr(new msckf::PointSharedData());
+  pointLandmark->setModelId(pointLandmarkOptions_.landmarkModelId);
   msckf::TriangulationStatus status = triangulateAMapPoint(
       mp, obsInPixel, *pointLandmark, vRi,
       pointDataPtr.get(), orderedCulledFrameIds, optimizationOptions_.useEpipolarConstraint);
@@ -756,21 +756,20 @@ msckf::MeasurementJacobianStatus MSCKF2::measurementJacobianGeneric(
   return status;
 }
 
-bool MSCKF2::featureJacobian(const MapPoint &mp, Eigen::MatrixXd &H_oi,
-                             Eigen::Matrix<double, Eigen::Dynamic, 1> &r_oi,
-                             Eigen::MatrixXd &R_oi,
-                             Eigen::Matrix<double, Eigen::Dynamic, 3> *pH_fi,
-                             std::vector<uint64_t> *orderedCulledFrameIds,
-                             msckf::PointLandmark *pointLandmark) const {
+bool MSCKF2::featureJacobian(
+    const MapPoint &mp, msckf::PointLandmark *pointLandmark,
+    Eigen::MatrixXd &H_oi, Eigen::Matrix<double, Eigen::Dynamic, 1> &r_oi,
+    Eigen::MatrixXd &R_oi, Eigen::Matrix<double, Eigen::Dynamic, 3> *pH_fi,
+    std::vector<uint64_t> *orderedCulledFrameIds) const {
   if (pointLandmarkOptions_.landmarkModelId ==
           msckf::ParallaxAngleParameterization::kModelId ||
       optimizationOptions_.cameraObservationModelId !=
           okvis::cameras::kReprojectionErrorId) {
-    return featureJacobianGeneric(mp, H_oi, r_oi, R_oi, pH_fi,
-                                  orderedCulledFrameIds, pointLandmark);
+    return featureJacobianGeneric(mp, pointLandmark, H_oi, r_oi, R_oi, pH_fi,
+                                  orderedCulledFrameIds);
   } else {
-    return HybridFilter::featureJacobian(mp, H_oi, r_oi, R_oi, pH_fi,
-                                         orderedCulledFrameIds, pointLandmark);
+    return HybridFilter::featureJacobian(mp, pointLandmark, H_oi, r_oi, R_oi,
+                                         pH_fi, orderedCulledFrameIds);
   }
 }
 
@@ -805,11 +804,12 @@ int MSCKF2::computeStackedJacobianAndResidual(
       continue;
     }
 
+    msckf::PointLandmark pointLandmark;
     Eigen::MatrixXd H_oi;                           //(nObsDim, dimH_o[1])
     H_oi.resize(0, featureVariableDimen);
     Eigen::Matrix<double, Eigen::Dynamic, 1> r_oi;  //(nObsDim, 1)
     Eigen::MatrixXd R_oi;                           //(nObsDim, nObsDim)
-    bool isValidJacobian = featureJacobian(it->second, H_oi, r_oi, R_oi);
+    bool isValidJacobian = featureJacobian(it->second, &pointLandmark, H_oi, r_oi, R_oi);
     if (!isValidJacobian) {
       isValidJacobian = optimizationOptions_.useEpipolarConstraint
                             ? featureJacobianEpipolar(it->second, &H_oi, &r_oi,

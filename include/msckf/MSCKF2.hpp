@@ -135,19 +135,19 @@ class MSCKF2 : public HybridFilter {
       Eigen::VectorXd *residual) const;
 
   bool
-  featureJacobian(const MapPoint &mp, Eigen::MatrixXd &H_oi,
+  featureJacobian(const MapPoint &mp, msckf::PointLandmark *pointLandmark,
+                  Eigen::MatrixXd &H_oi,
                   Eigen::Matrix<double, Eigen::Dynamic, 1> &r_oi,
                   Eigen::MatrixXd &R_oi,
                   Eigen::Matrix<double, Eigen::Dynamic, 3> *pH_fi = nullptr,
-                  std::vector<uint64_t> *involved_frame_ids = nullptr,
-                  msckf::PointLandmark *pointLandmark = nullptr) const override;
+                  std::vector<uint64_t> *involved_frame_ids = nullptr) const override;
 
   bool featureJacobianGeneric(
-      const MapPoint &mp, Eigen::MatrixXd &H_oi,
+      const MapPoint &mp, msckf::PointLandmark *pointLandmark,
+      Eigen::MatrixXd &H_oi,
       Eigen::Matrix<double, Eigen::Dynamic, 1> &r_oi, Eigen::MatrixXd &R_oi,
       Eigen::Matrix<double, Eigen::Dynamic, 3> *pH_fi = nullptr,
-      std::vector<uint64_t> *involved_frame_ids = nullptr,
-      msckf::PointLandmark *pointLandmark = nullptr) const;
+      std::vector<uint64_t> *involved_frame_ids = nullptr) const;
 
   int computeStackedJacobianAndResidual(
       Eigen::MatrixXd *T_H, Eigen::Matrix<double, Eigen::Dynamic, 1> *r_q,

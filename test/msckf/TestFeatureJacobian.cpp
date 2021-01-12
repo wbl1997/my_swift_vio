@@ -33,13 +33,14 @@ void computeNavErrors(
 
 int examinLandmarkStackedJacobian(const okvis::MapPoint& mapPoint,
                                    std::shared_ptr<okvis::MSCKF2> estimator) {
+  msckf::PointLandmark pointLandmark;
   Eigen::MatrixXd H_oi[2];
   Eigen::Matrix<double, Eigen::Dynamic, 1> r_oi[2];
   Eigen::MatrixXd R_oi[2];
   bool jacOk1 =
-      estimator->featureJacobian(mapPoint, H_oi[0], r_oi[0], R_oi[0], nullptr);
+      estimator->featureJacobian(mapPoint, &pointLandmark, H_oi[0], r_oi[0], R_oi[0], nullptr);
   bool jacOk2 =
-      estimator->featureJacobianGeneric(mapPoint, H_oi[1], r_oi[1], R_oi[1]);
+      estimator->featureJacobianGeneric(mapPoint, &pointLandmark, H_oi[1], r_oi[1], R_oi[1]);
   EXPECT_EQ(jacOk1, jacOk2) << "featureJacobian status";
   if (jacOk1 && jacOk2) {
     Eigen::MatrixXd information = R_oi[0].inverse();
@@ -99,10 +100,11 @@ int examinLandmarkStackedJacobian(const okvis::MapPoint& mapPoint,
 
 int examineLandmarkMeasurementJacobian(
     const okvis::MapPoint& mapPoint, std::shared_ptr<okvis::MSCKF2> estimator) {
+  msckf::PointLandmark pointLandmark;
   Eigen::MatrixXd H_oi;
   Eigen::Matrix<double, Eigen::Dynamic, 1> r_oi;
   Eigen::MatrixXd R_oi;
-  bool jacOk = estimator->featureJacobianGeneric(mapPoint, H_oi, r_oi, R_oi);
+  bool jacOk = estimator->featureJacobianGeneric(mapPoint, &pointLandmark, H_oi, r_oi, R_oi);
 
   // init landmark parameterization
 
