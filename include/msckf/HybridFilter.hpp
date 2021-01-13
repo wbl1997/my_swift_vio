@@ -283,9 +283,17 @@ class HybridFilter : public Estimator, public BaseFilter {
                                          uint64_t anchorStateId,
                                          size_t anchorCameraId) const;
 
+  /**
+   * @brief computeStackedJacobianAndResidual
+   * @warning This function is not const because it modifies map point's status member.
+   * @param T_H
+   * @param r_q
+   * @param R_q
+   * @return
+   */
   int computeStackedJacobianAndResidual(
       Eigen::MatrixXd* T_H, Eigen::Matrix<double, Eigen::Dynamic, 1>* r_q,
-      Eigen::MatrixXd* R_q) const override;
+      Eigen::MatrixXd* R_q) override;
 
   void cloneFilterStates(StatePointerAndEstimateList *currentStates) const override;
 
@@ -630,15 +638,11 @@ class HybridFilter : public Estimator, public BaseFilter {
   // its landmark id which points to the parameter block
   Eigen::AlignedDeque<okvis::ceres::HomogeneousPointParameterBlock> mInCovLmIds;
 
-  // maximum number of consecutive observations until a landmark is added to the state.
-  static const size_t maxTrackLength_ = 11;
-
   std::vector<size_t>
       mTrackLengthAccumulator;  // histogram of the track lengths, start from
                                 // 0,1,2, to a fixed number
   msckf::MotionAndStructureStats slamStats_;
   double trackingRate_;
-
 };
 
 /**

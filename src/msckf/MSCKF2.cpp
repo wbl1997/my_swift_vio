@@ -101,13 +101,9 @@ int MSCKF2::marginalizeRedundantFrames(size_t numKeyframes, size_t numImuFrames)
 
   // for each map point in the landmarksMap_,
   // see if the landmark is observed in the redundant frames
-  for (okvis::PointMap::iterator it = landmarksMap_.begin(); it != landmarksMap_.end();
-       ++it) {
-    const size_t nNumObs = it->second.observations.size();
-    // this feature has been marginalized earlier in optimize()
-    if (it->second.residualizeCase ==
-            NotInState_NotTrackedNow ||
-        nNumObs < minCulledFrames_) {
+  for (okvis::PointMap::iterator it = landmarksMap_.begin();
+       it != landmarksMap_.end(); ++it) {
+    if (!it->second.goodForMarginalization(minCulledFrames_)) {
       continue;
     }
 
@@ -145,7 +141,6 @@ int MSCKF2::marginalizeRedundantFrames(size_t numKeyframes, size_t numImuFrames)
       continue;
     }
 
-    it->second.usedForUpdate = true;
     vr_o.push_back(r_oi);
     vR_o.push_back(R_oi);
     vH_o.push_back(H_oi);
@@ -299,11 +294,11 @@ bool MSCKF2::applyMarginalizationStrategy(
     marginalizeRedundantFrames(numKeyframes, numImuFrames);
   }
 
-  // remove features tracked no more
+  // remove features tracked no more.
   for (PointMap::iterator pit = landmarksMap_.begin();
        pit != landmarksMap_.end();) {
     const MapPoint& mapPoint = pit->second;
-    if (mapPoint.residualizeCase == NotInState_NotTrackedNow) {
+    if (mapPoint.shouldRemove(pointLandmarkOptions_.maxHibernationFrames)) {
       ++mTrackLengthAccumulator[mapPoint.observations.size()];
       for (std::map<okvis::KeypointIdentifier, uint64_t>::const_iterator it =
                mapPoint.observations.begin();
@@ -681,7 +676,7 @@ bool MSCKF2::featureJacobianGeneric(
     ++itFrameIds;
     itRoi += 2;
   }
-  if (numValidObs < optimizationOptions_.minTrackLength) {
+  if (numValidObs < pointLandmarkOptions_.minTrackLengthForMsckf) {
     computeHTimer.stop();
     return false;
   }
@@ -780,7 +775,7 @@ void MSCKF2::addCameraSystem(const okvis::cameras::NCameraSystem &cameras) {
 
 int MSCKF2::computeStackedJacobianAndResidual(
     Eigen::MatrixXd *T_H, Eigen::Matrix<double, Eigen::Dynamic, 1> *r_q,
-    Eigen::MatrixXd *R_q) const {
+    Eigen::MatrixXd *R_q) {
   // compute and stack Jacobians and Residuals for landmarks observed no more
   size_t nMarginalizedFeatures = 0;
   int culledPoints[2] = {0};
@@ -795,12 +790,8 @@ int MSCKF2::computeStackedJacobianAndResidual(
   Eigen::AlignedVector<Eigen::MatrixXd> vH_o;
   Eigen::AlignedVector<Eigen::MatrixXd> vR_o;
 
-  for (auto it = landmarksMap_.begin(); it != landmarksMap_.end();
-       ++it) {
-    const size_t nNumObs = it->second.observations.size();
-    if (it->second.residualizeCase !=
-            NotInState_NotTrackedNow ||
-        nNumObs < optimizationOptions_.minTrackLength) {
+  for (auto it = landmarksMap_.begin(); it != landmarksMap_.end(); ++it) {
+    if (it->second.status.measurementType != FeatureTrackStatus::kMsckfTrack) {
       continue;
     }
 
@@ -816,16 +807,18 @@ int MSCKF2::computeStackedJacobianAndResidual(
                                                       &R_oi, ENTIRE_TRACK)
                             : isValidJacobian;
       if (!isValidJacobian) {
+        it->second.status.measurementFate = FeatureTrackStatus::kComputingJacobiansFailed;
         ++culledPoints[0];
         continue;
       }
     }
 
     if (!FilterHelper::gatingTest(H_oi, r_oi, R_oi, variableCov)) {
-        ++culledPoints[1];
-        continue;
+      it->second.status.measurementFate = FeatureTrackStatus::kPotentialOutlier;
+      ++culledPoints[1];
+      continue;
     }
-
+    it->second.status.measurementFate = FeatureTrackStatus::kSuccessful;
     vr_o.push_back(r_oi);
     vR_o.push_back(R_oi);
     vH_o.push_back(H_oi);
@@ -855,24 +848,16 @@ void MSCKF2::optimize(size_t /*numIter*/, size_t /*numThreads*/, bool verbose) {
     loopFrameAndMatchesList_.clear();
   }
 
-
-  // mark tracks of features that are not tracked in current frame
+  // mark tracks of features that are not tracked in current frame.
   int numTracked = 0;
   int featureVariableDimen = minimalDimOfAllCameraParams() +
       kClonedStateMinimalDimen * (statesMap_.size() - 1);
   int navAndImuParamsDim = navStateAndImuParamsMinimalDim();
-  for (okvis::PointMap::iterator it = landmarksMap_.begin(); it != landmarksMap_.end(); ++it) {
-    ResidualizeCase toResidualize = NotInState_NotTrackedNow;
-    for (auto itObs = it->second.observations.rbegin(),
-              iteObs = it->second.observations.rend();
-         itObs != iteObs; ++itObs) {
-      if (itObs->first.frameId == currFrameId) {
-        toResidualize = NotToAdd_TrackedNow;
-        ++numTracked;
-        break;
-      }
-    }
-    it->second.residualizeCase = toResidualize;
+  for (okvis::PointMap::iterator it = landmarksMap_.begin();
+       it != landmarksMap_.end(); ++it) {
+    numTracked += (it->second.trackedInCurrentFrame(currFrameId) ? 1 : 0);
+    it->second.updateStatus(currFrameId, pointLandmarkOptions_.minTrackLengthForMsckf,
+                            std::numeric_limits<std::size_t>::max());
   }
   trackingRate_ = static_cast<double>(numTracked) /
       static_cast<double>(landmarksMap_.size());
@@ -902,17 +887,14 @@ void MSCKF2::optimize(size_t /*numIter*/, size_t /*numThreads*/, bool verbose) {
 
     for (auto it = landmarksMap_.begin(); it != landmarksMap_.end();
          ++it) {
-      if (it->second.residualizeCase == NotInState_NotTrackedNow) continue;
-      // #Obs may be 1 for a new landmark by the KLT tracking frontend.
-      // It ought to be >= 2 for descriptor matching frontend.
-      if (it->second.observations.size() < 2)
+      if (it->second.status.measurementType != FeatureTrackStatus::kPremature ||
+          it->second.observations.size() < pointLandmarkOptions_.minTrackLengthForMsckf)
         continue;
 
       // update coordinates of map points, this is only necessary when
       // (1) they are used to predict the points projection in new frames OR
       // (2) to visualize the point quality
-      std::vector<Eigen::Vector2d, Eigen::aligned_allocator<Eigen::Vector2d>>
-          obsInPixel;
+      Eigen::AlignedVector<Eigen::Vector2d> obsInPixel;
       std::vector<uint64_t> frameIds;
       std::vector<double> vRi;  // std noise in pixels
 

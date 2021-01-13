@@ -151,7 +151,7 @@ class MSCKF2 : public HybridFilter {
 
   int computeStackedJacobianAndResidual(
       Eigen::MatrixXd *T_H, Eigen::Matrix<double, Eigen::Dynamic, 1> *r_q,
-      Eigen::MatrixXd *R_q) const final;
+      Eigen::MatrixXd *R_q) final;
 
   void addCameraSystem(const okvis::cameras::NCameraSystem& cameras) final;
 

@@ -34,7 +34,7 @@ public:
 
   int computeStackedJacobianAndResidual(
       Eigen::MatrixXd *T_H, Eigen::Matrix<double, Eigen::Dynamic, 1> *r_q,
-      Eigen::MatrixXd *R_q) const override {
+      Eigen::MatrixXd *R_q) override {
     T_H->resize(observations.size() * 2, 6);
     r_q->resize(observations.size() * 2);
     R_q->resize(observations.size() * 2, observations.size() * 2);

@@ -50,7 +50,7 @@ bool ConsistentEstimator::triangulateWithDisparityCheck(
   Eigen::AlignedVector<okvis::kinematics::Transformation> T_CWs;
   std::vector<double> imageNoiseStd;
   size_t numObs = gatherMapPointObservations(mp, &obsDirections, &T_CWs, &imageNoiseStd);
-  if (numObs < optimizationOptions_.minTrackLength) {
+  if (numObs < pointLandmarkOptions_.minTrackLengthForMsckf) {
     return false;
   }
   if (msckf::hasLowDisparity(obsDirections, T_CWs, imageNoiseStd, focalLength, raySigmaScalar))
@@ -105,11 +105,10 @@ bool ConsistentEstimator::addReprojectionFactors() {
   uint64_t minValidStateId = statesMap_.begin()->first;
   for (PointMap::iterator pit = landmarksMap_.begin();
        pit != landmarksMap_.end(); ++pit) {
-    if (pit->second.residualizeCase == NotInState_NotTrackedNow) {
+    if (pit->second.status.inState == false) {
       // remove observations outside the sliding window.
       // because in applyMarginalizationStrategy, we do not delete landmarks
-      // that are in NotInState_NotTrackedNow status
-      // and have zero residuals, so we have to delete these old observations
+      // that are not in state or have zero residuals, so we have to delete these old observations
       // and landmarks of zero observations here.
       for (std::map<KeypointIdentifier, uint64_t>::iterator obsIter =
                pit->second.observations.begin();
@@ -205,7 +204,7 @@ void ConsistentEstimator::optimize(size_t numIter, size_t /*numThreads*/,
   // update landmarks
   {
     for(auto it = landmarksMap_.begin(); it!=landmarksMap_.end(); ++it){
-      if (it->second.residualizeCase == InState_TrackedNow) {
+      if (it->second.status.inState) {
         Eigen::MatrixXd H(3, 3);
         mapPtr_->getLhs(it->first, H);
         Eigen::SelfAdjointEigenSolver<Eigen::Matrix3d> saes(H);
@@ -430,7 +429,7 @@ bool ConsistentEstimator::applyMarginalizationStrategy(
     {
       for(PointMap::iterator pit = landmarksMap_.begin();
           pit != landmarksMap_.end(); ) {
-        if (pit->second.residualizeCase == NotInState_NotTrackedNow) {
+        if (pit->second.status.inState == false) {
           MapPoint& mp = pit->second;
           for (std::map<okvis::KeypointIdentifier, uint64_t>::iterator oit =
                    mp.observations.begin();

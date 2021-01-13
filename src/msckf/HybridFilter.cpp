@@ -681,21 +681,19 @@ bool HybridFilter::applyMarginalizationStrategy(
   LOG(INFO) << "Removing map points!";
   for (PointMap::iterator pit = landmarksMap_.begin();
        pit != landmarksMap_.end();) {
-    ResidualizeCase residualizeCase = pit->second.residualizeCase;
-    if (residualizeCase == NotInState_NotTrackedNow ||
-        residualizeCase == InState_NotTrackedNow) {
-      ceres::Map::ResidualBlockCollection residuals =
-          mapPtr_->residuals(pit->first);
-      for (size_t r = 0; r < residuals.size(); ++r) {
-        std::shared_ptr<ceres::ReprojectionErrorBase> reprojectionError =
-            std::dynamic_pointer_cast<ceres::ReprojectionErrorBase>(
-                residuals[r].errorInterfacePtr);
-        OKVIS_ASSERT_TRUE(Exception, reprojectionError,
-                          "Wrong index of reprojection error");
-        removeObservation(residuals[r].residualBlockId);
+    FeatureTrackStatus status = pit->second.status;
+    if (pit->second.shouldRemove(pointLandmarkOptions_.maxHibernationFrames)) {
+      std::map<okvis::KeypointIdentifier, uint64_t> &observationList =
+          pit->second.observations;
+      for (auto iter = observationList.begin(); iter != observationList.end();
+           ++iter) {
+        if (iter->second) {
+          mapPtr_->removeResidualBlock(
+              reinterpret_cast<::ceres::ResidualBlockId>(iter->second));
+        }
       }
 
-      if (residualizeCase == InState_NotTrackedNow) {
+      if (status.inState) {
         OKVIS_ASSERT_TRUE_DBG(Exception, pit->second.anchorStateId > 0,
                               "a tracked point in the states not recorded");
         toRemoveLmIds.push_back(pit->first);
@@ -705,15 +703,30 @@ bool HybridFilter::applyMarginalizationStrategy(
       removedLandmarks.push_back(pit->second);
       pit = landmarksMap_.erase(pit);
     } else {
+      // remove all observations before minValidStateId
+      std::map<okvis::KeypointIdentifier, uint64_t> &observationList =
+          pit->second.observations;
+      for (auto iter = observationList.begin();
+           iter != observationList.end();) {
+        if (iter->first.frameId < minValidStateId_) {
+          if (iter->second) {
+            mapPtr_->removeResidualBlock(
+                reinterpret_cast<::ceres::ResidualBlockId>(iter->second));
+          }
+          iter = observationList.erase(iter);
+        } else {
+          break;
+        }
+      }
+
       // change anchor pose for features whose anchor is not in the state vector any more.
-      if (residualizeCase == InState_TrackedNow) {
-        if (pit->second.anchorStateId < minValidStateId_) {
-          uint64_t currFrameId = currentFrameId();
+      if (pit->second.shouldChangeAnchor(minValidStateId_)) {
           // transform from the body frame at the anchor frame epoch to the world frame.
+          uint64_t newAnchorFrameId = pit->second.observations.rbegin()->first.frameId;
           okvis::kinematics::Transformation T_WBa;
           get_T_WS(pit->second.anchorStateId, T_WBa);
           okvis::kinematics::Transformation T_BCa;
-          getCameraSensorStates(currFrameId, pit->second.anchorCameraId, T_BCa);
+          getCameraSensorStates(newAnchorFrameId, pit->second.anchorCameraId, T_BCa);
           okvis::kinematics::Transformation T_WCa = T_WBa * T_BCa;
 
           // use the earliest camera frame as the anchor image.
@@ -721,7 +734,7 @@ bool HybridFilter::applyMarginalizationStrategy(
           for (auto observationIter = pit->second.observations.rbegin();
                observationIter != pit->second.observations.rend();
                ++observationIter) {
-            if (observationIter->first.frameId == currFrameId) {
+            if (observationIter->first.frameId == newAnchorFrameId) {
               newAnchorCameraId = observationIter->first.cameraIndex;
             } else {
               break;
@@ -729,9 +742,9 @@ bool HybridFilter::applyMarginalizationStrategy(
           }
           OKVIS_ASSERT_NE(Exception, newAnchorCameraId, -1, "Anchor image not found!");
           okvis::kinematics::Transformation T_WBj;
-          get_T_WS(currFrameId, T_WBj);
+          get_T_WS(newAnchorFrameId, T_WBj);
           okvis::kinematics::Transformation T_BCj;
-          getCameraSensorStates(currFrameId, newAnchorCameraId, T_BCj);
+          getCameraSensorStates(newAnchorFrameId, newAnchorCameraId, T_BCj);
           okvis::kinematics::Transformation T_WCj = T_WBj * T_BCj;
 
           uint64_t toFind = pit->first;
@@ -753,7 +766,7 @@ bool HybridFilter::applyMarginalizationStrategy(
                                    T_WCj.r(), abrhoj, &jacobian);
 
           reparamJacobian.setZero();
-          size_t startRowC = statesMap_[currFrameId]
+          size_t startRowC = statesMap_[newAnchorFrameId]
                                  .global.at(GlobalStates::T_WS)
                                  .startIndexInCov;
           size_t startRowA = statesMap_[pit->second.anchorStateId]
@@ -775,9 +788,8 @@ bool HybridFilter::applyMarginalizationStrategy(
           ab1rho /= ab1rho[2];
           landmarkIter->setEstimate(ab1rho);
 
-          pit->second.anchorStateId = currFrameId;
+          pit->second.anchorStateId = newAnchorFrameId;
           pit->second.anchorCameraId = newAnchorCameraId;
-        }
       }
       ++pit;
     }
@@ -1280,7 +1292,7 @@ bool HybridFilter::featureJacobian(
     ++observationIter;
     imageNoiseIter += 2;
   }
-  if (numValidObs < optimizationOptions_.minTrackLength) {
+  if (numValidObs < pointLandmarkOptions_.minTrackLengthForMsckf) {
     computeHTimer.stop();
     return false;
   }
@@ -1981,7 +1993,7 @@ void HybridFilter::updateStates(
 
 int HybridFilter::computeStackedJacobianAndResidual(
     Eigen::MatrixXd */*T_H*/, Eigen::Matrix<double, Eigen::Dynamic, 1> */*r_q*/,
-    Eigen::MatrixXd */*R_q*/) const {
+    Eigen::MatrixXd */*R_q*/) {
   // for each feature track
   //   if the feature track is to be initialized and marginalized
   //     compute Jacobians and residuals
@@ -2042,8 +2054,6 @@ void HybridFilter::optimize(size_t /*numIter*/, size_t /*numThreads*/,
   size_t nMarginalizedFeatures =
       0;  // features not in state and not tracked in current frame
   size_t nInStateFeatures = 0;  // features in state and tracked now
-  size_t nToAddFeatures =
-      0;  // features tracked long enough and to be included in states
 
   const uint64_t currFrameId = currentFrameId();
   size_t navAndImuParamsDim = navStateAndImuParamsMinimalDim();
@@ -2056,46 +2066,11 @@ void HybridFilter::optimize(size_t /*numIter*/, size_t /*numThreads*/,
       dimH_o[1] + kClonedStateMinimalDimen,
       dimH_o[1] + kClonedStateMinimalDimen);  // covariance block for camera and pose state copies including the current pose state is used for SLAM features.
 
-  for (okvis::PointMap::iterator it = landmarksMap_.begin(); it != landmarksMap_.end();
-       ++it) {
-    ResidualizeCase toResidualize = NotInState_NotTrackedNow;
-    const size_t nNumObs = it->second.observations.size();
-    if (it->second.anchorStateId == 0) {  // this point is not in the state vector.
-      for (auto itObs = it->second.observations.rbegin(),
-                iteObs = it->second.observations.rend();
-           itObs != iteObs; ++itObs) {
-        if (itObs->first.frameId == currFrameId) {
-          if (nNumObs == maxTrackLength_) {
-            // this point could be included in the state vector.
-            toResidualize = ToAdd_TrackedNow;
-            ++nToAddFeatures;
-          } else {
-            std::stringstream ss;
-            ss << "A point not in state should not have consecutive"
-                  " features more than " << maxTrackLength_;
-            OKVIS_ASSERT_LT_DBG(Exception, nNumObs, maxTrackLength_,
-                                ss.str());
-            toResidualize = NotToAdd_TrackedNow;
-          }
-          break;
-        }
-      }
-    } else {
-      toResidualize = InState_NotTrackedNow;
-      for (auto itObs = it->second.observations.rbegin(),
-                iteObs = it->second.observations.rend();
-           itObs != iteObs; ++itObs) {
-        if (itObs->first.frameId ==
-            currFrameId) {  // point in states are still tracked so far
-          toResidualize = InState_TrackedNow;
-          break;
-        }
-      }
-    }
-    it->second.residualizeCase = toResidualize;
+  for (okvis::PointMap::iterator it = landmarksMap_.begin(); it != landmarksMap_.end(); ++it) {
+    it->second.updateStatus(currFrameId, pointLandmarkOptions_.minTrackLengthForMsckf,
+                            pointLandmarkOptions_.minTrackLengthForSlam);
 
-    if (toResidualize == NotInState_NotTrackedNow &&
-        nNumObs >= optimizationOptions_.minTrackLength) {
+    if (it->second.status.measurementType == FeatureTrackStatus::kMsckfTrack) {
       msckf::PointLandmark landmark;
       Eigen::MatrixXd H_oi;                           //(2n-3, dimH_o[1])
       Eigen::Matrix<double, Eigen::Dynamic, 1> r_oi;  //(2n-3, 1)
@@ -2103,18 +2078,20 @@ void HybridFilter::optimize(size_t /*numIter*/, size_t /*numThreads*/,
       bool isValidJacobian =
           featureJacobian(it->second, &landmark, H_oi, r_oi, R_oi);
       if (!isValidJacobian) {
-          continue;
-      }
-      if (!FilterHelper::gatingTest(H_oi, r_oi, R_oi, variableCov)) {
+        it->second.setMeasurementFate(FeatureTrackStatus::kComputingJacobiansFailed);
         continue;
       }
-
+      if (!FilterHelper::gatingTest(H_oi, r_oi, R_oi, variableCov)) {
+        it->second.setMeasurementFate(FeatureTrackStatus::kPotentialOutlier);
+        continue;
+      }
+      it->second.status.measurementFate = FeatureTrackStatus::kSuccessful;
       vr_o.push_back(r_oi);
       vR_o.push_back(R_oi);
       vH_o.push_back(H_oi);
       dimH_o[0] += r_oi.rows();
       ++nMarginalizedFeatures;
-    } else if (toResidualize == InState_TrackedNow) {
+    } else if (it->second.status.measurementType == FeatureTrackStatus::kSlamObservation) {
       // compute residual and Jacobian for a observed point which is in the states
       Eigen::Matrix<double, -1, 1> r_i;
       Eigen::MatrixXd H_x;
@@ -2122,15 +2099,18 @@ void HybridFilter::optimize(size_t /*numIter*/, size_t /*numThreads*/,
       Eigen::MatrixXd R_i;
       bool isValidJacobian =
           slamFeatureJacobian(it->second, H_x, r_i, R_i, H_f);
-      if (!isValidJacobian) continue;
+      if (!isValidJacobian) {
+        it->second.setMeasurementFate(FeatureTrackStatus::kComputingJacobiansFailed);
+        continue;
+      }
       Eigen::MatrixXd H_xf(H_x.rows(), H_x.cols() + H_f.cols());
       H_xf.leftCols(H_x.cols()) = H_x;
       H_xf.rightCols(H_f.cols()) = H_f;
       if (!FilterHelper::gatingTest(H_xf, r_i, R_i, variableCov2)) {
-        it->second.residualizeCase = InState_NotTrackedNow;
+        it->second.setMeasurementFate(FeatureTrackStatus::kPotentialOutlier);
         continue;
       }
-
+      it->second.status.measurementFate = FeatureTrackStatus::kSuccessful;
       vr_i.push_back(r_i);
       vH_x.push_back(H_x);
       vH_f.push_back(H_f);
@@ -2199,7 +2179,7 @@ void HybridFilter::optimize(size_t /*numIter*/, size_t /*numThreads*/,
 
   // initialize SLAM features and update state
   updateLandmarksTimer.start();
-  if (nToAddFeatures) {
+  {
     Eigen::Matrix<double, Eigen::Dynamic, 1> r_i;
     Eigen::MatrixXd H_i;
     Eigen::MatrixXd R_i;
@@ -2243,12 +2223,12 @@ void HybridFilter::optimize(size_t /*numIter*/, size_t /*numThreads*/,
     landmarksToAdd.reserve(20);
     for (okvis::PointMap::iterator pit = landmarksMap_.begin();
          pit != landmarksMap_.end(); ++pit) {
-      if (pit->second.residualizeCase == ToAdd_TrackedNow) {
+      if (pit->second.status.measurementType == FeatureTrackStatus::kSlamInitialization) {
         msckf::PointLandmark pointLandmark;
         bool isValidJacobian =
             featureJacobian(pit->second, &pointLandmark, H_i, r_i, R_i, &H_fi);
         if (!isValidJacobian) {  // This feature will be removed and marginalized as a MSCKF feature in the next optimization step.
-          pit->second.residualizeCase = NotInState_NotTrackedNow;
+          pit->second.setMeasurementFate(FeatureTrackStatus::kComputingJacobiansFailed);
           continue;
         }
         Eigen::Vector4d homogeneousPoint =
@@ -2260,7 +2240,7 @@ void HybridFilter::optimize(size_t /*numIter*/, size_t /*numThreads*/,
         R_o = Q2.transpose() * R_i * Q2;
 
         if (!FilterHelper::gatingTest(H_o, z_o, R_o, variableCov)) {
-          pit->second.residualizeCase = NotInState_NotTrackedNow;
+          pit->second.setMeasurementFate(FeatureTrackStatus::kPotentialOutlier);
           continue;
         }
 
@@ -2278,7 +2258,8 @@ void HybridFilter::optimize(size_t /*numIter*/, size_t /*numThreads*/,
         }
         OKVIS_ASSERT_NE(Exception, anchorCameraId, -1, "Anchor image not found!");
         pit->second.anchorCameraId = anchorCameraId;
-        pit->second.residualizeCase = InState_TrackedNow;
+        pit->second.status.inState = true;
+        pit->second.setMeasurementFate(FeatureTrackStatus::kSuccessful);
         landmarksToAdd.emplace_back(homogeneousPoint, pit->first);
 
         vz_1.push_back(Q1.transpose() * r_i);
@@ -2414,21 +2395,8 @@ void HybridFilter::optimize(size_t /*numIter*/, size_t /*numThreads*/,
   minValidStateId_ = currFrameId;
   for (auto it = landmarksMap_.begin(); it != landmarksMap_.end();
        ++it) {
-    ResidualizeCase residualizeCase = it->second.residualizeCase;
-    if (residualizeCase == NotInState_NotTrackedNow ||
-        residualizeCase == InState_NotTrackedNow)
-      continue;
-
-    if (residualizeCase == NotToAdd_TrackedNow) {
-      if (it->second.observations.size() <
-          2)  // this happens with a just inserted landmark that has not been
-              // triangulated.
-        continue;
-
-      auto itObs = it->second.observations.begin();
-      if (itObs->first.frameId < minValidStateId_)
-        minValidStateId_ = itObs->first.frameId;
-    } else { // SLAM features
+    if (it->second.status.inState) {
+      // SLAM features
       it->second.quality = 1.0;
       uint64_t toFind = it->first;
       auto landmarkIter = std::find_if(
@@ -2443,6 +2411,12 @@ void HybridFilter::optimize(size_t /*numIter*/, size_t /*numThreads*/,
       double depth = it->second.pointHomog[2];
       if (depth < 1e-6) {
         it->second.quality = 0.0;
+      }
+    } else {
+      if (it->second.status.measurementType == FeatureTrackStatus::kPremature) {
+        auto itObs = it->second.observations.begin();
+        if (itObs->first.frameId < minValidStateId_)
+          minValidStateId_ = itObs->first.frameId;
       }
     }
   }
@@ -2633,7 +2607,7 @@ msckf::TriangulationStatus HybridFilter::triangulateAMapPoint(
       &imageNoiseStd, &badObservationIdentifiers);
 
   msckf::TriangulationStatus status;
-  if (numObs < optimizationOptions_.minTrackLength) {
+  if (numObs < pointLandmarkOptions_.minTrackLengthForMsckf) {
       triangulateTimer.stop();
       status.lackObservations = true;
       return status;
@@ -3124,7 +3098,7 @@ bool HybridFilter::featureJacobianEpipolar(
   double headObsCovModifier[2] = {1.0, 1.0};
   headObsCovModifier[0] =
       seqType == HEAD_TAIL
-          ? (static_cast<double>(trackLength - optimizationOptions_.minTrackLength + 2u))
+          ? (static_cast<double>(trackLength - pointLandmarkOptions_.minTrackLengthForMsckf + 2u))
           : 1.0;
 
   std::vector<std::pair<int, int>> featurePairs =
@@ -3182,15 +3156,14 @@ bool HybridFilter::featureJacobianEpipolar(
 }
 
 uint64_t HybridFilter::getMinValidStateId() const {
-  uint64_t min_state_id = statesMap_.rbegin()->first;
-  for (auto it = landmarksMap_.begin(); it != landmarksMap_.end();
-       ++it) {
-    if (it->second.residualizeCase == NotInState_NotTrackedNow)
-      continue;
-
-    auto itObs = it->second.observations.begin();
-    if (itObs->first.frameId < min_state_id) {
-      min_state_id = itObs->first.frameId;
+  uint64_t currentFrameId = statesMap_.rbegin()->first;
+  uint64_t minStateId = currentFrameId;
+  for (auto it = landmarksMap_.begin(); it != landmarksMap_.end(); ++it) {
+    if (it->second.status.measurementType == FeatureTrackStatus::kPremature) {
+      auto itObs = it->second.observations.begin();
+      if (itObs->first.frameId < minStateId) {
+        minStateId = itObs->first.frameId;
+      }
     }
   }
   // We keep at least one keyframe which is required for visualization.
@@ -3207,7 +3180,7 @@ uint64_t HybridFilter::getMinValidStateId() const {
       break;
     }
   }
-  return std::min(min_state_id, std::min(lastKeyframeId, keepFrameId));
+  return std::min(minStateId, std::min(lastKeyframeId, keepFrameId));
 }
 
 bool HybridFilter::getOdometryConstraintsForKeyframe(

@@ -1,6 +1,5 @@
 #include <msckf/VioFactoryMethods.hpp>
 
-#include <msckf/ConsistentEstimator.hpp>
 #include <msckf/GeneralEstimator.hpp>
 #include <msckf/HybridFrontend.hpp>
 #include <msckf/MSCKF2.hpp>
@@ -43,7 +42,7 @@ std::shared_ptr<okvis::Estimator> createBackend(
 
     case okvis::EstimatorAlgorithm::Consistent:
       return std::shared_ptr<okvis::Estimator>(
-          new okvis::ConsistentEstimator(mapPtr));
+          new okvis::Estimator(mapPtr));
 
     case okvis::EstimatorAlgorithm::SlidingWindowSmoother:
       return std::shared_ptr<okvis::Estimator>(

@@ -11,7 +11,7 @@ struct TriangulationStatus {
   bool chi2Small;
   bool raysParallel; // True if rotation compensated observation directions are parallel.
   bool flipped; // True if the landmark is flipped to be in front of every camera.
-  bool lackObservations; // True if #obs is less than minTrackLength.
+  bool lackObservations; // True if #obs is too few.
   TriangulationStatus()
       : triangulationOk(false),
         chi2Small(true),

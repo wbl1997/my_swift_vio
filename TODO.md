@@ -94,10 +94,6 @@ terminate called after throwing an instance of 'boost::exception_detail::clone_i
 
 The root cause for this issue has nothing to do with the report. It is caused by a seemingly innocuous exit(1) in the codebase.
 
-36. In testHybridFilter, of DeadreckoningO some runs have zigzag ripples in the pose profile, 
-some runs have results close to the pose profile of DeadreckoningM. 
-Preliminary tests find that this issue with DeadreckoningO is not caused by applyMarginalizationStrategy.
-
 39. develop iSAM with monocular, and multiple camera e.g., binocular, or stereo frontend, refer to Kimera stereo VIO implementation, 
 my previous vin-csfm repo that depends on gtsam, and cpi closed_form preintegration by Eckenhoff, and 
 the structureless factor from Forster RSS2017.

@@ -43,7 +43,7 @@ public:
    */
   virtual int computeStackedJacobianAndResidual(
       Eigen::MatrixXd *T_H, Eigen::Matrix<double, Eigen::Dynamic, 1> *r_q,
-      Eigen::MatrixXd *R_q) const;
+      Eigen::MatrixXd *R_q);
 
   /**
    * @brief boxminusFromInput

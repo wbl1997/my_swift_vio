@@ -53,7 +53,7 @@ bool TFVIO::applyMarginalizationStrategy(
   for (PointMap::iterator pit = landmarksMap_.begin();
        pit != landmarksMap_.end();) {
     const MapPoint& mapPoint = pit->second;
-    if (mapPoint.residualizeCase == NotInState_NotTrackedNow) {
+    if (mapPoint.shouldRemove(pointLandmarkOptions_.maxHibernationFrames)) {
       ++mTrackLengthAccumulator[mapPoint.observations.size()];
       for (std::map<okvis::KeypointIdentifier, uint64_t>::const_iterator it =
                mapPoint.observations.begin();
@@ -114,14 +114,13 @@ int TFVIO::computeStackedJacobianAndResidual(
   RetrieveObsSeqType seqType =
       static_cast<RetrieveObsSeqType>(FLAGS_two_view_obs_seq_type);
   for (auto it = landmarksMap_.begin(); it != landmarksMap_.end(); ++it) {
-    ResidualizeCase rc = it->second.residualizeCase;
     const size_t nNumObs = it->second.observations.size();
     if (seqType == ENTIRE_TRACK) {
-      if (rc != NotInState_NotTrackedNow || nNumObs < optimizationOptions_.minTrackLength) {
+      if (it->second.status.measurementType != FeatureTrackStatus::kMsckfTrack) {
         continue;
       }
     } else {
-      if (rc != NotToAdd_TrackedNow || nNumObs < optimizationOptions_.minTrackLength) {
+      if (!it->second.trackedInCurrentFrame(currentFrameId()) || nNumObs < pointLandmarkOptions_.minTrackLengthForMsckf) {
         continue;
       }
     }
@@ -168,17 +167,9 @@ void TFVIO::optimize(size_t /*numIter*/, size_t /*numThreads*/, bool verbose) {
   int navAndImuParamsDim = navStateAndImuParamsMinimalDim();
   for (okvis::PointMap::iterator it = landmarksMap_.begin();
        it != landmarksMap_.end(); ++it) {
-    ResidualizeCase toResidualize = NotInState_NotTrackedNow;
-    for (auto itObs = it->second.observations.rbegin(),
-              iteObs = it->second.observations.rend();
-         itObs != iteObs; ++itObs) {
-      if (itObs->first.frameId == currFrameId) {
-        toResidualize = NotToAdd_TrackedNow;
-        ++numTracked;
-        break;
-      }
-    }
-    it->second.residualizeCase = toResidualize;
+    numTracked += (it->second.trackedInCurrentFrame(currFrameId) ? 1 : 0);
+    it->second.updateStatus(currFrameId, pointLandmarkOptions_.minTrackLengthForMsckf,
+                            std::numeric_limits<std::size_t>::max());
   }
   trackingRate_ = static_cast<double>(numTracked) /
                   static_cast<double>(landmarksMap_.size());
@@ -199,7 +190,7 @@ void TFVIO::optimize(size_t /*numIter*/, size_t /*numThreads*/, bool verbose) {
     updateLandmarksTimer.start();
     minValidStateId_ = getMinValidStateId();
     for (auto it = landmarksMap_.begin(); it != landmarksMap_.end(); ++it) {
-      if (it->second.residualizeCase == NotInState_NotTrackedNow) continue;
+      if (it->second.shouldRemove(pointLandmarkOptions_.maxHibernationFrames)) continue;
       // this happens with a just inserted landmark without triangulation.
       if (it->second.observations.size() < 2) continue;
 

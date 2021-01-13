@@ -1,7 +1,6 @@
 #include "msckf/VioTestSystemBuilder.hpp"
 
 #include <msckf/CameraSystemCreator.hpp>
-#include <msckf/ConsistentEstimator.hpp>
 #include <msckf/GeneralEstimator.hpp>
 
 #include <gtsam/SlidingWindowSmoother.hpp>

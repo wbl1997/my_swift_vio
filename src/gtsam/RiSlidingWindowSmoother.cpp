@@ -239,7 +239,7 @@ bool RiSlidingWindowSmoother::addLandmarkToGraph(
     lastImageId =
         IsObservedInFrame(obsIter->first.frameId, obsIter->first.cameraIndex);
   }
-  mp.residualizeCase = InState_TrackedNow;
+  mp.status.inState = true;
   return true;
 }
 
@@ -291,7 +291,7 @@ void RiSlidingWindowSmoother::addLandmarkSmartFactorToGraph(const LandmarkId& lm
   okvis::MapPoint& mp = landmarksMap_.at(lmkId);
   auto obsIt = mp.observations.lower_bound(okvis::KeypointIdentifier(minValidStateId, 0u, 0u));
   size_t numValidObs = std::distance(obsIt, mp.observations.end());
-  if (numValidObs < optimizationOptions_.minTrackLength) {
+  if (numValidObs < pointLandmarkOptions_.minTrackLengthForMsckf) {
       return;
   }
   std::shared_ptr<okvis::ceres::HomogeneousPointParameterBlock>
@@ -331,7 +331,7 @@ void RiSlidingWindowSmoother::addLandmarkSmartFactorToGraph(const LandmarkId& lm
     lastImageId =
         IsObservedInFrame(obsIter->first.frameId, obsIter->first.cameraIndex);
   }
-  mp.residualizeCase = InState_TrackedNow;
+  mp.status.inState = true;
   new_factor->setAnchorIndex(new_factor->keys().size() - 1);
 
   new_smart_factors_.emplace(lmkId, new_factor);
@@ -438,7 +438,7 @@ void RiSlidingWindowSmoother::updateStates() {
   {
     updateLandmarksTimer.start();
     for (auto it = landmarksMap_.begin(); it != landmarksMap_.end(); ++it) {
-      if (it->second.residualizeCase == NotInState_NotTrackedNow) continue;
+      if (it->second.status.inState == false) continue;
       uint64_t lmkId = it->first;
       auto estimatesIter = estimates.find(gtsam::Symbol('l', lmkId));
       if (estimatesIter == estimates.end()) {

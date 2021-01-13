@@ -637,8 +637,7 @@ bool SlidingWindowSmoother::applyMarginalizationStrategy(
     for (auto lmkId : itemPtr->second) {
       // This landmark is still in landmarksMap_ because its feature track still
       // overlaps the sliding window.
-      landmarksMap_.at(lmkId).residualizeCase =
-          NotInState_NotTrackedNow;  // set to not in state.
+      landmarksMap_.at(lmkId).status.inState = false;  // set to not in state.
     }
     navStateToLandmarks_.erase(itemPtr);
   }
@@ -655,7 +654,7 @@ bool SlidingWindowSmoother::applyMarginalizationStrategy(
     Slot slot_id = old_smart_factor_it->second.second;
     if (!graph.exists(slot_id)) {
       old_smart_factor_it = old_smart_factors_.erase(old_smart_factor_it);
-      landmarksMap_.at(lmkId).residualizeCase = NotInState_NotTrackedNow;
+      landmarksMap_.at(lmkId).status.inState = false;
       continue;
     }
 
@@ -670,7 +669,7 @@ bool SlidingWindowSmoother::applyMarginalizationStrategy(
                  << "lmk with id: " << lmkId << "\n."
                  << "Deleting old_smart_factor of the lmk";
       old_smart_factor_it = old_smart_factors_.erase(old_smart_factor_it);
-      landmarksMap_.at(lmkId).residualizeCase = NotInState_NotTrackedNow;
+      landmarksMap_.at(lmkId).status.inState = false;
       continue;
     }
     ++old_smart_factor_it;
@@ -793,7 +792,7 @@ bool SlidingWindowSmoother::addLandmarkToGraph(uint64_t lmkId, const Eigen::Vect
     lastImageId =
         IsObservedInFrame(obsIter->first.frameId, obsIter->first.cameraIndex);
   }
-  mp.residualizeCase = InState_TrackedNow;
+  mp.status.inState = true;
   return true;
 }
 
@@ -833,7 +832,7 @@ void SlidingWindowSmoother::addLandmarkSmartFactorToGraph(const LandmarkId& lmkI
   okvis::MapPoint& mp = landmarksMap_.at(lmkId);
   auto obsIt = mp.observations.lower_bound(okvis::KeypointIdentifier(minValidStateId, 0u, 0u));
   size_t numValidObs = std::distance(obsIt, mp.observations.end());
-  if (numValidObs < optimizationOptions_.minTrackLength) {
+  if (numValidObs < pointLandmarkOptions_.minTrackLengthForMsckf) {
       return;
   }
   std::shared_ptr<okvis::ceres::HomogeneousPointParameterBlock>
@@ -871,7 +870,7 @@ void SlidingWindowSmoother::addLandmarkSmartFactorToGraph(const LandmarkId& lmkI
     lastImageId =
         IsObservedInFrame(obsIter->first.frameId, obsIter->first.cameraIndex);
   }
-  mp.residualizeCase = InState_TrackedNow;
+  mp.status.inState = true;
 
   new_smart_factors_.emplace(lmkId, new_factor);
   old_smart_factors_.emplace(lmkId, std::make_pair(new_factor, -1));
@@ -1060,7 +1059,7 @@ void SlidingWindowSmoother::updateStates() {
   {
     updateLandmarksTimer.start();
     for (auto it = landmarksMap_.begin(); it != landmarksMap_.end(); ++it) {
-      if (it->second.residualizeCase == NotInState_NotTrackedNow) continue;
+      if (it->second.status.inState == false) continue;
       uint64_t lmkId = it->first;
       auto estimatesIter = estimates.find(gtsam::Symbol('l', lmkId));
       if (estimatesIter == estimates.end()) {
@@ -1315,7 +1314,7 @@ bool SlidingWindowSmoother::triangulateWithDisparityCheck(
   Eigen::AlignedVector<okvis::kinematics::Transformation> T_CWs;
   std::vector<double> imageNoiseStd;
   size_t numObs = gatherMapPointObservations(mp, &obsDirections, &T_CWs, &imageNoiseStd);
-  if (numObs < optimizationOptions_.minTrackLength) {
+  if (numObs < pointLandmarkOptions_.minTrackLengthForMsckf) {
     return false;
   }
   if (msckf::hasLowDisparity(obsDirections, T_CWs, imageNoiseStd, focalLength, raySigmaScalar))
@@ -1339,9 +1338,9 @@ void SlidingWindowSmoother::optimize(size_t /*numIter*/, size_t /*numThreads*/,
 
   // Mark landmarks that are added to the graph solver.
   // A landmark has only two status:
-  // 1. NotInState_NotTrackedNow means that it has not been added to the graph
+  // 1. Not in state means that it has not been added to the graph
   // solver.
-  // 2. InState_TrackedNow means that it has been added to the graph solver.
+  // 2. In state means that it has been added to the graph solver.
   // To avoid confusion, do not interpret the second half of the status value.
 
   Eigen::VectorXd intrinsics;
@@ -1360,8 +1359,8 @@ void SlidingWindowSmoother::optimize(size_t /*numIter*/, size_t /*numThreads*/,
         break;
       }
     }
-    ResidualizeCase landmarkStatus = it->second.residualizeCase;
-    if (landmarkStatus == NotInState_NotTrackedNow) {
+    FeatureTrackStatus landmarkStatus = it->second.status;
+    if (landmarkStatus.inState == false) {
       // The landmark has not been added to the graph.
       if (observedInCurrentFrame) {
         if (backendParams_.backendModality_ == BackendModality::PROJECTION) {

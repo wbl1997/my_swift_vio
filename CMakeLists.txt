@@ -202,7 +202,6 @@ LIST(APPEND SOURCEFILES
 
     src/msckf/BaseFilter.cpp
     src/msckf/CameraSystemCreator.cpp
-    src/msckf/ConsistentEstimator.cpp
     src/msckf/GeneralEstimator.cpp
     src/msckf/FeatureTriangulation.cpp
     src/msckf/FilterHelper.cpp
