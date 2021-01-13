@@ -20,7 +20,7 @@
 #include <msckf/PointLandmark.hpp>
 #include <msckf/PointLandmarkModels.hpp>
 #include <msckf/PointSharedData.hpp>
-#include <msckf/PreconditionedEkfUpdater.h>
+#include <msckf/EkfUpdater.h>
 
 DECLARE_bool(use_mahalanobis);
 DECLARE_bool(use_first_estimate);

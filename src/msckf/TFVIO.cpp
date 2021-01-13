@@ -12,7 +12,7 @@
 #include <msckf/FilterHelper.hpp>
 
 #include <msckf/PointLandmarkModels.hpp>
-#include <msckf/PreconditionedEkfUpdater.h>
+#include <msckf/EkfUpdater.h>
 
 DECLARE_bool(use_IEKF);
 DEFINE_int32(

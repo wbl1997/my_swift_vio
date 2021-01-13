@@ -212,7 +212,7 @@ LIST(APPEND SOURCEFILES
     src/msckf/MSCKF2.cpp
     src/msckf/PointLandmark.cpp
     src/msckf/PointLandmarkSimulationRS.cpp
-    src/msckf/PreconditionedEkfUpdater.cpp
+    src/msckf/EkfUpdater.cpp
     src/msckf/SimulationFrontend.cpp
     src/msckf/StatAccumulator.cpp
 

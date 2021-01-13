@@ -1,6 +1,6 @@
 
 #include "msckf/BaseFilter.h"
-#include "msckf/PreconditionedEkfUpdater.h"
+#include "msckf/EkfUpdater.h"
 
 #include <Eigen/Dense>
 

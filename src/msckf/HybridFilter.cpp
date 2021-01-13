@@ -20,7 +20,7 @@
 #include <msckf/EuclideanParamBlock.hpp>
 #include <msckf/ExtrinsicModels.hpp>
 
-#include <msckf/PreconditionedEkfUpdater.h>
+#include <msckf/EkfUpdater.h>
 #include <msckf/FilterHelper.hpp>
 #include <msckf/MultipleTransformPointJacobian.hpp>
 #include <msckf/imu/ImuOdometry.h>
