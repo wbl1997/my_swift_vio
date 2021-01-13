@@ -364,8 +364,9 @@ void CameraMeasurementJacobianTest::computeAndCheckJacobians() const {
 }
 
 TEST(CameraMeasurementJacobianTest, RadialTangential_AIDP) {
-  okvis::PointLandmarkOptions plOptions(
-      msckf::InverseDepthParameterization::kModelId, true);
+  okvis::PointLandmarkOptions plOptions;
+  plOptions.landmarkModelId = msckf::InverseDepthParameterization::kModelId;
+  plOptions.anchorAtObservationTime = true;
   CameraMeasurementJacobianTest cmjt(
       okvis::cameras::NCameraSystem::DistortionType::RadialTangential,
       plOptions);
@@ -373,8 +374,9 @@ TEST(CameraMeasurementJacobianTest, RadialTangential_AIDP) {
 }
 
 TEST(CameraMeasurementJacobianTest, FOV_AIDP) {
-  okvis::PointLandmarkOptions plOptions(
-      msckf::InverseDepthParameterization::kModelId, true);
+  okvis::PointLandmarkOptions plOptions;
+  plOptions.landmarkModelId = msckf::InverseDepthParameterization::kModelId;
+  plOptions.anchorAtObservationTime = true;
   CameraMeasurementJacobianTest cmjt(
       okvis::cameras::NCameraSystem::DistortionType::FOV,
       plOptions);
@@ -382,8 +384,9 @@ TEST(CameraMeasurementJacobianTest, FOV_AIDP) {
 }
 
 TEST(CameraMeasurementJacobianTest, RadialTangential_AIDP_onesided) {
-  okvis::PointLandmarkOptions plOptions(
-      msckf::InverseDepthParameterization::kModelId, false);
+  okvis::PointLandmarkOptions plOptions;
+  plOptions.landmarkModelId = msckf::InverseDepthParameterization::kModelId;
+  plOptions.anchorAtObservationTime = false;
   CameraMeasurementJacobianTest cmjt(
       okvis::cameras::NCameraSystem::DistortionType::RadialTangential,
       plOptions);
@@ -391,8 +394,9 @@ TEST(CameraMeasurementJacobianTest, RadialTangential_AIDP_onesided) {
 }
 
 TEST(CameraMeasurementJacobianTest, FOV_AIDP_onesided) {
-  okvis::PointLandmarkOptions plOptions(
-      msckf::InverseDepthParameterization::kModelId, false);
+  okvis::PointLandmarkOptions plOptions;
+  plOptions.landmarkModelId = msckf::InverseDepthParameterization::kModelId;
+  plOptions.anchorAtObservationTime = false;
   CameraMeasurementJacobianTest cmjt(
       okvis::cameras::NCameraSystem::DistortionType::FOV,
       plOptions);
@@ -400,8 +404,9 @@ TEST(CameraMeasurementJacobianTest, FOV_AIDP_onesided) {
 }
 
 TEST(CameraMeasurementJacobianTest, RadialTangential_HPP) {
-  okvis::PointLandmarkOptions plOptions(
-      msckf::HomogeneousPointParameterization::kModelId, false);
+  okvis::PointLandmarkOptions plOptions;
+  plOptions.landmarkModelId = msckf::HomogeneousPointParameterization::kModelId;
+  plOptions.anchorAtObservationTime = false;
   CameraMeasurementJacobianTest cmjt(
       okvis::cameras::NCameraSystem::DistortionType::RadialTangential,
       plOptions);
@@ -409,8 +414,9 @@ TEST(CameraMeasurementJacobianTest, RadialTangential_HPP) {
 }
 
 TEST(CameraMeasurementJacobianTest, FOV_HPP) {
-  okvis::PointLandmarkOptions plOptions(
-      msckf::HomogeneousPointParameterization::kModelId, false);
+  okvis::PointLandmarkOptions plOptions;
+  plOptions.landmarkModelId = msckf::HomogeneousPointParameterization::kModelId;
+  plOptions.anchorAtObservationTime = false;
   CameraMeasurementJacobianTest cmjt(
       okvis::cameras::NCameraSystem::DistortionType::FOV,
       plOptions);
