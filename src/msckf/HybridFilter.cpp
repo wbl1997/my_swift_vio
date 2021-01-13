@@ -617,14 +617,13 @@ void HybridFilter::initCameraParamCovariance(int camIdx) {
 void HybridFilter::addCovForClonedStates() {
   // augment states in the propagated covariance matrix
   int oldCovDim = covariance_.rows();
-  statesMap_.rbegin()->second.global.at(GlobalStates::T_WS).startIndexInCov =
-      oldCovDim;
-  size_t covDimAugmented = oldCovDim + 9;  //$\delta p,\delta \alpha,\delta v$
-  Eigen::MatrixXd covarianceAugmented(covDimAugmented, covDimAugmented);
-
   const size_t numPointStates = 3 * mInCovLmIds.size();
   const size_t numOldNavImuCamPoseStates = oldCovDim - numPointStates;
+  statesMap_.rbegin()->second.global.at(GlobalStates::T_WS).startIndexInCov =
+      numOldNavImuCamPoseStates;
 
+  size_t covDimAugmented = oldCovDim + 9;  //$\delta p,\delta \alpha,\delta v$
+  Eigen::MatrixXd covarianceAugmented(covDimAugmented, covDimAugmented);
   covarianceAugmented.topLeftCorner(numOldNavImuCamPoseStates,
                                     numOldNavImuCamPoseStates) =
       covariance_.topLeftCorner(numOldNavImuCamPoseStates,
@@ -915,6 +914,7 @@ bool HybridFilter::applyMarginalizationStrategy(
       covariance_.block(finishIndex, finishIndex, covDim - finishIndex,
                         covDim - finishIndex);
   covariance_ = slimCovariance;
+  updateCovarianceIndex();
   return true;
 }
 
@@ -1518,7 +1518,7 @@ bool HybridFilter::slamFeatureJacobian(const MapPoint &mp, Eigen::MatrixXd &H_x,
   vJ_pfi.clear();
   vJ_X.clear();
   computeHTimer.stop();
-  return true;
+  return numValidObs > 0;
 }
 
 void HybridFilter::updateImuAugmentedStates(
@@ -2063,8 +2063,7 @@ void HybridFilter::optimize(size_t /*numIter*/, size_t /*numThreads*/,
       dimH_o[1]); // covariance block for camera and pose state copies except for the current pose state is used for MSCKF features.
   Eigen::MatrixXd variableCov2 = covariance_.block(
       navAndImuParamsDim, navAndImuParamsDim,
-      dimH_o[1] + kClonedStateMinimalDimen,
-      dimH_o[1] + kClonedStateMinimalDimen);  // covariance block for camera and pose state copies including the current pose state is used for SLAM features.
+      numCamPosePointStates, numCamPosePointStates);  // covariance block for camera and pose state copies including the current pose state is used for SLAM features.
 
   for (okvis::PointMap::iterator it = landmarksMap_.begin(); it != landmarksMap_.end(); ++it) {
     it->second.updateStatus(currFrameId, pointLandmarkOptions_.minTrackLengthForMsckf,
