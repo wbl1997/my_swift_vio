@@ -30,10 +30,12 @@ DEFINE_int32(
 namespace okvis {
 
 TFVIO::TFVIO(std::shared_ptr<okvis::ceres::Map> mapPtr)
-    : HybridFilter(mapPtr) {}
+    : HybridFilter(mapPtr),
+      minValidStateId_(0u) {}
 
 // The default constructor.
-TFVIO::TFVIO() {}
+TFVIO::TFVIO() :
+  minValidStateId_(0u) {}
 
 TFVIO::~TFVIO() {}
 
@@ -95,10 +97,9 @@ bool TFVIO::applyMarginalizationStrategy(
   return true;
 }
 
-
 int TFVIO::computeStackedJacobianAndResidual(
     Eigen::MatrixXd* T_H, Eigen::Matrix<double, Eigen::Dynamic, 1>* r_q,
-    Eigen::MatrixXd* R_q) const {
+    Eigen::MatrixXd* R_q) {
   // compute and stack Jacobians and Residuals for landmarks observed in current
   // frame
   const int camParamStartIndex = startIndexOfCameraParamsFast(0u);
@@ -153,6 +154,35 @@ int TFVIO::computeStackedJacobianAndResidual(
   FilterHelper::shrinkResidual(H, r, R, T_H, r_q, R_q);
   return dimH[0];
 }
+
+uint64_t TFVIO::getMinValidStateId() const {
+  uint64_t currentFrameId = statesMap_.rbegin()->first;
+  uint64_t minStateId = currentFrameId;
+  for (auto it = landmarksMap_.begin(); it != landmarksMap_.end(); ++it) {
+    if (it->second.status.measurementType == FeatureTrackStatus::kPremature) {
+      auto itObs = it->second.observations.begin();
+      if (itObs->first.frameId < minStateId) {
+        minStateId = itObs->first.frameId;
+      }
+    }
+  }
+  // We keep at least one keyframe which is required for visualization.
+  uint64_t lastKeyframeId = currentKeyframeId();
+  // Also keep at least numImuFrames frames.
+  uint64_t keepFrameId(0u);
+  size_t i = 0u;
+  size_t numFrameToKeep = optimizationOptions_.numImuFrames + optimizationOptions_.numKeyframes;
+  for (std::map<uint64_t, States>::const_reverse_iterator rit = statesMap_.rbegin();
+       rit != statesMap_.rend(); ++rit) {
+    keepFrameId = rit->first;
+    ++i;
+    if (i == numFrameToKeep) {
+      break;
+    }
+  }
+  return std::min(minStateId, std::min(lastKeyframeId, keepFrameId));
+}
+
 
 void TFVIO::optimize(size_t /*numIter*/, size_t /*numThreads*/, bool verbose) {
   uint64_t currFrameId = currentFrameId();

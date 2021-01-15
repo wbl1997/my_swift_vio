@@ -36,263 +36,18 @@ DEFINE_bool(use_IEKF, false,
 namespace okvis {
 
 MSCKF2::MSCKF2(std::shared_ptr<okvis::ceres::Map> mapPtr)
-    : HybridFilter(mapPtr), minCulledFrames_(3u) {}
+    : HybridFilter(mapPtr) {}
 
 // The default constructor.
 MSCKF2::MSCKF2() {}
 
 MSCKF2::~MSCKF2() {}
 
-void MSCKF2::findRedundantCamStates(
-    std::vector<uint64_t>* rm_cam_state_ids,
-    size_t numImuFrames) {
-  int closeFrames(0), oldFrames(0);
-  rm_cam_state_ids->clear();
-  rm_cam_state_ids->reserve(minCulledFrames_);
-  auto rit = statesMap_.rbegin();
-  for (size_t j = 0; j < numImuFrames; ++j) {
-    ++rit;
-  }
-  for (; rit != statesMap_.rend(); ++rit) {
-    if (rm_cam_state_ids->size() >= minCulledFrames_) {
-      break;
-    }
-    if (!rit->second.isKeyframe) {
-      rm_cam_state_ids->push_back(rit->first);
-      ++closeFrames;
-    }
-  }
-  if (rm_cam_state_ids->size() < minCulledFrames_) {
-    for (auto it = statesMap_.begin(); it != --statesMap_.end(); ++it) {
-      if (it->second.isKeyframe) {
-        rm_cam_state_ids->push_back(it->first);
-        ++oldFrames;
-      }
-      if (rm_cam_state_ids->size() >= minCulledFrames_) {
-        break;
-      }
-    }
-  }
-
-  sort(rm_cam_state_ids->begin(), rm_cam_state_ids->end());
-  return;
-}
-
-int MSCKF2::marginalizeRedundantFrames(size_t numKeyframes, size_t numImuFrames) {
-  if (statesMap_.size() < numKeyframes + numImuFrames) {
-    return 0;
-  }
-  std::vector<uint64_t> rm_cam_state_ids;
-  findRedundantCamStates(&rm_cam_state_ids, numImuFrames);
-
-  size_t nMarginalizedFeatures = 0u;
-  int featureVariableDimen = minimalDimOfAllCameraParams() +
-      kClonedStateMinimalDimen * (statesMap_.size() - 1);
-  int navAndImuParamsDim = navStateAndImuParamsMinimalDim();
-  int startIndexCamParams = startIndexOfCameraParamsFast(0u);
-  const Eigen::MatrixXd featureVariableCov =
-      covariance_.block(startIndexCamParams, startIndexCamParams,
-                        featureVariableDimen, featureVariableDimen);
-  int dimH_o[2] = {0, featureVariableDimen};
-  // containers of Jacobians of measurements
-  Eigen::AlignedVector<Eigen::Matrix<double, -1, 1>> vr_o;
-  Eigen::AlignedVector<Eigen::MatrixXd> vH_o;
-  Eigen::AlignedVector<Eigen::MatrixXd> vR_o;
-
-  // for each map point in the landmarksMap_,
-  // see if the landmark is observed in the redundant frames
-  for (okvis::PointMap::iterator it = landmarksMap_.begin();
-       it != landmarksMap_.end(); ++it) {
-    if (!it->second.goodForMarginalization(minCulledFrames_)) {
-      continue;
-    }
-
-    std::vector<uint64_t> involved_cam_state_ids;
-    auto obsMap = it->second.observations;
-    auto obsSearchStart = obsMap.begin();
-    for (auto camStateId : rm_cam_state_ids) {
-      auto obsIter = std::find_if(obsSearchStart, obsMap.end(),
-                                  okvis::IsObservedInNFrame(camStateId));
-      if (obsIter != obsMap.end()) {
-        involved_cam_state_ids.emplace_back(camStateId);
-        obsSearchStart = obsIter;
-        ++obsSearchStart;
-      }
-    }
-    if (involved_cam_state_ids.size() < minCulledFrames_) {
-      continue;
-    }
-
-    msckf::PointLandmark landmark;
-    Eigen::MatrixXd H_oi;                           //(nObsDim, dimH_o[1])
-    Eigen::Matrix<double, Eigen::Dynamic, 1> r_oi;  //(nObsDim, 1)
-    Eigen::MatrixXd R_oi;                           //(nObsDim, nObsDim)
-
-    bool isValidJacobian =
-        featureJacobian(it->second, &landmark, H_oi, r_oi, R_oi, nullptr, &involved_cam_state_ids);
-    if (!isValidJacobian) {
-      // Do we use epipolar constraints for the marginalized feature
-      // observations when they do not exhibit enough disparity? It is probably
-      // a overkill.
-      continue;
-    }
-
-    if (!FilterHelper::gatingTest(H_oi, r_oi, R_oi, featureVariableCov)) {
-      continue;
-    }
-
-    vr_o.push_back(r_oi);
-    vR_o.push_back(R_oi);
-    vH_o.push_back(H_oi);
-    dimH_o[0] += r_oi.rows();
-    ++nMarginalizedFeatures;
-  }
-
-  if (nMarginalizedFeatures > 0u) {
-    Eigen::MatrixXd H_o =
-        Eigen::MatrixXd::Zero(dimH_o[0], featureVariableDimen);
-    Eigen::Matrix<double, -1, 1> r_o(dimH_o[0], 1);
-    Eigen::MatrixXd R_o = Eigen::MatrixXd::Zero(dimH_o[0], dimH_o[0]);
-    FilterHelper::stackJacobianAndResidual(vH_o, vr_o, vR_o, &H_o, &r_o, &R_o);
-    Eigen::MatrixXd T_H, R_q;
-    Eigen::Matrix<double, Eigen::Dynamic, 1> r_q;
-    FilterHelper::shrinkResidual(H_o, r_o, R_o, &T_H, &r_q, &R_q);
-
-    DefaultEkfUpdater updater(covariance_, navAndImuParamsDim, featureVariableDimen);
-    computeKalmanGainTimer.start();
-    Eigen::Matrix<double, Eigen::Dynamic, 1> deltaX =
-        updater.computeCorrection(T_H, r_q, R_q);
-    computeKalmanGainTimer.stop();
-    updateStates(deltaX);
-
-    updateCovarianceTimer.start();
-    updater.updateCovariance(&covariance_);
-    updateCovarianceTimer.stop();
-  }
-
-  // sanity check
-  for (const auto &cam_id : rm_cam_state_ids) {
-    int cam_sequence =
-        std::distance(statesMap_.begin(), statesMap_.find(cam_id));
-    OKVIS_ASSERT_EQ(Exception,
-                    cam_sequence * kClonedStateMinimalDimen +
-                        startIndexOfClonedStatesFast(),
-                    statesMap_[cam_id].global.at(GlobalStates::T_WS).startIndexInCov,
-                    "Inconsistent state order in covariance");
-  }
-
-  // remove observations in removed frames
-  for (okvis::PointMap::iterator it = landmarksMap_.begin();
-       it != landmarksMap_.end();) {
-    okvis::MapPoint& mapPoint = it->second;
-    bool removeAllEpipolarConstraints = false;
-    std::map<okvis::KeypointIdentifier, uint64_t>::iterator obsIter =
-        mapPoint.observations.begin();
-    for (uint64_t camStateId : rm_cam_state_ids) {
-      while (obsIter != mapPoint.observations.end() &&
-             obsIter->first.frameId < camStateId) {
-        ++obsIter;
-      }
-      while (obsIter != mapPoint.observations.end() &&
-             obsIter->first.frameId == camStateId) {
-        // loop in case there are dud observations for the
-        // landmark in the same frame.
-        const KeypointIdentifier& kpi = obsIter->first;
-        auto mfp = multiFramePtrMap_.find(kpi.frameId);
-        mfp->second->setLandmarkId(kpi.cameraIndex, kpi.keypointIndex, 0);
-        if (obsIter->second) {
-          mapPtr_->removeResidualBlock(
-              reinterpret_cast<::ceres::ResidualBlockId>(obsIter->second));
-        } else {
-          if (obsIter == mapPoint.observations.begin()) {
-            // this is a head obs for epipolar constraints, remove all of them
-            removeAllEpipolarConstraints = true;
-          }  // else do nothing. This can happen if we removed an epipolar
-             // constraint in a previous step and up to now the landmark has not
-             // been initialized so its observations are not converted to
-             // reprojection errors.
-        }
-        obsIter = mapPoint.observations.erase(obsIter);
-      }
-    }
-    if (removeAllEpipolarConstraints) {
-      for (std::map<okvis::KeypointIdentifier, uint64_t>::iterator obsIter =
-               mapPoint.observations.begin();
-           obsIter != mapPoint.observations.end(); ++obsIter) {
-        if (obsIter->second) {
-          ::ceres::ResidualBlockId rid =
-              reinterpret_cast<::ceres::ResidualBlockId>(obsIter->second);
-          std::shared_ptr<const okvis::ceres::ErrorInterface> err =
-              mapPtr_->errorInterfacePtr(rid);
-          OKVIS_ASSERT_EQ(Exception, err->residualDim(), 1,
-                          "Head obs not associated to a residual means that "
-                          "the following are all epipolar constraints");
-          mapPtr_->removeResidualBlock(rid);
-          obsIter->second = 0u;
-        }
-      }
-    }
-    if (mapPoint.observations.size() == 0u) {
-      mapPtr_->removeParameterBlock(it->first);
-      it = landmarksMap_.erase(it);
-    } else {
-      ++it;
-    }
-  }
-
-  // check
-//  int count = 0;
-//  for (okvis::PointMap::iterator it = landmarksMap_.begin();
-//       it != landmarksMap_.end(); ++it) {
-//    okvis::MapPoint& mapPoint = it->second;
-//    for (uint64_t camStateId : rm_cam_state_ids) {
-//      auto obsIter = std::find_if(mapPoint.observations.begin(),
-//                                  mapPoint.observations.end(),
-//                                  okvis::IsObservedInNFrame(camStateId));
-//      if (obsIter != mapPoint.observations.end()) {
-//        LOG(INFO) << "persist lmk " << mapPoint.id << " frm " << camStateId
-//                  << " " << obsIter->first.cameraIndex << " "
-//                  << obsIter->first.keypointIndex << " residual "
-//                  << std::hex << obsIter->second;
-//        ++count;
-//      }
-//    }
-//  }
-//  OKVIS_ASSERT_EQ(Exception, count, 0, "found residuals not removed!");
-
-  for (const auto &cam_id : rm_cam_state_ids) {
-    auto statesIter = statesMap_.find(cam_id);
-    int cam_sequence =
-        std::distance(statesMap_.begin(), statesIter);
-    int cam_state_start =
-        startIndexOfClonedStatesFast() + kClonedStateMinimalDimen * cam_sequence;
-    int cam_state_end = cam_state_start + kClonedStateMinimalDimen;
-
-    FilterHelper::pruneSquareMatrix(cam_state_start, cam_state_end,
-                                    &covariance_);
-    removeState(cam_id);
-  }
-  updateCovarianceIndex();
-
-  uint64_t firstStateId = statesMap_.begin()->first;
-  minValidStateId_ = std::min(minValidStateId_, firstStateId);
-  return rm_cam_state_ids.size();
-}
-
 bool MSCKF2::applyMarginalizationStrategy(
     size_t numKeyframes, size_t numImuFrames,
     okvis::MapPointVector& removedLandmarks) {
-  std::vector<uint64_t> removeFrames;
-  std::map<uint64_t, States>::reverse_iterator rit = statesMap_.rbegin();
-  while (rit != statesMap_.rend()) {
-    if (rit->first < minValidStateId_) {
-      removeFrames.push_back(rit->second.id);
-    }
-    ++rit;
-  }
-  if (removeFrames.size() == 0) {
-    marginalizeRedundantFrames(numKeyframes, numImuFrames);
-  }
+
+  marginalizeRedundantFrames(numKeyframes, numImuFrames);
 
   // remove features tracked no more.
   for (PointMap::iterator pit = landmarksMap_.begin();
@@ -319,24 +74,6 @@ bool MSCKF2::applyMarginalizationStrategy(
       ++pit;
     }
   }
-
-  for (size_t k = 0; k < removeFrames.size(); ++k) {
-    okvis::Time removedStateTime = removeState(removeFrames[k]);
-    inertialMeasForStates_.pop_front(removedStateTime - half_window_);
-  }
-
-  // update covariance matrix
-  size_t numRemovedStates = removeFrames.size();
-  if (numRemovedStates == 0) {
-    return true;
-  }
-
-  size_t startIndex = startIndexOfClonedStatesFast();
-  size_t finishIndex = startIndex + numRemovedStates * 9;
-  CHECK_NE(finishIndex, covariance_.rows())
-      << "Never remove the covariance of the lastest state";
-  FilterHelper::pruneSquareMatrix(startIndex, finishIndex, &covariance_);
-  updateCovarianceIndex();
   return true;
 }
 
@@ -768,11 +505,6 @@ bool MSCKF2::featureJacobian(
   }
 }
 
-void MSCKF2::addCameraSystem(const okvis::cameras::NCameraSystem &cameras) {
-  Estimator::addCameraSystem(cameras);
-  minCulledFrames_ = 4u - camera_rig_.numberCameras();
-}
-
 int MSCKF2::computeStackedJacobianAndResidual(
     Eigen::MatrixXd *T_H, Eigen::Matrix<double, Eigen::Dynamic, 1> *r_q,
     Eigen::MatrixXd *R_q) {
@@ -868,7 +600,6 @@ void MSCKF2::optimize(size_t /*numIter*/, size_t /*numThreads*/, bool verbose) {
     updateEkf(navAndImuParamsDim, featureVariableDimen);
   }
   if (numResiduals_ == 0) {
-    minValidStateId_ = getMinValidStateId();
     return;
   }
 
@@ -878,7 +609,6 @@ void MSCKF2::optimize(size_t /*numIter*/, size_t /*numThreads*/, bool verbose) {
     updateLandmarksTimer.start();
     const int camIdx = 0;
     const okvis::kinematics::Transformation T_SC0 = camera_rig_.getCameraExtrinsic(camIdx);
-    minValidStateId_ = getMinValidStateId();
 
     okvis::kinematics::Transformation T_WSc;
     get_T_WS(currentFrameId(), T_WSc);

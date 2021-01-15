@@ -64,11 +64,11 @@ namespace okvis {
 // Constructor if a ceres map is already available.
 HybridFilter::HybridFilter(std::shared_ptr<okvis::ceres::Map> mapPtr)
     : Estimator(mapPtr),
-      minValidStateId_(0),
       triangulateTimer("3.1.1.1 triangulateAMapPoint", true),
       computeHTimer("3.1.1 featureJacobian", true),
       updateLandmarksTimer("3.1.5 updateLandmarks", true),
-      mTrackLengthAccumulator(100, 0u) {
+      mTrackLengthAccumulator(100, 0u),
+      minCulledFrames_(3u) {
   // reset the default to AIDP.
   PointLandmarkOptions plOptions;
   plOptions.landmarkModelId = msckf::InverseDepthParameterization::kModelId;
@@ -78,11 +78,11 @@ HybridFilter::HybridFilter(std::shared_ptr<okvis::ceres::Map> mapPtr)
 // The default constructor.
 HybridFilter::HybridFilter()
     : Estimator(),
-      minValidStateId_(0),
       triangulateTimer("3.1.1.1 triangulateAMapPoint", true),
       computeHTimer("3.1.1 featureJacobian", true),
       updateLandmarksTimer("3.1.5 updateLandmarks", true),
-      mTrackLengthAccumulator(100, 0u) {
+      mTrackLengthAccumulator(100, 0u),
+      minCulledFrames_(3u) {
   // reset the default to AIDP.
   PointLandmarkOptions plOptions;
   plOptions.landmarkModelId = msckf::InverseDepthParameterization::kModelId;
@@ -266,6 +266,11 @@ void HybridFilter::initializeCameraParamBlocks(
                              ceres::Map::Parameterization::Trivial);
   cameraInfos->at(CameraSensorStates::TR).id = id;
   // The startIndex in covariance will be initialized along with covariance.
+}
+
+void HybridFilter::addCameraSystem(const okvis::cameras::NCameraSystem &cameras) {
+  Estimator::addCameraSystem(cameras);
+  minCulledFrames_ = 4u > camera_rig_.numberCameras() ? 4u - camera_rig_.numberCameras() : 1u;
 }
 
 bool HybridFilter::addStates(okvis::MultiFramePtr multiFrame,
@@ -656,26 +661,354 @@ void HybridFilter::addCovForClonedStates() {
   covariance_ = covarianceAugmented;
 }
 
-bool HybridFilter::applyMarginalizationStrategy(
-    size_t /*numKeyframes*/, size_t /*numImuFrames*/,
-    okvis::MapPointVector& removedLandmarks) {
-  // remove features no longer tracked which can be in or out of the state vector.
+void HybridFilter::findRedundantCamStates(
+    std::vector<uint64_t>* rm_cam_state_ids,
+    size_t numImuFrames) {
+  int closeFrames(0), oldFrames(0);
+  rm_cam_state_ids->clear();
+  rm_cam_state_ids->reserve(minCulledFrames_);
+  auto rit = statesMap_.rbegin();
+  for (size_t j = 0; j < numImuFrames; ++j) {
+    ++rit;
+  }
+  for (; rit != statesMap_.rend(); ++rit) {
+    if (rm_cam_state_ids->size() >= minCulledFrames_) {
+      break;
+    }
+    if (!rit->second.isKeyframe) {
+      rm_cam_state_ids->push_back(rit->first);
+      ++closeFrames;
+    }
+  }
+  if (rm_cam_state_ids->size() < minCulledFrames_) {
+    for (auto it = statesMap_.begin(); it != --statesMap_.end(); ++it) {
+      if (it->second.isKeyframe) {
+        rm_cam_state_ids->push_back(it->first);
+        ++oldFrames;
+      }
+      if (rm_cam_state_ids->size() >= minCulledFrames_) {
+        break;
+      }
+    }
+  }
+
+  sort(rm_cam_state_ids->begin(), rm_cam_state_ids->end());
+  return;
+}
+
+int HybridFilter::marginalizeRedundantFrames(size_t numKeyframes, size_t numImuFrames) {
+  if (statesMap_.size() < numKeyframes + numImuFrames) {
+    return 0;
+  }
+  std::vector<uint64_t> rm_cam_state_ids;
+  findRedundantCamStates(&rm_cam_state_ids, numImuFrames);
+
+  size_t nMarginalizedFeatures = 0u;
+  int featureVariableDimen = minimalDimOfAllCameraParams() +
+      kClonedStateMinimalDimen * (statesMap_.size() - 1);
+  int navAndImuParamsDim = navStateAndImuParamsMinimalDim();
+  int startIndexCamParams = startIndexOfCameraParamsFast(0u);
+  const Eigen::MatrixXd featureVariableCov =
+      covariance_.block(startIndexCamParams, startIndexCamParams,
+                        featureVariableDimen, featureVariableDimen);
+  int dimH_o[2] = {0, featureVariableDimen};
+  // containers of Jacobians of measurements
+  Eigen::AlignedVector<Eigen::Matrix<double, -1, 1>> vr_o;
+  Eigen::AlignedVector<Eigen::MatrixXd> vH_o;
+  Eigen::AlignedVector<Eigen::MatrixXd> vR_o;
+
+  // for each map point in the landmarksMap_,
+  // see if the landmark is observed in the redundant frames
+  for (okvis::PointMap::iterator it = landmarksMap_.begin();
+       it != landmarksMap_.end(); ++it) {
+    if (!it->second.goodForMarginalization(minCulledFrames_)) {
+      continue;
+    }
+
+    std::vector<uint64_t> involved_cam_state_ids;
+    auto obsMap = it->second.observations;
+    auto obsSearchStart = obsMap.begin();
+    for (auto camStateId : rm_cam_state_ids) {
+      auto obsIter = std::find_if(obsSearchStart, obsMap.end(),
+                                  okvis::IsObservedInNFrame(camStateId));
+      if (obsIter != obsMap.end()) {
+        involved_cam_state_ids.emplace_back(camStateId);
+        obsSearchStart = obsIter;
+        ++obsSearchStart;
+      }
+    }
+    if (involved_cam_state_ids.size() < minCulledFrames_) {
+      continue;
+    }
+
+    msckf::PointLandmark landmark;
+    Eigen::MatrixXd H_oi;                           //(nObsDim, dimH_o[1])
+    Eigen::Matrix<double, Eigen::Dynamic, 1> r_oi;  //(nObsDim, 1)
+    Eigen::MatrixXd R_oi;                           //(nObsDim, nObsDim)
+
+    bool isValidJacobian =
+        featureJacobian(it->second, &landmark, H_oi, r_oi, R_oi, nullptr, &involved_cam_state_ids);
+    if (!isValidJacobian) {
+      // Do we use epipolar constraints for the marginalized feature
+      // observations when they do not exhibit enough disparity? It is probably
+      // a overkill.
+      continue;
+    }
+
+    if (!FilterHelper::gatingTest(H_oi, r_oi, R_oi, featureVariableCov)) {
+      continue;
+    }
+
+    vr_o.push_back(r_oi);
+    vR_o.push_back(R_oi);
+    vH_o.push_back(H_oi);
+    dimH_o[0] += r_oi.rows();
+    ++nMarginalizedFeatures;
+  }
+
+  if (nMarginalizedFeatures > 0u) {
+    Eigen::MatrixXd H_o =
+        Eigen::MatrixXd::Zero(dimH_o[0], featureVariableDimen);
+    Eigen::Matrix<double, -1, 1> r_o(dimH_o[0], 1);
+    Eigen::MatrixXd R_o = Eigen::MatrixXd::Zero(dimH_o[0], dimH_o[0]);
+    FilterHelper::stackJacobianAndResidual(vH_o, vr_o, vR_o, &H_o, &r_o, &R_o);
+    Eigen::MatrixXd T_H, R_q;
+    Eigen::Matrix<double, Eigen::Dynamic, 1> r_q;
+    FilterHelper::shrinkResidual(H_o, r_o, R_o, &T_H, &r_q, &R_q);
+
+    DefaultEkfUpdater updater(covariance_, navAndImuParamsDim, featureVariableDimen);
+    computeKalmanGainTimer.start();
+    Eigen::Matrix<double, Eigen::Dynamic, 1> deltaX =
+        updater.computeCorrection(T_H, r_q, R_q);
+    computeKalmanGainTimer.stop();
+    updateStates(deltaX);
+
+    updateCovarianceTimer.start();
+    updater.updateCovariance(&covariance_);
+    updateCovarianceTimer.stop();
+  }
+
+  // sanity check
+  for (const auto &cam_id : rm_cam_state_ids) {
+    int cam_sequence =
+        std::distance(statesMap_.begin(), statesMap_.find(cam_id));
+    OKVIS_ASSERT_EQ(Exception,
+                    cam_sequence * kClonedStateMinimalDimen +
+                        startIndexOfClonedStatesFast(),
+                    statesMap_[cam_id].global.at(GlobalStates::T_WS).startIndexInCov,
+                    "Inconsistent state order in covariance");
+  }
+
+  // remove observations in removed frames
+  for (okvis::PointMap::iterator it = landmarksMap_.begin();
+       it != landmarksMap_.end();) {
+    okvis::MapPoint& mapPoint = it->second;
+    bool removeAllEpipolarConstraints = false;
+    std::map<okvis::KeypointIdentifier, uint64_t>::iterator obsIter =
+        mapPoint.observations.begin();
+    for (uint64_t camStateId : rm_cam_state_ids) {
+      while (obsIter != mapPoint.observations.end() &&
+             obsIter->first.frameId < camStateId) {
+        ++obsIter;
+      }
+      while (obsIter != mapPoint.observations.end() &&
+             obsIter->first.frameId == camStateId) {
+        // loop in case there are dud observations for the
+        // landmark in the same frame.
+        const KeypointIdentifier& kpi = obsIter->first;
+        auto mfp = multiFramePtrMap_.find(kpi.frameId);
+        mfp->second->setLandmarkId(kpi.cameraIndex, kpi.keypointIndex, 0);
+        if (obsIter->second) {
+          mapPtr_->removeResidualBlock(
+              reinterpret_cast<::ceres::ResidualBlockId>(obsIter->second));
+        } else {
+//          if (obsIter == mapPoint.observations.begin()) {
+            // this is a head obs for epipolar constraints, remove all of them
+//            removeAllEpipolarConstraints = true;
+//          }  // else do nothing. This can happen if we removed an epipolar
+             // constraint in a previous step and up to now the landmark has not
+             // been initialized so its observations are not converted to
+             // reprojection errors.
+        }
+        obsIter = mapPoint.observations.erase(obsIter);
+      }
+    }
+    if (removeAllEpipolarConstraints) {
+      for (std::map<okvis::KeypointIdentifier, uint64_t>::iterator obsIter =
+               mapPoint.observations.begin();
+           obsIter != mapPoint.observations.end(); ++obsIter) {
+        if (obsIter->second) {
+          ::ceres::ResidualBlockId rid =
+              reinterpret_cast<::ceres::ResidualBlockId>(obsIter->second);
+          std::shared_ptr<const okvis::ceres::ErrorInterface> err =
+              mapPtr_->errorInterfacePtr(rid);
+          OKVIS_ASSERT_EQ(Exception, err->residualDim(), 1,
+                          "Head obs not associated to a residual means that "
+                          "the following are all epipolar constraints");
+          mapPtr_->removeResidualBlock(rid);
+          obsIter->second = 0u;
+        }
+      }
+    }
+    if (mapPoint.observations.size() == 0u) {
+      mapPtr_->removeParameterBlock(it->first);
+      it = landmarksMap_.erase(it);
+    } else {
+      ++it;
+    }
+  }
+
+  // check
+//  int count = 0;
+//  for (okvis::PointMap::iterator it = landmarksMap_.begin();
+//       it != landmarksMap_.end(); ++it) {
+//    okvis::MapPoint& mapPoint = it->second;
+//    for (uint64_t camStateId : rm_cam_state_ids) {
+//      auto obsIter = std::find_if(mapPoint.observations.begin(),
+//                                  mapPoint.observations.end(),
+//                                  okvis::IsObservedInNFrame(camStateId));
+//      if (obsIter != mapPoint.observations.end()) {
+//        LOG(INFO) << "persist lmk " << mapPoint.id << " frm " << camStateId
+//                  << " " << obsIter->first.cameraIndex << " "
+//                  << obsIter->first.keypointIndex << " residual "
+//                  << std::hex << obsIter->second;
+//        ++count;
+//      }
+//    }
+//  }
+//  OKVIS_ASSERT_EQ(Exception, count, 0, "found residuals not removed!");
+
+  // change anchor for affected landmarks.
+  changeAnchors(rm_cam_state_ids);
+
+  for (const auto &cam_id : rm_cam_state_ids) {
+    auto statesIter = statesMap_.find(cam_id);
+    int cam_sequence =
+        std::distance(statesMap_.begin(), statesIter);
+    int cam_state_start =
+        startIndexOfClonedStatesFast() + kClonedStateMinimalDimen * cam_sequence;
+    int cam_state_end = cam_state_start + kClonedStateMinimalDimen;
+
+    FilterHelper::pruneSquareMatrix(cam_state_start, cam_state_end,
+                                    &covariance_);
+    removeState(cam_id);
+  }
+  updateCovarianceIndex();
+
+  inertialMeasForStates_.pop_front(statesMap_.begin()->second.timestamp - half_window_);
+  return rm_cam_state_ids.size();
+}
+
+void HybridFilter::changeAnchors(const std::vector<uint64_t>& sortedRemovedStateIds) {
   int covDim = covariance_.rows();
+  const size_t numNavImuCamStates = startIndexOfClonedStatesFast();
+  const size_t numNavImuCamPoseStates =
+      numNavImuCamStates + 9 * statesMap_.size();
   Eigen::Matrix<double, 3, -1> reparamJacobian(3, covDim); // Jacobians of feature reparameterization due to anchor change.
   Eigen::AlignedVector<Eigen::Matrix<double, 3, -1>> vJacobian;  // container of these reparameterizing Jacobians.
   vJacobian.reserve(10);
   std::vector<size_t> vCovPtId;  // id in covariance of point features to be reparameterized, 0 for the first landmark.
   vCovPtId.reserve(10);
+  for (auto landmark : mInCovLmIds) {
+    MapPoint& mapPoint = landmarksMap_.at(landmark.id());
+    uint64_t newAnchorFrameId = mapPoint.shouldChangeAnchor(sortedRemovedStateIds);
+    if (newAnchorFrameId) {
+        // transform from the body frame at the anchor frame epoch to the world frame.
+        okvis::kinematics::Transformation T_WBa;
+        get_T_WS(mapPoint.anchorStateId, T_WBa);
+        okvis::kinematics::Transformation T_BCa;
+        getCameraSensorStates(newAnchorFrameId, mapPoint.anchorCameraId, T_BCa);
+        okvis::kinematics::Transformation T_WCa = T_WBa * T_BCa;
 
-  std::vector<uint64_t> toRemoveLmIds;  // id of landmarks to be removed that are in state.
+        // use the camera with the minimum index as the anchor camera.
+        int newAnchorCameraId = -1;
+        for (auto observationIter = mapPoint.observations.rbegin();
+             observationIter != mapPoint.observations.rend();
+             ++observationIter) {
+          if (observationIter->first.frameId == newAnchorFrameId) {
+            newAnchorCameraId = observationIter->first.cameraIndex;
+          } else {
+            break;
+          }
+        }
+        OKVIS_ASSERT_NE(Exception, newAnchorCameraId, -1, "Anchor image not found!");
+        okvis::kinematics::Transformation T_WBj;
+        get_T_WS(newAnchorFrameId, T_WBj);
+        okvis::kinematics::Transformation T_BCj;
+        getCameraSensorStates(newAnchorFrameId, newAnchorCameraId, T_BCj);
+        okvis::kinematics::Transformation T_WCj = T_WBj * T_BCj;
+
+        uint64_t toFind = mapPoint.id;
+        Eigen::AlignedDeque<okvis::ceres::HomogeneousPointParameterBlock>::iterator landmarkIter =
+            std::find_if(mInCovLmIds.begin(), mInCovLmIds.end(),
+                         [toFind](const okvis::ceres::HomogeneousPointParameterBlock &x) { return x.id() == toFind;});
+        OKVIS_ASSERT_TRUE(Exception, landmarkIter != mInCovLmIds.end(),
+                          "The tracked landmark is not in mInCovLmIds ");
+
+        // update covariance matrix
+        OKVIS_ASSERT_EQ(Exception, pointLandmarkOptions_.landmarkModelId,
+                        msckf::InverseDepthParameterization::kModelId,
+                        "Only inverse depth parameterization is supported for reparameterization!");
+        Eigen::Vector4d ab1rho = landmarkIter->estimate();
+        Eigen::Vector3d abrhoi(ab1rho[0], ab1rho[1], ab1rho[3]);
+        Eigen::Vector3d abrhoj;
+        Eigen::Matrix<double, 3, 9> jacobian;
+        vio::reparameterize_AIDP(T_WCa.C(), T_WCj.C(), abrhoi, T_WCa.r(),
+                                 T_WCj.r(), abrhoj, &jacobian);
+
+        reparamJacobian.setZero();
+        size_t startRowC = statesMap_[newAnchorFrameId]
+                               .global.at(GlobalStates::T_WS)
+                               .startIndexInCov;
+        size_t startRowA = statesMap_[mapPoint.anchorStateId]
+                               .global.at(GlobalStates::T_WS)
+                               .startIndexInCov;
+
+        reparamJacobian.block<3, 3>(0, startRowA) =
+            jacobian.block<3, 3>(0, 3);
+        reparamJacobian.block<3, 3>(0, startRowC) =
+            jacobian.block<3, 3>(0, 6);
+
+        size_t covPtId = std::distance(mInCovLmIds.begin(), landmarkIter);
+        vCovPtId.push_back(covPtId);
+        reparamJacobian.block<3, 3>(0, numNavImuCamPoseStates + 3 * covPtId) =
+            jacobian.topLeftCorner<3, 3>();
+        vJacobian.push_back(reparamJacobian);
+
+        ab1rho = T_WCj.inverse() * T_WCa * ab1rho;
+        ab1rho /= ab1rho[2];
+        landmarkIter->setEstimate(ab1rho);
+
+        mapPoint.anchorStateId = newAnchorFrameId;
+        mapPoint.anchorCameraId = newAnchorCameraId;
+    }
+  }
+
+  // update covariance for reparameterized landmarks.
+  if (vJacobian.size()) {
+    int landmarkIndex = 0;
+    Eigen::MatrixXd featureJacMat = Eigen::MatrixXd::Identity(
+        covDim, covDim); // Jacobian of all the new states w.r.t the old states
+    for (auto it = vJacobian.begin(); it != vJacobian.end();
+         ++it, ++landmarkIndex) {
+      featureJacMat.block(numNavImuCamPoseStates + vCovPtId[landmarkIndex] * 3,
+                          0, 3, covDim) = vJacobian[landmarkIndex];
+    }
+    covariance_ =
+        (featureJacMat * covariance_).eval() * featureJacMat.transpose();
+  }
+}
+
+bool HybridFilter::applyMarginalizationStrategy(
+    size_t numKeyframes, size_t numImuFrames,
+    okvis::MapPointVector& removedLandmarks) {
+  marginalizeRedundantFrames(numKeyframes, numImuFrames);
+
+  // remove features no longer tracked which can be in or out of the state vector.
+  std::vector<uint64_t> toRemoveLmIds;
   toRemoveLmIds.reserve(10);
-
   const size_t numNavImuCamStates = startIndexOfClonedStatesFast();
-  // number of navigation, imu, and camera states in the covariance
-  const size_t numNavImuCamPoseStates =
-      numNavImuCamStates + 9 * statesMap_.size();
-  // number of navigation, imu, camera, and pose copies states in the
-  // covariance.
+  const size_t numNavImuCamPoseStates = numNavImuCamStates + 9 * statesMap_.size();
 
   for (PointMap::iterator pit = landmarksMap_.begin();
        pit != landmarksMap_.end();) {
@@ -700,117 +1033,16 @@ bool HybridFilter::applyMarginalizationStrategy(
       mapPtr_->removeParameterBlock(pit->first);
       removedLandmarks.push_back(pit->second);
       pit = landmarksMap_.erase(pit);
-    } else {
-      // remove all observations before minValidStateId
-      std::map<okvis::KeypointIdentifier, uint64_t> &observationList =
-          pit->second.observations;
-      for (auto iter = observationList.begin();
-           iter != observationList.end();) {
-        if (iter->first.frameId < minValidStateId_) {
-          if (iter->second) {
-            mapPtr_->removeResidualBlock(
-                reinterpret_cast<::ceres::ResidualBlockId>(iter->second));
-          }
-          iter = observationList.erase(iter);
-        } else {
-          break;
-        }
-      }
-
-      // change anchor pose for features whose anchor is not in the state vector any more.
-      if (pit->second.shouldChangeAnchor(minValidStateId_)) {
-          // transform from the body frame at the anchor frame epoch to the world frame.
-          uint64_t newAnchorFrameId = pit->second.observations.rbegin()->first.frameId;
-          okvis::kinematics::Transformation T_WBa;
-          get_T_WS(pit->second.anchorStateId, T_WBa);
-          okvis::kinematics::Transformation T_BCa;
-          getCameraSensorStates(newAnchorFrameId, pit->second.anchorCameraId, T_BCa);
-          okvis::kinematics::Transformation T_WCa = T_WBa * T_BCa;
-
-          // use the earliest camera frame as the anchor image.
-          int newAnchorCameraId = -1;
-          for (auto observationIter = pit->second.observations.rbegin();
-               observationIter != pit->second.observations.rend();
-               ++observationIter) {
-            if (observationIter->first.frameId == newAnchorFrameId) {
-              newAnchorCameraId = observationIter->first.cameraIndex;
-            } else {
-              break;
-            }
-          }
-          OKVIS_ASSERT_NE(Exception, newAnchorCameraId, -1, "Anchor image not found!");
-          okvis::kinematics::Transformation T_WBj;
-          get_T_WS(newAnchorFrameId, T_WBj);
-          okvis::kinematics::Transformation T_BCj;
-          getCameraSensorStates(newAnchorFrameId, newAnchorCameraId, T_BCj);
-          okvis::kinematics::Transformation T_WCj = T_WBj * T_BCj;
-
-          uint64_t toFind = pit->first;
-          Eigen::AlignedDeque<okvis::ceres::HomogeneousPointParameterBlock>::iterator landmarkIter =
-              std::find_if(mInCovLmIds.begin(), mInCovLmIds.end(),
-                           [toFind](const okvis::ceres::HomogeneousPointParameterBlock &x) { return x.id() == toFind;});
-          OKVIS_ASSERT_TRUE(Exception, landmarkIter != mInCovLmIds.end(),
-                            "The tracked landmark is not in mInCovLmIds ");
-
-          // update covariance matrix
-          OKVIS_ASSERT_EQ(Exception, pointLandmarkOptions_.landmarkModelId,
-                          msckf::InverseDepthParameterization::kModelId,
-                          "Only inverse depth parameterization is supported for reparameterization!");
-          Eigen::Vector4d ab1rho = landmarkIter->estimate();
-          Eigen::Vector3d abrhoi(ab1rho[0], ab1rho[1], ab1rho[3]);
-          Eigen::Vector3d abrhoj;
-          Eigen::Matrix<double, 3, 9> jacobian;
-          vio::reparameterize_AIDP(T_WCa.C(), T_WCj.C(), abrhoi, T_WCa.r(),
-                                   T_WCj.r(), abrhoj, &jacobian);
-
-          reparamJacobian.setZero();
-          size_t startRowC = statesMap_[newAnchorFrameId]
-                                 .global.at(GlobalStates::T_WS)
-                                 .startIndexInCov;
-          size_t startRowA = statesMap_[pit->second.anchorStateId]
-                                 .global.at(GlobalStates::T_WS)
-                                 .startIndexInCov;
-
-          reparamJacobian.block<3, 3>(0, startRowA) =
-              jacobian.block<3, 3>(0, 3);
-          reparamJacobian.block<3, 3>(0, startRowC) =
-              jacobian.block<3, 3>(0, 6);
-
-          size_t covPtId = std::distance(mInCovLmIds.begin(), landmarkIter);
-          vCovPtId.push_back(covPtId);
-          reparamJacobian.block<3, 3>(0, numNavImuCamPoseStates + 3 * covPtId) =
-              jacobian.topLeftCorner<3, 3>();
-          vJacobian.push_back(reparamJacobian);
-
-          ab1rho = T_WCj.inverse() * T_WCa * ab1rho;
-          ab1rho /= ab1rho[2];
-          landmarkIter->setEstimate(ab1rho);
-
-          pit->second.anchorStateId = newAnchorFrameId;
-          pit->second.anchorCameraId = newAnchorCameraId;
-      }
+    } else {  
       ++pit;
     }
   }
 
-  // actual covariance update for reparameterized features
-  int landmarkIndex = 0;
-  Eigen::MatrixXd featureJacMat = Eigen::MatrixXd::Identity(covDim, covDim);  // Jacobian of all the new states w.r.t the old states
-  for (auto it = vJacobian.begin(); it != vJacobian.end();
-       ++it, ++landmarkIndex) {
-    featureJacMat.block(numNavImuCamPoseStates + vCovPtId[landmarkIndex] * 3, 0,
-                          3, covDim) = vJacobian[landmarkIndex];
-  }
-  if (vJacobian.size()) {
-    covariance_ =
-        (featureJacMat * covariance_).eval() * featureJacMat.transpose();
-  }
-
-  // actual covariance decimation for features in state and not tracked now
+  // decimate covariance for landmarks to be removed from state.
   std::vector<size_t> toRemoveIndices;  // start indices of removed columns,
                                         // each interval of size 3
   toRemoveIndices.reserve(toRemoveLmIds.size());
-
+  int covDim = covariance_.rows();
   for (auto it = toRemoveLmIds.begin(), itEnd = toRemoveLmIds.end();
        it != itEnd; ++it) {
     uint64_t toFind = *it;
@@ -820,17 +1052,15 @@ bool HybridFilter::applyMarginalizationStrategy(
           return x.id() == toFind;
         });
     OKVIS_ASSERT_TRUE(Exception, idPos != mInCovLmIds.end(),
-                      "The tracked landmark in state is not in mInCovLmIds ");
+                      "The landmark in state is not in mInCovLmIds!");
 
-    // to-be-removed SLAM feature's dimension from the covariance matrix
     int startIndex = numNavImuCamPoseStates + 3 * std::distance(mInCovLmIds.begin(), idPos);
     toRemoveIndices.push_back(startIndex);
   }
   std::sort(toRemoveIndices.begin(), toRemoveIndices.end());
   std::vector<std::pair<size_t, size_t>> vRowStartInterval;
   vRowStartInterval.reserve(toRemoveLmIds.size() + 1);
-  size_t startKeptRow =
-      0;  // start index (based on the old covariance) of the kept rows
+  size_t startKeptRow = 0;  // start index of the kept rows.
   for (auto it = toRemoveIndices.begin(), itEnd = toRemoveIndices.end();
        it != itEnd; ++it) {
     vRowStartInterval.push_back(
@@ -854,65 +1084,6 @@ bool HybridFilter::applyMarginalizationStrategy(
         });
     mInCovLmIds.erase(idPos);
   }
-  covDim -= 3 * toRemoveLmIds.size();
-
-  // remove old frames
-  std::vector<uint64_t> paremeterBlocksToBeMarginalized;
-  std::vector<uint64_t> removeFrames;
-  LOG(INFO) << "selecting which states to remove: min valid state Id " << minValidStateId_
-            << " oldest and latest stateid " << statesMap_.begin()->first << " "
-            << statesMap_.rbegin()->first;
-
-  for (auto rit = statesMap_.rbegin(); rit != statesMap_.rend();) {
-    if (rit->first < minValidStateId_) {
-      removeFrames.push_back(rit->first);
-      rit->second.global[GlobalStates::T_WS].exists =
-          false;  // remember we removed
-      rit->second.sensors.at(SensorStates::Imu)
-          .at(0)
-          .at(ImuSensorStates::SpeedAndBias)
-          .exists = false;
-      paremeterBlocksToBeMarginalized.push_back(
-          rit->second.global[GlobalStates::T_WS].id);
-      paremeterBlocksToBeMarginalized.push_back(
-          rit->second.sensors.at(SensorStates::Imu)
-              .at(0)
-              .at(ImuSensorStates::SpeedAndBias)
-              .id);
-      mapPtr_->removeParameterBlock(rit->second.global[GlobalStates::T_WS].id);
-      mapPtr_->removeParameterBlock(rit->second.sensors.at(SensorStates::Imu)
-                                        .at(0)
-                                        .at(ImuSensorStates::SpeedAndBias)
-                                        .id);
-
-      inertialMeasForStates_.pop_front(statesMap_.find(rit->first)->second.timestamp - half_window_);
-      multiFramePtrMap_.erase(rit->first);
-    }
-    ++rit;
-  }
-
-  std::stringstream ss;
-  for (auto iter = removeFrames.begin(); iter != removeFrames.end(); ++iter) {
-    std::map<uint64_t, States>::iterator it = statesMap_.find(*iter);
-    statesMap_.erase(it);
-    ss << *iter << " ";
-  }
-
-  size_t numRemovedStates = removeFrames.size();
-  if (numRemovedStates == 0u) {
-    return true;
-  }
-  int startIndex = startIndexOfClonedStatesFast();
-  int finishIndex = startIndex + numRemovedStates * 9;  // TODO(jhuai): Here assumes that the removed frames are consecutive.
-  Eigen::MatrixXd slimCovariance(covDim - numRemovedStates * 9,
-                                 covDim - numRemovedStates * 9);
-  slimCovariance << covariance_.topLeftCorner(startIndex, startIndex),
-      covariance_.block(0, finishIndex, startIndex, covDim - finishIndex),
-      covariance_.block(finishIndex, 0, covDim - finishIndex, startIndex),
-      covariance_.block(finishIndex, finishIndex, covDim - finishIndex,
-                        covDim - finishIndex);
-  covariance_ = slimCovariance;
-  updateCovarianceIndex();
   return true;
 }
 
@@ -2015,7 +2186,7 @@ Eigen::Vector4d HybridFilter::anchoredInverseDepthToWorldCoordinates(
 }
 
 void HybridFilter::optimize(size_t /*numIter*/, size_t /*numThreads*/,
-                            bool verbose) {
+                            bool /*verbose*/) {
   // containers of Jacobians of measurements of marginalized features
   std::vector<
       Eigen::Matrix<double, Eigen::Dynamic, 1>,
@@ -2173,221 +2344,11 @@ void HybridFilter::optimize(size_t /*numIter*/, size_t /*numThreads*/,
   }
 
   // initialize SLAM features and update state
-  updateLandmarksTimer.start();
-  {
-    Eigen::Matrix<double, Eigen::Dynamic, 1> r_i;
-    Eigen::MatrixXd H_i;
-    Eigen::MatrixXd R_i;
-    Eigen::Matrix<double, Eigen::Dynamic, 3> H_fi;
-    Eigen::MatrixXd Q2;  // nullspace of H_fi
-    Eigen::MatrixXd Q1;  // column space of H_fi
+  initializeLandmarksInFilter();
 
-    Eigen::Matrix<double, Eigen::Dynamic, 1> z_o;
-    Eigen::MatrixXd H_o;
-    Eigen::MatrixXd R_o;
-
-    std::vector<
-        Eigen::Matrix<double, Eigen::Dynamic, 1>,
-        Eigen::aligned_allocator<Eigen::Matrix<double, Eigen::Dynamic, 1>>>
-        vz_1;
-    std::vector<
-        Eigen::Matrix<double, Eigen::Dynamic, 1>,
-        Eigen::aligned_allocator<Eigen::Matrix<double, Eigen::Dynamic, 1>>>
-        vz_o;
-    std::vector<
-        Eigen::Matrix<double, 3, Eigen::Dynamic>,
-        Eigen::aligned_allocator<Eigen::Matrix<double, 3, Eigen::Dynamic>>>
-        vH_1;
-    std::vector<Eigen::Matrix<double, 3, 3>,
-                Eigen::aligned_allocator<Eigen::Matrix<double, 3, 3>>>
-        vH_2;
-    std::vector<Eigen::Matrix<double, 3, 3>,
-                Eigen::aligned_allocator<Eigen::Matrix<double, 3, 3>>>
-        vR_1;
-    vH_o.clear();
-    vR_o.clear();
-
-    size_t totalObsDim = 0;  // total dimensions of all features' observations
-    const size_t numCamPoseStates =
-        numCamPosePointStates - 3 * mInCovLmIds.size();
-    Eigen::MatrixXd variableCov = covariance_.block(
-        navAndImuParamsDim, navAndImuParamsDim, numCamPoseStates,
-        numCamPoseStates); // covariance of camera and pose copy states
-
-    Eigen::AlignedVector<okvis::ceres::HomogeneousPointParameterBlock> landmarksToAdd;
-    landmarksToAdd.reserve(20);
-    for (okvis::PointMap::iterator pit = landmarksMap_.begin();
-         pit != landmarksMap_.end(); ++pit) {
-      if (pit->second.status.measurementType == FeatureTrackStatus::kSlamInitialization) {
-        msckf::PointLandmark pointLandmark;
-        bool isValidJacobian =
-            featureJacobian(pit->second, &pointLandmark, H_i, r_i, R_i, &H_fi);
-        if (!isValidJacobian) {  // This feature will be removed and marginalized as a MSCKF feature in the next optimization step.
-          pit->second.setMeasurementFate(FeatureTrackStatus::kComputingJacobiansFailed);
-          continue;
-        }
-        Eigen::Vector4d homogeneousPoint =
-            Eigen::Map<Eigen::Vector4d>(pointLandmark.data(), 4);
-
-        vio::leftNullspaceAndColumnSpace(H_fi, &Q2, &Q1);
-        z_o = Q2.transpose() * r_i;
-        H_o = Q2.transpose() * H_i;
-        R_o = Q2.transpose() * R_i * Q2;
-
-        if (!FilterHelper::gatingTest(H_o, z_o, R_o, variableCov)) {
-          pit->second.setMeasurementFate(FeatureTrackStatus::kPotentialOutlier);
-          continue;
-        }
-
-        pit->second.anchorStateId = currFrameId;
-        // use the earliest camera frame as the anchor image.
-        int anchorCameraId = -1;
-        for (auto observationIter = pit->second.observations.rbegin();
-             observationIter != pit->second.observations.rend();
-             ++observationIter) {
-          if (observationIter->first.frameId == currFrameId) {
-            anchorCameraId = observationIter->first.cameraIndex;
-          } else {
-            break;
-          }
-        }
-        OKVIS_ASSERT_NE(Exception, anchorCameraId, -1, "Anchor image not found!");
-        pit->second.anchorCameraId = anchorCameraId;
-        pit->second.status.inState = true;
-        pit->second.setMeasurementFate(FeatureTrackStatus::kSuccessful);
-        landmarksToAdd.emplace_back(homogeneousPoint, pit->first);
-
-        vz_1.push_back(Q1.transpose() * r_i);
-        vz_o.push_back(z_o);
-        vH_1.push_back(Q1.transpose() * H_i);
-        vH_2.push_back(Q1.transpose() * H_fi);
-        vH_o.push_back(H_o);
-        vR_o.push_back(R_o);
-        vR_1.push_back(Q1.transpose() * R_i * Q1);
-        totalObsDim += H_i.rows();
-      }
-    }
-
-    // augment and update the covariance matrix.
-    size_t nNewFeatures = landmarksToAdd.size();
-//    LOG(INFO) << "Initializing " << nNewFeatures << " landmarks into the state vector of " << mInCovLmIds.size() << " landmarks!";
-    if (nNewFeatures) {
-      Eigen::MatrixXd H_o(totalObsDim - 3 * nNewFeatures, numCamPoseStates);
-      Eigen::MatrixXd H_1(3 * nNewFeatures, numCamPoseStates);
-      Eigen::MatrixXd invH_2 =
-          Eigen::MatrixXd::Zero(3 * nNewFeatures, 3 * nNewFeatures);
-      Eigen::MatrixXd R_o = Eigen::MatrixXd::Zero(
-          totalObsDim - 3 * nNewFeatures, totalObsDim - 3 * nNewFeatures);
-      Eigen::MatrixXd R_1 =
-          Eigen::MatrixXd::Zero(3 * nNewFeatures, 3 * nNewFeatures);
-      Eigen::Matrix<double, Eigen::Dynamic, 1> z_1(nNewFeatures * 3, 1);
-      Eigen::Matrix<double, Eigen::Dynamic, 1> z_o(
-          totalObsDim - nNewFeatures * 3, 1);
-
-      size_t startRow = 0u;
-      for (size_t featureIndex = 0u; featureIndex < nNewFeatures; ++featureIndex) {
-        H_o.block(startRow, 0, vH_o[featureIndex].rows(), numCamPoseStates) =
-            vH_o[featureIndex];
-        H_1.block(3 * featureIndex, 0, 3, numCamPoseStates) = vH_1[featureIndex];
-        invH_2.block<3, 3>(3 * featureIndex, 3 * featureIndex) =
-            vH_2[featureIndex].inverse();
-        R_o.block(startRow, startRow, vH_o[featureIndex].rows(),
-                  vH_o[featureIndex].rows()) = vR_o[featureIndex];
-        R_1.block<3, 3>(3 * featureIndex, 3 * featureIndex) = vR_1[featureIndex];
-        z_1.segment<3>(3 * featureIndex) = vz_1[featureIndex];
-        z_o.segment(startRow, vH_o[featureIndex].rows()) = vz_o[featureIndex];
-        startRow += vH_o[featureIndex].rows();
-      }
-
-      // initialize features into the state vector with z_1, R_1, H_1, H_2.
-      // also correct the landmark parameters
-      updateCovarianceTimer.start();
-      int covDim = covariance_.rows();
-      Eigen::MatrixXd Paug(covDim + nNewFeatures * 3,
-                           covDim + nNewFeatures * 3);
-      Paug.topLeftCorner(covDim, covDim) = covariance_;
-      Eigen::MatrixXd invH2H1 = invH_2 * H_1;
-      Paug.block(covDim, 0, 3 * nNewFeatures, covDim) =
-          -invH2H1 * Paug.block(navAndImuParamsDim, 0,
-                                numCamPoseStates, covDim);
-      Paug.block(0, covDim, covDim, 3 * nNewFeatures) =
-          Paug.block(covDim, 0, 3 * nNewFeatures, covDim).transpose();
-      Paug.bottomRightCorner(3 * nNewFeatures, 3 * nNewFeatures) =
-          -Paug.block(covDim, navAndImuParamsDim,
-                      3 * nNewFeatures, numCamPoseStates) *
-              invH2H1.transpose() +
-          invH_2 * R_1 * invH_2.transpose();
-      covariance_ = Paug;
-      updateCovarianceTimer.stop();
-
-      Eigen::Matrix<double, Eigen::Dynamic, 1> deltaLandmarks = invH_2 * z_1;
-      // TODO(jhuai): use polymorphism for variables.
-      switch (pointLandmarkOptions_.landmarkModelId) {
-        case msckf::InverseDepthParameterization::kModelId:
-          for (size_t j = 0u; j < nNewFeatures; ++j) {
-            Eigen::Vector4d ab1rho = landmarksToAdd[j].estimate();
-            ab1rho[0] += deltaLandmarks[j * 3];
-            ab1rho[1] += deltaLandmarks[j * 3 + 1];
-            ab1rho[3] += deltaLandmarks[j * 3 + 2];
-            landmarksToAdd[j].setEstimate(ab1rho);
-          }
-          break;
-        case msckf::HomogeneousPointParameterization::kModelId:
-          for (size_t j = 0u; j < nNewFeatures; ++j) {
-              Eigen::Vector4d pointW = landmarksToAdd[j].estimate();
-              pointW[0] += deltaLandmarks[j * 3];
-              pointW[1] += deltaLandmarks[j * 3 + 1];
-              pointW[2] += deltaLandmarks[j * 3 + 2];
-              landmarksToAdd[j].setEstimate(pointW);
-          }
-          break;
-        default:
-          break;
-      }
-
-      mInCovLmIds.insert(mInCovLmIds.end(), landmarksToAdd.begin(),
-                         landmarksToAdd.end());
-
-      // TODO(jhuai): add homogeneous point parameter block to satisfy setLandmark
-      // which potentially needs point blocks to be registered in the map.
-      // This would be unnecessary if the frontend refers to the backendInterface
-      // instead of the concrete Estimator class.
-      for (auto landmark : landmarksToAdd) {
-        uint64_t landmarkId = landmark.id();
-        const MapPoint &mp = landmarksMap_.at(landmarkId);
-        Eigen::Vector4d hpW = anchoredInverseDepthToWorldCoordinates(
-            landmark.estimate(), mp.anchorStateId, mp.anchorCameraId);
-        std::shared_ptr<okvis::ceres::HomogeneousPointParameterBlock>
-            pointParameterBlock(
-                new okvis::ceres::HomogeneousPointParameterBlock(hpW, landmark.id()));
-        if (!mapPtr_->addParameterBlock(pointParameterBlock,
-                                        okvis::ceres::Map::HomogeneousPoint)) {
-          LOG(WARNING) << "Failed to add block for landmark " << landmark.id();
-          continue;
-        }
-      }
-
-      // update the state vector with z_o, R_o, H_o.
-      DefaultEkfUpdater updater(covariance_, navAndImuParamsDim, numCamPoseStates);
-      computeKalmanGainTimer.start();
-      Eigen::Matrix<double, Eigen::Dynamic, 1> deltaX =
-          updater.computeCorrection(H_o, z_o, R_o);
-      computeKalmanGainTimer.stop();
-      updateStatesTimer.start();
-      updateStates(deltaX);
-      updateStatesTimer.stop();
-      updateCovarianceTimer.start();
-      updater.updateCovariance(&covariance_);
-      updateCovarianceTimer.stop();
-    }
-  }
-  updateLandmarksTimer.stop();
-
-  // Update minValidStateId_ for removing old states.
   // And update landmark positions which is only necessary when
   // (1) landmark coordinates are used to predict the points projection in
   // new frames OR (2) to visualize the points.
-  minValidStateId_ = currentFrameId();
   for (auto it = landmarksMap_.begin(); it != landmarksMap_.end(); ++it) {
     if (it->second.status.inState) {
       // SLAM features
@@ -2406,17 +2367,227 @@ void HybridFilter::optimize(size_t /*numIter*/, size_t /*numThreads*/,
       if (depth < 1e-6) {
         it->second.quality = 0.0;
       }
-    } else {
-      if (it->second.status.measurementType == FeatureTrackStatus::kPremature) {
-        auto itObs = it->second.observations.begin();
-        if (itObs->first.frameId < minValidStateId_)
-          minValidStateId_ = itObs->first.frameId;
-      }
     }
   }
 }
 
-// private stuff
+void HybridFilter::initializeLandmarksInFilter() {
+  updateLandmarksTimer.start();
+  Eigen::Matrix<double, Eigen::Dynamic, 1> r_i;
+  Eigen::MatrixXd H_i;
+  Eigen::MatrixXd R_i;
+  Eigen::Matrix<double, Eigen::Dynamic, 3> H_fi;
+  Eigen::MatrixXd Q2;  // nullspace of H_fi
+  Eigen::MatrixXd Q1;  // column space of H_fi
+
+  Eigen::Matrix<double, Eigen::Dynamic, 1> z_o;
+  Eigen::MatrixXd H_o;
+  Eigen::MatrixXd R_o;
+
+  std::vector<
+      Eigen::Matrix<double, Eigen::Dynamic, 1>,
+      Eigen::aligned_allocator<Eigen::Matrix<double, Eigen::Dynamic, 1>>>
+      vz_1;
+  std::vector<
+      Eigen::Matrix<double, Eigen::Dynamic, 1>,
+      Eigen::aligned_allocator<Eigen::Matrix<double, Eigen::Dynamic, 1>>>
+      vz_o;
+  std::vector<
+      Eigen::Matrix<double, 3, Eigen::Dynamic>,
+      Eigen::aligned_allocator<Eigen::Matrix<double, 3, Eigen::Dynamic>>>
+      vH_1;
+  std::vector<Eigen::Matrix<double, 3, 3>,
+              Eigen::aligned_allocator<Eigen::Matrix<double, 3, 3>>>
+      vH_2;
+  std::vector<Eigen::Matrix<double, 3, 3>,
+              Eigen::aligned_allocator<Eigen::Matrix<double, 3, 3>>>
+      vR_1;
+
+  std::vector<Eigen::MatrixXd, Eigen::aligned_allocator<Eigen::MatrixXd>>
+      vH_o;  // each entry has a size say (2n-3)x(13+9m) where n is the number of observations,
+  // and m is the number of cloned state variables in the sliding window.
+  std::vector<Eigen::MatrixXd, Eigen::aligned_allocator<Eigen::MatrixXd>>
+      vR_o;  // each entry has a size (2n-3)x(2n-3)
+
+  size_t totalObsDim = 0;  // total dimensions of all features' observations
+  const uint64_t currFrameId = currentFrameId();
+  size_t navAndImuParamsDim = navStateAndImuParamsMinimalDim();
+  size_t numCamPosePointStates = cameraParamPoseAndLandmarkMinimalDimen();
+  const size_t numCamPoseStates =
+      numCamPosePointStates - 3 * mInCovLmIds.size();
+  Eigen::MatrixXd variableCov = covariance_.block(
+      navAndImuParamsDim, navAndImuParamsDim, numCamPoseStates,
+      numCamPoseStates); // covariance of camera and pose copy states
+
+  Eigen::AlignedVector<okvis::ceres::HomogeneousPointParameterBlock> landmarksToAdd;
+  landmarksToAdd.reserve(20);
+  for (okvis::PointMap::iterator pit = landmarksMap_.begin();
+       pit != landmarksMap_.end(); ++pit) {
+    if (pit->second.status.measurementType == FeatureTrackStatus::kSlamInitialization) {
+      msckf::PointLandmark pointLandmark;
+      bool isValidJacobian =
+          featureJacobian(pit->second, &pointLandmark, H_i, r_i, R_i, &H_fi);
+      if (!isValidJacobian) {  // This feature will be removed and marginalized as a MSCKF feature in the next optimization step.
+        pit->second.setMeasurementFate(FeatureTrackStatus::kComputingJacobiansFailed);
+        continue;
+      }
+      Eigen::Vector4d homogeneousPoint =
+          Eigen::Map<Eigen::Vector4d>(pointLandmark.data(), 4);
+
+      vio::leftNullspaceAndColumnSpace(H_fi, &Q2, &Q1);
+      z_o = Q2.transpose() * r_i;
+      H_o = Q2.transpose() * H_i;
+      R_o = Q2.transpose() * R_i * Q2;
+
+      if (!FilterHelper::gatingTest(H_o, z_o, R_o, variableCov)) {
+        pit->second.setMeasurementFate(FeatureTrackStatus::kPotentialOutlier);
+        continue;
+      }
+
+      pit->second.anchorStateId = currFrameId;
+      // use the earliest camera frame as the anchor image.
+      int anchorCameraId = -1;
+      for (auto observationIter = pit->second.observations.rbegin();
+           observationIter != pit->second.observations.rend();
+           ++observationIter) {
+        if (observationIter->first.frameId == currFrameId) {
+          anchorCameraId = observationIter->first.cameraIndex;
+        } else {
+          break;
+        }
+      }
+      OKVIS_ASSERT_NE(Exception, anchorCameraId, -1, "Anchor image not found!");
+      pit->second.anchorCameraId = anchorCameraId;
+      pit->second.status.inState = true;
+      pit->second.setMeasurementFate(FeatureTrackStatus::kSuccessful);
+      landmarksToAdd.emplace_back(homogeneousPoint, pit->first);
+
+      vz_1.push_back(Q1.transpose() * r_i);
+      vz_o.push_back(z_o);
+      vH_1.push_back(Q1.transpose() * H_i);
+      vH_2.push_back(Q1.transpose() * H_fi);
+      vH_o.push_back(H_o);
+      vR_o.push_back(R_o);
+      vR_1.push_back(Q1.transpose() * R_i * Q1);
+      totalObsDim += H_i.rows();
+    }
+  }
+
+  // augment and update the covariance matrix.
+  size_t nNewFeatures = landmarksToAdd.size();
+//    LOG(INFO) << "Initializing " << nNewFeatures << " landmarks into the state vector of " << mInCovLmIds.size() << " landmarks!";
+  if (nNewFeatures) {
+    Eigen::MatrixXd H_o(totalObsDim - 3 * nNewFeatures, numCamPoseStates);
+    Eigen::MatrixXd H_1(3 * nNewFeatures, numCamPoseStates);
+    Eigen::MatrixXd invH_2 =
+        Eigen::MatrixXd::Zero(3 * nNewFeatures, 3 * nNewFeatures);
+    Eigen::MatrixXd R_o = Eigen::MatrixXd::Zero(
+        totalObsDim - 3 * nNewFeatures, totalObsDim - 3 * nNewFeatures);
+    Eigen::MatrixXd R_1 =
+        Eigen::MatrixXd::Zero(3 * nNewFeatures, 3 * nNewFeatures);
+    Eigen::Matrix<double, Eigen::Dynamic, 1> z_1(nNewFeatures * 3, 1);
+    Eigen::Matrix<double, Eigen::Dynamic, 1> z_o(
+        totalObsDim - nNewFeatures * 3, 1);
+
+    size_t startRow = 0u;
+    for (size_t featureIndex = 0u; featureIndex < nNewFeatures; ++featureIndex) {
+      H_o.block(startRow, 0, vH_o[featureIndex].rows(), numCamPoseStates) =
+          vH_o[featureIndex];
+      H_1.block(3 * featureIndex, 0, 3, numCamPoseStates) = vH_1[featureIndex];
+      invH_2.block<3, 3>(3 * featureIndex, 3 * featureIndex) =
+          vH_2[featureIndex].inverse();
+      R_o.block(startRow, startRow, vH_o[featureIndex].rows(),
+                vH_o[featureIndex].rows()) = vR_o[featureIndex];
+      R_1.block<3, 3>(3 * featureIndex, 3 * featureIndex) = vR_1[featureIndex];
+      z_1.segment<3>(3 * featureIndex) = vz_1[featureIndex];
+      z_o.segment(startRow, vH_o[featureIndex].rows()) = vz_o[featureIndex];
+      startRow += vH_o[featureIndex].rows();
+    }
+
+    // initialize features into the state vector with z_1, R_1, H_1, H_2.
+    // also correct the landmark parameters
+    updateCovarianceTimer.start();
+    int covDim = covariance_.rows();
+    Eigen::MatrixXd Paug(covDim + nNewFeatures * 3,
+                         covDim + nNewFeatures * 3);
+    Paug.topLeftCorner(covDim, covDim) = covariance_;
+    Eigen::MatrixXd invH2H1 = invH_2 * H_1;
+    Paug.block(covDim, 0, 3 * nNewFeatures, covDim) =
+        -invH2H1 * Paug.block(navAndImuParamsDim, 0,
+                              numCamPoseStates, covDim);
+    Paug.block(0, covDim, covDim, 3 * nNewFeatures) =
+        Paug.block(covDim, 0, 3 * nNewFeatures, covDim).transpose();
+    Paug.bottomRightCorner(3 * nNewFeatures, 3 * nNewFeatures) =
+        -Paug.block(covDim, navAndImuParamsDim,
+                    3 * nNewFeatures, numCamPoseStates) *
+            invH2H1.transpose() +
+        invH_2 * R_1 * invH_2.transpose();
+    covariance_ = Paug;
+    updateCovarianceTimer.stop();
+
+    Eigen::Matrix<double, Eigen::Dynamic, 1> deltaLandmarks = invH_2 * z_1;
+    // TODO(jhuai): use polymorphism for variables.
+    switch (pointLandmarkOptions_.landmarkModelId) {
+      case msckf::InverseDepthParameterization::kModelId:
+        for (size_t j = 0u; j < nNewFeatures; ++j) {
+          Eigen::Vector4d ab1rho = landmarksToAdd[j].estimate();
+          ab1rho[0] += deltaLandmarks[j * 3];
+          ab1rho[1] += deltaLandmarks[j * 3 + 1];
+          ab1rho[3] += deltaLandmarks[j * 3 + 2];
+          landmarksToAdd[j].setEstimate(ab1rho);
+        }
+        break;
+      case msckf::HomogeneousPointParameterization::kModelId:
+        for (size_t j = 0u; j < nNewFeatures; ++j) {
+            Eigen::Vector4d pointW = landmarksToAdd[j].estimate();
+            pointW[0] += deltaLandmarks[j * 3];
+            pointW[1] += deltaLandmarks[j * 3 + 1];
+            pointW[2] += deltaLandmarks[j * 3 + 2];
+            landmarksToAdd[j].setEstimate(pointW);
+        }
+        break;
+      default:
+        break;
+    }
+
+    mInCovLmIds.insert(mInCovLmIds.end(), landmarksToAdd.begin(),
+                       landmarksToAdd.end());
+
+    // TODO(jhuai): add homogeneous point parameter block to satisfy setLandmark
+    // which potentially needs point blocks to be registered in the map.
+    // This would be unnecessary if the frontend refers to the backendInterface
+    // instead of the concrete Estimator class.
+    for (auto landmark : landmarksToAdd) {
+      uint64_t landmarkId = landmark.id();
+      const MapPoint &mp = landmarksMap_.at(landmarkId);
+      Eigen::Vector4d hpW = anchoredInverseDepthToWorldCoordinates(
+          landmark.estimate(), mp.anchorStateId, mp.anchorCameraId);
+      std::shared_ptr<okvis::ceres::HomogeneousPointParameterBlock>
+          pointParameterBlock(
+              new okvis::ceres::HomogeneousPointParameterBlock(hpW, landmark.id()));
+      if (!mapPtr_->addParameterBlock(pointParameterBlock,
+                                      okvis::ceres::Map::HomogeneousPoint)) {
+        LOG(WARNING) << "Failed to add block for landmark " << landmark.id();
+        continue;
+      }
+    }
+
+    // update the state vector with z_o, R_o, H_o.
+    DefaultEkfUpdater updater(covariance_, navAndImuParamsDim, numCamPoseStates);
+    computeKalmanGainTimer.start();
+    Eigen::Matrix<double, Eigen::Dynamic, 1> deltaX =
+        updater.computeCorrection(H_o, z_o, R_o);
+    computeKalmanGainTimer.stop();
+    updateStatesTimer.start();
+    updateStates(deltaX);
+    updateStatesTimer.stop();
+    updateCovarianceTimer.start();
+    updater.updateCovariance(&covariance_);
+    updateCovarianceTimer.stop();
+  }
+  updateLandmarksTimer.stop();
+}
+
 size_t HybridFilter::gatherMapPointObservations(
     const MapPoint& mp,
     msckf::PointSharedData* pointDataPtr,
@@ -3141,34 +3312,6 @@ bool HybridFilter::featureJacobianEpipolar(
   Ri->resize(numConstraints, numConstraints);
   *Ri = H_fi * cov_fi * H_fi.transpose();
   return true;
-}
-
-uint64_t HybridFilter::getMinValidStateId() const {
-  uint64_t currentFrameId = statesMap_.rbegin()->first;
-  uint64_t minStateId = currentFrameId;
-  for (auto it = landmarksMap_.begin(); it != landmarksMap_.end(); ++it) {
-    if (it->second.status.measurementType == FeatureTrackStatus::kPremature) {
-      auto itObs = it->second.observations.begin();
-      if (itObs->first.frameId < minStateId) {
-        minStateId = itObs->first.frameId;
-      }
-    }
-  }
-  // We keep at least one keyframe which is required for visualization.
-  uint64_t lastKeyframeId = currentKeyframeId();
-  // Also keep at least numImuFrames frames.
-  uint64_t keepFrameId(0u);
-  size_t i = 0u;
-  size_t numFrameToKeep = optimizationOptions_.numImuFrames + optimizationOptions_.numKeyframes;
-  for (std::map<uint64_t, States>::const_reverse_iterator rit = statesMap_.rbegin();
-       rit != statesMap_.rend(); ++rit) {
-    keepFrameId = rit->first;
-    ++i;
-    if (i == numFrameToKeep) {
-      break;
-    }
-  }
-  return std::min(minStateId, std::min(lastKeyframeId, keepFrameId));
 }
 
 bool HybridFilter::getOdometryConstraintsForKeyframe(

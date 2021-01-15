@@ -73,6 +73,8 @@ class HybridFilter : public Estimator, public BaseFilter {
 
   virtual ~HybridFilter();
 
+  void addCameraSystem(const okvis::cameras::NCameraSystem& cameras) final;
+
   /**
    * @brief add a state to the state map
    * @param multiFrame Matched multiFrame.
@@ -91,16 +93,6 @@ class HybridFilter : public Estimator, public BaseFilter {
                  bool asKeyframe) final;
 
   /**
-   * @brief Applies the dropping/marginalization strategy according to the
-   * RSS'13/IJRR'14 paper. The new number of frames in the window will be
-   * numKeyframes+numImuFrames.
-   * @return True if successful.
-   */
-  bool applyMarginalizationStrategy(
-      size_t numKeyframes, size_t numImuFrames,
-      okvis::MapPointVector &removedLandmarks) override;
-
-  /**
    * @brief optimize
    * @param numIter
    * @param numThreads
@@ -108,6 +100,15 @@ class HybridFilter : public Estimator, public BaseFilter {
    */
   void optimize(size_t numIter, size_t numThreads = 1,
                 bool verbose = false) override;
+
+  /**
+   * @brief Drop out redundant frames if the number of frames in the window is greater than
+   * numKeyframes+numImuFrames.
+   * @return True if successful.
+   */
+  bool applyMarginalizationStrategy(
+      size_t numKeyframes, size_t numImuFrames,
+      okvis::MapPointVector &removedLandmarks) override;
 
   /// @name Getters
   ///\{
@@ -303,6 +304,8 @@ class HybridFilter : public Estimator, public BaseFilter {
 
   void updateStates(const Eigen::Matrix<double, Eigen::Dynamic, 1> &deltaX) override;
 
+  void initializeLandmarksInFilter();
+
   /// print out the most recent state vector and the stds of its elements.
   /// It can be called in the optimizationLoop, but a better way to save
   /// results is to save in the publisher loop
@@ -473,6 +476,20 @@ class HybridFilter : public Estimator, public BaseFilter {
   static const int kClonedStateMinimalDimen = 9;
 
  protected:
+  void findRedundantCamStates(
+      std::vector<uint64_t>* rm_cam_state_ids,
+      size_t numImuFrames);
+
+  /**
+   * @brief marginalizeRedundantFrames
+   * @param numKeyframes
+   * @param numImuFrames
+   * @return number of marginalized frames
+   */
+  int marginalizeRedundantFrames(size_t numKeyframes, size_t numImuFrames);
+
+  void changeAnchors(const std::vector<uint64_t>& sortedRemovedStateIds);
+
   bool getOdometryConstraintsForKeyframe(
       std::shared_ptr<okvis::LoopQueryKeyframeMessage> queryKeyframe) const final;
 
@@ -622,14 +639,6 @@ class HybridFilter : public Estimator, public BaseFilter {
       Eigen::Matrix<double, Eigen::Dynamic, 2>* J_n,
       Eigen::VectorXd* residual) const;
 
-
-  /// the error vector corresponds to states x_B | x_imu | x_c | \pi{B_{N-m}}
-  /// ... \pi{B_{N-1}} following Li icra 2014 x_B = [^{G}p_B] ^{G}q_B ^{G}v_B
-  /// b_g b_a]
-
-  // minimum of the ids of the states that have tracked features
-  uint64_t minValidStateId_;
-
   mutable okvis::timing::Timer triangulateTimer;
   mutable okvis::timing::Timer computeHTimer;
   okvis::timing::Timer updateLandmarksTimer;
@@ -643,6 +652,13 @@ class HybridFilter : public Estimator, public BaseFilter {
                                 // 0,1,2, to a fixed number
   msckf::MotionAndStructureStats slamStats_;
   double trackingRate_;
+
+  // minimum number of culled frames in each prune frame state
+  // step if cloned states size hit maxClonedStates_
+  // should be at least 3 for the monocular case so that
+  // the marginalized observations can contribute innovation to the states,
+  // see Sun 2017 Robust stereo appendix D
+  size_t minCulledFrames_;
 };
 
 /**

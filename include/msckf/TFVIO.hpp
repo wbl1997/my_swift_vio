@@ -55,19 +55,22 @@ class TFVIO : public HybridFilter {
    * numKeyframes+numImuFrames.
    * @return True if successful.
    */
-  virtual bool applyMarginalizationStrategy(
-      size_t numKeyframes, size_t numImuFrames,
-      okvis::MapPointVector& removedLandmarks) final;
+  bool
+  applyMarginalizationStrategy(size_t numKeyframes, size_t numImuFrames,
+                               okvis::MapPointVector &removedLandmarks) final;
 
-  virtual void optimize(size_t numIter, size_t numThreads = 1,
-                        bool verbose = false) final;
-
- private:
+  void optimize(size_t numIter, size_t numThreads = 1,
+                bool verbose = false) final;
 
   int computeStackedJacobianAndResidual(
-      Eigen::MatrixXd* T_H, Eigen::Matrix<double, Eigen::Dynamic, 1>* r_q,
-      Eigen::MatrixXd* R_q) const;
+      Eigen::MatrixXd *T_H, Eigen::Matrix<double, Eigen::Dynamic, 1> *r_q,
+      Eigen::MatrixXd *R_q) final;
 
+private:
+  uint64_t getMinValidStateId() const;
+
+  // minimum of the ids of the states that have tracked features
+  uint64_t minValidStateId_;
 };
 
 }  // namespace okvis
