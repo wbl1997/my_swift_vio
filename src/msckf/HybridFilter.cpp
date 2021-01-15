@@ -677,7 +677,6 @@ bool HybridFilter::applyMarginalizationStrategy(
   // number of navigation, imu, camera, and pose copies states in the
   // covariance.
 
-  LOG(INFO) << "Removing map points!";
   for (PointMap::iterator pit = landmarksMap_.begin();
        pit != landmarksMap_.end();) {
     FeatureTrackStatus status = pit->second.status;
@@ -898,7 +897,6 @@ bool HybridFilter::applyMarginalizationStrategy(
     statesMap_.erase(it);
     ss << *iter << " ";
   }
-  LOG(INFO) << "Marginalized covariance and states of Ids " << ss.str();
 
   size_t numRemovedStates = removeFrames.size();
   if (numRemovedStates == 0u) {
@@ -2044,7 +2042,7 @@ void HybridFilter::optimize(size_t /*numIter*/, size_t /*numThreads*/,
       vR_i;
 
   OKVIS_ASSERT_EQ_DBG(
-      Exception, covariance_.rows(),
+      Exception, (size_t)covariance_.rows(),
       startIndexOfClonedStatesFast() +
           kClonedStateMinimalDimen * statesMap_.size() + 3 * mInCovLmIds.size(),
       "Inconsistent rows of covariance matrix and number of states");
@@ -2121,7 +2119,6 @@ void HybridFilter::optimize(size_t /*numIter*/, size_t /*numThreads*/,
 
   // update with MSCKF features
   if (dimH_o[0] > 0) {
-    LOG(INFO) << "MSCKF feature observation dim " << dimH_o[0];
     Eigen::MatrixXd H_o(dimH_o[0], dimH_o[1]);
     Eigen::Matrix<double, Eigen::Dynamic, 1> r_o(dimH_o[0], 1);
     Eigen::MatrixXd R_o = Eigen::MatrixXd::Zero(dimH_o[0], dimH_o[0]);
@@ -2146,7 +2143,6 @@ void HybridFilter::optimize(size_t /*numIter*/, size_t /*numThreads*/,
   // update with SLAM features
   if (nInStateFeatures > 0) {
     const size_t obsRows = 2 * nInStateFeatures;
-    LOG(INFO) << "SLAM feature observation dim " << obsRows;
     const size_t numPointStates = 3 * mInCovLmIds.size();
     Eigen::MatrixXd H_all(obsRows, numCamPosePointStates);
     H_all.block(0, numCamPosePointStates - numPointStates, obsRows, numPointStates).setZero();
@@ -2274,7 +2270,7 @@ void HybridFilter::optimize(size_t /*numIter*/, size_t /*numThreads*/,
 
     // augment and update the covariance matrix.
     size_t nNewFeatures = landmarksToAdd.size();
-    LOG(INFO) << "Initializing " << nNewFeatures << " landmarks into the state vector!";
+//    LOG(INFO) << "Initializing " << nNewFeatures << " landmarks into the state vector of " << mInCovLmIds.size() << " landmarks!";
     if (nNewFeatures) {
       Eigen::MatrixXd H_o(totalObsDim - 3 * nNewFeatures, numCamPoseStates);
       Eigen::MatrixXd H_1(3 * nNewFeatures, numCamPoseStates);
@@ -2348,14 +2344,14 @@ void HybridFilter::optimize(size_t /*numIter*/, size_t /*numThreads*/,
         default:
           break;
       }
-      LOG(INFO) << "Initialized features into the state vector!";
 
       mInCovLmIds.insert(mInCovLmIds.end(), landmarksToAdd.begin(),
                          landmarksToAdd.end());
 
       // TODO(jhuai): add homogeneous point parameter block to satisfy setLandmark
       // which potentially needs point blocks to be registered in the map.
-      // This would be unnecessary the backendInterface is used by the frontend.
+      // This would be unnecessary if the frontend refers to the backendInterface
+      // instead of the concrete Estimator class.
       for (auto landmark : landmarksToAdd) {
         uint64_t landmarkId = landmark.id();
         const MapPoint &mp = landmarksMap_.at(landmarkId);
@@ -2383,17 +2379,16 @@ void HybridFilter::optimize(size_t /*numIter*/, size_t /*numThreads*/,
       updateCovarianceTimer.start();
       updater.updateCovariance(&covariance_);
       updateCovarianceTimer.stop();
-
     }
   }
+  updateLandmarksTimer.stop();
 
-  /// update minValidStateId_ for removing old states
-  /// also update landmark positions which is only necessary when
-  /// (1) landmark coordinates are used to predict the points projection in
-  /// new frames OR (2) to visualize the points
-  minValidStateId_ = currFrameId;
-  for (auto it = landmarksMap_.begin(); it != landmarksMap_.end();
-       ++it) {
+  // Update minValidStateId_ for removing old states.
+  // And update landmark positions which is only necessary when
+  // (1) landmark coordinates are used to predict the points projection in
+  // new frames OR (2) to visualize the points.
+  minValidStateId_ = currentFrameId();
+  for (auto it = landmarksMap_.begin(); it != landmarksMap_.end(); ++it) {
     if (it->second.status.inState) {
       // SLAM features
       it->second.quality = 1.0;
@@ -2418,12 +2413,6 @@ void HybridFilter::optimize(size_t /*numIter*/, size_t /*numThreads*/,
           minValidStateId_ = itObs->first.frameId;
       }
     }
-  }
-  updateLandmarksTimer.stop();
-
-  // summary output
-  if (verbose) {
-    LOG(INFO) << mapPtr_->summary.FullReport();
   }
 }
 
