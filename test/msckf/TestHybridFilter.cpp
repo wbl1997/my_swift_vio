@@ -319,7 +319,7 @@ void testHybridFilterSinusoid(
 
     srand((unsigned int)time(0)); // comment out to make tests deterministic
 
-    LOG(INFO) << "Run " << run << " " << methodIdentifier << " " << testSetting.print();
+    LOG(INFO) << "Run " << run << " " << methodIdentifier << " " << testSetting.toString();
 
     std::string pointFile = outputPath + "/" + trajLabel + "_Points.txt";
     std::string imuSampleFile = outputPath + "/" + trajLabel + "_IMU.txt";

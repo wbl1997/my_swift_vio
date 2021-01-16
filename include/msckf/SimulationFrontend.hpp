@@ -237,7 +237,7 @@ struct TestSetting {
         gridType(_gridType),
         landmarkRadius(_landmarkRadius) {}
 
-  std::string print() const {
+  std::string toString() const {
     std::stringstream ss;
     ss << "addImuNoise " << addImuNoise << " noisyInitialSpeedAndBiases "
        << noisyInitialSpeedAndBiases << " noisyInitialSensorParams "
@@ -248,7 +248,7 @@ struct TestSetting {
        << okvis::EstimatorAlgorithmIdToName(estimator_algorithm)
        << " use epipolar constraint? " << useEpipolarConstraint
        << " camera observation model id " << cameraObservationModelId
-       << " camera landmark model id " << landmarkModelId
+       << " landmark model id " << landmarkModelId
        << " camera geometry type " << static_cast<int>(cameraModelId)
        << " camera orientation type " << static_cast<int>(cameraOrientationId)
        << " landmark grid type " << static_cast<int>(gridType)

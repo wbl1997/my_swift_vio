@@ -192,11 +192,9 @@ void VioTestSystemBuilder::createVioSystem(
   estimator->setOptimizationOptions(optimOptions);
 
   okvis::PointLandmarkOptions plOptions;
+  plOptions.minTrackLengthForSlam = 5;
   plOptions.landmarkModelId = testSetting.landmarkModelId;
   estimator->setPointLandmarkOptions(plOptions);
-
-  LOG(INFO) << "Present landmark model " << testSetting.landmarkModelId
-            << " camera model " << testSetting.cameraObservationModelId;
 
   frontend.reset(new okvis::SimulationFrontend(trueCameraSystem_->numCameras(),
                                                testSetting.addImageNoise, 60,

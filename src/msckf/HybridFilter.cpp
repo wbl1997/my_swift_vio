@@ -69,10 +69,6 @@ HybridFilter::HybridFilter(std::shared_ptr<okvis::ceres::Map> mapPtr)
       updateLandmarksTimer("3.1.5 updateLandmarks", true),
       mTrackLengthAccumulator(100, 0u),
       minCulledFrames_(3u) {
-  // reset the default to AIDP.
-  PointLandmarkOptions plOptions;
-  plOptions.landmarkModelId = msckf::InverseDepthParameterization::kModelId;
-  setPointLandmarkOptions(plOptions);
 }
 
 // The default constructor.
@@ -83,10 +79,6 @@ HybridFilter::HybridFilter()
       updateLandmarksTimer("3.1.5 updateLandmarks", true),
       mTrackLengthAccumulator(100, 0u),
       minCulledFrames_(3u) {
-  // reset the default to AIDP.
-  PointLandmarkOptions plOptions;
-  plOptions.landmarkModelId = msckf::InverseDepthParameterization::kModelId;
-  setPointLandmarkOptions(plOptions);
 }
 
 HybridFilter::~HybridFilter() {
@@ -899,6 +891,19 @@ int HybridFilter::marginalizeRedundantFrames(size_t numKeyframes, size_t numImuF
   return rm_cam_state_ids.size();
 }
 
+void HybridFilter::removeAnchorlessLandmarks(
+    const std::vector<uint64_t> &sortedRemovedStateIds) {
+  for (auto landmark : mInCovLmIds) {
+    MapPoint &mapPoint = landmarksMap_.at(landmark.id());
+    uint64_t newAnchorFrameId =
+        mapPoint.shouldChangeAnchor(sortedRemovedStateIds);
+    if (newAnchorFrameId) {
+      // The landmark will be removed in applyMarginalizationStrategy step.
+      mapPoint.status.numMissFrames = pointLandmarkOptions_.maxHibernationFrames + 1;
+    }
+  }
+}
+
 void HybridFilter::changeAnchors(const std::vector<uint64_t>& sortedRemovedStateIds) {
   int covDim = covariance_.rows();
   const size_t numNavImuCamStates = startIndexOfClonedStatesFast();
@@ -913,74 +918,78 @@ void HybridFilter::changeAnchors(const std::vector<uint64_t>& sortedRemovedState
     MapPoint& mapPoint = landmarksMap_.at(landmark.id());
     uint64_t newAnchorFrameId = mapPoint.shouldChangeAnchor(sortedRemovedStateIds);
     if (newAnchorFrameId) {
-        // transform from the body frame at the anchor frame epoch to the world frame.
-        okvis::kinematics::Transformation T_WBa;
-        get_T_WS(mapPoint.anchorStateId, T_WBa);
-        okvis::kinematics::Transformation T_BCa;
-        getCameraSensorStates(newAnchorFrameId, mapPoint.anchorCameraId, T_BCa);
-        okvis::kinematics::Transformation T_WCa = T_WBa * T_BCa;
+      // transform from the body frame at the anchor frame epoch to the world
+      // frame.
+      okvis::kinematics::Transformation T_WBa;
+      get_T_WS(mapPoint.anchorStateId, T_WBa);
+      okvis::kinematics::Transformation T_BCa;
+      getCameraSensorStates(newAnchorFrameId, mapPoint.anchorCameraId, T_BCa);
+      okvis::kinematics::Transformation T_WCa = T_WBa * T_BCa;
 
-        // use the camera with the minimum index as the anchor camera.
-        int newAnchorCameraId = -1;
-        for (auto observationIter = mapPoint.observations.rbegin();
-             observationIter != mapPoint.observations.rend();
-             ++observationIter) {
-          if (observationIter->first.frameId == newAnchorFrameId) {
-            newAnchorCameraId = observationIter->first.cameraIndex;
-          } else {
-            break;
-          }
+      // use the camera with the minimum index as the anchor camera.
+      int newAnchorCameraId = -1;
+      for (auto observationIter = mapPoint.observations.rbegin();
+           observationIter != mapPoint.observations.rend(); ++observationIter) {
+        if (observationIter->first.frameId == newAnchorFrameId) {
+          newAnchorCameraId = observationIter->first.cameraIndex;
+        } else {
+          break;
         }
-        OKVIS_ASSERT_NE(Exception, newAnchorCameraId, -1, "Anchor image not found!");
-        okvis::kinematics::Transformation T_WBj;
-        get_T_WS(newAnchorFrameId, T_WBj);
-        okvis::kinematics::Transformation T_BCj;
-        getCameraSensorStates(newAnchorFrameId, newAnchorCameraId, T_BCj);
-        okvis::kinematics::Transformation T_WCj = T_WBj * T_BCj;
+      }
+      OKVIS_ASSERT_NE(Exception, newAnchorCameraId, -1,
+                      "Anchor image not found!");
+      okvis::kinematics::Transformation T_WBj;
+      get_T_WS(newAnchorFrameId, T_WBj);
+      okvis::kinematics::Transformation T_BCj;
+      getCameraSensorStates(newAnchorFrameId, newAnchorCameraId, T_BCj);
+      okvis::kinematics::Transformation T_WCj = T_WBj * T_BCj;
 
-        uint64_t toFind = mapPoint.id;
-        Eigen::AlignedDeque<okvis::ceres::HomogeneousPointParameterBlock>::iterator landmarkIter =
-            std::find_if(mInCovLmIds.begin(), mInCovLmIds.end(),
-                         [toFind](const okvis::ceres::HomogeneousPointParameterBlock &x) { return x.id() == toFind;});
-        OKVIS_ASSERT_TRUE(Exception, landmarkIter != mInCovLmIds.end(),
-                          "The tracked landmark is not in mInCovLmIds ");
+      uint64_t toFind = mapPoint.id;
+      Eigen::AlignedDeque<
+          okvis::ceres::HomogeneousPointParameterBlock>::iterator landmarkIter =
+          std::find_if(
+              mInCovLmIds.begin(), mInCovLmIds.end(),
+              [toFind](const okvis::ceres::HomogeneousPointParameterBlock &x) {
+                return x.id() == toFind;
+              });
+      OKVIS_ASSERT_TRUE(Exception, landmarkIter != mInCovLmIds.end(),
+                        "The tracked landmark is not in mInCovLmIds ");
 
-        // update covariance matrix
-        OKVIS_ASSERT_EQ(Exception, pointLandmarkOptions_.landmarkModelId,
-                        msckf::InverseDepthParameterization::kModelId,
-                        "Only inverse depth parameterization is supported for reparameterization!");
-        Eigen::Vector4d ab1rho = landmarkIter->estimate();
-        Eigen::Vector3d abrhoi(ab1rho[0], ab1rho[1], ab1rho[3]);
-        Eigen::Vector3d abrhoj;
-        Eigen::Matrix<double, 3, 9> jacobian;
-        vio::reparameterize_AIDP(T_WCa.C(), T_WCj.C(), abrhoi, T_WCa.r(),
-                                 T_WCj.r(), abrhoj, &jacobian);
+      // update covariance matrix
+      OKVIS_ASSERT_EQ(Exception, pointLandmarkOptions_.landmarkModelId,
+                      msckf::InverseDepthParameterization::kModelId,
+                      "Only inverse depth parameterization is supported for "
+                      "reparameterization!");
+      Eigen::Vector4d ab1rho = landmarkIter->estimate();
+      Eigen::Vector3d abrhoi(ab1rho[0], ab1rho[1], ab1rho[3]);
+      Eigen::Vector3d abrhoj;
+      Eigen::Matrix<double, 3, 9> jacobian;
+      vio::reparameterize_AIDP(T_WCa.C(), T_WCj.C(), abrhoi, T_WCa.r(),
+                               T_WCj.r(), abrhoj, &jacobian);
 
-        reparamJacobian.setZero();
-        size_t startRowC = statesMap_[newAnchorFrameId]
-                               .global.at(GlobalStates::T_WS)
-                               .startIndexInCov;
-        size_t startRowA = statesMap_[mapPoint.anchorStateId]
-                               .global.at(GlobalStates::T_WS)
-                               .startIndexInCov;
+      reparamJacobian.setZero();
+      size_t startRowC = statesMap_[newAnchorFrameId]
+                             .global.at(GlobalStates::T_WS)
+                             .startIndexInCov;
+      size_t startRowA = statesMap_[mapPoint.anchorStateId]
+                             .global.at(GlobalStates::T_WS)
+                             .startIndexInCov;
 
-        reparamJacobian.block<3, 3>(0, startRowA) =
-            jacobian.block<3, 3>(0, 3);
-        reparamJacobian.block<3, 3>(0, startRowC) =
-            jacobian.block<3, 3>(0, 6);
+      reparamJacobian.block<3, 3>(0, startRowA) = jacobian.block<3, 3>(0, 3);
+      reparamJacobian.block<3, 3>(0, startRowC) = jacobian.block<3, 3>(0, 6);
 
-        size_t covPtId = std::distance(mInCovLmIds.begin(), landmarkIter);
-        vCovPtId.push_back(covPtId);
-        reparamJacobian.block<3, 3>(0, numNavImuCamPoseStates + 3 * covPtId) =
-            jacobian.topLeftCorner<3, 3>();
-        vJacobian.push_back(reparamJacobian);
+      size_t covPtId = std::distance(mInCovLmIds.begin(), landmarkIter);
+      vCovPtId.push_back(covPtId);
+      reparamJacobian.block<3, 3>(0, numNavImuCamPoseStates + 3 * covPtId) =
+          jacobian.topLeftCorner<3, 3>();
+      vJacobian.push_back(reparamJacobian);
 
-        ab1rho = T_WCj.inverse() * T_WCa * ab1rho;
-        ab1rho /= ab1rho[2];
-        landmarkIter->setEstimate(ab1rho);
+      ab1rho = T_WCj.inverse() * T_WCa * ab1rho;
+      ab1rho /= ab1rho[2];
+      landmarkIter->setEstimate(ab1rho);
 
-        mapPoint.anchorStateId = newAnchorFrameId;
-        mapPoint.anchorCameraId = newAnchorCameraId;
+      mapPoint.anchorStateId = newAnchorFrameId;
+      mapPoint.anchorCameraId = newAnchorCameraId;
     }
   }
 
@@ -1025,8 +1034,6 @@ bool HybridFilter::applyMarginalizationStrategy(
       }
 
       if (status.inState) {
-        OKVIS_ASSERT_TRUE_DBG(Exception, pit->second.anchorStateId > 0,
-                              "a tracked point in the states not recorded");
         toRemoveLmIds.push_back(pit->first);
       }
 
@@ -1515,48 +1522,56 @@ bool HybridFilter::slamFeatureJacobian(const MapPoint &mp, Eigen::MatrixXd &H_x,
   std::vector<double> imageNoiseStd;
   imageNoiseStd.reserve(4);
 
+  if (pointLandmarkOptions_.landmarkModelId ==
+      msckf::InverseDepthParameterization::kModelId) {
+    // add the observation for anchor camera frame which is only needed for
+    // computing Jacobians.
+    KeypointIdentifier anchorFrameId(mp.anchorStateId, mp.anchorCameraId, 0u);
+    auto itObs = std::find_if(
+        mp.observations.begin(), mp.observations.end(),
+        [anchorFrameId](const std::pair<KeypointIdentifier, uint64_t> &v) {
+          return v.first.frameId == anchorFrameId.frameId &&
+                 v.first.cameraIndex == anchorFrameId.cameraIndex;
+        });
+    OKVIS_ASSERT_FALSE(Exception, itObs == mp.observations.end(),
+                       "Anchor observation not found!");
 
-  // add the observation for anchor camera frame which is only needed for computing Jacobians.
-  KeypointIdentifier anchorFrameId(mp.anchorStateId, mp.anchorCameraId, 0u);
-  auto itObs = std::find_if(
-      mp.observations.begin(), mp.observations.end(),
-      [anchorFrameId](const std::pair<KeypointIdentifier, uint64_t> &v) {
-        return v.first.frameId == anchorFrameId.frameId &&
-               v.first.cameraIndex == anchorFrameId.cameraIndex;
-      });
-  OKVIS_ASSERT_FALSE(Exception, itObs == mp.observations.end(), "Anchor observation not found!");
+    uint64_t poseId = mp.anchorStateId;
+    Eigen::Vector2d measurement;
+    auto multiFrameIter = multiFramePtrMap_.find(poseId);
+    okvis::MultiFramePtr multiFramePtr = multiFrameIter->second;
+    multiFramePtr->getKeypoint(itObs->first.cameraIndex,
+                               itObs->first.keypointIndex, measurement);
+    okvis::Time imageTimestamp =
+        multiFramePtr->timestamp(itObs->first.cameraIndex);
+    std::shared_ptr<const cameras::CameraBase> cameraGeometry =
+        camera_rig_.getCameraGeometry(itObs->first.cameraIndex);
+    uint32_t imageHeight = cameraGeometry->imageHeight();
+    obsInPixel.push_back(measurement);
 
-  uint64_t poseId = mp.anchorStateId;
-  Eigen::Vector2d measurement;
-  auto multiFrameIter = multiFramePtrMap_.find(poseId);
-  okvis::MultiFramePtr multiFramePtr = multiFrameIter->second;
-  multiFramePtr->getKeypoint(itObs->first.cameraIndex,
-                             itObs->first.keypointIndex, measurement);
-  okvis::Time imageTimestamp = multiFramePtr->timestamp(itObs->first.cameraIndex);
-  std::shared_ptr<const cameras::CameraBase> cameraGeometry =
-      camera_rig_.getCameraGeometry(itObs->first.cameraIndex);
-  uint32_t imageHeight = cameraGeometry->imageHeight();
-  obsInPixel.push_back(measurement);
+    double kpSize = 1.0;
+    multiFramePtr->getKeypointSize(itObs->first.cameraIndex,
+                                   itObs->first.keypointIndex, kpSize);
+    double sigma = kpSize / 8;
+    imageNoiseStd.push_back(sigma);
+    imageNoiseStd.push_back(sigma);
 
-  double kpSize = 1.0;
-  multiFramePtr->getKeypointSize(itObs->first.cameraIndex,
-                                 itObs->first.keypointIndex, kpSize);
-  double sigma = kpSize / 8;
-  imageNoiseStd.push_back(sigma);
-  imageNoiseStd.push_back(sigma);
+    std::shared_ptr<ceres::ParameterBlock> parameterBlockPtr;
+    getGlobalStateParameterBlockPtr(poseId, GlobalStates::T_WS,
+                                    parameterBlockPtr);
 
-  std::shared_ptr<ceres::ParameterBlock> parameterBlockPtr;
-  getGlobalStateParameterBlockPtr(poseId, GlobalStates::T_WS, parameterBlockPtr);
+    double kpN = measurement[1] / imageHeight - 0.5;
+    pointDataPtr->addKeypointObservation(itObs->first, parameterBlockPtr, kpN,
+                                         imageTimestamp);
 
-  double kpN = measurement[1] / imageHeight - 0.5;
-  pointDataPtr->addKeypointObservation(
-        itObs->first, parameterBlockPtr, kpN, imageTimestamp);
-
-  okvis::AnchorFrameIdentifier anchorId{mp.anchorStateId, mp.anchorCameraId, 0u};
-  pointDataPtr->setAnchors({anchorId});
+    okvis::AnchorFrameIdentifier anchorId{mp.anchorStateId, mp.anchorCameraId,
+                                          0u};
+    pointDataPtr->setAnchors({anchorId});
+  }
 
   // add observations in images of the current frame.
   uint64_t currFrameId = currentFrameId();
+  size_t numNewObservations = 0u;
   for (auto itObs = mp.observations.rbegin(), iteObs = mp.observations.rend();
        itObs != iteObs; ++itObs) {
     if (itObs->first.frameId == currFrameId) {
@@ -1580,16 +1595,20 @@ bool HybridFilter::slamFeatureJacobian(const MapPoint &mp, Eigen::MatrixXd &H_x,
       std::shared_ptr<ceres::ParameterBlock> parameterBlockPtr;
       getGlobalStateParameterBlockPtr(poseId, GlobalStates::T_WS, parameterBlockPtr);
 
+      std::shared_ptr<const cameras::CameraBase> cameraGeometry =
+          camera_rig_.getCameraGeometry(itObs->first.cameraIndex);
+      uint32_t imageHeight = cameraGeometry->imageHeight();
       double kpN = measurement[1] / imageHeight - 0.5;
       pointDataPtr->addKeypointObservation(
             itObs->first, parameterBlockPtr, kpN, imageTimestamp);
+      ++numNewObservations;
     } else {
       break;
     }
   }
-  size_t numObservations = pointDataPtr->numObservations();
-  OKVIS_ASSERT_GT(
-      Exception, numObservations, 1u,
+
+  OKVIS_ASSERT_GE(
+      Exception, numNewObservations, 1u,
       "A point in slamFeatureJacobian should be observed in current frame!");
 
   propagatePoseAndVelocityForMapPoint(pointDataPtr.get());
@@ -1634,6 +1653,7 @@ bool HybridFilter::slamFeatureJacobian(const MapPoint &mp, Eigen::MatrixXd &H_x,
     homogeneousPoint /= homogeneousPoint[3];  //[X, Y, Z, 1] in world frame.
   }
 
+  size_t numObservations = pointDataPtr->numObservations();
   // compute Jacobians for all observations in the current frame.
   Eigen::AlignedVector<Eigen::Matrix<double, 2, Eigen::Dynamic>> vJ_X;
   vJ_X.reserve(numObservations);
@@ -2359,10 +2379,13 @@ void HybridFilter::optimize(size_t /*numIter*/, size_t /*numThreads*/,
           [toFind](const okvis::ceres::HomogeneousPointParameterBlock &x) {
             return x.id() == toFind;
           });
-
-      it->second.pointHomog = anchoredInverseDepthToWorldCoordinates(
-          landmarkIter->estimate(), it->second.anchorStateId,
-          it->second.anchorCameraId);
+      if (it->second.anchorStateId == 0u) {
+        it->second.pointHomog = landmarkIter->estimate();
+      } else {
+        it->second.pointHomog = anchoredInverseDepthToWorldCoordinates(
+            landmarkIter->estimate(), it->second.anchorStateId,
+            it->second.anchorCameraId);
+      }
       double depth = it->second.pointHomog[2];
       if (depth < 1e-6) {
         it->second.quality = 0.0;
@@ -2444,20 +2467,25 @@ void HybridFilter::initializeLandmarksInFilter() {
         continue;
       }
 
-      pit->second.anchorStateId = currFrameId;
-      // use the earliest camera frame as the anchor image.
-      int anchorCameraId = -1;
-      for (auto observationIter = pit->second.observations.rbegin();
-           observationIter != pit->second.observations.rend();
-           ++observationIter) {
-        if (observationIter->first.frameId == currFrameId) {
-          anchorCameraId = observationIter->first.cameraIndex;
-        } else {
-          break;
+      if (pointLandmarkOptions_.landmarkModelId ==
+          msckf::InverseDepthParameterization::kModelId) {
+        // use the earliest camera frame as the anchor image.
+        int anchorCameraId = -1;
+        for (auto observationIter = pit->second.observations.rbegin();
+             observationIter != pit->second.observations.rend();
+             ++observationIter) {
+          if (observationIter->first.frameId == currFrameId) {
+            anchorCameraId = observationIter->first.cameraIndex;
+          } else {
+            break;
+          }
         }
+        OKVIS_ASSERT_NE(Exception, anchorCameraId, -1,
+                        "Anchor image not found!");
+        pit->second.anchorStateId = currFrameId;
+        pit->second.anchorCameraId = anchorCameraId;
       }
-      OKVIS_ASSERT_NE(Exception, anchorCameraId, -1, "Anchor image not found!");
-      pit->second.anchorCameraId = anchorCameraId;
+
       pit->second.status.inState = true;
       pit->second.setMeasurementFate(FeatureTrackStatus::kSuccessful);
       landmarksToAdd.emplace_back(homogeneousPoint, pit->first);
@@ -2560,8 +2588,13 @@ void HybridFilter::initializeLandmarksInFilter() {
     for (auto landmark : landmarksToAdd) {
       uint64_t landmarkId = landmark.id();
       const MapPoint &mp = landmarksMap_.at(landmarkId);
-      Eigen::Vector4d hpW = anchoredInverseDepthToWorldCoordinates(
-          landmark.estimate(), mp.anchorStateId, mp.anchorCameraId);
+      Eigen::Vector4d hpW;
+      if (mp.anchorStateId == 0u) {
+        hpW = landmark.estimate();
+      } else {
+        hpW = anchoredInverseDepthToWorldCoordinates(
+            landmark.estimate(), mp.anchorStateId, mp.anchorCameraId);
+      }
       std::shared_ptr<okvis::ceres::HomogeneousPointParameterBlock>
           pointParameterBlock(
               new okvis::ceres::HomogeneousPointParameterBlock(hpW, landmark.id()));

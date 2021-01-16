@@ -488,7 +488,17 @@ class HybridFilter : public Estimator, public BaseFilter {
    */
   int marginalizeRedundantFrames(size_t numKeyframes, size_t numImuFrames);
 
+  /**
+   * @brief changeAnchors Change the anchor frame for a landmark in the state that is losing its anchor frame.
+   * @param sortedRemovedStateIds
+   */
   void changeAnchors(const std::vector<uint64_t>& sortedRemovedStateIds);
+
+  /**
+   * @brief removeAnchorlessLandmarks Remove the landmarks in the state that are losing their anchor frame.
+   * @param sortedRemovedStateIds
+   */
+  void removeAnchorlessLandmarks(const std::vector<uint64_t>& sortedRemovedStateIds);
 
   bool getOdometryConstraintsForKeyframe(
       std::shared_ptr<okvis::LoopQueryKeyframeMessage> queryKeyframe) const final;
