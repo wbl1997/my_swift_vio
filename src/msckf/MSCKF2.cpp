@@ -43,40 +43,6 @@ MSCKF2::MSCKF2() {}
 
 MSCKF2::~MSCKF2() {}
 
-bool MSCKF2::applyMarginalizationStrategy(
-    size_t numKeyframes, size_t numImuFrames,
-    okvis::MapPointVector& removedLandmarks) {
-
-  marginalizeRedundantFrames(numKeyframes, numImuFrames);
-
-  // remove features tracked no more.
-  for (PointMap::iterator pit = landmarksMap_.begin();
-       pit != landmarksMap_.end();) {
-    const MapPoint& mapPoint = pit->second;
-    if (mapPoint.shouldRemove(pointLandmarkOptions_.maxHibernationFrames)) {
-      ++mTrackLengthAccumulator[mapPoint.observations.size()];
-      for (std::map<okvis::KeypointIdentifier, uint64_t>::const_iterator it =
-               mapPoint.observations.begin();
-           it != mapPoint.observations.end(); ++it) {
-        if (it->second) {
-          mapPtr_->removeResidualBlock(
-              reinterpret_cast<::ceres::ResidualBlockId>(it->second));
-        }
-        const KeypointIdentifier& kpi = it->first;
-        auto mfp = multiFramePtrMap_.find(kpi.frameId);
-        OKVIS_ASSERT_TRUE(Exception, mfp != multiFramePtrMap_.end(), "frame id not found in frame map!");
-        mfp->second->setLandmarkId(kpi.cameraIndex, kpi.keypointIndex, 0);
-      }
-      mapPtr_->removeParameterBlock(pit->first);
-      removedLandmarks.push_back(pit->second);
-      pit = landmarksMap_.erase(pit);
-    } else {
-      ++pit;
-    }
-  }
-  return true;
-}
-
 bool MSCKF2::measurementJacobianAIDPMono(
     const Eigen::Vector4d& ab1rho,
     const Eigen::Vector2d& obs,

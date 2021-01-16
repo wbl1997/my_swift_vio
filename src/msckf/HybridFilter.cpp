@@ -893,15 +893,36 @@ int HybridFilter::marginalizeRedundantFrames(size_t numKeyframes, size_t numImuF
 
 void HybridFilter::removeAnchorlessLandmarks(
     const std::vector<uint64_t> &sortedRemovedStateIds) {
+  // a lazy approach to deal with landmarks that have lost their anchors is to
+  // remove them.
+  std::vector<uint64_t> toRemoveLmIds;
+  toRemoveLmIds.reserve(10);
   for (auto landmark : mInCovLmIds) {
     MapPoint &mapPoint = landmarksMap_.at(landmark.id());
     uint64_t newAnchorFrameId =
         mapPoint.shouldChangeAnchor(sortedRemovedStateIds);
     if (newAnchorFrameId) {
-      // The landmark will be removed in applyMarginalizationStrategy step.
-      mapPoint.status.numMissFrames = pointLandmarkOptions_.maxHibernationFrames + 1;
+      // remove the landmark's observations.
+      std::map<okvis::KeypointIdentifier, uint64_t> &observationList =
+          mapPoint.observations;
+      for (auto iter = observationList.begin(); iter != observationList.end();
+           ++iter) {
+        if (iter->second) {
+          mapPtr_->removeResidualBlock(
+              reinterpret_cast<::ceres::ResidualBlockId>(iter->second));
+        }
+        const KeypointIdentifier &kpi = iter->first;
+        auto mfp = multiFramePtrMap_.find(kpi.frameId);
+        mfp->second->setLandmarkId(kpi.cameraIndex, kpi.keypointIndex, 0);
+      }
+      mapPtr_->removeParameterBlock(landmark.id());
+      landmarksMap_.erase(landmark.id());
+      toRemoveLmIds.push_back(landmark.id());
     }
   }
+
+  // remove the covariance entries and state variables.
+  decimateCovarianceForLandmarks(toRemoveLmIds);
 }
 
 void HybridFilter::changeAnchors(const std::vector<uint64_t>& sortedRemovedStateIds) {
@@ -1016,9 +1037,6 @@ bool HybridFilter::applyMarginalizationStrategy(
   // remove features no longer tracked which can be in or out of the state vector.
   std::vector<uint64_t> toRemoveLmIds;
   toRemoveLmIds.reserve(10);
-  const size_t numNavImuCamStates = startIndexOfClonedStatesFast();
-  const size_t numNavImuCamPoseStates = numNavImuCamStates + 9 * statesMap_.size();
-
   for (PointMap::iterator pit = landmarksMap_.begin();
        pit != landmarksMap_.end();) {
     FeatureTrackStatus status = pit->second.status;
@@ -1031,6 +1049,9 @@ bool HybridFilter::applyMarginalizationStrategy(
           mapPtr_->removeResidualBlock(
               reinterpret_cast<::ceres::ResidualBlockId>(iter->second));
         }
+        const KeypointIdentifier &kpi = iter->first;
+        auto mfp = multiFramePtrMap_.find(kpi.frameId);
+        mfp->second->setLandmarkId(kpi.cameraIndex, kpi.keypointIndex, 0);
       }
 
       if (status.inState) {
@@ -1040,12 +1061,22 @@ bool HybridFilter::applyMarginalizationStrategy(
       mapPtr_->removeParameterBlock(pit->first);
       removedLandmarks.push_back(pit->second);
       pit = landmarksMap_.erase(pit);
-    } else {  
+    } else {
       ++pit;
     }
   }
 
+  decimateCovarianceForLandmarks(toRemoveLmIds);
+  return true;
+}
+
+void HybridFilter::decimateCovarianceForLandmarks(const std::vector<uint64_t>& toRemoveLmIds) {
   // decimate covariance for landmarks to be removed from state.
+  if (toRemoveLmIds.size() == 0u)
+    return;
+  const size_t numNavImuCamStates = startIndexOfClonedStatesFast();
+  const size_t numNavImuCamPoseStates = numNavImuCamStates + 9 * statesMap_.size();
+
   std::vector<size_t> toRemoveIndices;  // start indices of removed columns,
                                         // each interval of size 3
   toRemoveIndices.reserve(toRemoveLmIds.size());
@@ -1091,7 +1122,6 @@ bool HybridFilter::applyMarginalizationStrategy(
         });
     mInCovLmIds.erase(idPos);
   }
-  return true;
 }
 
 void HybridFilter::updateImuRig() {
@@ -2503,7 +2533,8 @@ void HybridFilter::initializeLandmarksInFilter() {
 
   // augment and update the covariance matrix.
   size_t nNewFeatures = landmarksToAdd.size();
-//    LOG(INFO) << "Initializing " << nNewFeatures << " landmarks into the state vector of " << mInCovLmIds.size() << " landmarks!";
+//  LOG(INFO) << "Initializing " << nNewFeatures << " landmarks into the state vector of "
+//            << mInCovLmIds.size() << " landmarks!";
   if (nNewFeatures) {
     Eigen::MatrixXd H_o(totalObsDim - 3 * nNewFeatures, numCamPoseStates);
     Eigen::MatrixXd H_1(3 * nNewFeatures, numCamPoseStates);

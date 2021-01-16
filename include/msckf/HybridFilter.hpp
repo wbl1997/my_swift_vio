@@ -653,9 +653,6 @@ class HybridFilter : public Estimator, public BaseFilter {
   mutable okvis::timing::Timer computeHTimer;
   okvis::timing::Timer updateLandmarksTimer;
 
-  // for each point in the state vector/covariance,
-  // its landmark id which points to the parameter block
-  Eigen::AlignedDeque<okvis::ceres::HomogeneousPointParameterBlock> mInCovLmIds;
 
   std::vector<size_t>
       mTrackLengthAccumulator;  // histogram of the track lengths, start from
@@ -669,6 +666,14 @@ class HybridFilter : public Estimator, public BaseFilter {
   // the marginalized observations can contribute innovation to the states,
   // see Sun 2017 Robust stereo appendix D
   size_t minCulledFrames_;
+
+private:
+  void decimateCovarianceForLandmarks(const std::vector<uint64_t>& toRemoveLmIds);
+
+  // for each point in the state vector/covariance,
+  // its landmark id which points to the parameter block
+  Eigen::AlignedDeque<okvis::ceres::HomogeneousPointParameterBlock> mInCovLmIds;
+
 };
 
 /**

@@ -53,16 +53,6 @@ class MSCKF2 : public HybridFilter {
 
   virtual ~MSCKF2();
 
-  /**
-   * @brief Applies the dropping/marginalization strategy according to the
-   * RSS'13/IJRR'14 paper. The new number of frames in the window will be
-   * numKeyframes+numImuFrames.
-   * @return True if successful.
-   */
-  bool
-  applyMarginalizationStrategy(size_t numKeyframes, size_t numImuFrames,
-                               okvis::MapPointVector &removedLandmarks) final;
-
   void optimize(size_t numIter, size_t numThreads = 1,
                 bool verbose = false) final;
 
