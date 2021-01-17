@@ -241,15 +241,15 @@ struct TestSetting {
     std::stringstream ss;
     ss << "addImuNoise " << addImuNoise << " noisyInitialSpeedAndBiases "
        << noisyInitialSpeedAndBiases << " noisyInitialSensorParams "
-       << noisyInitialSensorParams << " addImageNoise " << addImageNoise
-       << " useImageObservs " << useImageObservs << " sim_ga_noise_factor "
+       << noisyInitialSensorParams << "\naddImageNoise " << addImageNoise
+       << " useImageObservs " << useImageObservs << "\nsim_ga_noise_factor "
        << sim_ga_noise_factor << " sim_ga_bias_noise_factor "
-       << sim_ga_bias_noise_factor << " stimator_algorithm "
+       << sim_ga_bias_noise_factor << "\nestimator_algorithm "
        << okvis::EstimatorAlgorithmIdToName(estimator_algorithm)
        << " use epipolar constraint? " << useEpipolarConstraint
-       << " camera observation model id " << cameraObservationModelId
+       << "\ncamera observation model id " << cameraObservationModelId
        << " landmark model id " << landmarkModelId
-       << " camera geometry type " << static_cast<int>(cameraModelId)
+       << "\ncamera geometry type " << static_cast<int>(cameraModelId)
        << " camera orientation type " << static_cast<int>(cameraOrientationId)
        << " landmark grid type " << static_cast<int>(gridType)
        << " landmark radius " << landmarkRadius;

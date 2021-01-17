@@ -86,7 +86,10 @@ frontend:
 
 point_landmark:
     landmarkModelId: 1
+    minTrackLength: 3
     anchorAtObservationTime: 0
+    minTrackLengthForSlam: 11
+    maxHibernationFrames: 3
 
 pose_graph:
     maxOdometryConstraintForAKeyframe: 2

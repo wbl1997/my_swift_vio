@@ -490,6 +490,7 @@ class HybridFilter : public Estimator, public BaseFilter {
 
   /**
    * @brief changeAnchors Change the anchor frame for a landmark in the state that is losing its anchor frame.
+   * This function handles the case when the landmarks are expressed in a world frame.
    * @param sortedRemovedStateIds
    */
   void changeAnchors(const std::vector<uint64_t>& sortedRemovedStateIds);

@@ -1331,7 +1331,6 @@ bool HybridFilter::measurementJacobian(
       std::vector<size_t> involvedCameraIndices;
       involvedCameraIndices.reserve(2);
       involvedCameraIndices.push_back(camIndices[ja]);
-      std::vector<std::pair<size_t, size_t>> startIndexToMinDimExtrinsics;
       Eigen::AlignedVector<Eigen::MatrixXd> dT_BC_dExtrinsics;
       computeExtrinsicJacobians(T_BC_list[ja], T_BC0, extrinsicModelIdList[ja],
                                mainExtrinsicModelId, &dT_BC_dExtrinsics,
@@ -1356,8 +1355,8 @@ bool HybridFilter::measurementJacobian(
 
     // Jacobians relative to time parameters and velocity.
     if (ja == 1u && !pointLandmarkOptions_.anchorAtObservationTime) {
-      // Because the anchor frame is at state epoch, then its pose to
-      // time and velocity are zero.
+      // Because the anchor frame is at state epoch, then the Jacobian of its
+      // pose relative to time and velocity are zero.
       dpoint_dX.emplace_back(lP_dpoint_dT_WBt);
     } else {
       Eigen::Matrix3d Phi_pq_tij_tj = pointDataPtr->Phi_pq_feature(observationIndices[ja]);
