@@ -850,27 +850,6 @@ int HybridFilter::marginalizeRedundantFrames(size_t numKeyframes, size_t numImuF
     }
   }
 
-  // check
-//  int count = 0;
-//  for (okvis::PointMap::iterator it = landmarksMap_.begin();
-//       it != landmarksMap_.end(); ++it) {
-//    okvis::MapPoint& mapPoint = it->second;
-//    for (uint64_t camStateId : rm_cam_state_ids) {
-//      auto obsIter = std::find_if(mapPoint.observations.begin(),
-//                                  mapPoint.observations.end(),
-//                                  okvis::IsObservedInNFrame(camStateId));
-//      if (obsIter != mapPoint.observations.end()) {
-//        LOG(INFO) << "persist lmk " << mapPoint.id << " frm " << camStateId
-//                  << " " << obsIter->first.cameraIndex << " "
-//                  << obsIter->first.keypointIndex << " residual "
-//                  << std::hex << obsIter->second;
-//        ++count;
-//      }
-//    }
-//  }
-//  OKVIS_ASSERT_EQ(Exception, count, 0, "found residuals not removed!");
-
-  // change anchor for affected landmarks.
   changeAnchors(rm_cam_state_ids);
 
   for (const auto &cam_id : rm_cam_state_ids) {
@@ -925,19 +904,23 @@ void HybridFilter::removeAnchorlessLandmarks(
   decimateCovarianceForLandmarks(toRemoveLmIds);
 }
 
-void HybridFilter::changeAnchors(const std::vector<uint64_t>& sortedRemovedStateIds) {
+void HybridFilter::changeAnchors(
+    const std::vector<uint64_t> &sortedRemovedStateIds) {
   int covDim = covariance_.rows();
   const size_t numNavImuCamStates = startIndexOfClonedStatesFast();
   const size_t numNavImuCamPoseStates =
       numNavImuCamStates + 9 * statesMap_.size();
-  Eigen::Matrix<double, 3, -1> reparamJacobian(3, covDim); // Jacobians of feature reparameterization due to anchor change.
-  Eigen::AlignedVector<Eigen::Matrix<double, 3, -1>> vJacobian;  // container of these reparameterizing Jacobians.
-  vJacobian.reserve(10);
-  std::vector<size_t> vCovPtId;  // id in covariance of point features to be reparameterized, 0 for the first landmark.
+  Eigen::Matrix<double, 3, -1> reparamJacobian(3, covDim);
+  Eigen::AlignedVector<Eigen::Matrix<double, 3, -1>>
+      reparamJacobianList; // container of these reparameterizing Jacobians.
+  reparamJacobianList.reserve(10);
+  std::vector<size_t> vCovPtId; // id in covariance of point features to be
+                                // reparameterized, 0 for the first landmark.
   vCovPtId.reserve(10);
   for (auto landmark : mInCovLmIds) {
-    MapPoint& mapPoint = landmarksMap_.at(landmark.id());
-    uint64_t newAnchorFrameId = mapPoint.shouldChangeAnchor(sortedRemovedStateIds);
+    MapPoint &mapPoint = landmarksMap_.at(landmark.id());
+    uint64_t newAnchorFrameId =
+        mapPoint.shouldChangeAnchor(sortedRemovedStateIds);
     if (newAnchorFrameId) {
       // transform from the body frame at the anchor frame epoch to the world
       // frame.
@@ -976,38 +959,134 @@ void HybridFilter::changeAnchors(const std::vector<uint64_t>& sortedRemovedState
       OKVIS_ASSERT_TRUE(Exception, landmarkIter != mInCovLmIds.end(),
                         "The tracked landmark is not in mInCovLmIds ");
 
-      // update covariance matrix
       OKVIS_ASSERT_EQ(Exception, pointLandmarkOptions_.landmarkModelId,
                       msckf::InverseDepthParameterization::kModelId,
-                      "Only inverse depth parameterization is supported for "
-                      "reparameterization!");
+                      "Only inverse depth parameterization is supposed to be "
+                      "reparameterized!");
       Eigen::Vector4d ab1rho = landmarkIter->estimate();
-      Eigen::Vector3d abrhoi(ab1rho[0], ab1rho[1], ab1rho[3]);
-      Eigen::Vector3d abrhoj;
-      Eigen::Matrix<double, 3, 9> jacobian;
-      vio::reparameterize_AIDP(T_WCa.C(), T_WCj.C(), abrhoi, T_WCa.r(),
-                               T_WCj.r(), abrhoj, &jacobian);
+      Eigen::Vector4d rhoxpCj = T_WCj.inverse() * T_WCa * ab1rho;
+      landmarkIter->setEstimate(rhoxpCj / rhoxpCj[2]);
 
-      reparamJacobian.setZero();
+      // compute Jacobians.
+      okvis::MultipleTransformPointJacobian mtpj;
+      okvis::MultipleTransformPointJacobian mtpjFej;
+      Eigen::AlignedVector<okvis::kinematics::Transformation> transformList{
+          T_BCj, T_WBj, T_WBa, T_BCa};
+
+      std::vector<int> exponentList{-1, -1, 1, 1};
+      Eigen::AlignedVector<okvis::kinematics::Transformation> transformFejList;
+      transformFejList.reserve(4);
+      transformFejList.push_back(T_BCj);
+      if (FLAGS_use_first_estimate) {
+        std::shared_ptr<const Eigen::Matrix<double, 6, 1>> positionVelocityPtr =
+            statesMap_.at(mapPoint.anchorStateId).linearizationPoint;
+        std::shared_ptr<const Eigen::Matrix<double, 6, 1>>
+            newAnchorPositionVelocityPtr =
+                statesMap_.at(newAnchorFrameId).linearizationPoint;
+        transformFejList.emplace_back(newAnchorPositionVelocityPtr->head<3>(),
+                                      T_WBj.q());
+        transformFejList.emplace_back(positionVelocityPtr->head<3>(),
+                                      T_WBa.q());
+      } else {
+        transformFejList.push_back(T_WBj);
+        transformFejList.push_back(T_WBa);
+      }
+      transformFejList.push_back(T_BCa);
+
+      mtpj.initialize(transformList, exponentList, landmarkIter->estimate());
+      mtpjFej.initialize(transformFejList, exponentList,
+                         landmarkIter->estimate());
+
+      Eigen::Matrix<double, 3, 4> dnewParams_drhoxpCj;
+      double inverseZ = 1.0 / rhoxpCj[2];
+      double inverseZ2 = inverseZ * inverseZ;
+      dnewParams_drhoxpCj << inverseZ, 0, -rhoxpCj[0] * inverseZ2, 0, 0,
+          inverseZ, -rhoxpCj[1] * inverseZ2, 0, 0, 0, -rhoxpCj[3] * inverseZ2,
+          inverseZ;
+
       size_t startRowC = statesMap_[newAnchorFrameId]
                              .global.at(GlobalStates::T_WS)
                              .startIndexInCov;
       size_t startRowA = statesMap_[mapPoint.anchorStateId]
                              .global.at(GlobalStates::T_WS)
                              .startIndexInCov;
+      std::vector<size_t> camIndices{static_cast<size_t>(newAnchorCameraId),
+                                     mapPoint.anchorCameraId};
+      std::vector<size_t> mtpjExtrinsicIndices{0u, 3u};
+      Eigen::AlignedVector<okvis::kinematics::Transformation> T_BC_list{T_BCj,
+                                                                        T_BCa};
+      std::vector<size_t> mtpjPoseIndices{1u, 2u};
+      std::vector<size_t> startIndices{startRowC, startRowA};
 
-      reparamJacobian.block<3, 3>(0, startRowA) = jacobian.block<3, 3>(0, 3);
-      reparamJacobian.block<3, 3>(0, startRowC) = jacobian.block<3, 3>(0, 6);
+      okvis::kinematics::Transformation T_BC0 =
+          camera_rig_.getCameraExtrinsic(kMainCameraIndex);
+      std::vector<std::pair<size_t, size_t>> startIndexToMinDim;
+      Eigen::AlignedVector<Eigen::MatrixXd> dpoint_dX; // drhoxpCtj_dParameters
 
+      size_t startIndexCameraParams =
+          startIndexOfCameraParams(kMainCameraIndex);
+      int mainExtrinsicModelId =
+          camera_rig_.getExtrinsicOptMode(kMainCameraIndex);
+      for (size_t ja = 0; ja < camIndices.size(); ++ja) {
+        // Extrinsic Jacobians.
+        if (!fixCameraExtrinsicParams_[camIndices[ja]]) {
+          Eigen::Matrix<double, 4, 6> dpoint_dT_BC =
+              mtpj.dp_dT(mtpjExtrinsicIndices[ja]);
+          std::vector<size_t> involvedCameraIndices;
+          involvedCameraIndices.reserve(2);
+          involvedCameraIndices.push_back(camIndices[ja]);
+          Eigen::AlignedVector<Eigen::MatrixXd> dT_BC_dExtrinsics;
+          int extrinsicModelId =
+              camera_rig_.getExtrinsicOptMode(camIndices[ja]);
+          computeExtrinsicJacobians(T_BC_list[ja], T_BC0, extrinsicModelId,
+                                    mainExtrinsicModelId, &dT_BC_dExtrinsics,
+                                    &involvedCameraIndices, kMainCameraIndex);
+          size_t camParamIdx = 0u;
+          for (auto idx : involvedCameraIndices) {
+            size_t extrinsicStartIndex = intraStartIndexOfCameraParams(idx);
+            size_t extrinsicDim = camera_rig_.getMinimalExtrinsicDimen(idx);
+            startIndexToMinDim.emplace_back(extrinsicStartIndex, extrinsicDim);
+            dpoint_dX.emplace_back(dpoint_dT_BC *
+                                   dT_BC_dExtrinsics[camParamIdx]);
+            ++camParamIdx;
+          }
+        }
+
+        // Jacobians relative to nav states
+        Eigen::Matrix<double, 4, 6> lP_dpoint_dT_WBt =
+            mtpjFej.dp_dT(mtpjPoseIndices[ja]);
+        size_t navStateIndex = startIndices[ja] - startIndexCameraParams;
+        startIndexToMinDim.emplace_back(navStateIndex, 6u);
+        OKVIS_ASSERT_FALSE(Exception,
+                           pointLandmarkOptions_.anchorAtObservationTime,
+                           "We assume landmarks are anchored at the state "
+                           "epoch of the anchor frame in changing the anchor.");
+        dpoint_dX.emplace_back(lP_dpoint_dT_WBt);
+      }
+
+      // Accumulate Jacobians relative to nav states and camera extrinsics.
+      reparamJacobian.setZero();
+      size_t iterIndex = 0u;
+      for (auto &startAndLen : startIndexToMinDim) {
+        reparamJacobian.block(0, startAndLen.first + startIndexCameraParams, 3, startAndLen.second) +=
+            dnewParams_drhoxpCj.leftCols<3>() *
+            dpoint_dX[iterIndex].topRows<3>();
+        ++iterIndex;
+      }
+
+      // Jacobian relative to landmark parameters.
       size_t covPtId = std::distance(mInCovLmIds.begin(), landmarkIter);
       vCovPtId.push_back(covPtId);
-      reparamJacobian.block<3, 3>(0, numNavImuCamPoseStates + 3 * covPtId) =
-          jacobian.topLeftCorner<3, 3>();
-      vJacobian.push_back(reparamJacobian);
+      Eigen::Matrix<double, 4, 3>
+          dhomo_dparams; // dHomogeneousPoint_dParameters.
+      dhomo_dparams.setZero();
+      dhomo_dparams(0, 0) = 1;
+      dhomo_dparams(1, 1) = 1;
+      dhomo_dparams(3, 2) = 1;
 
-      ab1rho = T_WCj.inverse() * T_WCa * ab1rho;
-      ab1rho /= ab1rho[2];
-      landmarkIter->setEstimate(ab1rho);
+      reparamJacobian.block<3, 3>(0, numNavImuCamPoseStates + 3 * covPtId) =
+          dnewParams_drhoxpCj * mtpj.dp_dpoint() * dhomo_dparams;
+      reparamJacobianList.push_back(reparamJacobian);
 
       mapPoint.anchorStateId = newAnchorFrameId;
       mapPoint.anchorCameraId = newAnchorCameraId;
@@ -1015,17 +1094,18 @@ void HybridFilter::changeAnchors(const std::vector<uint64_t>& sortedRemovedState
   }
 
   // update covariance for reparameterized landmarks.
-  if (vJacobian.size()) {
+  if (reparamJacobianList.size()) {
     int landmarkIndex = 0;
     Eigen::MatrixXd featureJacMat = Eigen::MatrixXd::Identity(
         covDim, covDim); // Jacobian of all the new states w.r.t the old states
-    for (auto it = vJacobian.begin(); it != vJacobian.end();
+    for (auto it = reparamJacobianList.begin(); it != reparamJacobianList.end();
          ++it, ++landmarkIndex) {
       featureJacMat.block(numNavImuCamPoseStates + vCovPtId[landmarkIndex] * 3,
-                          0, 3, covDim) = vJacobian[landmarkIndex];
+                          0, 3, covDim) = reparamJacobianList[landmarkIndex];
     }
     covariance_ =
         (featureJacMat * covariance_).eval() * featureJacMat.transpose();
+//    LOG(INFO) << "Reanchored " << reparamJacobianList.size() << " landmarks!";
   }
 }
 

@@ -497,6 +497,7 @@ class HybridFilter : public Estimator, public BaseFilter {
 
   /**
    * @brief removeAnchorlessLandmarks Remove the landmarks in the state that are losing their anchor frame.
+   * This is an alternative to changeAnchors().
    * @param sortedRemovedStateIds
    */
   void removeAnchorlessLandmarks(const std::vector<uint64_t>& sortedRemovedStateIds);
