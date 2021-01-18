@@ -39,3 +39,5 @@ CMakeLists\.txt\.user
 evaluation/.idea/
 
 vocabulary/ORBvoc.yml
+
+sensor_calib/build/

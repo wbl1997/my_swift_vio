@@ -1,0 +1,3 @@
+add_library(libsensor_calib TimeAndRotationCalibrator.cpp)
+
+target_include_directories(libsensor_calib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
