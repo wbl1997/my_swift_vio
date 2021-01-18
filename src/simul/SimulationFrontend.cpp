@@ -1,4 +1,4 @@
-#include <msckf/SimulationFrontend.hpp>
+#include <simul/SimulationFrontend.hpp>
 
 #include <algorithm>
 #include <list>
@@ -9,6 +9,8 @@
 
 #include <vio/Sample.h>
 
+#include <msckf/implementation/HybridFrontend.hpp>
+
 #include <okvis/IdProvider.hpp>
 
 // cameras and distortions
@@ -18,8 +20,7 @@
 #include <okvis/cameras/RadialTangentialDistortion.hpp>
 #include <okvis/cameras/RadialTangentialDistortion8.hpp>
 
-#include <msckf/PointLandmarkSimulationRS.hpp>
-#include <msckf/implementation/HybridFrontend.hpp>
+#include <simul/PointLandmarkSimulationRS.hpp>
 
 /// \brief okvis Main namespace of this package.
 namespace okvis {
@@ -240,6 +241,7 @@ int SimulationFrontend::dataAssociationAndInitialization(
 
   int trackedFeatures = 0;
   if (estimator.numFrames() > 1) {
+    // TODO(jhuai): make it possible to match multiple earlier keyframes.
     // find matches between the previous keyframe and current frame
     // Matching to last Keyframe should not encounter zombie landmark
     // ids for filters because they remove disappearing landmarks from
@@ -369,6 +371,7 @@ void SimulationFrontend::printNumFeatureDistribution(std::ofstream& /*stream*/) 
 //  featureTracker_.printNumFeatureDistribution(stream);
 }
 
+// TODO(jhuai): make it work with multiple cameras.
 template <class CAMERA_GEOMETRY_T>
 int SimulationFrontend::addMatchToEstimator(
     okvis::Estimator& estimator, std::shared_ptr<okvis::MultiFrame> prevFrames,
@@ -509,6 +512,7 @@ int SimulationFrontend::addMatchToEstimator(
   return trackedFeatures;
 }
 
+// TODO(jhuai): make it work with multiple camera images.
 int SimulationFrontend::matchToFrame(
     const std::vector<std::vector<int>>& previousKeypointIndices,
     const std::vector<std::vector<int>>& currentKeypointIndices,

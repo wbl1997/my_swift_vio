@@ -3,10 +3,11 @@
 
 #include <gtsam/VioBackEndParams.h>
 
-#include <msckf/ImuSimulator.h>
 #include <msckf/MSCKF2.hpp>
-#include <msckf/SimulationFrontend.hpp>
-#include <msckf/CameraSystemCreator.hpp>
+
+#include <simul/CameraSystemCreator.hpp>
+#include <simul/ImuSimulator.h>
+#include <simul/SimulationFrontend.hpp>
 
 namespace simul {
 class VioTestSystemBuilder {

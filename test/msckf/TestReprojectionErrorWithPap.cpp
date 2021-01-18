@@ -3,10 +3,9 @@
 
 #include <ceres/ceres.h>
 
-#include <msckf/ImuSimulator.h>
 #include <msckf/memory.h>
 #include <msckf/CameraRig.hpp>
-#include <msckf/CameraSystemCreator.hpp>
+
 #include <msckf/CameraTimeParamBlock.hpp>
 #include <msckf/ChordalDistance.hpp>
 #include <msckf/EuclideanParamBlock.hpp>
@@ -18,7 +17,6 @@
 #include <msckf/ProjParamOptModels.hpp>
 #include <msckf/ReprojectionErrorWithPap.hpp>
 #include <msckf/imu/BoundedImuDeque.hpp>
-#include <msckf/numeric_ceres_residual_Jacobian.hpp>
 
 #include <okvis/FrameTypedefs.hpp>
 #include <okvis/Time.hpp>
@@ -32,6 +30,10 @@
 #include <okvis/ceres/PoseParameterBlock.hpp>
 #include <okvis/ceres/SpeedAndBiasParameterBlock.hpp>
 #include <okvis/kinematics/Transformation.hpp>
+
+#include <simul/CameraSystemCreator.hpp>
+#include <simul/ImuSimulator.h>
+#include <simul/numeric_ceres_residual_Jacobian.hpp>
 
 namespace {
 

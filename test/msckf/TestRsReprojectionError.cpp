@@ -9,7 +9,6 @@
 #include <msckf/ExtrinsicModels.hpp>
 #include <msckf/ProjParamOptModels.hpp>
 #include <msckf/RsReprojectionError.hpp>
-#include <msckf/numeric_ceres_residual_Jacobian.hpp>
 
 #include <okvis/FrameTypedefs.hpp>
 #include <okvis/Time.hpp>
@@ -24,6 +23,8 @@
 #include <okvis/ceres/ReprojectionError.hpp>
 #include <okvis/ceres/SpeedAndBiasParameterBlock.hpp>
 #include <okvis/kinematics/Transformation.hpp>
+
+#include <simul/numeric_ceres_residual_Jacobian.hpp>
 
 // When readout time, tr is non zero, analytic, numeric and automatic Jacobians
 // of the rolling shutter reprojection factor are roughly the same.

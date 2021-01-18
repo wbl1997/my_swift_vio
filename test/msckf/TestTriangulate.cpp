@@ -1,10 +1,9 @@
 #include <iostream>
+#include <ceres/ceres.h>
 #include <gtest/gtest.h>
 
-#include <msckf/SimulationNView.h>
 #include <msckf/triangulate.h>
-
-#include <ceres/ceres.h>
+#include <simul/SimulationNView.h>
 
 using ceres::AutoDiffCostFunction;
 using ceres::CostFunction;

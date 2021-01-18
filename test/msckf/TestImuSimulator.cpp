@@ -1,7 +1,7 @@
 #include <glog/logging.h>
 #include <gtest/gtest.h>
 #include "okvis/kinematics/sophus_operators.hpp"
-#include "msckf/ImuSimulator.h"
+#include "simul/ImuSimulator.h"
 
 void testSquircle(double radius, double sideLength, double velocity) {
   okvis::Time startEpoch(0, 0);

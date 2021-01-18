@@ -1,9 +1,11 @@
 #include <gtest/gtest.h>
 
 #include <gtsam/VioBackEndParams.h>
-#include <io_wrap/StreamHelper.hpp>
-#include <msckf/VioTestSystemBuilder.hpp>
 #include <vio/eigen_utils.h>
+
+#include <io_wrap/StreamHelper.hpp>
+#include <simul/VioTestSystemBuilder.hpp>
+
 
 namespace {
 void computeNavErrors(

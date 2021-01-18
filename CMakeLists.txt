@@ -201,28 +201,29 @@ LIST(APPEND SOURCEFILES
     src/loop_closure/LoopClosureDetectorParams.cpp
 
     src/msckf/BaseFilter.cpp
-    src/msckf/CameraSystemCreator.cpp
-    src/msckf/GeneralEstimator.cpp
+    src/msckf/EkfUpdater.cpp
     src/msckf/FeatureTriangulation.cpp
     src/msckf/FilterHelper.cpp
+    src/msckf/GeneralEstimator.cpp
     src/msckf/HybridFilter.cpp
     src/msckf/HybridFrontend.cpp
-    src/msckf/ImuSimulator.cpp
     src/msckf/MotionAndStructureStats.cpp
     src/msckf/MSCKF2.cpp
     src/msckf/PointLandmark.cpp
-    src/msckf/PointLandmarkSimulationRS.cpp
-    src/msckf/EkfUpdater.cpp
-    src/msckf/SimulationFrontend.cpp
-    src/msckf/StatAccumulator.cpp
 
+    src/msckf/StatAccumulator.cpp
     src/msckf/TFVIO.cpp
     src/msckf/TwoViewPair.cpp
     src/msckf/VioEvaluationCallback.cpp
     src/msckf/VioFactoryMethods.cpp
-    src/msckf/VioTestSystemBuilder.cpp
-    src/msckf/numeric_ceres_residual_Jacobian.cpp
     src/msckf/triangulate.cpp
+
+    src/simul/CameraSystemCreator.cpp
+    src/simul/ImuSimulator.cpp
+    src/simul/numeric_ceres_residual_Jacobian.cpp
+    src/simul/PointLandmarkSimulationRS.cpp
+    src/simul/SimulationFrontend.cpp
+    src/simul/VioTestSystemBuilder.cpp
 )
 
 if(GTSAM_FOUND)

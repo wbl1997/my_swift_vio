@@ -1,7 +1,7 @@
-#include "msckf/ImuSimulator.h"
-#include <gflags/gflags.h>
+#include "simul/ImuSimulator.h"
 
-#include "ceres/internal/autodiff.h"
+#include <gflags/gflags.h>
+#include <ceres/internal/autodiff.h>
 
 #include "vio/Sample.h"
 #include <okvis/kinematics/sophus_operators.hpp>

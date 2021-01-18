@@ -1,7 +1,7 @@
 #include <gtest/gtest.h>
 #include <msckf/FilterHelper.hpp>
 #include <msckf/RemoveFromVector.hpp>
-#include <msckf/SimulationNView.h>
+#include <simul/SimulationNView.h>
 
 #include <random>
 

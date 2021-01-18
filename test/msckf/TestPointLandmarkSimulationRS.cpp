@@ -1,8 +1,10 @@
 #include <gtest/gtest.h>
-#include <msckf/ImuSimulator.h>
+
 #include <msckf/memory.h>
-#include <msckf/CameraSystemCreator.hpp>
-#include <msckf/PointLandmarkSimulationRS.hpp>
+
+#include <simul/CameraSystemCreator.hpp>
+#include <simul/ImuSimulator.h>
+#include <simul/PointLandmarkSimulationRS.hpp>
 
 class PointLandmarkSimulationRSTest : public ::testing::Test {
  public:

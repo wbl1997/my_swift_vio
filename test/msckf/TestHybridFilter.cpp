@@ -4,6 +4,8 @@
 
 #include <gtest/gtest.h>
 
+
+#include <vio/eigen_utils.h>
 #include <vio/Sample.h>
 
 #include <gtsam/VioBackEndParams.h>
@@ -25,13 +27,11 @@
 
 #include <msckf/CameraTimeParamBlock.hpp>
 #include <msckf/EuclideanParamBlock.hpp>
-
 #include <msckf/PointLandmarkModels.hpp>
 #include <msckf/ProjParamOptModels.hpp>
 #include <msckf/StatAccumulator.h>
-#include <msckf/VioTestSystemBuilder.hpp>
 
-#include <vio/eigen_utils.h>
+#include <simul/VioTestSystemBuilder.hpp>
 
 DEFINE_bool(
     noisyInitialSpeedAndBiases, true,

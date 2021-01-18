@@ -1,8 +1,7 @@
 
-#include <msckf/numeric_ceres_residual_Jacobian.hpp>
+#include <simul/numeric_ceres_residual_Jacobian.hpp>
 
 namespace simul {
-
 void computeNumericJacPose(okvis::ceres::PoseParameterBlock& paramBlock,
                            okvis::ceres::ErrorInterface* costFuncPtr,
                            double const* const* parameters,

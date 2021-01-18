@@ -1,14 +1,15 @@
-#include "msckf/VioTestSystemBuilder.hpp"
+#include "simul/VioTestSystemBuilder.hpp"
 
-#include <msckf/CameraSystemCreator.hpp>
-#include <msckf/GeneralEstimator.hpp>
+#include <gflags/gflags.h>
 
 #include <gtsam/SlidingWindowSmoother.hpp>
+
+#include <msckf/GeneralEstimator.hpp>
 #include <msckf/TFVIO.hpp>
 #include <msckf/VioEvaluationCallback.hpp>
 #include <msckf/VioFactoryMethods.hpp>
 
-#include <gflags/gflags.h>
+#include <simul/CameraSystemCreator.hpp>
 
 DEFINE_bool(zero_camera_intrinsic_param_noise, true,
             "Set the variance of the camera intrinsic parameters zero."

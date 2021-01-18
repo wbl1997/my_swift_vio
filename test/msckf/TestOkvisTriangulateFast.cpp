@@ -2,10 +2,11 @@
 
 #include <iostream>
 
-#include <msckf/SimulationNView.h>
 #include <msckf/triangulate.h>
 
 #include <okvis/triangulation/stereo_triangulation.hpp>
+
+#include <simul/SimulationNView.h>
 
 // verify that given points' estimated coordinates are correctly
 // flipped in triangulateFast

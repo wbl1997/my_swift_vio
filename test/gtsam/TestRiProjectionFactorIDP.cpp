@@ -4,17 +4,17 @@
  * @author  Jianzhu Huai
  */
 
-#include "gtsam/RiProjectionFactorIDP.h"
-#include "gtsam/RiProjectionFactorIDPAnchor.h"
 
+#include <gtest/gtest.h>
 #include <gtsam/base/numericalDerivative.h>
 #include <gtsam/inference/Symbol.h>
 
-#include "gtest/gtest.h"
+#include "gtsam/RiProjectionFactorIDP.h"
+#include "gtsam/RiProjectionFactorIDPAnchor.h"
 
 #include <msckf/memory.h>
-#include "msckf/CameraSystemCreator.hpp"
-#include "msckf/SimulationNView.h"
+#include "simul/CameraSystemCreator.hpp"
+#include "simul/SimulationNView.h"
 
 class RiProjectionFactorIDPTest : public ::testing::Test {
  public:

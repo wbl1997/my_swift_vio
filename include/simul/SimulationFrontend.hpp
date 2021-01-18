@@ -4,21 +4,20 @@
 
 #include <mutex>
 
-#include <msckf/CameraSystemCreator.hpp>
-#include <msckf/ImuSimulator.h>
+#include <boost/accumulators/accumulators.hpp>
+#include <boost/accumulators/statistics/density.hpp>
+#include <boost/accumulators/statistics/stats.hpp>
 
 #include <okvis/DenseMatcher.hpp>
+#include <okvis/Estimator.hpp>
 #include <okvis/assert_macros.hpp>
 #include <okvis/timing/Timer.hpp>
-
-#include <okvis/Estimator.hpp>
 #include <okvis/triangulation/ProbabilisticStereoTriangulator.hpp>
 
 #include <feature_tracker/feature_tracker.h>
 
-#include <boost/accumulators/accumulators.hpp>
-#include <boost/accumulators/statistics/density.hpp>
-#include <boost/accumulators/statistics/stats.hpp>
+#include <simul/CameraSystemCreator.hpp>
+#include <simul/ImuSimulator.h>
 
 /// \brief okvis Main namespace of this package.
 namespace okvis {
@@ -30,7 +29,7 @@ enum class LandmarkGridType {
 };
 
 /**
- * @brief A frontend using BRISK features
+ * @brief A frontend for simulation with predefined landmarks.
  */
 class SimulationFrontend {
  public:

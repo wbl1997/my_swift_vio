@@ -1,11 +1,11 @@
 #ifndef INCLUDE_MSCKF_POINT_LANDMARK_SIMULATION_HPP
 #define INCLUDE_MSCKF_POINT_LANDMARK_SIMULATION_HPP
 
-#include <msckf/ImuSimulator.h>
-
 #include <okvis/MultiFrame.hpp>
 #include <okvis/cameras/NCameraSystem.hpp>
 #include <okvis/kinematics/Transformation.hpp>
+
+#include <simul/ImuSimulator.h>
 
 class PointLandmarkSimulationRS
 {

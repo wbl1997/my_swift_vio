@@ -1,19 +1,20 @@
-#include "gtest/gtest.h"
+#include <gtest/gtest.h>
 
 #include <Eigen/StdVector>
 
-#include <msckf/CameraSystemCreator.hpp>
 #include <msckf/CameraTimeParamBlock.hpp>
 #include <msckf/EpipolarFactor.hpp>
 #include <msckf/EuclideanParamBlock.hpp>
 #include <msckf/ExtrinsicModels.hpp>
-#include <msckf/ImuSimulator.h>
-#include <msckf/numeric_ceres_residual_Jacobian.hpp>
 
 #include <okvis/cameras/EquidistantDistortion.hpp>
 #include <okvis/cameras/PinholeCamera.hpp>
 #include <okvis/ceres/PoseParameterBlock.hpp>
 #include <okvis/ceres/SpeedAndBiasParameterBlock.hpp>
+
+#include <simul/CameraSystemCreator.hpp>
+#include <simul/ImuSimulator.h>
+#include <simul/numeric_ceres_residual_Jacobian.hpp>
 
 TEST(EpipolarFactor, Jacobians) {
   typedef okvis::cameras::PinholeCamera<

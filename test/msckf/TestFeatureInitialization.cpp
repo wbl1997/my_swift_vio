@@ -17,7 +17,7 @@
 
 
 #include <msckf/FeatureTriangulation.hpp>
-#include <msckf/SimulationNView.h>
+#include <simul/SimulationNView.h>
 
 using namespace std;
 using namespace Eigen;
