@@ -17,7 +17,7 @@
 #include <feature_tracker/feature_tracker.h>
 
 #include <simul/CameraSystemCreator.hpp>
-#include <simul/ImuSimulator.h>
+#include <simul/curves.h>
 
 /// \brief okvis Main namespace of this package.
 namespace okvis {

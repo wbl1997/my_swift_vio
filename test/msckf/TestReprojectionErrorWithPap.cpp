@@ -32,7 +32,7 @@
 #include <okvis/kinematics/Transformation.hpp>
 
 #include <simul/CameraSystemCreator.hpp>
-#include <simul/ImuSimulator.h>
+#include <simul/curves.h>
 #include <simul/numeric_ceres_residual_Jacobian.hpp>
 
 namespace {

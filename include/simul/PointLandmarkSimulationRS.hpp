@@ -5,7 +5,7 @@
 #include <okvis/cameras/NCameraSystem.hpp>
 #include <okvis/kinematics/Transformation.hpp>
 
-#include <simul/ImuSimulator.h>
+#include <simul/curves.h>
 
 class PointLandmarkSimulationRS
 {

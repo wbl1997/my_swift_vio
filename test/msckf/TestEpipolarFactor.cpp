@@ -13,7 +13,8 @@
 #include <okvis/ceres/SpeedAndBiasParameterBlock.hpp>
 
 #include <simul/CameraSystemCreator.hpp>
-#include <simul/ImuSimulator.h>
+#include <simul/curves.h>
+#include <simul/ImuNoiseSimulator.h>
 #include <simul/numeric_ceres_residual_Jacobian.hpp>
 
 TEST(EpipolarFactor, Jacobians) {

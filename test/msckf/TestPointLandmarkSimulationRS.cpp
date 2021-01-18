@@ -3,7 +3,7 @@
 #include <msckf/memory.h>
 
 #include <simul/CameraSystemCreator.hpp>
-#include <simul/ImuSimulator.h>
+#include <simul/curves.h>
 #include <simul/PointLandmarkSimulationRS.hpp>
 
 class PointLandmarkSimulationRSTest : public ::testing::Test {

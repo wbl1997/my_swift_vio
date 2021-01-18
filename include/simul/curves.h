@@ -1,9 +1,8 @@
-#ifndef IMU_SIMULATOR_H_
-#define IMU_SIMULATOR_H_
+#ifndef SIMUL_CURVE_H_
+#define SIMUL_CURVE_H_
 
-#include "okvis/Measurements.hpp"
-#include "okvis/Parameters.hpp"
-#include "okvis/Time.hpp"
+#include "okvis/ImuMeasurements.hpp"
+#include "okvis/kinematics/Transformation.hpp"
 
 #include <Eigen/Core>
 #include <Eigen/Dense>
@@ -11,6 +10,7 @@
 
 #include <fstream>
 #include <iostream>
+#include <map>
 #include <vector>
 
 namespace simul {
@@ -67,29 +67,45 @@ class CircularSinusoidalTrajectory {
   CircularSinusoidalTrajectory(
       double imuFreq, Eigen::Vector3d ginw, double _maxThetaZ = 0.2 * M_PI);
   virtual ~CircularSinusoidalTrajectory() {}
-  virtual void getTrueInertialMeasurements(
-      const okvis::Time tStart, const okvis::Time tEnd,
-      okvis::ImuMeasurementDeque& imuMeasurements) final;
 
-  virtual void getNoisyInertialMeasurements(
-      const okvis::Time tStart, const okvis::Time tEnd,
-      okvis::ImuMeasurementDeque& imuMeasurements) final;
+  void getTrueInertialMeasurements(const okvis::Time tStart,
+                                   const okvis::Time tEnd,
+                                   okvis::ImuMeasurementDeque &imuMeasurements) const;
 
-  virtual void getTruePoses(
-      const okvis::Time tStart, const okvis::Time tEnd,
-      std::vector<okvis::kinematics::Transformation>& vT_WB) final;
+  void getTrueInertialMeasurements(okvis::Time t, Eigen::Vector3d *gyroscope,
+                                   Eigen::Vector3d *accelerometer) const;
 
-  virtual void getSampleTimes(const okvis::Time tStart, const okvis::Time tEnd,
-                              std::vector<okvis::Time>& vTime) final;
+  /**
+   * @brief computeLocalLinearAcceleration  $a_{WB}^B$ by applied force.
+   * @warning Not efficient. You may want to use getTrueInertialMeasurements.
+   * @param time
+   * @return
+   */
+  Eigen::Vector3d computeLocalLinearAcceleration(const okvis::Time time) const;
+
+  /**
+   * @brief computeLocalAngularVelocity  \f$\omega_{WB}^B\f$
+   * @warning Not efficient. You may want to use getTrueInertialMeasurements.
+   * @param time
+   * @return
+   */
+  Eigen::Vector3d computeLocalAngularVelocity(const okvis::Time time) const;
+
+  void getTruePoses(const okvis::Time tStart, const okvis::Time tEnd,
+                    std::vector<okvis::kinematics::Transformation> &vT_WB);
+
+  void getSampleTimes(const okvis::Time tStart, const okvis::Time tEnd,
+                      std::vector<okvis::Time> &vTime);
 
   // compute angular rate in the global frame, $\omega_{WB}^{W}$
   virtual Eigen::Vector3d computeGlobalAngularRate(const okvis::Time time) const;
 
-  // $a_{WB}^W$, applied force
-  virtual Eigen::Vector3d computeGlobalLinearAcceleration(
-      const okvis::Time time) const;
+  // $a_{WB}^W$ by applied force.
+  virtual Eigen::Vector3d
+  computeGlobalLinearAcceleration(const okvis::Time time) const;
   // $v_{WB}^W$
   virtual Eigen::Vector3d computeGlobalLinearVelocity(const okvis::Time time) const;
+
   // $T_{WB}$
   virtual okvis::kinematics::Transformation computeGlobalPose(
       const okvis::Time time) const;
@@ -280,7 +296,15 @@ class Motionless : public CircularSinusoidalTrajectory {
 };
 
 template <typename T>
-Eigen::Matrix<T, 3, 3> RotX(T theta);
+Eigen::Matrix<T, 3, 3> RotX(T theta) {
+  T ct = cos(theta);
+  T st = sin(theta);
+  Eigen::Matrix<T, 3, 3> Rx;
+  Rx << T(1), T(0), T(0),
+  T(0), ct, st,
+  T(0), -st, ct;
+  return Rx;
+}
 
 /**
  * @brief rotMat2d This is in effect RotZ(theta + 90).
@@ -288,40 +312,6 @@ Eigen::Matrix<T, 3, 3> RotX(T theta);
  * @return
  */
 Eigen::Matrix2d rotMat2d(double theta);
-
-/**
- * @brief initImuNoiseParams
- * @param imuParameters
- * @param noisyInitialSpeedAndBiases
- * @param noisyInitialSensorParams
- * @param sigma_bg std dev of initial gyroscope bias.
- * @param sigma_ba std dev of initial accelerometer bias.
- * @param std_Ta_elem
- * @param fixImuInternalParams If true, set the noise of IMU intrinsic
- *     parameters (including misalignment shape matrices) to zeros in order
- *     to fix IMU intrinsic parameters in estimator.
- */
-void initImuNoiseParams(
-    okvis::ImuParameters* imuParameters, bool noisyInitialSpeedAndBiases,
-    bool noisyInitialSensorParams,
-    double sigma_bg, double sigma_ba, double std_Tg_elem,
-    double std_Ts_elem, double std_Ta_elem,
-    bool fixImuInternalParams);
-
-/**
- * @brief addNoiseToImuReadings
- * @param imuParameters
- * @param imuMeasurements as input original perfect imu measurement,
- *     as output imu measurements with added bias and noise
- * @param trueBiases output added biases
- * @param inertialStream
- */
-void addNoiseToImuReadings(const okvis::ImuParameters& imuParameters,
-                           okvis::ImuMeasurementDeque* imuMeasurements,
-                           okvis::ImuMeasurementDeque* trueBiases,
-                           double gyroAccelNoiseFactor,
-                           double gyroAccelBiasNoiseFactor,
-                           std::ofstream* inertialStream);
 
 /**
  * @brief createSimulatedTrajectory factory method.
@@ -335,4 +325,4 @@ createSimulatedTrajectory(SimulatedTrajectoryType trajectoryType, int rate,
                           double gravityNorm);
 
 } // namespace simul
-#endif
+#endif // SIMUL_CURVE_H_

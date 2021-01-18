@@ -219,7 +219,8 @@ LIST(APPEND SOURCEFILES
     src/msckf/triangulate.cpp
 
     src/simul/CameraSystemCreator.cpp
-    src/simul/ImuSimulator.cpp
+    src/simul/curves.cpp
+    src/simul/ImuNoiseSimulator.cpp
     src/simul/numeric_ceres_residual_Jacobian.cpp
     src/simul/PointLandmarkSimulationRS.cpp
     src/simul/SimulationFrontend.cpp
@@ -335,7 +336,7 @@ list(APPEND TEST_SRC_FILES
     test/msckf/TestFilterHelper.cpp
     test/msckf/TestHybridFilter.cpp
     test/msckf/TestImuOdometry.cpp
-    test/msckf/TestImuSimulator.cpp
+    test/msckf/TestCurves.cpp
     test/msckf/TestMergeTwoLandmarks.cpp
     test/msckf/TestOkvisTriangulateFast.cpp
     test/msckf/TestOkvisTime.cpp

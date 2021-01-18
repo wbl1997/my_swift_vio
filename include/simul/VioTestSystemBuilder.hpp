@@ -6,7 +6,8 @@
 #include <msckf/MSCKF2.hpp>
 
 #include <simul/CameraSystemCreator.hpp>
-#include <simul/ImuSimulator.h>
+#include <simul/curves.h>
+#include <simul/ImuNoiseSimulator.h>
 #include <simul/SimulationFrontend.hpp>
 
 namespace simul {
