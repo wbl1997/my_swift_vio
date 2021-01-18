@@ -1,17 +1,17 @@
-#include <glog/logging.h>
-#include <gtest/gtest.h>
 #include "okvis/kinematics/sophus_operators.hpp"
 #include "simul/ImuSimulator.h"
+#include <glog/logging.h>
+#include <gtest/gtest.h>
 
 void testSquircle(double radius, double sideLength, double velocity) {
   okvis::Time startEpoch(0, 0);
   simul::RoundedSquare rs(100, Eigen::Vector3d{0, 0, -9.8}, startEpoch, radius,
-                        sideLength, velocity);
+                          sideLength, velocity);
 
   double half_d = sideLength * 0.5;
   double half_pi = M_PI * 0.5;
   std::vector<double> keyEpochs = rs.getEndEpochs();
-  std::vector<Eigen::Vector3d, Eigen::aligned_allocator<Eigen::Vector3d> >
+  std::vector<Eigen::Vector3d, Eigen::aligned_allocator<Eigen::Vector3d>>
       ref_xytheta_list{
           {half_d + radius, 0, half_pi},
           {half_d + radius, half_d, half_pi},
@@ -26,7 +26,7 @@ void testSquircle(double radius, double sideLength, double velocity) {
       };
 
   std::vector<okvis::kinematics::Transformation,
-              Eigen::aligned_allocator<okvis::kinematics::Transformation> >
+              Eigen::aligned_allocator<okvis::kinematics::Transformation>>
       ref_T_WS_list;
   for (const Eigen::Vector3d xytheta : ref_xytheta_list) {
     Eigen::Quaterniond q_WB(
@@ -41,7 +41,7 @@ void testSquircle(double radius, double sideLength, double velocity) {
   keyEpochs.insert(keyEpochs.begin(), startEpoch.toSec());
   int jack = 0;
   okvis::kinematics::Transformation eye_AB;
-  for (const double& time : keyEpochs) {
+  for (const double &time : keyEpochs) {
     okvis::Time wrap;
     okvis::kinematics::Transformation T_WB =
         rs.computeGlobalPose(wrap.fromSec(time));
@@ -81,43 +81,76 @@ TEST(Squircle, Dot) {
   testSquircle(radius, sideLength, velocity);
 }
 
+class TrajectoryTest {
+public:
+  TrajectoryTest(simul::SimulatedTrajectoryType trajType, okvis::Time _time)
+      : time(_time) {
+    traj = simul::createSimulatedTrajectory(trajType, 100, 9.80665);
+  }
+
+  TrajectoryTest(
+      std::shared_ptr<const simul::CircularSinusoidalTrajectory> _traj,
+      okvis::Time _time)
+      : traj(_traj), time(_time) {}
+
+  void testDerivatives() {
+    testAngularVelocity();
+    testLinearVelocity();
+    testLinearAcceleration();
+  }
+
+  void testAngularVelocity() {
+    Eigen::Vector3d omegaW = traj->computeGlobalAngularRate(time);
+    Eigen::Vector3d omegaWNumeric = traj->computeGlobalAngularRateNumeric(time);
+    EXPECT_LT((omegaWNumeric - omegaW).lpNorm<Eigen::Infinity>(), 5e-6);
+  }
+  void testLinearVelocity() {
+    Eigen::Vector3d vW = traj->computeGlobalLinearVelocity(time);
+    Eigen::Vector3d vWNumeric = traj->computeGlobalLinearVelocityNumeric(time);
+    EXPECT_LT((vWNumeric - vW).lpNorm<Eigen::Infinity>(), 5e-6);
+  }
+
+  void testLinearAcceleration() {
+    Eigen::Vector3d aW = traj->computeGlobalLinearAcceleration(time);
+    Eigen::Vector3d aWNumeric =
+        traj->computeGlobalLinearAccelerationNumeric(time);
+    EXPECT_LT((aWNumeric - aW).lpNorm<Eigen::Infinity>(), 5e-6);
+  }
+
+private:
+  std::shared_ptr<const simul::CircularSinusoidalTrajectory> traj;
+  okvis::Time time;
+};
+
 TEST(WavyCircle, AngularVelocity) {
-  simul::WavyCircle wavyCircle(100, Eigen::Vector3d(0, 0, -9.80665), 5.0, 4.0, 3,
-                             10, 1.2);
+  simul::WavyCircle wavyCircle(100, Eigen::Vector3d(0, 0, -9.80665), 5.0, 4.0,
+                               3, 10, 1.2);
   EXPECT_NEAR(wavyCircle.waveHeight(), 0.18, 1e-8);
-  okvis::Time time(0.8 / 1.2);
-  okvis::kinematics::Transformation T_WB = wavyCircle.computeGlobalPose(time);
-  Eigen::Vector3d omegaW = wavyCircle.computeGlobalAngularRate(time);
-  double h = 1e-6;
-  okvis::kinematics::Transformation T_WBdelta = wavyCircle.computeGlobalPose(time + okvis::Duration(h));
-  Eigen::Matrix3d Rdelta = (T_WBdelta.C() - T_WB.C()) / h;
-  Eigen::Matrix3d OmegaW = Rdelta * T_WB.C().transpose();
-  EXPECT_LT((okvis::kinematics::vee(OmegaW) - omegaW).lpNorm<Eigen::Infinity>(), 5e-6);
 }
 
-TEST(WavyCircle, LinearVelocity) {
-  simul::WavyCircle wavyCircle(100, Eigen::Vector3d(0, 0, -9.80665), 5.0, 4.0, 3,
-                             10, 1.2);
+TEST(TrajectoryTest, WavyCircle) {
+  std::shared_ptr<const simul::CircularSinusoidalTrajectory> wavyCircle(
+      new simul::WavyCircle(100, Eigen::Vector3d(0, 0, -9.80665), 5.0, 4.0, 3,
+                            10, 1.2));
   okvis::Time time(0.8 / 1.2);
-  okvis::kinematics::Transformation T_WB = wavyCircle.computeGlobalPose(time);
-  Eigen::Vector3d v_WB = wavyCircle.computeGlobalLinearVelocity(time);
-  double h = 1e-6;
-  okvis::kinematics::Transformation T_WBdelta = wavyCircle.computeGlobalPose(time + okvis::Duration(h));
-  Eigen::Vector3d v_numeric = (T_WBdelta.r() - T_WB.r())/ h;
-
-  EXPECT_LT((v_numeric - v_WB).lpNorm<Eigen::Infinity>(), 5e-6);
+  TrajectoryTest trajTest(wavyCircle, time);
+  trajTest.testDerivatives();
 }
 
-TEST(WavyCircle, LinearAcceleration) {
-  Eigen::Vector3d gw(0, 0, -9.80665);
-  simul::WavyCircle wavyCircle(100, gw, 5.0, 4.0, 3,
-                             10, 1.2);
-  okvis::Time time(0.8 / 1.2);
-  Eigen::Vector3d a_WB = wavyCircle.computeGlobalLinearAcceleration(time);
-  Eigen::Vector3d v_WB = wavyCircle.computeGlobalLinearVelocity(time);
-  double h = 1e-6;
-  Eigen::Vector3d v_WBdelta = wavyCircle.computeGlobalLinearVelocity(time + okvis::Duration(h));
-  Eigen::Vector3d a_numeric = (v_WBdelta - v_WB) / h;
-
-  EXPECT_LT((a_numeric - gw - a_WB).lpNorm<Eigen::Infinity>(), 5e-6);
+TEST(TrajectoryTest, AllTrajectories) {
+  std::vector<simul::SimulatedTrajectoryType> trajTypeList{
+      simul::SimulatedTrajectoryType::Sinusoid,
+      simul::SimulatedTrajectoryType::Torus,
+      simul::SimulatedTrajectoryType::Torus2,
+      simul::SimulatedTrajectoryType::Ball,
+      simul::SimulatedTrajectoryType::Squircle,
+      simul::SimulatedTrajectoryType::Circle,
+      simul::SimulatedTrajectoryType::Dot,
+      simul::SimulatedTrajectoryType::WavyCircle,
+      simul::SimulatedTrajectoryType::Motionless};
+  for (auto trajType : trajTypeList) {
+    okvis::Time time(2.0);
+    TrajectoryTest trajTest(trajType, time);
+    trajTest.testDerivatives();
+  }
 }

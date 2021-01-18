@@ -93,6 +93,18 @@ class CircularSinusoidalTrajectory {
   // $T_{WB}$
   virtual okvis::kinematics::Transformation computeGlobalPose(
       const okvis::Time time) const;
+
+  // compute angular rate in the global frame, $\omega_{WB}^{W}$, with numerical
+  // differentiation.
+  Eigen::Vector3d computeGlobalAngularRateNumeric(const okvis::Time time) const;
+
+  // compute $a_{WB}^W$ caused by applied force with numerical differentiation.
+  Eigen::Vector3d
+  computeGlobalLinearAccelerationNumeric(const okvis::Time time) const;
+
+  // compute $v_{WB}^W$ with numerical differentiation.
+  Eigen::Vector3d
+  computeGlobalLinearVelocityNumeric(const okvis::Time time) const;
 };
 
 // Yarn torus
@@ -310,6 +322,17 @@ void addNoiseToImuReadings(const okvis::ImuParameters& imuParameters,
                            double gyroAccelNoiseFactor,
                            double gyroAccelBiasNoiseFactor,
                            std::ofstream* inertialStream);
+
+/**
+ * @brief createSimulatedTrajectory factory method.
+ * @param trajectoryType
+ * @param rate
+ * @param gravityNorm
+ * @return
+ */
+std::shared_ptr<CircularSinusoidalTrajectory>
+createSimulatedTrajectory(SimulatedTrajectoryType trajectoryType, int rate,
+                          double gravityNorm);
 
 } // namespace simul
 #endif

@@ -54,51 +54,8 @@ void VioTestSystemBuilder::createVioSystem(
   const okvis::Time tStart(100);
   const okvis::Time tEnd = tStart + okvis::Duration(kDuration);
 
-  switch (trajectoryType) {
-    case SimulatedTrajectoryType::Sinusoid:
-      circularSinusoidalTrajectory.reset(
-          new simul::CircularSinusoidalTrajectory(
-              imuParameters.rate, Eigen::Vector3d(0, 0, -imuParameters.g)));
-      break;
-    case SimulatedTrajectoryType::Torus:
-      circularSinusoidalTrajectory.reset(new simul::TorusTrajectory(
-          imuParameters.rate, Eigen::Vector3d(0, 0, -imuParameters.g)));
-      break;
-    case SimulatedTrajectoryType::Squircle:
-      circularSinusoidalTrajectory.reset(new simul::RoundedSquare(
-          imuParameters.rate, Eigen::Vector3d(0, 0, -imuParameters.g)));
-      break;
-    case SimulatedTrajectoryType::Circle:
-      circularSinusoidalTrajectory.reset(new simul::RoundedSquare(
-          imuParameters.rate, Eigen::Vector3d(0, 0, -imuParameters.g),
-          okvis::Time(0, 0), 1.0, 0, 0.8));
-      break;
-    case SimulatedTrajectoryType::Dot:
-      circularSinusoidalTrajectory.reset(new simul::RoundedSquare(
-          imuParameters.rate, Eigen::Vector3d(0, 0, -imuParameters.g),
-          okvis::Time(0, 0), 1e-3, 0, 0.8e-3));
-      break;
-    case SimulatedTrajectoryType::WavyCircle:
-      circularSinusoidalTrajectory.reset(new simul::WavyCircle(
-          imuParameters.rate, Eigen::Vector3d(0, 0, -imuParameters.g)));
-      break;
-    case SimulatedTrajectoryType::Motionless:
-      circularSinusoidalTrajectory.reset(new simul::Motionless(
-          imuParameters.rate, Eigen::Vector3d(0, 0, -imuParameters.g)));
-      break;
-    case SimulatedTrajectoryType::Torus2:
-      circularSinusoidalTrajectory.reset(new simul::SphereTrajectory(
-          imuParameters.rate, Eigen::Vector3d(0, 0, -imuParameters.g)));
-      break;
-    case SimulatedTrajectoryType::Ball:
-      circularSinusoidalTrajectory.reset(new simul::SphereTrajectory(
-          imuParameters.rate, Eigen::Vector3d(0, 0, -imuParameters.g), 1.0,
-          0.4 * M_PI));
-      break;
-    default:
-      LOG(ERROR) << "Unknown trajectory id " << static_cast<int>(trajectoryType);
-      break;
-  }
+  circularSinusoidalTrajectory = simul::createSimulatedTrajectory(
+      trajectoryType, imuParameters.rate, imuParameters.g);
 
   circularSinusoidalTrajectory->getTruePoses(tStart, tEnd, ref_T_WS_list_);
   circularSinusoidalTrajectory->getSampleTimes(tStart, tEnd, times_);

@@ -184,6 +184,41 @@ CircularSinusoidalTrajectory::computeGlobalPose(const okvis::Time time) const {
           Eigen::AngleAxisd(thetaZ, Eigen::Vector3d::UnitY()));
 }
 
+Eigen::Vector3d CircularSinusoidalTrajectory::computeGlobalAngularRateNumeric(
+    const okvis::Time time) const {
+  double h = 1e-6;
+  okvis::kinematics::Transformation T_WBdelta =
+      computeGlobalPose(time + okvis::Duration(h));
+  okvis::kinematics::Transformation T_WB = computeGlobalPose(time);
+  okvis::kinematics::Transformation T_WBmdelta =
+      computeGlobalPose(time - okvis::Duration(h));
+  Eigen::Matrix3d Rdelta = (T_WBdelta.C() - T_WBmdelta.C()) / (2 * h);
+  Eigen::Matrix3d OmegaW = Rdelta * T_WB.C().transpose();
+  return okvis::kinematics::vee(OmegaW);
+}
+
+Eigen::Vector3d
+CircularSinusoidalTrajectory::computeGlobalLinearAccelerationNumeric(
+    const okvis::Time time) const {
+  double h = 1e-6;
+  Eigen::Vector3d v_WBdelta =
+      computeGlobalLinearVelocity(time + okvis::Duration(h));
+  Eigen::Vector3d v_WBmdelta =
+      computeGlobalLinearVelocity(time - okvis::Duration(h));
+  return (v_WBdelta - v_WBmdelta) / (2 * h) - gw;
+}
+
+Eigen::Vector3d
+CircularSinusoidalTrajectory::computeGlobalLinearVelocityNumeric(
+    const okvis::Time time) const {
+  double h = 1e-6;
+  okvis::kinematics::Transformation T_WBdelta =
+      computeGlobalPose(time + okvis::Duration(h));
+  okvis::kinematics::Transformation T_WBmdelta =
+      computeGlobalPose(time - okvis::Duration(h));
+  return (T_WBdelta.r() - T_WBmdelta.r()) / (2 * h);
+}
+
 TorusTrajectory::TorusTrajectory()
     : CircularSinusoidalTrajectory(), wr(19 * M_PI / 137), xosc(rxy - rz) {}
 
@@ -828,6 +863,56 @@ Eigen::Matrix<T, 3, 3> WavyCircle::orientation(T t) const {
   Eigen::Matrix<T, 3, 3> Rx = RotX(T(30 * M_PI / 180) * sin(T(5) * t));
   R_WB = R_WB * Rx;
   return R_WB;
+}
+
+std::shared_ptr<CircularSinusoidalTrajectory>
+createSimulatedTrajectory(SimulatedTrajectoryType trajectoryType, int rate,
+                          double gravityNorm) {
+  switch (trajectoryType) {
+  case SimulatedTrajectoryType::Sinusoid:
+    return std::shared_ptr<CircularSinusoidalTrajectory>(
+        new simul::CircularSinusoidalTrajectory(
+            rate, Eigen::Vector3d(0, 0, -gravityNorm)));
+
+  case SimulatedTrajectoryType::Torus:
+    return std::shared_ptr<CircularSinusoidalTrajectory>(
+        new simul::TorusTrajectory(rate, Eigen::Vector3d(0, 0, -gravityNorm)));
+
+  case SimulatedTrajectoryType::Squircle:
+    return std::shared_ptr<CircularSinusoidalTrajectory>(
+        new simul::RoundedSquare(rate, Eigen::Vector3d(0, 0, -gravityNorm)));
+
+  case SimulatedTrajectoryType::Circle:
+    return std::shared_ptr<CircularSinusoidalTrajectory>(
+        new simul::RoundedSquare(rate, Eigen::Vector3d(0, 0, -gravityNorm),
+                                 okvis::Time(0, 0), 1.0, 0, 0.8));
+
+  case SimulatedTrajectoryType::Dot:
+    return std::shared_ptr<CircularSinusoidalTrajectory>(
+        new simul::RoundedSquare(rate, Eigen::Vector3d(0, 0, -gravityNorm),
+                                 okvis::Time(0, 0), 1e-3, 0, 0.8e-3));
+
+  case SimulatedTrajectoryType::WavyCircle:
+    return std::shared_ptr<CircularSinusoidalTrajectory>(
+        new simul::WavyCircle(rate, Eigen::Vector3d(0, 0, -gravityNorm)));
+
+  case SimulatedTrajectoryType::Motionless:
+    return std::shared_ptr<CircularSinusoidalTrajectory>(
+        new simul::Motionless(rate, Eigen::Vector3d(0, 0, -gravityNorm)));
+
+  case SimulatedTrajectoryType::Torus2:
+    return std::shared_ptr<CircularSinusoidalTrajectory>(
+        new simul::SphereTrajectory(rate, Eigen::Vector3d(0, 0, -gravityNorm)));
+
+  case SimulatedTrajectoryType::Ball:
+    return std::shared_ptr<CircularSinusoidalTrajectory>(
+        new simul::SphereTrajectory(rate, Eigen::Vector3d(0, 0, -gravityNorm),
+                                    1.0, 0.4 * M_PI));
+
+  default:
+    LOG(ERROR) << "Unknown trajectory id " << static_cast<int>(trajectoryType);
+    return std::shared_ptr<CircularSinusoidalTrajectory>();
+  }
 }
 
 }  // namespace simul
