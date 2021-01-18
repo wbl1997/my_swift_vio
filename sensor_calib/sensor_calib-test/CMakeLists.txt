@@ -28,7 +28,8 @@ add_subdirectory(${CMAKE_CURRENT_BINARY_DIR}/googletest-src
                  EXCLUDE_FROM_ALL)
 
 # Now simply link against gtest or gtest_main as needed. Eg
-add_executable(sensor_calib-test TestTimeAndRotationCalibrator.cpp)
+add_executable(sensor_calib-test TestTimeAndRotationCalibrator.cpp ../../src/simul/curves.cpp)
 target_link_libraries(sensor_calib-test libsensor_calib gmock_main)
+target_include_directories(sensor_calib-test PRIVATE "../../include" "${OKVIS_DIR}/okvis_time/include")
 
 gtest_discover_tests(sensor_calib-test)
