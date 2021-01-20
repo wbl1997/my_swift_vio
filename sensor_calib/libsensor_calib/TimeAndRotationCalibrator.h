@@ -10,8 +10,7 @@ namespace sensor_calib {
 
 template <class Element>
 int removeObsoleteData(Eigen::AlignedDeque<okvis::Measurement<Element>> *q,
-                       double windowSize) {
-  okvis::Time eraseUntil = q->back().timeStamp - okvis::Duration(windowSize);
+                       okvis::Time eraseUntil) {
   if (q->front().timeStamp > eraseUntil)
     return 0;
 
@@ -31,11 +30,13 @@ int removeObsoleteData(Eigen::AlignedDeque<okvis::Measurement<Element>> *q,
  * @param[in] y rowwise observation matrix.
  * @param[out] C_ output covariance matrix.
  * https://eigen.tuxfamily.org/dox/TopicFunctionTakingEigenTypes.html
- * An alternative is to use FFT as in cvMatchTemplate() with method=CV_TM_CCORR_NORMED.
+ * An alternative is to use FFT as in cvMatchTemplate() with
+ * method=CV_TM_CCORR_NORMED.
  */
 template <typename Derived, typename OtherDerived>
-void cov(const Eigen::MatrixBase<Derived>& x, const Eigen::MatrixBase<Derived>& y, Eigen::MatrixBase<OtherDerived> const & C_)
-{
+void cov(const Eigen::MatrixBase<Derived> &x,
+         const Eigen::MatrixBase<Derived> &y,
+         Eigen::MatrixBase<OtherDerived> const &C_) {
   typedef typename Derived::Scalar Scalar;
   typedef typename Eigen::internal::plain_row_type<Derived>::type RowVectorType;
 
@@ -44,19 +45,38 @@ void cov(const Eigen::MatrixBase<Derived>& x, const Eigen::MatrixBase<Derived>& 
   const RowVectorType x_mean = x.colwise().sum() / num_observations;
   const RowVectorType y_mean = y.colwise().sum() / num_observations;
 
-  Eigen::MatrixBase<OtherDerived>& C = const_cast< Eigen::MatrixBase<OtherDerived>& >(C_);
+  Eigen::MatrixBase<OtherDerived> &C =
+      const_cast<Eigen::MatrixBase<OtherDerived> &>(C_);
 
-  C.derived().resize(x.cols(),x.cols()); // resize the derived object
-  C = (x.rowwise() - x_mean).transpose() * (y.rowwise() - y_mean) / (num_observations - 1);
+  C.derived().resize(x.cols(), x.cols()); // resize the derived object
+  C = (x.rowwise() - x_mean).transpose() * (y.rowwise() - y_mean) /
+      (num_observations - 1);
 }
+
+/**
+ * @brief computeCovariance
+ * @param[in] startTimestamp start time of correlation period.
+ * @param[in] observationDuration correlation period.
+ * @param[in] xy x and y should have observation overlap no less than
+ * observationDuration, also their timestamps should be identical in the time
+ * overlap.
+ * @param[out] C covariance matrix
+ * @return
+ */
+int computeCovariance(
+    okvis::Time startTimestamp, double observationDuration,
+    const std::vector<
+        const Eigen::AlignedDeque<okvis::Measurement<Eigen::Vector3d>> *> &xy,
+    Eigen::Matrix3d *C);
 
 /**
  * @brief The TimeAndRotationCalibrator class
  * Implementation of Algorithm 1 in
  * Qiu et al. 2020 T-RO. Real-time temporal and rotational calibration of
  * heterogeneous sensors using motion correlation analysis.
- * Assume the central IMU sensor has a higher sampling rate than the target sensor.
- * Notation: W - world frame, G - Generic sensor frame, I - reference IMU frame.
+ * Assume the central IMU sensor has a higher sampling rate than the target
+ * sensor. Notation: W - world frame, G - Generic sensor frame, I - reference
+ * IMU frame.
  */
 class TimeAndRotationCalibrator {
 public:
@@ -72,10 +92,9 @@ public:
                             double traceCorrelationLowerBound = 0.9,
                             double eigenvalueRatioUpperBound = 10,
                             double minimumEigenvalueLowerBound = 0.03,
-                            double enumerationRangeMs = 1100);
+                            double enumerationRangeMs = 1.1);
 
-  void addImuAngularRate(okvis::Time time,
-                         const Eigen::Vector3d &gyroMeasured);
+  void addImuAngularRate(okvis::Time time, const Eigen::Vector3d &gyroMeasured);
 
   void addTargetAngularRate(okvis::Time time,
                             const Eigen::Vector3d &gyroMeasured);
@@ -94,30 +113,44 @@ public:
 
   double relativeTimeOffset() const { return calibratedTimeOffset_; }
 
+  void check() const;
 private:
-  void computeCovariance();
+  okvis::Time correlationStartTime() const;
 
-
+  bool hasSufficientData() const;
 
 private:
-  Eigen::AlignedDeque<okvis::Measurement<Eigen::Vector3d>> angularRates_; // IMU measured angular rates.
-  Eigen::AlignedDeque<okvis::Measurement<Eigen::Vector3d>> targetAngularRates_; // angular rates measured by the target sensor.
+  /// Input
+  Eigen::AlignedDeque<okvis::Measurement<Eigen::Vector3d>>
+      angularRates_; // IMU measured angular rates.
+  Eigen::AlignedDeque<okvis::Measurement<Eigen::Vector3d>>
+      targetAngularRates_; // angular rates measured by the target sensor.
   Eigen::AlignedDeque<okvis::Measurement<Eigen::Quaterniond>>
       targetOrientations_; // orientations measured by the target sensor.
 
-  Eigen::AlignedDeque<okvis::Measurement<Eigen::Vector3d>> uniformAngularRates_; // uniform upsampled IMU angular rates.
+  /// Processed input
+  Eigen::AlignedDeque<okvis::Measurement<Eigen::Vector3d>>
+      uniformAngularRates_; // uniform upsampled IMU angular rates.
   Eigen::AlignedVector<Eigen::AlignedDeque<okvis::Measurement<Eigen::Vector3d>>>
-      averageImuAngularRateBuffer_;
+      averageImuAngularRateBuffer_; // average IMU angular rate for the target
+                                    // sensor at target measurement timestamps.
+                                    // Each element at i corresponds to time
+                                    // offset td = (i - halfTotalSteps) /
+                                    // imuRate.
+  double targetSamplingInterval_; // target sensor sampling interval.
 
+  /// Settings
   double observationDuration_; // d_o
-  double imuRate_; // f_I, nominal rate of the central IMU sensor.
-  double traceCorrelationLowerBound_; // \f$ \epsilon_b \f$
-  double eigenvalueRatioUpperBound_; // \f$ \zeta_u \f$
+  double imuRate_;             // f_I, nominal rate of the central IMU sensor.
+  double traceCorrelationLowerBound_;  // \f$ \epsilon_b \f$
+  double eigenvalueRatioUpperBound_;   // \f$ \zeta_u \f$
   double minimumEigenvalueLowerBound_; // \f$ \zeta_b \f$
-  double enumerationRangeMs_; // \f$ t_r \f$ in millisecs.
-  double targetSensorRate_; // f_G, nominal rate of the generic sensor.
+  double enumerationRangeSecs_;        // \f$ t_r \f$.
   int halfTotalSteps_;
+  okvis::Duration samplingInterval_;   // central IMU sensor sampling interval.
+  double samplingIntervalLambda_;      // sampling interval observation weight in [0, 1].
 
+  /// Results
   CalibrationStatus status_;
   Eigen::Quaterniond calibratedOrientation_; // R_IG
   double calibratedTimeOffset_; // timestamp by imu clock = timestamp by target

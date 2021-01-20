@@ -12,6 +12,7 @@ target_include_directories(libsensor_calib PUBLIC
     "${OKVIS_DIR}/okvis_common/include"
     "${OKVIS_DIR}/okvis_kinematics/include"
     "${OKVIS_DIR}/okvis_time/include"
+    "${OKVIS_DIR}/okvis_util/include"
     ${CERES_INCLUDE_DIR}
     ${GLOG_INCLUDE_DIRS})
 
