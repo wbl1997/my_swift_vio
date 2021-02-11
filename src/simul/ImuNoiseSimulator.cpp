@@ -89,6 +89,8 @@ void addNoiseToImuReadings(const okvis::ImuParameters& imuParameters,
   double biasNoiseFactor = gyroAccelBiasNoiseFactor;
   LOG(INFO) << "noise downscale factor " << noiseFactor
             << " bias noise downscale factor " << biasNoiseFactor;
+  double sqrtRate = std::sqrt(imuParameters.rate);
+  double sqrtDeltaT = 1 / sqrtRate;
   *trueBiases = (*imuMeasurements);
   // The expected means of the prior of biases, imuParameters.g0 and a0,
   // fed to the estimator, are different from the true biases.
@@ -110,8 +112,6 @@ void addNoiseToImuReadings(const okvis::ImuParameters& imuParameters,
     trueBiases->at(i).measurement.gyroscopes = bgk;
     trueBiases->at(i).measurement.accelerometers = bak;
 
-    double sqrtRate = std::sqrt(imuParameters.rate);
-    double sqrtDeltaT = 1 / sqrtRate;
     // eq 50, Oliver Woodman, An introduction to inertial navigation
     imuMeasurements->at(i).measurement.gyroscopes +=
         (bgk +

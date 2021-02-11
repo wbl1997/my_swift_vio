@@ -73,6 +73,10 @@ class ConsistentEstimator : public Estimator
    */
   bool addReprojectionFactors();
 
+//  bool addStates(okvis::MultiFramePtr multiFrame,
+//                 const okvis::ImuMeasurementDeque &imuMeasurements,
+//                 bool asKeyframe) override;
+
   /**
    * @brief Start ceres optimization.
    * @param[in] numIter Maximum number of iterations.
