@@ -171,7 +171,7 @@ int addConstraintToEstimator(
         OKVIS_ASSERT_TRUE(std::runtime_error, estimator.isLandmarkAdded(lmId),
                           lmId << " not added, bug");
         estimator.setLandmarkInitialized(lmId, false);
-        estimator.addLandmarkObservation(lmId, fIdB, im, keypointIndex);
+        estimator.addObservation<CAMERA_GEOMETRY_T>(lmId, fIdB, im, keypointIndex);
       }
       ++keypointIndex;
     }

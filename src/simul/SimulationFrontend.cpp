@@ -490,9 +490,9 @@ int SimulationFrontend::addMatchToEstimator(
           case OnlyTwoViewConstraints:
             if (estimator.numObservations(landmarkMatch.landmarkId) + 1 <
                 estimator.minTrackLength()) {
-              estimator.addLandmarkObservation(landmarkMatch.landmarkId,
-                                               IdA.frameId, IdA.cameraIndex,
-                                               IdA.keypointIndex);
+              estimator.addObservation<CAMERA_GEOMETRY_T>(
+                  landmarkMatch.landmarkId, IdA.frameId, IdA.cameraIndex,
+                  IdA.keypointIndex);
             } else {
               estimator.addEpipolarConstraint<CAMERA_GEOMETRY_T>(
                   landmarkMatch.landmarkId, IdA.frameId, IdA.cameraIndex,

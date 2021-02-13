@@ -805,8 +805,7 @@ int HybridFilter::marginalizeRedundantFrames(size_t numKeyframes, size_t numImuF
       }
       while (obsIter != mapPoint.observations.end() &&
              obsIter->first.frameId == camStateId) {
-        // loop in case there are dud observations for the
-        // landmark in the same frame.
+        // loop in case that there are more than one observations in an NFrame for a landmark.
         const KeypointIdentifier& kpi = obsIter->first;
         auto mfp = multiFramePtrMap_.find(kpi.frameId);
         mfp->second->setLandmarkId(kpi.cameraIndex, kpi.keypointIndex, 0);
@@ -1680,11 +1679,16 @@ bool HybridFilter::slamFeatureJacobian(const MapPoint &mp, Eigen::MatrixXd &H_x,
 
   // add observations in images of the current frame.
   uint64_t currFrameId = currentFrameId();
+  int cameraId = -1;
   size_t numNewObservations = 0u;
   for (auto itObs = mp.observations.rbegin(), iteObs = mp.observations.rend();
        itObs != iteObs; ++itObs) {
     if (itObs->first.frameId == currFrameId) {
+      if (static_cast<int>(itObs->first.cameraIndex) == cameraId) { // avoid double observations.
+        continue;
+      }
       uint64_t poseId = itObs->first.frameId;
+      cameraId = itObs->first.cameraIndex;
       Eigen::Vector2d measurement;
       auto multiFrameIter = multiFramePtrMap_.find(poseId);
       okvis::MultiFramePtr multiFramePtr = multiFrameIter->second;
@@ -1716,9 +1720,11 @@ bool HybridFilter::slamFeatureJacobian(const MapPoint &mp, Eigen::MatrixXd &H_x,
     }
   }
 
-  OKVIS_ASSERT_GE(
-      Exception, numNewObservations, 1u,
-      "A point in slamFeatureJacobian should be observed in current frame!");
+  OKVIS_ASSERT_TRUE_DBG(Exception,
+                        1u <= numNewObservations &&
+                            numNewObservations <= camera_rig_.numberCameras(),
+                        "Landmark observations " << numNewObservations
+                                                 << " unexpected!");
 
   propagatePoseAndVelocityForMapPoint(pointDataPtr.get());
 
@@ -2351,7 +2357,7 @@ void HybridFilter::optimize(size_t /*numIter*/, size_t /*numThreads*/,
   size_t dimH_o[2] = {0, numCamPosePointStates - 3 * mInCovLmIds.size() - kClonedStateMinimalDimen};
   size_t nMarginalizedFeatures =
       0;  // features not in state and not tracked in current frame
-  size_t nInStateFeatures = 0;  // features in state and tracked now
+  size_t nInStateFeatures = 0u;  // features in state and tracked now
 
   const uint64_t currFrameId = currentFrameId();
   size_t navAndImuParamsDim = navStateAndImuParamsMinimalDim();

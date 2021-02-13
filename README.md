@@ -361,11 +361,12 @@ Note the program will not exit if Ctrl+C is entered in the terminal of roscore.
 
 ```
 export MSCKF_WS=$HOME/Documents/docker/msckf_ws
+source $MSCKF_WS/devel/setup.bash
 rosrun msckf okvis_node_synchronous $MSCKF_WS/src/msckf/config/config_fpga_p2_euroc.yaml \
  $MSCKF_WS/src/msckf/config/LcdParams.yaml \
  --vocabulary_path=$MSCKF_WS/src/msckf/vocabulary/ORBvoc.yml \
  --bagname=/media/$USER/Seagate/$USER/data/euroc/MH_01_easy.bag --skip_first_seconds=0 --max_inc_tol=30.0 \
- --camera_topics="/cam0/image_raw,/cam1/image_raw" --imu_topic="/imu0"
+ --camera_topics="/cam0/image_raw,/cam1/image_raw" --imu_topic="/imu0" \
  --dump_output_option=3 --output_dir=$HOME/Desktop/temp --publish_via_ros=true
 
 rosrun rviz rviz -d $MSCKF_WS/src/msckf/config/rviz.rviz
