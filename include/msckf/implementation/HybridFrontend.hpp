@@ -147,8 +147,7 @@ int addConstraintToEstimator(
           if (valid && canBeInitialized) {
             estimator.setLandmark(lmId, T_WCa * hP_Ca);
             estimator.setLandmarkInitialized(lmId, true);
-            estimator.replaceEpipolarWithReprojectionErrors<CAMERA_GEOMETRY_T>(
-                lmId);
+            estimator.replaceEpipolarWithReprojectionErrors(lmId);
             estimator.addObservation<CAMERA_GEOMETRY_T>(lmId, fIdB, im,
                                                         keypointIndex);
           } else {

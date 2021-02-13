@@ -123,6 +123,8 @@ class HybridFilter : public Estimator, public BaseFilter {
   }
   ///@}
 
+  uint64_t mergeTwoLandmarks(uint64_t lmIdA, uint64_t lmIdB) override;
+
   /**
    * @brief gatherMapPointObservations
    * @param mp
@@ -670,6 +672,10 @@ class HybridFilter : public Estimator, public BaseFilter {
   size_t minCulledFrames_;
 
 private:
+  bool hasLandmarkParameterBlock(uint64_t landmarkId) const;
+
+  bool removeLandmarkParameterBlock(uint64_t landmarkId);
+
   void decimateCovarianceForLandmarks(const std::vector<uint64_t>& toRemoveLmIds);
 
   // for each point in the state vector/covariance,

@@ -842,7 +842,11 @@ int HybridFilter::marginalizeRedundantFrames(size_t numKeyframes, size_t numImuF
       }
     }
     if (mapPoint.observations.size() == 0u) {
-      mapPtr_->removeParameterBlock(it->first);
+      uint64_t landmarkId = it->first;
+      mapPtr_->removeParameterBlock(landmarkId);
+      if (hasLandmarkParameterBlock(landmarkId)) {
+        decimateCovarianceForLandmarks({landmarkId});
+      }
       it = landmarksMap_.erase(it);
     } else {
       ++it;
@@ -1149,6 +1153,30 @@ bool HybridFilter::applyMarginalizationStrategy(
   return true;
 }
 
+bool HybridFilter::removeLandmarkParameterBlock(uint64_t landmarkId) {
+  auto idPos = std::find_if(
+      mInCovLmIds.begin(), mInCovLmIds.end(),
+      [landmarkId](const okvis::ceres::HomogeneousPointParameterBlock &x) {
+        return x.id() == landmarkId;
+      });
+  bool miss = (idPos == mInCovLmIds.end());
+  if (miss) {
+    return false;
+  } else {
+    mInCovLmIds.erase(idPos);
+    return true;
+  }
+}
+
+bool HybridFilter::hasLandmarkParameterBlock(uint64_t landmarkId) const {
+  auto idPos = std::find_if(
+      mInCovLmIds.begin(), mInCovLmIds.end(),
+      [landmarkId](const okvis::ceres::HomogeneousPointParameterBlock &x) {
+        return x.id() == landmarkId;
+      });
+  return idPos != mInCovLmIds.end();
+}
+
 void HybridFilter::decimateCovarianceForLandmarks(const std::vector<uint64_t>& toRemoveLmIds) {
   // decimate covariance for landmarks to be removed from state.
   if (toRemoveLmIds.size() == 0u)
@@ -1184,7 +1212,7 @@ void HybridFilter::decimateCovarianceForLandmarks(const std::vector<uint64_t>& t
         std::make_pair(startKeptRow, *it - startKeptRow));
     startKeptRow = *it + 3;
   }
-  if (startKeptRow != (size_t)covDim) {
+  if (startKeptRow < (size_t)covDim) {
     vRowStartInterval.push_back(
         std::make_pair(startKeptRow, (size_t)covDim - startKeptRow));
   }
@@ -1193,13 +1221,7 @@ void HybridFilter::decimateCovarianceForLandmarks(const std::vector<uint64_t>& t
 
   for (auto it = toRemoveLmIds.begin(), itEnd = toRemoveLmIds.end();
        it != itEnd; ++it) {
-    uint64_t toFind = *it;
-    auto idPos = std::find_if(
-        mInCovLmIds.begin(), mInCovLmIds.end(),
-        [toFind](const okvis::ceres::HomogeneousPointParameterBlock &x) {
-          return x.id() == toFind;
-        });
-    mInCovLmIds.erase(idPos);
+    removeLandmarkParameterBlock(*it);
   }
 }
 
@@ -1528,12 +1550,7 @@ bool HybridFilter::featureJacobian(
            "MSCKF feature.";
   } else {
     featureVariableDimen += 9;
-    OKVIS_ASSERT_EQ_DBG(Exception, pointDataPtr->anchorIds()[0].frameId_,
-                        (statesMap_.rbegin())->first,
-                        "Anchor frame of a SLAM feature to be added to the "
-                        "state vector should be the current frame.");
   }
-
   pointDataPtr->computePoseAndVelocityForJacobians(FLAGS_use_first_estimate);
   pointDataPtr->computeSharedJacobians(optimizationOptions_.cameraObservationModelId);
 
@@ -1745,7 +1762,7 @@ bool HybridFilter::slamFeatureJacobian(const MapPoint &mp, Eigen::MatrixXd &H_x,
         return x.id() == hpbid;
       });
   OKVIS_ASSERT_TRUE(Exception, idPos != mInCovLmIds.end(),
-                    "The tracked landmark is not in the state vector.");
+                    "The tracked landmark " << hpbid << " is not in the state vector.");
   size_t covPtId = std::distance(mInCovLmIds.begin(), idPos);
   Eigen::Vector4d homogeneousPoint = idPos->estimate();
   if (pointLandmarkOptions_.landmarkModelId ==
@@ -2735,6 +2752,14 @@ void HybridFilter::initializeLandmarksInFilter() {
     updateCovarianceTimer.stop();
   }
   updateLandmarksTimer.stop();
+}
+
+uint64_t HybridFilter::mergeTwoLandmarks(uint64_t lmIdA, uint64_t lmIdB) {
+  uint64_t removedLandmark = Estimator::mergeTwoLandmarks(lmIdA, lmIdB);
+  if (hasLandmarkParameterBlock(removedLandmark)) {
+    decimateCovarianceForLandmarks({removedLandmark});
+  }
+  return lmIdA;
 }
 
 size_t HybridFilter::gatherMapPointObservations(
