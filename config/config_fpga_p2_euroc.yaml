@@ -69,6 +69,11 @@ imu_params:
     sigma_TAElement: 5e-3
     model_type: BG_BA_TG_TS_TA
 
+initial_state:
+    std_v_WS: [0.1, 0.1, 0.1]
+    std_q_WS: [0.2, 0.2, 0.05]
+    std_p_WS: [0.1, 0.1, 0.1]
+
 # Estimator parameters
 numKeyframes: 5 # number of keyframes in optimisation window
 numImuFrames: 3 # number of frames linked by most recent nonlinear IMU error terms
@@ -88,8 +93,9 @@ point_landmark:
     landmarkModelId: 1
     minTrackLength: 3
     anchorAtObservationTime: 0
-    minTrackLengthForSlam: 11
+    minTrackLengthForSlam: 7
     maxHibernationFrames: 3
+    maxInStateLandmarks: 50
 
 pose_graph:
     maxOdometryConstraintForAKeyframe: 2

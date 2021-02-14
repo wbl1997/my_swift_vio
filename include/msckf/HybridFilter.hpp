@@ -42,12 +42,12 @@ enum RetrieveObsSeqType {
     HEAD_TAIL,
 };
 
+/**
+ * @brief The HybridFilter class uses short feature track observations in the
+ * MSCKF manner and long feature track observations in the SLAM manner, i.e.,
+ * putting the landmark into the state vector.
+ * It does not support iterative EKF.
 
-//! The HybridFilter that uses short feature track observations in the MSCKF
-//!  manner and long feature track observations in the SLAM manner, i.e.,
-//! put into the state vector.
-/*!
- The estimator class does all the backend work.
  Frames:
  W: World
  C: Camera
@@ -236,6 +236,7 @@ class HybridFilter : public Estimator, public BaseFilter {
   /**
    * @brief slamFeatureJacobian, compute the residual and Jacobians for a SLAM
    * feature i observed in the current frame which may have multiple cameras.
+   * We assume that the landmark is well observed including its depth.
    * @param mp mappoint
    * @param H_x Jacobian w.r.t variables related to camera intrinsics, camera
    * poses, with e.g. (13+9m) columns where m is the number of cloned nav

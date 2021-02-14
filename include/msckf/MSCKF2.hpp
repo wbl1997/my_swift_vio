@@ -25,17 +25,11 @@
 /// \brief okvis Main namespace of this package.
 namespace okvis {
 
-//! The estimator class
-/*!
- The estimator class. This does all the backend work.
- Frames:
- W: World
- B: Body
- C: Camera
- S: Sensor (IMU)
+/**
+ * @brief The MSCKF2 class implement the MSCKF with first estimate Jacobian technique.
+ * It does not include landmarks in the state vector but supports iterative EKF.
  */
 class MSCKF2 : public HybridFilter {
-  // landmarks are not in the EKF states in contrast to HybridFilter
  public:
   OKVIS_DEFINE_EXCEPTION(Exception, std::runtime_error)
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW

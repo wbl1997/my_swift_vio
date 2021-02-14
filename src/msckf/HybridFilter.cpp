@@ -2403,8 +2403,7 @@ void HybridFilter::optimize(size_t /*numIter*/, size_t /*numThreads*/,
       Eigen::MatrixXd H_x;
       Eigen::MatrixXd H_f;
       Eigen::MatrixXd R_i;
-      bool isValidJacobian =
-          slamFeatureJacobian(it->second, H_x, r_i, R_i, H_f);
+      bool isValidJacobian = slamFeatureJacobian(it->second, H_x, r_i, R_i, H_f);
       if (!isValidJacobian) {
         it->second.setMeasurementFate(FeatureTrackStatus::kComputingJacobiansFailed);
         continue;
@@ -2564,7 +2563,7 @@ void HybridFilter::initializeLandmarksInFilter() {
       }
       Eigen::Vector4d homogeneousPoint =
           Eigen::Map<Eigen::Vector4d>(pointLandmark.data(), 4);
-
+      // jhuai: We assume that H_fi has full column rank. That is, the landmark is well observed.
       vio::leftNullspaceAndColumnSpace(H_fi, &Q2, &Q1);
       z_o = Q2.transpose() * r_i;
       H_o = Q2.transpose() * H_i;
@@ -2732,6 +2731,7 @@ void HybridFilter::initializeLandmarksInFilter() {
 }
 
 uint64_t HybridFilter::mergeTwoLandmarks(uint64_t lmIdA, uint64_t lmIdB) {
+  // jhuai: We simply remove the covariance entries for the removed landmark.
   uint64_t removedLandmark = Estimator::mergeTwoLandmarks(lmIdA, lmIdB);
   if (hasLandmarkParameterBlock(removedLandmark)) {
     decimateCovarianceForLandmarks({removedLandmark});
