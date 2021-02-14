@@ -695,7 +695,7 @@ int HybridFilter::marginalizeRedundantFrames(size_t numKeyframes, size_t numImuF
   std::vector<uint64_t> rm_cam_state_ids;
   findRedundantCamStates(&rm_cam_state_ids, numImuFrames);
 
-  size_t nMarginalizedFeatures = 0u;
+  size_t numMsckfLandmarks = 0u;
   int featureVariableDimen = minimalDimOfAllCameraParams() +
       kClonedStateMinimalDimen * (statesMap_.size() - 1);
   int navAndImuParamsDim = navStateAndImuParamsMinimalDim();
@@ -755,10 +755,10 @@ int HybridFilter::marginalizeRedundantFrames(size_t numKeyframes, size_t numImuF
     vR_o.push_back(R_oi);
     vH_o.push_back(H_oi);
     dimH_o[0] += r_oi.rows();
-    ++nMarginalizedFeatures;
+    ++numMsckfLandmarks;
   }
 
-  if (nMarginalizedFeatures > 0u) {
+  if (numMsckfLandmarks > 0u) {
     Eigen::MatrixXd H_o =
         Eigen::MatrixXd::Zero(dimH_o[0], featureVariableDimen);
     Eigen::Matrix<double, -1, 1> r_o(dimH_o[0], 1);
@@ -2340,29 +2340,16 @@ Eigen::Vector4d HybridFilter::anchoredInverseDepthToWorldCoordinates(
 void HybridFilter::optimize(size_t /*numIter*/, size_t /*numThreads*/,
                             bool /*verbose*/) {
   // containers of Jacobians of measurements of marginalized features
-  std::vector<
-      Eigen::Matrix<double, Eigen::Dynamic, 1>,
-      Eigen::aligned_allocator<Eigen::Matrix<double, Eigen::Dynamic, 1>>>
-      vr_o;
-  std::vector<Eigen::MatrixXd, Eigen::aligned_allocator<Eigen::MatrixXd>>
-      vH_o;  // each entry has a size say (2n-3)x(13+9m) where n is the number of observations,
+  Eigen::AlignedVector<Eigen::VectorXd> vr_o;
+  Eigen::AlignedVector<Eigen::MatrixXd> vH_o;  // each entry has a size say (2n-3)x(13+9m) where n is the number of observations,
   // and m is the number of cloned state variables in the sliding window.
-  std::vector<Eigen::MatrixXd, Eigen::aligned_allocator<Eigen::MatrixXd>>
-      vR_o;  // each entry has a size (2n-3)x(2n-3)
+  Eigen::AlignedVector<Eigen::MatrixXd> vR_o;  // each entry has a size (2n-3)x(2n-3).
 
   // containers of Jacobians of measurements of points in the states
-  std::vector<Eigen::Vector2d, Eigen::aligned_allocator<Eigen::Vector2d>> vr_i;
-  std::vector<
-      Eigen::Matrix<double, 2, Eigen::Dynamic>,
-      Eigen::aligned_allocator<Eigen::Matrix<double, 2, Eigen::Dynamic>>>
-      vH_x;  // each entry has a size say 2x(13 + 9m)
-  std::vector<
-      Eigen::Matrix<double, 2, Eigen::Dynamic>,
-      Eigen::aligned_allocator<Eigen::Matrix<double, 2, Eigen::Dynamic>>>
-      vH_f;  // each entry has a size 2 x 3k where k is the number of in state landmarks.
-  std::vector<Eigen::Matrix2d,
-              Eigen::aligned_allocator<Eigen::Matrix<double, 2, 2>>>
-      vR_i;
+  Eigen::AlignedVector<Eigen::VectorXd> vr_i;
+  Eigen::AlignedVector<Eigen::MatrixXd> vH_x;  // each entry has a size say 2j x(13 + 9m)
+  Eigen::AlignedVector<Eigen::MatrixXd> vH_f;  // each entry has a size 2j x 3k where j is the number of observing cameras, k is the number of landmarks in state.
+  Eigen::AlignedVector<Eigen::MatrixXd> vR_i;
 
   OKVIS_ASSERT_EQ_DBG(
       Exception, (size_t)covariance_.rows(),
@@ -2372,9 +2359,8 @@ void HybridFilter::optimize(size_t /*numIter*/, size_t /*numThreads*/,
 
   int numCamPosePointStates = cameraParamPoseAndLandmarkMinimalDimen();
   size_t dimH_o[2] = {0, numCamPosePointStates - 3 * mInCovLmIds.size() - kClonedStateMinimalDimen};
-  size_t nMarginalizedFeatures =
-      0;  // features not in state and not tracked in current frame
-  size_t nInStateFeatures = 0u;  // features in state and tracked now
+  size_t numMsckfLandmarks = 0u;  // number of landmarks not in state and not tracked in current frame.
+  size_t numSlamObservations = 0u;  // number of observations for landmarks in state and tracked now
 
   const uint64_t currFrameId = currentFrameId();
   size_t navAndImuParamsDim = navStateAndImuParamsMinimalDim();
@@ -2410,10 +2396,10 @@ void HybridFilter::optimize(size_t /*numIter*/, size_t /*numThreads*/,
       vR_o.push_back(R_oi);
       vH_o.push_back(H_oi);
       dimH_o[0] += r_oi.rows();
-      ++nMarginalizedFeatures;
+      ++numMsckfLandmarks;
     } else if (it->second.status.measurementType == FeatureTrackStatus::kSlamObservation) {
-      // compute residual and Jacobian for a observed point which is in the states
-      Eigen::Matrix<double, -1, 1> r_i;
+      // compute residual and Jacobian for an observed point which is in the state.
+      Eigen::VectorXd r_i;
       Eigen::MatrixXd H_x;
       Eigen::MatrixXd H_f;
       Eigen::MatrixXd R_i;
@@ -2435,10 +2421,9 @@ void HybridFilter::optimize(size_t /*numIter*/, size_t /*numThreads*/,
       vH_x.push_back(H_x);
       vH_f.push_back(H_f);
       vR_i.push_back(R_i);
-      ++nInStateFeatures;
+      numSlamObservations += r_i.size();
     }
   }  // every landmark
-
 
   // update with MSCKF features
   if (dimH_o[0] > 0) {
@@ -2464,22 +2449,22 @@ void HybridFilter::optimize(size_t /*numIter*/, size_t /*numThreads*/,
   }
 
   // update with SLAM features
-  if (nInStateFeatures > 0) {
-    const size_t obsRows = 2 * nInStateFeatures;
+  if (numSlamObservations) {
     const size_t numPointStates = 3 * mInCovLmIds.size();
-    Eigen::MatrixXd H_all(obsRows, numCamPosePointStates);
-    H_all.block(0, numCamPosePointStates - numPointStates, obsRows, numPointStates).setZero();
-    Eigen::Matrix<double, Eigen::Dynamic, 1> r_all(obsRows, 1);
-    Eigen::MatrixXd R_all = Eigen::MatrixXd::Zero(obsRows, obsRows);
+    Eigen::MatrixXd H_all(numSlamObservations, numCamPosePointStates);
+    H_all.block(0, numCamPosePointStates - numPointStates, numSlamObservations, numPointStates).setZero();
+    Eigen::VectorXd r_all(numSlamObservations);
+    Eigen::MatrixXd R_all = Eigen::MatrixXd::Zero(numSlamObservations, numSlamObservations);
     size_t startRow = 0u;
-    for (size_t jack = 0; jack < nInStateFeatures; ++jack) {
-      H_all.block(startRow, 0, 2, numCamPosePointStates - numPointStates) =
+    for (size_t jack = 0u; jack < vr_i.size(); ++jack) {
+      int blockRows = vr_i[jack].rows();
+      H_all.block(startRow, 0, blockRows, numCamPosePointStates - numPointStates) =
           vH_x[jack];
-      H_all.block(startRow, numCamPosePointStates - numPointStates, 2,
+      H_all.block(startRow, numCamPosePointStates - numPointStates, blockRows,
                   numPointStates) = vH_f[jack];
-      r_all.block<2, 1>(startRow, 0) = vr_i[jack];
-      R_all.block<2, 2>(startRow, startRow) = vR_i[jack];
-      startRow += 2;
+      r_all.segment(startRow, blockRows) = vr_i[jack];
+      R_all.block(startRow, startRow, blockRows, blockRows) = vR_i[jack];
+      startRow += blockRows;
     }
 
     DefaultEkfUpdater updater(covariance_, navAndImuParamsDim, numCamPosePointStates);
@@ -2539,50 +2524,41 @@ void HybridFilter::initializeLandmarksInFilter() {
   Eigen::MatrixXd H_o;
   Eigen::MatrixXd R_o;
 
-  std::vector<
-      Eigen::Matrix<double, Eigen::Dynamic, 1>,
-      Eigen::aligned_allocator<Eigen::Matrix<double, Eigen::Dynamic, 1>>>
-      vz_1;
-  std::vector<
-      Eigen::Matrix<double, Eigen::Dynamic, 1>,
-      Eigen::aligned_allocator<Eigen::Matrix<double, Eigen::Dynamic, 1>>>
-      vz_o;
-  std::vector<
-      Eigen::Matrix<double, 3, Eigen::Dynamic>,
-      Eigen::aligned_allocator<Eigen::Matrix<double, 3, Eigen::Dynamic>>>
-      vH_1;
-  std::vector<Eigen::Matrix<double, 3, 3>,
-              Eigen::aligned_allocator<Eigen::Matrix<double, 3, 3>>>
-      vH_2;
-  std::vector<Eigen::Matrix<double, 3, 3>,
-              Eigen::aligned_allocator<Eigen::Matrix<double, 3, 3>>>
-      vR_1;
+  Eigen::AlignedVector<Eigen::VectorXd> vz_1;
+  Eigen::AlignedVector<Eigen::VectorXd> vz_o;
+  Eigen::AlignedVector<Eigen::Matrix<double, 3, -1>> vH_1;
+  Eigen::AlignedVector<Eigen::Matrix3d> vH_2;
+  Eigen::AlignedVector<Eigen::Matrix3d> vR_1;
 
-  std::vector<Eigen::MatrixXd, Eigen::aligned_allocator<Eigen::MatrixXd>>
-      vH_o;  // each entry has a size say (2n-3)x(13+9m) where n is the number of observations,
-  // and m is the number of cloned state variables in the sliding window.
-  std::vector<Eigen::MatrixXd, Eigen::aligned_allocator<Eigen::MatrixXd>>
-      vR_o;  // each entry has a size (2n-3)x(2n-3)
+  Eigen::AlignedVector<Eigen::MatrixXd> vH_o;  // Each entry has a size say (2n-3)x(13+9m),
+  // where n is the number of observations, and m is the number of cloned state
+  // variables in the sliding window.
+  Eigen::AlignedVector<Eigen::MatrixXd> vR_o;  // Each entry has a size (2n-3)x(2n-3).
 
-  size_t totalObsDim = 0;  // total dimensions of all features' observations
+  size_t totalObsDim = 0u;  // Total dimensions of all features' observations.
   const uint64_t currFrameId = currentFrameId();
   size_t navAndImuParamsDim = navStateAndImuParamsMinimalDim();
   size_t numCamPosePointStates = cameraParamPoseAndLandmarkMinimalDimen();
-  const size_t numCamPoseStates =
-      numCamPosePointStates - 3 * mInCovLmIds.size();
+  const size_t numCamPoseStates = numCamPosePointStates - 3 * mInCovLmIds.size();
   Eigen::MatrixXd variableCov = covariance_.block(
       navAndImuParamsDim, navAndImuParamsDim, numCamPoseStates,
       numCamPoseStates); // covariance of camera and pose copy states
 
+  int capacity = pointLandmarkOptions_.maxInStateLandmarks - (int)(mInCovLmIds.size());
+  int numQualified = 0;
   Eigen::AlignedVector<okvis::ceres::HomogeneousPointParameterBlock> landmarksToAdd;
-  landmarksToAdd.reserve(20);
+  landmarksToAdd.reserve(16);
   for (okvis::PointMap::iterator pit = landmarksMap_.begin();
        pit != landmarksMap_.end(); ++pit) {
     if (pit->second.status.measurementType == FeatureTrackStatus::kSlamInitialization) {
+      if (capacity <= numQualified) {
+        pit->second.setMeasurementFate(FeatureTrackStatus::kWaitToState);
+        continue;
+      }
       msckf::PointLandmark pointLandmark;
       bool isValidJacobian =
           featureJacobian(pit->second, &pointLandmark, H_i, r_i, R_i, &H_fi);
-      if (!isValidJacobian) {  // This feature will be removed and marginalized as a MSCKF feature in the next optimization step.
+      if (!isValidJacobian) {
         pit->second.setMeasurementFate(FeatureTrackStatus::kComputingJacobiansFailed);
         continue;
       }
@@ -2620,6 +2596,7 @@ void HybridFilter::initializeLandmarksInFilter() {
 
       pit->second.status.inState = true;
       pit->second.setMeasurementFate(FeatureTrackStatus::kSuccessful);
+      ++numQualified;
       landmarksToAdd.emplace_back(homogeneousPoint, pit->first);
 
       vz_1.push_back(Q1.transpose() * r_i);
