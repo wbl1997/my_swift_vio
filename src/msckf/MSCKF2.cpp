@@ -475,7 +475,7 @@ int MSCKF2::computeStackedJacobianAndResidual(
     Eigen::MatrixXd *T_H, Eigen::Matrix<double, Eigen::Dynamic, 1> *r_q,
     Eigen::MatrixXd *R_q) {
   // compute and stack Jacobians and Residuals for landmarks observed no more
-  size_t nMarginalizedFeatures = 0;
+  int numMarginalizedLandmarks = 0;
   int culledPoints[2] = {0};
   int featureVariableDimen = minimalDimOfAllCameraParams() +
       kClonedStateMinimalDimen * (statesMap_.size() - 1);
@@ -488,41 +488,58 @@ int MSCKF2::computeStackedJacobianAndResidual(
   Eigen::AlignedVector<Eigen::MatrixXd> vH_o;
   Eigen::AlignedVector<Eigen::MatrixXd> vR_o;
 
-  for (auto it = landmarksMap_.begin(); it != landmarksMap_.end(); ++it) {
-    if (it->second.status.measurementType != FeatureTrackStatus::kMsckfTrack) {
+  std::vector<std::pair<uint64_t, int>> msckfLandmarks;
+  msckfLandmarks.reserve(pointLandmarkOptions_.maxMarginalizedLandmarks);
+  for (okvis::PointMap::const_iterator it = landmarksMap_.begin();
+       it != landmarksMap_.end(); ++it) {
+    if (it->second.status.measurementType == FeatureTrackStatus::kMsckfTrack) {
+      msckfLandmarks.emplace_back(it->first, it->second.observations.size());
+    }
+  }
+  std::sort(msckfLandmarks.begin(), msckfLandmarks.end(),
+            [](const std::pair<uint64_t, int> &a,
+               const std::pair<uint64_t, int> &b) -> bool {
+              return a.second > b.second;
+            });
+
+  for (auto idAndLength : msckfLandmarks) {
+    okvis::MapPoint &mapPoint = landmarksMap_.at(idAndLength.first);
+    if (numMarginalizedLandmarks >= pointLandmarkOptions_.maxMarginalizedLandmarks) {
+      mapPoint.setMeasurementFate(FeatureTrackStatus::kLeftOver);
       continue;
     }
-
     msckf::PointLandmark pointLandmark;
     Eigen::MatrixXd H_oi;                           //(nObsDim, dimH_o[1])
     H_oi.resize(0, featureVariableDimen);
     Eigen::Matrix<double, Eigen::Dynamic, 1> r_oi;  //(nObsDim, 1)
     Eigen::MatrixXd R_oi;                           //(nObsDim, nObsDim)
-    bool isValidJacobian = featureJacobian(it->second, &pointLandmark, H_oi, r_oi, R_oi);
+    bool isValidJacobian = featureJacobian(mapPoint, &pointLandmark, H_oi, r_oi, R_oi);
     if (!isValidJacobian) {
       isValidJacobian = optimizationOptions_.useEpipolarConstraint
-                            ? featureJacobianEpipolar(it->second, &H_oi, &r_oi,
+                            ? featureJacobianEpipolar(mapPoint, &H_oi, &r_oi,
                                                       &R_oi, ENTIRE_TRACK)
                             : isValidJacobian;
       if (!isValidJacobian) {
-        it->second.status.measurementFate = FeatureTrackStatus::kComputingJacobiansFailed;
+        mapPoint.status.measurementFate = FeatureTrackStatus::kComputingJacobiansFailed;
         ++culledPoints[0];
         continue;
       }
     }
 
     if (!FilterHelper::gatingTest(H_oi, r_oi, R_oi, variableCov)) {
-      it->second.status.measurementFate = FeatureTrackStatus::kPotentialOutlier;
+      mapPoint.status.measurementFate = FeatureTrackStatus::kPotentialOutlier;
       ++culledPoints[1];
       continue;
     }
-    it->second.status.measurementFate = FeatureTrackStatus::kSuccessful;
+    mapPoint.status.measurementFate = FeatureTrackStatus::kSuccessful;
     vr_o.push_back(r_oi);
     vR_o.push_back(R_oi);
     vH_o.push_back(H_oi);
     dimH_o[0] += r_oi.rows();
-    ++nMarginalizedFeatures;
+    ++numMarginalizedLandmarks;
   }
+//  LOG(INFO) << "MSCKF landmark candidates " << msckfLandmarks.size() << " used "
+//            << numMarginalizedLandmarks << ".";
   if (dimH_o[0] == 0) {
     return 0;
   }

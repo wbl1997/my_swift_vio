@@ -2359,7 +2359,7 @@ void HybridFilter::optimize(size_t /*numIter*/, size_t /*numThreads*/,
 
   int numCamPosePointStates = cameraParamPoseAndLandmarkMinimalDimen();
   size_t dimH_o[2] = {0, numCamPosePointStates - 3 * mInCovLmIds.size() - kClonedStateMinimalDimen};
-  size_t numMsckfLandmarks = 0u;  // number of landmarks not in state and not tracked in current frame.
+  int numMsckfLandmarks = 0;  // number of landmarks not in state and not tracked in current frame.
   size_t numSlamObservations = 0u;  // number of observations for landmarks in state and tracked now
 
   const uint64_t currFrameId = currentFrameId();
@@ -2372,58 +2372,95 @@ void HybridFilter::optimize(size_t /*numIter*/, size_t /*numThreads*/,
       navAndImuParamsDim, navAndImuParamsDim,
       numCamPosePointStates, numCamPosePointStates);  // covariance block for camera and pose state copies including the current pose state is used for SLAM features.
 
-  for (okvis::PointMap::iterator it = landmarksMap_.begin(); it != landmarksMap_.end(); ++it) {
-    it->second.updateStatus(currFrameId, pointLandmarkOptions_.minTrackLengthForMsckf,
+  std::vector<std::pair<uint64_t, int>> msckfLandmarks;
+  msckfLandmarks.reserve(pointLandmarkOptions_.maxMarginalizedLandmarks);
+  std::vector<std::pair<uint64_t, int>> slamLandmarks;
+  slamLandmarks.reserve(pointLandmarkOptions_.maxInStateLandmarks / 2);
+  for (okvis::PointMap::iterator it = landmarksMap_.begin();
+       it != landmarksMap_.end(); ++it) {
+    it->second.updateStatus(currFrameId,
+                            pointLandmarkOptions_.minTrackLengthForMsckf,
                             pointLandmarkOptions_.minTrackLengthForSlam);
-
     if (it->second.status.measurementType == FeatureTrackStatus::kMsckfTrack) {
-      msckf::PointLandmark landmark;
-      Eigen::MatrixXd H_oi;                           //(2n-3, dimH_o[1])
-      Eigen::Matrix<double, Eigen::Dynamic, 1> r_oi;  //(2n-3, 1)
-      Eigen::MatrixXd R_oi;                           //(2n-3, 2n-3)
-      bool isValidJacobian =
-          featureJacobian(it->second, &landmark, H_oi, r_oi, R_oi);
-      if (!isValidJacobian) {
-        it->second.setMeasurementFate(FeatureTrackStatus::kComputingJacobiansFailed);
-        continue;
-      }
-      if (!FilterHelper::gatingTest(H_oi, r_oi, R_oi, variableCov)) {
-        it->second.setMeasurementFate(FeatureTrackStatus::kPotentialOutlier);
-        continue;
-      }
-      it->second.status.measurementFate = FeatureTrackStatus::kSuccessful;
-      vr_o.push_back(r_oi);
-      vR_o.push_back(R_oi);
-      vH_o.push_back(H_oi);
-      dimH_o[0] += r_oi.rows();
-      ++numMsckfLandmarks;
-    } else if (it->second.status.measurementType == FeatureTrackStatus::kSlamObservation) {
-      // compute residual and Jacobian for an observed point which is in the state.
-      Eigen::VectorXd r_i;
-      Eigen::MatrixXd H_x;
-      Eigen::MatrixXd H_f;
-      Eigen::MatrixXd R_i;
-      bool isValidJacobian = slamFeatureJacobian(it->second, H_x, r_i, R_i, H_f);
-      if (!isValidJacobian) {
-        it->second.setMeasurementFate(FeatureTrackStatus::kComputingJacobiansFailed);
-        continue;
-      }
-      Eigen::MatrixXd H_xf(H_x.rows(), H_x.cols() + H_f.cols());
-      H_xf.leftCols(H_x.cols()) = H_x;
-      H_xf.rightCols(H_f.cols()) = H_f;
-      if (!FilterHelper::gatingTest(H_xf, r_i, R_i, variableCov2)) {
-        it->second.setMeasurementFate(FeatureTrackStatus::kPotentialOutlier);
-        continue;
-      }
-      it->second.status.measurementFate = FeatureTrackStatus::kSuccessful;
-      vr_i.push_back(r_i);
-      vH_x.push_back(H_x);
-      vH_f.push_back(H_f);
-      vR_i.push_back(R_i);
-      numSlamObservations += r_i.size();
+      msckfLandmarks.emplace_back(it->first, it->second.observations.size());
+    } else if (it->second.status.measurementType ==
+               FeatureTrackStatus::kSlamObservation) {
+      slamLandmarks.emplace_back(it->first, it->second.observations.size());
     }
-  }  // every landmark
+  }
 
+  std::sort(msckfLandmarks.begin(), msckfLandmarks.end(),
+            [](const std::pair<uint64_t, int> &a,
+               const std::pair<uint64_t, int> &b) -> bool {
+              return a.second > b.second;
+            }); // in the descending order of track length.
+
+  std::sort(slamLandmarks.begin(), slamLandmarks.end(),
+            [](const std::pair<uint64_t, int> &a,
+               const std::pair<uint64_t, int> &b) -> bool {
+              return a.second > b.second;
+            });
+
+  for (auto idAndLength : msckfLandmarks) {
+    okvis::MapPoint &mapPoint = landmarksMap_.at(idAndLength.first);
+    if (numMsckfLandmarks >= pointLandmarkOptions_.maxMarginalizedLandmarks) {
+      mapPoint.setMeasurementFate(FeatureTrackStatus::kLeftOver);
+      continue;
+    }
+    msckf::PointLandmark landmark;
+    Eigen::MatrixXd H_oi;                          //(2n-3, dimH_o[1])
+    Eigen::Matrix<double, Eigen::Dynamic, 1> r_oi; //(2n-3, 1)
+    Eigen::MatrixXd R_oi;                          //(2n-3, 2n-3)
+    bool isValidJacobian =
+        featureJacobian(mapPoint, &landmark, H_oi, r_oi, R_oi);
+    if (!isValidJacobian) {
+      mapPoint.setMeasurementFate(
+          FeatureTrackStatus::kComputingJacobiansFailed);
+      continue;
+    }
+    if (!FilterHelper::gatingTest(H_oi, r_oi, R_oi, variableCov)) {
+      mapPoint.setMeasurementFate(FeatureTrackStatus::kPotentialOutlier);
+      continue;
+    }
+    mapPoint.status.measurementFate = FeatureTrackStatus::kSuccessful;
+    vr_o.push_back(r_oi);
+    vR_o.push_back(R_oi);
+    vH_o.push_back(H_oi);
+    dimH_o[0] += r_oi.rows();
+    ++numMsckfLandmarks;
+  }
+
+  for (auto idAndLength : slamLandmarks) {
+    okvis::MapPoint &mapPoint = landmarksMap_.at(idAndLength.first);
+    // compute residual and Jacobian for an observed point which is in the
+    // state.
+    Eigen::VectorXd r_i;
+    Eigen::MatrixXd H_x;
+    Eigen::MatrixXd H_f;
+    Eigen::MatrixXd R_i;
+    bool isValidJacobian = slamFeatureJacobian(mapPoint, H_x, r_i, R_i, H_f);
+    if (!isValidJacobian) {
+      mapPoint.setMeasurementFate(
+          FeatureTrackStatus::kComputingJacobiansFailed);
+      continue;
+    }
+    Eigen::MatrixXd H_xf(H_x.rows(), H_x.cols() + H_f.cols());
+    H_xf.leftCols(H_x.cols()) = H_x;
+    H_xf.rightCols(H_f.cols()) = H_f;
+    if (!FilterHelper::gatingTest(H_xf, r_i, R_i, variableCov2)) {
+      mapPoint.setMeasurementFate(FeatureTrackStatus::kPotentialOutlier);
+      continue;
+    }
+    mapPoint.status.measurementFate = FeatureTrackStatus::kSuccessful;
+    vr_i.push_back(r_i);
+    vH_x.push_back(H_x);
+    vH_f.push_back(H_f);
+    vR_i.push_back(R_i);
+    numSlamObservations += r_i.size();
+  }
+//  LOG(INFO) << "MSCKF landmark candidates " << msckfLandmarks.size() << " used "
+//            << numMsckfLandmarks << ". SLAM landmarks " << slamLandmarks.size()
+//            << " observation dim " << numSlamObservations;
   // update with MSCKF features
   if (dimH_o[0] > 0) {
     Eigen::MatrixXd H_o(dimH_o[0], dimH_o[1]);
@@ -2551,7 +2588,7 @@ void HybridFilter::initializeLandmarksInFilter() {
        pit != landmarksMap_.end(); ++pit) {
     if (pit->second.status.measurementType == FeatureTrackStatus::kSlamInitialization) {
       if (capacity <= numQualified) {
-        pit->second.setMeasurementFate(FeatureTrackStatus::kWaitToState);
+        pit->second.setMeasurementFate(FeatureTrackStatus::kLeftOver);
         continue;
       }
       msckf::PointLandmark pointLandmark;
