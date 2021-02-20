@@ -99,28 +99,33 @@ if __name__ == '__main__':
     }
 
     config_name_to_diffs = {
-        ('isam2-fls', 'OKVIS'): {
-            "algo_code": "SlidingWindowSmoother",
-            "extra_gflags": "--publish_via_ros=false",
+        ('KSWF', 'OKVIS'): {
+            "algo_code": 'HybridFilter',
+            "numImuFrames": 5,
+            "sigma_absolute_translation": 0.02,
+            "sigma_absolute_orientation": 0.01,
         },
-        ('ri-fls', 'OKVIS'): {
-            "algo_code": "RiSlidingWindowSmoother",
-            "extra_gflags": "--publish_via_ros=false --rifls_lock_jacobian=true",
+        ('KSWF_n', 'OKVIS'): {
+            "algo_code": 'HybridFilter',
+            "numImuFrames": 5,
+            "monocular_input": 0,
+            "sigma_absolute_translation": 0.02,
+            "sigma_absolute_orientation": 0.01,
         },
-        ('ri-fls-exact', 'OKVIS'): {
-            "algo_code": "RiSlidingWindowSmoother",
-            "extra_gflags": "--publish_via_ros=false --rifls_lock_jacobian=false",
-        },
-        ('OKVIS_4_4', 'OKVIS'): {
-            "sigma_g_c": 12.0e-4 * 4,
-            "sigma_a_c": 8.0e-3 * 4,
-            "sigma_gw_c": 4.0e-6 * 4,
-            "sigma_aw_c": 4.0e-5 * 4,
+        ('OKVIS', 'OKVIS'): {
+            "sigma_g_c": 12.0e-4 * 6,
+            "sigma_a_c": 8.0e-3 * 6,
+            "sigma_gw_c": 4.0e-6 * 6,
+            "sigma_aw_c": 4.0e-5 * 6,
         },
         ('OKVIS_n', 'OKVIS'): {
             "monocular_input": 0,
             # We override P_C0C_Q_C0C as it conflicts with okvis estimator.
             "extrinsic_opt_mode_other_camera": "P_BC_Q_BC",
+            "sigma_g_c": 12.0e-4 * 4,
+            "sigma_a_c": 8.0e-3 * 4,
+            "sigma_gw_c": 4.0e-6 * 4,
+            "sigma_aw_c": 4.0e-5 * 4,
         },
         ('KSF', 'OKVIS'): {
             "algo_code": 'MSCKF',
@@ -134,6 +139,18 @@ if __name__ == '__main__':
             "monocular_input": 0,
             "sigma_absolute_translation": 0.02,
             "sigma_absolute_orientation": 0.01,
+        },
+        ('isam2-fls', 'OKVIS'): {
+            "algo_code": "SlidingWindowSmoother",
+            "extra_gflags": "--publish_via_ros=false",
+        },
+        ('ri-fls', 'OKVIS'): {
+            "algo_code": "RiSlidingWindowSmoother",
+            "extra_gflags": "--publish_via_ros=false --rifls_lock_jacobian=true",
+        },
+        ('ri-fls-exact', 'OKVIS'): {
+            "algo_code": "RiSlidingWindowSmoother",
+            "extra_gflags": "--publish_via_ros=false --rifls_lock_jacobian=false",
         },
     }
 
