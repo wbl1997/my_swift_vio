@@ -17,7 +17,6 @@
 #include <dynamic_reconfigure/server.h>
 #include <image_geometry/pinhole_camera_model.h>
 #include <ros/ros.h>
-// #include <okvis_ros/CameraConfig.h> // generated
 #pragma GCC diagnostic pop
 #include <image_transport/image_transport.h>
 #include "sensor_msgs/Imu.h"

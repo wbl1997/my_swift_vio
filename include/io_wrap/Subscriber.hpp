@@ -139,7 +139,7 @@ class Subscriber {
   void directFrameCornerCallback(visensor::ViFrame::Ptr frame_ptr,
                                  visensor::ViCorner::Ptr corners_ptr);
   /// \brief Dynamic reconfigure callback
-  void configCallback(okvis_ros::CameraConfig& config, uint32_t level);
+  void configCallback(msckf::CameraConfig& config, uint32_t level);
 #endif
 
   /// @}
@@ -156,7 +156,7 @@ class Subscriber {
 
 #ifdef HAVE_LIBVISENSOR
   std::shared_ptr<visensor::ViSensorDriver> sensor_;  ///< The sensor API.
-  dynamic_reconfigure::Server<okvis_ros::CameraConfig>
+  dynamic_reconfigure::Server<msckf::CameraConfig>
       cameraConfigReconfigureService_;  ///< dynamic reconfigure service.
 #endif
 

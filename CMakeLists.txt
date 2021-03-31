@@ -185,6 +185,7 @@ add_definitions(-fPIC -march=native -Wextra -Winit-self -Woverloaded-virtual
 LIST(APPEND SOURCEFILES
     src/feature_tracker/feature_tracker.cpp
 
+    src/gtsam/VioBackEndParams.cpp
     src/gtsam/ImuFactorTestHelpers.cpp
 
     src/io_wrap/CameraPoseVisualization.cpp
@@ -240,7 +241,6 @@ list(APPEND SOURCEFILES
     src/gtsam/RiExtendedPose3Prior.cpp
     src/gtsam/RiImuFactor.cpp
     src/gtsam/RiSlidingWindowSmoother.cpp
-    src/gtsam/VioBackEndParams.cpp
     src/gtsam/SlidingWindowSmoother.cpp
 )
 endif(GTSAM_FOUND)
