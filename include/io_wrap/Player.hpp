@@ -17,7 +17,6 @@
 #include <dynamic_reconfigure/server.h>
 #include <image_geometry/pinhole_camera_model.h>
 #include <ros/ros.h>
-// #include <okvis_ros/CameraConfig.h> // generated
 #pragma GCC diagnostic pop
 #include <image_transport/image_transport.h>
 #include "sensor_msgs/Imu.h"
@@ -55,7 +54,9 @@ class Player {
          const okvis::VioParameters& param_reader);
 
   void Run();
-  void RunWithSavedTracks();
+  // Block if previous processing has not finished.
+  void RunBlocking();
+
   std::atomic<bool> mbFinished;
 
  protected:
@@ -72,7 +73,7 @@ class Player {
 
   /// @}
 
-  okvis::VioInterface* vioInterface_;  ///< The VioInterface. (E.g. HybridVio)
+  okvis::VioInterface* vioInterface_;  ///< The VioInterface.
   okvis::VioParameters
       vioParameters_;  ///< The parameters and settings. //huai: although
                        ///< cameraGeometry info is included but not used through
@@ -91,8 +92,6 @@ class Player {
   Player(const Player& rhs);
   Player& operator=(const Player&) = delete;
 };
-
-std::string removeTrailingSlash(const std::string& path);
 
 }  // namespace okvis
 

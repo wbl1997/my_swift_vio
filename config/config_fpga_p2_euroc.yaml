@@ -9,19 +9,28 @@ cameras:
         distortion_coefficients: [-0.28340811217, 0.0739590738929, 0.000193595028569, 1.76187114545e-05],
         distortion_type: radialtangential,
         focal_length: [458.654880721, 457.296696463],
-        principal_point: [367.215803962, 248.37534061]}
+        principal_point: [367.215803962, 248.37534061],
+        projection_opt_mode: FXY_CXY,
+        extrinsic_opt_mode: P_CB,
+        image_delay: 0.0,
+        image_readout_time: 0.00}
 
      - {T_SC:
         [ 0.0125552670891, -0.999755099723, 0.0182237714554, -0.0198435579556,
           0.999598781151, 0.0130119051815, 0.0251588363115, 0.0453689425024,
-          -0.0253898008918, 0.0179005838253, 0.999517347078, 0.00786212447038,
-           0.0, 0.0, 0.0, 1.0],
+         -0.0253898008918, 0.0179005838253, 0.999517347078, 0.00786212447038,
+          0.0, 0.0, 0.0, 1.0],
         image_dimension: [752, 480],
         distortion_coefficients: [-0.283683654496, 0.0745128430929, -0.000104738949098, -3.55590700274e-05],
         distortion_type: radialtangential,
         focal_length: [457.587426604, 456.13442556],
-        principal_point: [379.99944652, 255.238185386]}
+        principal_point: [379.99944652, 255.238185386],
+        projection_opt_mode: FXY_CXY,
+        extrinsic_opt_mode: P_C0C_Q_C0C,
+        image_delay: 0.0,
+        image_readout_time: 0.00}
 
+monocular_input: true
 
 camera_params:
     camera_rate: 20 # just to manage the expectations of when there should be frames arriving
@@ -30,6 +39,11 @@ camera_params:
     sigma_c_relative_translation: 0.0 # The std. dev. of the cam. extr. transl. change between frames, e.g. 1.0e-6 for adaptive online calib (not less for numerics) [m].
     sigma_c_relative_orientation: 0.0 # The std. dev. of the cam. extr. orient. change between frames, e.g. 1.0e-6 for adaptive online calib (not less for numerics) [rad].
     timestamp_tolerance: 0.005 # [s] stereo frame out-of-sync tolerance
+    sigma_focal_length: 5.0
+    sigma_principal_point: 5.0
+    sigma_distortion: [0.05, 0.01, 0.001, 0.001, 0.0001]
+    sigma_td: 5e-3
+    sigma_tr: 5e-3
 
 imu_params:
     a_max: 176.0 # acceleration saturation [m/s^2]
@@ -50,10 +64,42 @@ imu_params:
          0.0000, 1.0000, 0.0000, 0.0000,
          0.0000, 0.0000, 1.0000, 0.0000,
          0.0000, 0.0000, 0.0000, 1.0000]
+    sigma_TGElement: 5e-3
+    sigma_TSElement: 1e-3
+    sigma_TAElement: 5e-3
+    model_type: BG_BA_TG_TS_TA
+
+initial_state:
+    std_v_WS: [0.1, 0.1, 0.1]
+    std_q_WS: [0.2, 0.2, 0.05]
+    std_p_WS: [0.1, 0.1, 0.1]
 
 # Estimator parameters
 numKeyframes: 5 # number of keyframes in optimisation window
 numImuFrames: 3 # number of frames linked by most recent nonlinear IMU error terms
+optimization:
+    triangulationMaxDepth: 1000.0
+    algorithm: "MSCKF"
+    useEpipolarConstraint: false
+    cameraObservationModelId: 0
+
+frontend:
+    initializeWithoutEnoughParallax: true
+    stereoMatchWithEpipolarCheck: true
+    epipolarDistanceThreshold: 2.5
+    featureTrackingMethod: 0
+
+point_landmark:
+    landmarkModelId: 1
+    minTrackLength: 3
+    anchorAtObservationTime: 0
+    minTrackLengthForSlam: 7
+    maxHibernationFrames: 3
+    maxInStateLandmarks: 50
+    maxMarginalizedLandmarks: 50
+
+pose_graph:
+    maxOdometryConstraintForAKeyframe: 2
 
 # ceres optimization options
 ceres_options:
@@ -74,16 +120,16 @@ imageDelay: 0.0  # in case you are using a custom setup, you will have to calibr
 displayImages: true  # displays debug video and keyframe matches. May be slow.
 
 # use direct driver
-useDriver: true 
+useDriver: false
 
 # some options for how and what to publish -- optional in ROS-free version
 publishing_options:
     publish_rate: 200                  # rate at which odometry updates are published only works properly if imu_rate/publish_rate is an integer!!
-    publishLandmarks: treu             # select, if you want to publish landmarks at all
+    publishLandmarks: true             # select, if you want to publish landmarks at all
     landmarkQualityThreshold: 1.0e-2   # landmark with lower quality will not be published
     maximumLandmarkQuality: 0.05       # landmark with higher quality will be published with the maximum colour intensity
     maxPathLength: 20                  # maximum length of the published path
-    publishImuPropagatedState: true    # Should the state that is propagated with IMU messages be published? Or just the optimized ones?
+    publishImuPropagatedState: false    # Should the state that is propagated with IMU messages be published? Or just the optimized ones?
     # provide custom World frame Wc
     T_Wc_W:
         [1.0000, 0.0000, 0.0000, 0.0000,

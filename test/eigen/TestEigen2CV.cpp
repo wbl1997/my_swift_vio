@@ -1,43 +1,30 @@
 #include <gtest/gtest.h>
 
 #include <Eigen/Core>
-#include <iostream>
-#include <opencv/cv.h>
+#include <opencv2/core/eigen.hpp>
 
-TEST(Eigen, Eigen2CV){
-                //test eigen and cv convertion functions
-                Eigen::Matrix2d eigenMat;
-                eigenMat << 1, 2,
-                        3, 4;
+TEST(Eigen, Eigen2CV) {
+  double eps = 1e-7;
+  Eigen::Matrix2d eigenMat;
+  eigenMat << 1, 2, 3, 4;
+  cv::Mat cvMat(2, 2, CV_64F);
+  cv::eigen2cv(eigenMat, cvMat);
+  Eigen::Matrix2d convertedMat;
+  cv::cv2eigen(cvMat, convertedMat);
+  EXPECT_LT((convertedMat - eigenMat).lpNorm<Eigen::Infinity>(), eps);
 
-                Eigen::Vector3d trans(100, 200, 300);
+  Eigen::Vector3d eigenVec(100, 200, 300);
+  cv::Mat cvVec(3, 1, CV_64F);
+  cv::eigen2cv(eigenVec, cvVec);
+  Eigen::Vector3d convertedVec;
+  cv::cv2eigen(cvVec, convertedVec);
+  EXPECT_LT((convertedVec - eigenVec).lpNorm<Eigen::Infinity>(), eps);
+  // cv2eigen(cvVec, eigenMat); // watch out! wrong result without a warning
 
-                cv::Mat dest(2,2, CV_64F);
-                cv::Mat destVec(3,1, CV_64F);
-                eigen2cv(eigenMat, dest);
-                eigen2cv(trans, destVec);
-std::cout<<"Expected matrix "<< std::endl << "1, 2"<< std::endl<< "3, 4"<< std::endl;
-std:;cout<<"Actual matrix "<< std::endl<< dest<<std::endl;
-
-std::cout<<"Expected vector "<< std::endl << "100, 200, 300"<< std::endl;
-std:;cout<<"Actual vector "<< std::endl<< destVec<<std::endl;
-
-                dest.at<double>(0,0)=300;
-                dest.at<double>(0,1)=500;
-                dest.at<double>(1,0)=50;
-                dest.at<double>(1,1)=200;
-
-                destVec.at<double>(0)=4;
-                destVec.at<double>(1)=5;
-                destVec.at<double>(2)=6;
-                cv2eigen(dest, eigenMat);
-                cv2eigen(destVec, trans);
-
-std::cout<<"Expected matrix "<< std::endl << "300, 500"<< std::endl<< "50, 200"<< std::endl;
-std:;cout<<"Actual matrix "<< std::endl<< eigenMat<<std::endl;
-
-std::cout<<"Expected vector "<< std::endl << "4, 5, 6"<< std::endl;
-std:;cout<<"Actual vector "<< std::endl<< trans<<std::endl;
-
-                //cv2eigen(destVec, eigenMat); //don't do this, although no error
+  Eigen::Matrix3f eigenRf = Eigen::Matrix3f::Random();
+  cv::Matx33f cvRf;
+  cv::eigen2cv(eigenRf, cvRf);
+  Eigen::Matrix3f convertedRf;
+  cv::cv2eigen(cvRf, convertedRf);
+  EXPECT_LT((convertedRf - eigenRf).lpNorm<Eigen::Infinity>(), eps);
 }

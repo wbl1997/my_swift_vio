@@ -1,25 +1,28 @@
-#include "msckf/EpipolarJacobian.hpp"
-#include "msckf/RelativeMotionJacobian.hpp"
-
 #include <iostream>
 #include "gtest/gtest.h"
+
+#include "msckf/EpipolarJacobian.hpp"
+#include "msckf/RelativeMotionJacobian.hpp"
+#include "okvis/kinematics/sophus_operators.hpp"
 
 TEST(EpipolarJacobian, de_dfjk) {
   srand((unsigned int)time(0));  // comment this for deterministic behavior
   const double eps = 1e-6;
-  okvis::kinematics::Transformation T_BC = okvis::randomTransform();
-  okvis::kinematics::Transformation T_GBj = okvis::randomTransform();
-  okvis::kinematics::Transformation T_GBk = okvis::randomTransform();
+  okvis::kinematics::Transformation T_BC;
+  T_BC.setRandom();
+  okvis::kinematics::Transformation T_GBj;
+  T_GBj.setRandom();
+  okvis::kinematics::Transformation T_GBk;
+  T_GBk.setRandom();
   okvis::RelativeMotionJacobian rmj(T_BC, T_GBj, T_GBk);
-  okvis::kinematics::Transformation T_CjCk = rmj.evaluate();
-
+  okvis::kinematics::Transformation T_CjCk = rmj.relativeMotionT();
   Eigen::Vector2d fj12 = Eigen::Vector2d::Random();
   Eigen::Vector2d fk12 = Eigen::Vector2d::Random();
   Eigen::Vector3d fj;
   fj << fj12, 1;
   Eigen::Vector3d fk;
   fk << fk12, 1;
-  okvis::EpipolarJacobian epj(T_CjCk.q(), T_CjCk.r(), fj, fk);
+  okvis::EpipolarJacobian epj(T_CjCk.C(), T_CjCk.r(), fj, fk);
   Eigen::Matrix<double, 1, 3> de_dtheta_CjCk_anal;
   epj.de_dtheta_CjCk(&de_dtheta_CjCk_anal);
   Eigen::Matrix<double, 1, 3> de_dt_CjCk_anal;
@@ -34,18 +37,18 @@ TEST(EpipolarJacobian, de_dfjk) {
   for (int i = 0; i < 3; ++i) {
     delta.setZero();
     delta[i] = eps;
-    Eigen::Quaterniond deltaq = vio::quaternionFromSmallAngle(delta);
-    okvis::EpipolarJacobian epj_bar(deltaq * T_CjCk.q(), T_CjCk.r(), fj, fk);
+    Eigen::Quaterniond deltaq = okvis::kinematics::expAndTheta(delta);
+    okvis::EpipolarJacobian epj_bar((deltaq * T_CjCk.q()).toRotationMatrix(), T_CjCk.r(), fj, fk);
     de_dtheta_CjCk[i] = (epj_bar.evaluate() - epj.evaluate()) / eps;
   }
   EXPECT_LT(
       (de_dtheta_CjCk - de_dtheta_CjCk_anal).lpNorm<Eigen::Infinity>(),
-      eps);
+      5e-6);
 
   for (int i = 0; i < 3; ++i) {
     delta.setZero();
     delta[i] = eps;
-    okvis::EpipolarJacobian epj_bar(T_CjCk.q(), delta + T_CjCk.r(), fj, fk);
+    okvis::EpipolarJacobian epj_bar(T_CjCk.C(), delta + T_CjCk.r(), fj, fk);
     de_dt_CjCk[i] = (epj_bar.evaluate() - epj.evaluate()) / eps;
   }
   EXPECT_LT(
@@ -54,7 +57,7 @@ TEST(EpipolarJacobian, de_dfjk) {
   for (int i = 0; i < 3; ++i) {
     delta.setZero();
     delta[i] = eps;
-    okvis::EpipolarJacobian epj_bar(T_CjCk.q(), T_CjCk.r(), fj + delta, fk);
+    okvis::EpipolarJacobian epj_bar(T_CjCk.C(), T_CjCk.r(), fj + delta, fk);
     de_dfj[i] = (epj_bar.evaluate() - epj.evaluate()) / eps;
   }
   EXPECT_LT(
@@ -63,7 +66,7 @@ TEST(EpipolarJacobian, de_dfjk) {
   for (int i = 0; i < 3; ++i) {
     delta.setZero();
     delta[i] = eps;
-    okvis::EpipolarJacobian epj_bar(T_CjCk.q(), T_CjCk.r(), fj,
+    okvis::EpipolarJacobian epj_bar(T_CjCk.C(), T_CjCk.r(), fj,
                                     fk + delta);
     de_dfk[i] = (epj_bar.evaluate() - epj.evaluate()) / eps;
   }
@@ -75,11 +78,14 @@ TEST(EpipolarJacobian, de_dfjk) {
 TEST(EpipolarJacobian, de_ddelta_BC) {
   srand((unsigned int)time(0));  // comment this for deterministic behavior
   const double eps = 1e-6;
-  okvis::kinematics::Transformation T_BC = okvis::randomTransform();
-  okvis::kinematics::Transformation T_GBj = okvis::randomTransform();
-  okvis::kinematics::Transformation T_GBk = okvis::randomTransform();
+  okvis::kinematics::Transformation T_BC;
+  T_BC.setRandom();
+  okvis::kinematics::Transformation T_GBj;
+  T_GBj.setRandom();
+  okvis::kinematics::Transformation T_GBk;
+  T_GBk.setRandom();
   okvis::RelativeMotionJacobian rmj(T_BC, T_GBj, T_GBk);
-  okvis::kinematics::Transformation T_CjCk = rmj.evaluate();
+  okvis::kinematics::Transformation T_CjCk = rmj.relativeMotionT();
   Eigen::Matrix3d dtheta_dtheta_BC;
   rmj.dtheta_dtheta_BC(&dtheta_dtheta_BC);
   Eigen::Matrix3d dtheta_dt_BC;
@@ -99,7 +105,7 @@ TEST(EpipolarJacobian, de_ddelta_BC) {
   fj << fj12, 1;
   Eigen::Vector3d fk;
   fk << fk12, 1;
-  okvis::EpipolarJacobian epj(T_CjCk.q(), T_CjCk.r(), fj, fk);
+  okvis::EpipolarJacobian epj(T_CjCk.C(), T_CjCk.r(), fj, fk);
   Eigen::Matrix<double, 1, 3> de_dtheta_CjCk_anal;
   epj.de_dtheta_CjCk(&de_dtheta_CjCk_anal);
   Eigen::Matrix<double, 1, 3> de_dt_CjCk_anal;
@@ -121,9 +127,8 @@ TEST(EpipolarJacobian, de_ddelta_BC) {
     okvis::kinematics::Transformation T_BC_bar = T_BC;
     T_BC_bar.oplus(delta);
     okvis::RelativeMotionJacobian rmj_bar(T_BC_bar, T_GBj, T_GBk);
-    okvis::kinematics::Transformation T_CjCk_bar = rmj_bar.evaluate();
-
-    okvis::EpipolarJacobian epj_bar(T_CjCk_bar.q(), T_CjCk_bar.r(), fj, fk);
+    okvis::kinematics::Transformation T_CjCk_bar = rmj_bar.relativeMotionT();
+    okvis::EpipolarJacobian epj_bar(T_CjCk_bar.C(), T_CjCk_bar.r(), fj, fk);
     de_ddelta_BC[i] = (epj_bar.evaluate() - epj.evaluate()) / eps;
   }
 
@@ -139,11 +144,14 @@ TEST(EpipolarJacobian, de_ddelta_BC) {
 TEST(EpipolarJacobian, de_ddelta_GBj) {
   srand((unsigned int)time(0));  // comment this for deterministic behavior
   const double eps = 1e-6;
-  okvis::kinematics::Transformation T_BC = okvis::randomTransform();
-  okvis::kinematics::Transformation T_GBj = okvis::randomTransform();
-  okvis::kinematics::Transformation T_GBk = okvis::randomTransform();
+  okvis::kinematics::Transformation T_BC;
+  T_BC.setRandom();
+  okvis::kinematics::Transformation T_GBj;
+  T_GBj.setRandom();
+  okvis::kinematics::Transformation T_GBk;
+  T_GBk.setRandom();
   okvis::RelativeMotionJacobian rmj(T_BC, T_GBj, T_GBk);
-  okvis::kinematics::Transformation T_CjCk = rmj.evaluate();
+  okvis::kinematics::Transformation T_CjCk = rmj.relativeMotionT();
   Eigen::Matrix3d dtheta_dtheta_GBj;
   rmj.dtheta_dtheta_GBj(&dtheta_dtheta_GBj);
   Eigen::Matrix3d dtheta_dt_GBj;
@@ -163,7 +171,7 @@ TEST(EpipolarJacobian, de_ddelta_GBj) {
   fj << fj12, 1;
   Eigen::Vector3d fk;
   fk << fk12, 1;
-  okvis::EpipolarJacobian epj(T_CjCk.q(), T_CjCk.r(), fj, fk);
+  okvis::EpipolarJacobian epj(T_CjCk.C(), T_CjCk.r(), fj, fk);
   Eigen::Matrix<double, 1, 3> de_dtheta_CjCk_anal;
   epj.de_dtheta_CjCk(&de_dtheta_CjCk_anal);
   Eigen::Matrix<double, 1, 3> de_dt_CjCk_anal;
@@ -185,9 +193,8 @@ TEST(EpipolarJacobian, de_ddelta_GBj) {
     okvis::kinematics::Transformation T_GBj_bar = T_GBj;
     T_GBj_bar.oplus(delta);
     okvis::RelativeMotionJacobian rmj_bar(T_BC, T_GBj_bar, T_GBk);
-    okvis::kinematics::Transformation T_CjCk_bar = rmj_bar.evaluate();
-
-    okvis::EpipolarJacobian epj_bar(T_CjCk_bar.q(), T_CjCk_bar.r(), fj, fk);
+    okvis::kinematics::Transformation T_CjCk_bar = rmj_bar.relativeMotionT();
+    okvis::EpipolarJacobian epj_bar(T_CjCk_bar.C(), T_CjCk_bar.r(), fj, fk);
     de_ddelta_GBj[i] = (epj_bar.evaluate() - epj.evaluate()) / eps;
   }
 
@@ -203,11 +210,14 @@ TEST(EpipolarJacobian, de_ddelta_GBj) {
 TEST(EpipolarJacobian, de_ddelta_GBk) {
   srand((unsigned int)time(0));  // comment this for deterministic behavior
   const double eps = 1e-6;
-  okvis::kinematics::Transformation T_BC = okvis::randomTransform();
-  okvis::kinematics::Transformation T_GBj = okvis::randomTransform();
-  okvis::kinematics::Transformation T_GBk = okvis::randomTransform();
+  okvis::kinematics::Transformation T_BC;
+  T_BC.setRandom();
+  okvis::kinematics::Transformation T_GBj;
+  T_GBj.setRandom();
+  okvis::kinematics::Transformation T_GBk;
+  T_GBk.setRandom();
   okvis::RelativeMotionJacobian rmj(T_BC, T_GBj, T_GBk);
-  okvis::kinematics::Transformation T_CjCk = rmj.evaluate();
+  okvis::kinematics::Transformation T_CjCk = rmj.relativeMotionT();
   Eigen::Matrix3d dtheta_dtheta_GBk;
   rmj.dtheta_dtheta_GBk(&dtheta_dtheta_GBk);
   Eigen::Matrix3d dtheta_dt_GBk;
@@ -227,7 +237,7 @@ TEST(EpipolarJacobian, de_ddelta_GBk) {
   fj << fj12, 1;
   Eigen::Vector3d fk;
   fk << fk12, 1;
-  okvis::EpipolarJacobian epj(T_CjCk.q(), T_CjCk.r(), fj, fk);
+  okvis::EpipolarJacobian epj(T_CjCk.C(), T_CjCk.r(), fj, fk);
   Eigen::Matrix<double, 1, 3> de_dtheta_CjCk_anal;
   epj.de_dtheta_CjCk(&de_dtheta_CjCk_anal);
   Eigen::Matrix<double, 1, 3> de_dt_CjCk_anal;
@@ -249,9 +259,8 @@ TEST(EpipolarJacobian, de_ddelta_GBk) {
     okvis::kinematics::Transformation T_GBk_bar = T_GBk;
     T_GBk_bar.oplus(delta);
     okvis::RelativeMotionJacobian rmj_bar(T_BC, T_GBj, T_GBk_bar);
-    okvis::kinematics::Transformation T_CjCk_bar = rmj_bar.evaluate();
-
-    okvis::EpipolarJacobian epj_bar(T_CjCk_bar.q(), T_CjCk_bar.r(), fj, fk);
+    okvis::kinematics::Transformation T_CjCk_bar = rmj_bar.relativeMotionT();
+    okvis::EpipolarJacobian epj_bar(T_CjCk_bar.C(), T_CjCk_bar.r(), fj, fk);
     de_ddelta_GBk[i] = (epj_bar.evaluate() - epj.evaluate()) / eps;
   }
 

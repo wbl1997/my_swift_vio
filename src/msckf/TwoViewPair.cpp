@@ -42,9 +42,20 @@ std::vector<std::pair<int, int>> TwoViewPair::getFramePairs(
         framePairs.emplace_back(numFeatures - 1, j);
       }
       break;
+    case FIXED_MIDDLE:
+      for (j = 0; j < halfFeatures; ++j) {
+        framePairs.emplace_back(j, halfFeatures);
+      }
+      for (j = halfFeatures + 1; j < numFeatures; ++j) {
+        framePairs.emplace_back(j, halfFeatures);
+      }
+      break;
+    case SINGLE_HEAD_TAIL:
+      framePairs.emplace_back(0, numFeatures - 1);
+      break;
     case MAX_GAP_EVEN_CHANCE:
     default:
-      if (numFeatures < pairs_lut.size()) {
+      if (numFeatures < static_cast<int>(pairs_lut.size())) {
         framePairs = pairs_lut[numFeatures];
       } else {
         // more constraints does not mean better results

@@ -32,13 +32,8 @@ This is a catkin package that wraps the pure CMake project.
 
 You will need to install the following dependencies,
 
-* ROS (currently supported: hydro, kinetic and jade). Read the instructions in 
-  http://wiki.ros.org/kinetic/Installation/Ubuntu. You will need the additional 
-  package pcl-ros as (assuming kinetic)
-
-```
-sudo apt-get install ros-kinetic-pcl-ros
-```
+* ROS (currently supported: hydro, jade, kinetic, and melodic). 
+Read the ROS installation [instructions](http://wiki.ros.org/melodic/Installation/Ubuntu).
 
 * google-glog + gflags,
 
@@ -50,8 +45,20 @@ sudo apt-get install libgoogle-glog-dev
 
 ```
 sudo apt-get install libatlas-base-dev libeigen3-dev libsuitesparse-dev 
-sudo apt-get install libopencv-dev libboost-dev libboost-filesystem-dev
+sudo apt-get install libboost-dev libboost-filesystem-dev
 ```
+
+* catkin tools
+```
+sudo apt-get install python-catkin-tools
+```
+
+* gtest (**No operation required**)
+
+ros melodic will install the source files for the following three packages by default: googletest libgtest-dev google-mock.
+The googletest package includes source for both googletest and googlemock.
+*Do not manually cmake and install gtest libraries to /usr/lib. It is a bad practice*.
+
 * vio_common
 
 ```
@@ -63,57 +70,132 @@ then clone the repository from github into your catkin workspace (assuming msckf
 
 ```
 cd msckf_ws/src
-git clone --recursive https://JzHuai0108@bitbucket.org/JzHuai0108/msckf2.git
+git clone --recursive https://JzHuai0108@bitbucket.org/JzHuai0108/msckf.git
 ```
+
+* gtsam (optional)
+Its installation refers to [Kimera-VIO](https://github.com/MIT-SPARK/Kimera-VIO/blob/master/docs/kimera_vio_install.md).
+
+```
+sudo apt-get install libtbb-dev
+cd $HOME/Documents/slam_src
+git clone https://github.com/borglab/gtsam.git --recursive
+cd gtsam
+git checkout 6c85850147751d45cf9c595f1a7e623d239305fc
+# 342f30d148fae84c92ff71705c9e50e0a3683bda(previously tested commit)
+mkdir build
+cd build
+
+*EIGEN_INCLUDE_DIR is needed for ubuntu 16 to preempt the incompatible system-wide Eigen.*
+*$HOME/Documents/slam_devel is more error prone than /usr/local as it may cause
+ difficulty in debugging this program in QtCreator.*
+cmake -DCMAKE_INSTALL_PREFIX=$HOME/Documents/slam_devel -DCMAKE_BUILD_TYPE=Release \
+  -DGTSAM_TANGENT_PREINTEGRATION=OFF -DGTSAM_POSE3_EXPMAP=ON -DGTSAM_ROT3_EXPMAP=ON \
+  -DGTSAM_USE_SYSTEM_EIGEN=ON ..
+# -DEIGEN3_INCLUDE_DIR=$HOME/slam_devel/include/eigen3 -DEIGEN_INCLUDE_DIR=$HOME/slam_devel/include/eigen3
+
+make -j $(nproc) check # (optional, runs unit tests)
+make -j $(nproc) install
+```
+
+If you get an error while loading shared libraries libmetis.so at run or test time, 
+you may need to add the lib path for gtsam to LD_LIBRARY_PATH as below inside the 
+incumbent terminal or the Run Environment in QtCreator. QtCreator debugger may have
+trouble understanding the symbol "$HOME", so it is preferred to replace it with its actual path.
+```
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$HOME/Documents/slam_devel/lib
+```
+Even LD_LIBRARY_PATH is properly set in Run Environment in QtCreator, 
+QtCreator debugger may still fail to load libmetis.so. In that case, you may 
+need to install gtsam to /usr/local, i.e., -DCMAKE_INSTALL_PREFIX=/usr/local.
 
 ## Build the project
 
 ```
 cd msckf_ws/
-catkin_make -DUSE_ROS=ON -DBUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Release --pkg vio_common msckf
-```
+if [[ "x$(nproc)" = "x1" ]] ; then export USE_PROC=1 ;
+else export USE_PROC=$(($(nproc)/2)) ; 
+fi
 
-## Configure linter for making contributions
+export ROS_VERSION=melodic # kinetic
+catkin init
+catkin config --merge-devel # Necessary for catkin_tools >= 0.4.
+catkin config --extend /opt/ros/$ROS_VERSION
+catkin config --cmake-args -DUSE_ROS=ON -DBUILD_TESTS=ON \
+ -DGTSAM_DIR=$HOME/Documents/slam_devel/lib/cmake/GTSAM
+# -DEIGEN3_INCLUDE_DIR=$HOME/slam_devel/include/eigen3 -DEIGEN_INCLUDE_DIR=$HOME/slam_devel/include/eigen3
 
-If you are going to contribute to the project, please configure linter as follows.
-The below instructions were tested on Ubuntu 16.04.
-```
-sudo pip2 install yapf requests
-sudo apt install clang-format-6.0 pylint
-# the below follows installation guide at https://github.com/ethz-asl/linter/tree/master
-cd workspace/src/msckf/tools/linter
-echo ". $(realpath setup_linter.sh)" >> ~/.bashrc
-bash
 
-cd ../..
-init_linter_git_hooks
-```
-
-## Run gtests
-
-* Both gtest and gmock are required. 
-They can be installed with the below instructions. 
-More info about installation can be found [here](https://www.eriksmistad.no/getting-started-with-google-test-on-ubuntu/).
-
+catkin build vio_common msckf -DUSE_ROS=ON -DBUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Release -j$USE_PROC
+# -DCMAKE_PREFIX_PATH=/opt/ros/$ROS_VERSION
+# -DDO_TIMING=ON
+# -DUSE_SANITIZER=Address
 
 ```
-sudo apt-get install libgtest-dev google-mock
-cd /usr/src/gtest
-sudo cmake CMakeLists.txt
-sudo make
-# copy or symlink libgtest.a and libgtest_main.a to your /usr/lib folder
-sudo cp *.a /usr/lib
-
-cd /usr/src/gmock
-sudo cmake CMakeLists.txt
-sudo make
-# copy or symlink libgmock.a and libgmock_main.a to your /usr/lib folder
-sudo cp *.a /usr/lib
+### 1. Why is EIGEN_INCLUDE_DIR passed as a build argument?
+Setting EIGEN_INCLUDE_DIR is necessary for Ubuntu 16.04 because
+the system wide Eigen library (usually 3.2) does not 
+meet the requirements of the ceres solver depended by this package.
+Therefore, the eigen library 3.3.4 should be downloaded from 
+[here](https://github.com/eigenteam/eigen-git-mirror/releases)
+and installed in a local directory with the below commands.
+In a low bandwidth environment, wget is significantly slower than 
+downloading from the webpage with the browser.
 ```
+mkdir -p $HOME/slam_src
+cd $HOME/slam_src
+wget https://github.com/eigenteam/eigen-git-mirror/archive/3.3.4.zip
+unzip 3.3.4.zip
+mv eigen-git-mirror-3.3.4 eigen-3.3.4
+cd $HOME/slam_src/eigen-3.3.4
+mkdir build
+cd build
+cmake .. -DCMAKE_INSTALL_PREFIX="$HOME/slam_devel"
+make install
+```
+### 2. Why is CMAKE_PREFIX_PATH passed as a build argument?
+After opening and building the project with QtCreator (see Section Debug the Project with QtCreator),
+the following warning and associated errors may come up when the project is built again by catkin in a terminal.
 
+"WARNING: Your workspace is configured to explicitly extend a workspace which
+yields a CMAKE_PREFIX_PATH which is different from the cached CMAKE_PREFIX_PATH
+used last time this workspace was built."
+
+To suppress these errors, CMAKE_PREFIX_PATH needs to be specified.
+
+TODO(jhuai): the progress percentage in building msckf jumps back and forth with catkin build.
+This effect is not observed with OKVIS_ROS.
+An comparison of the CMakeLists.txt between msckf and okvis_ros does not reveal suspicious differences.
+
+### 3. CATKIN_ENABLE_TESTING
+BUILD_TESTS=ON tells the program to build tests which depends on gmock and gtest. 
+If the program is built outside a catkin environment, then we will automatically download and build gmock and gtest.
+Otherwise, if the program is built by catkin, the ros stack provides gmock and gtest. 
+Additional build of gmock and gtest will cause the error 
+"add_library cannot create imported target "gmock" because another target with the same name already exists."
+To tell if we are in catkin, CATKIN_ENABLE_TESTING=ON can be used. 
+But since this the default value in catkin, we do not need to specify it.
+
+### 4. DO_TIMING
+Add this cmake flag to enable timing statistics.
+
+### 5. Error "ceres-solver/include/ceres/jet.h:887:8: error: ‘ScalarBinaryOpTraits’ is not a class template".
+This error arises when the system wide Eigen, e.g., on Ubuntu 16, is incompatible with ceres solver 14.0 
+which requires Eigen version >= 3.3.
+You need to pass EIGEN_INCLUDE_DIR and EIGEN3_INCLUDE_DIR to this package and also eschew PCL 
+which depends on system wide Eigen.
+In the end, the workspace should be clear of traces of system wide Eigen. That is, 
+no /usr/include/eigen3 should appear when searching in the workspace.
+
+## Build and run tests
+* To build all tests
+```
+catkin build msckf --catkin-make-args run_tests # or
+catkin build --make-args tests -- msckf
+```
 * To run all tests,
 ```
-# catkin_make run_tests # or
+catkin build msckf --catkin-make-args run_tests # or
 rosrun msckf msckf_test
 ```
 
@@ -122,33 +204,51 @@ rosrun msckf msckf_test
 rosrun msckf msckf_test --gtest_filter="*Eigen*"
 ```
 
+* To test RPGO,
+```
+cd msckf_ws/build/msckf/Kimera-RPGO
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$HOME/Documents/slam_devel/lib
+make check
+```
+
+* To run integration tests,
+You will need to download [rpg_trajectory_evaluation](https://github.com/uzh-rpg/rpg_trajectory_evaluation.git) which is the evaluation engine.
+And install its dependencies,
+```
+pip2 install --upgrade pyyaml
+pip2 install numpy matplotlib colorama ruamel.yaml
+```
+Because python scripts under evaluation/ directory also deaults to use python3, 
+you also need to install the python3 counterparts,
+```
+pip3 install numpy matplotlib colorama pyyaml ruamel.yaml
+```
+
+For tests, you will need to download the EuRoC dataset and optionally the UZH-FPV dataset.
+```
+msckf/evaluation/smoke_test.py tests the program with one data session from EuRoC dataset.
+msckf/evaluation/main_evaluation.py tests the program with multiple data session from EuRoC and UZH-FPV dataset.
+```
+
 ## Debug the project with QtCreator
 
 Follow the below steps exactly, otherwise mysterious errors like missing generate_config file arise.
 
-Even following the below instructions, the qtcreator still will create binaries and
-file structures different from that generated by running catkin_make.
+### 1. Build msckf with catkin
 
-### First, build msckf with catkin_make
-
-To prepare the workspace file structure, 
-clean build and devel dirs under the workspace, 
-then build the project with the below instructions.
+Build the project with instructions in Section Build the project. 
+You may need to clean build and devel dirs under the workspace with
 
 ```
-cd msckf_ws/devel
-rm -rf ./*
-cd ../build
-rm -rf ./*
-catkin_make -DUSE_ROS=ON --pkg vio_common msckf
+catkin clean -y
 ```
 
-### Second, build msckf with QtCreator
+### 2. Open msckf with QtCreator
 
-To begin with, open QtCreator, assuming msckf_ws is the workspace dir,
+Open QtCreator, assuming msckf_ws is the workspace dir,
 
 ```
-source msckf_ws/devel/setup.zsh
+source /opt/ros/melodic/setup.bash # or .zsh depending on the terminal shell
 /opt/Qt/Tools/QtCreator/bin/qtcreator
 ```
 
@@ -161,52 +261,57 @@ source /opt/ros/kinetic/setup.zsh
 /opt/Qt/Tools/QtCreator/bin/qtcreator
 ```
 
-Then, open msckf_ws/src/msckf/CMakeLists.txt in QtCreator. For the first time, configure the DEFAULT output path for the project in QtCreator as msckf_ws/build/msckf. 
-QtCreator may not find cmake files for libraries like roscpp, 
-set the path like /opt/ros/kinetic/share/roscpp/cmake. Doing similar changes for other not found ros libraries.
+Then, open msckf_ws/src/msckf/CMakeLists.txt in QtCreator. 
 
-To enable debug mode, in the Build option panel, set CMake Build Type to Debug.
+If a dialog warning "the CMakeCache.txt file or the project configuration has changed",
+comes up with two buttons, "Overwrite Changes in CMake" and 
+"Apply Changes to Project" with the former being the default one. 
+To avoid adding CMAKE_PREFIX_PATH in future builds with catkin in a terminal,
+the "Apply Changes to Project" option is recommended.
 
-To start debugging, add commandline arguments in the Run option panel, then press the Run icon.
+To enable building test targets inside QtCreator, you may need to turn on 
+"CATKIN_ENABLE_TESTING" in the CMake section of Building Settings and 
+select the *_test target in a newly added Build Step from the Build Steps section.
+The default target "all" may not emcompass building some test targets.
 
 ## Example running cases
 
 ### Parameter description
+The parameters are divided into two groups, those that depend on operating system and file system, 
+and those that are intrinsic to the program.
+Parameters belonging to the first group are typically passed through command line gflags.
+Parameters of the second group are typically configured through yaml.
 
-Parameters through command line
+**List of parameters through command line**
 |  Command line arguments | Description | Default |
 |---|---|---|
-|  estimator_algorithm | 0 OKVIS, 1 MSCKF, 2 triangulation-free (TF) VIO | 1 |
 |  load_input_option |  0 subscribe to rostopics, 1 load video and IMU csv |  1 |
-| dump_output_option | 0 publish to rostopics, 1 save nav states to csv, 3 save nav states and calibration parameters to csv. 0 and others do not work simultaneously | 3 |
-| use_AIDP | true, anchored inverse depth parameterization; false, Euclidean. AIDP is preferred. | true |
-| feature_tracking_method | 0 BRISK brute force in OKVIS with 3d2d RANSAC, 1 KLT. KLT is very experimental. | 0 |
+| dump_output_option | 0 only publish to rostopics, 1 also save nav states to csv, 2, also save nav states and extrinsic parameters, 3 also save nav states and all calibration parameters to csv. | 3 |
 | use_IEKF | true iterated EKF, false EKF. For filters only | false |
 | max_inc_tol | the maximum infinity norm of the filter correction. 10.0 for outdoors, 2.0 for indoors, though its value should be insensitive | 2.0 |
 | head_tail | Use the fixed head and receding tail observations or the entire feature track to compose two-view constraints in TF_VIO | false |
-| pixel_noise_scale_factor | Scale up the image observation noise std for TF_VIO. 3 is recommended for the two-view constraint scheme based on an entire feature track, 5 is recommended for the two-view head_tail constraint scheme | 3 |
+| image_noise_cov_multiplier | Scale up the image observation noise cov for TF_VIO. 9 is recommended for the two-view constraint scheme based on an entire feature track, 25 is recommended for the two-view head_tail constraint scheme | 9 |
 
-Parameters through config yaml
-
+**Parameters through config yaml**
 Remark: set sigma_{param} to zero to disable estimating "param" in filtering methods.
 
 | Configuration parameters | Description | Default |
 |---|---|---|
-| extrinsic_opt_mode | For MSCKF and TF_VIO. "P_CS", estimate camera extrinsic translation, used with IMU TgTsTa 27 dim model [2]; "P_SC_R_SC", estimate camera extrinsics, used with say IMU BgBa model; "", fixed camera extrinsics | "" |
+| extrinsic_opt_mode | For MSCKF and TF_VIO. "P_CB", estimate camera extrinsic translation, used with IMU TgTsTa 27 dim model [2]; "P_BC_R_BC", estimate camera extrinsics, used with say IMU BgBa model; "", fixed camera extrinsics | "" |
 | projection_opt_mode | For MSCKF and TF_VIO. "FXY_CXY", estimate fx fy cx cy; "FX_CXY", estimate fx=fy, cx, cy; "FX", estimate fx=fy; "", camera projection intrinsic parameters are fixed | "" |
 | down_scale | divide up the configured image width, image height, fx, fy, cx, cy by this divisor | 1 |
 | distortion_type | "radialtangential", "equidistant", "radialtangential8", "fov" | REQUIRED |
 | camera_rate | For processing data loaded from a video and an IMU csv, it determines the play speed. For debug mode, half of the normal camera rate is recommended, e.g., 15 Hz | 30 for Release, 15 for Debug |
 | image_readout_time | time to read out an entire frame, i.e., the rolling shutter skew. 0 for global shutter, ~0.030 for rolling shutter | 0 |
 | sigma_absolute_translation | The standard deviation [m] of the camera extrinsics translation. With OKVIS, e.g. 1.0e-10 for online-calib; With MSCKF or TF_VIO, 5e-2 for online extrinsic translation calib, 0 to fix the translation. |  0 |
-| sigma_absolute_orientation | The standard deviation [rad] of the camera extrinsics orientation. With OKVIS, e.g. 1.0e-3 for online-calib; With MSCKF or TF_VIO and extrinsic_opt_mode is "P_SC_R_SC", 5e-2 for online extrinsic orientation calib, 0 to fix the extrinsic orientation | 0 |
+| sigma_absolute_orientation | The standard deviation [rad] of the camera extrinsics orientation. With OKVIS, e.g. 1.0e-3 for online-calib; With MSCKF or TF_VIO and extrinsic_opt_mode is "P_BC_R_BC", 5e-2 for online extrinsic orientation calib, 0 to fix the extrinsic orientation | 0 |
 | sigma_c_relative_translation | For OKVIS only, the std. dev. [m] of the cam. extr. transl. change between frames, e.g. 1.0e-6 for adaptive online calib (not less for numerics) | 0 |
 | sigma_c_relative_orientation | For OKVIS only, the std. dev. [rad] of the cam. extr. orient. change between frames, e.g. 1.0e-6 for adaptive online calib (not less for numerics) | 0 |
 | timestamp_tolerance | stereo frame out-of-sync tolerance [s] | 0.2/camera_rate, e.g., 0.005 |
 | sigma_focal_length | For MSCKF and TF_VIO only, set to say 5.0 to estimate focal lengths, set to 0 to fix them | 0.0 |
 | sigma_principal_point | For MSCKF and TF_VIO only, set to say 5.0 to estimate cx, cy, set to 0 to fix them | 0.0 |
 | sigma_distortion | For MSCKF and TF_VIO only, set to nonzeros to estimate distortion parameters, set to 0s to fix them. Adapt to distortion types, e.g., [0.01, 0.003, 0.0, 0.0] for "radialtangential", e.g., [0.01] for "fov" | [0.0] * k |
-| imageDelay | Only used for loading data from a video and an IMU csv, image frame time in the video clock - imageDelay = frame time in the IMU clock | 0.0 |
+| imageDelay | Used e.g., when loading data from a video and an IMU csv, image frame time in the video clock - imageDelay = frame time in the IMU clock | 0.0 |
 | sigma_td | For MSCKF and TF_VIO only, set to say 5e-3 sec to estimate time delay between the camera and IMU, set to 0 to fix the delay as imageDelay | 0.0 |
 | sigma_tr | For MSCKF and TF_VIO only, set to say 5e-3 sec to estimate the rolling shutter readout time, set to 0 to fix the readout time as image_readout_time | 0.0 |
 | sigma_TGElement | For MSCKF and TF_VIO only, set to say 5e-3 to estimate the Tg matrix for gyros, set to 0 to fix the matrix as Identity | 0 |
@@ -214,15 +319,16 @@ Remark: set sigma_{param} to zero to disable estimating "param" in filtering met
 | sigma_TAElement | For MSCKF and TF_VIO only, set to say 5e-3 to estimate the Ta matrix for accelerometers, set to 0 to fix the matrix as Identity | 0 |
 | numKeyframes | For OKVIS, number of keyframes in optimisation window | 5 |
 | numImuFrames | For OKVIS, number of average frames in optimisation window, 3 recommended; For MSCKF and TF_VIO, numKeyframes + numImuFrames is the maximum allowed cloned states in the entire state vector, 30 recommended for their sum. | 2 |
+| featureTrackingMethod | 0 BRISK brute force in OKVIS with 3d2d RANSAC, 1 KLT back-to-back, 2 BRISK back-to-back | 0 |
 
 ### Process measurements from a video and an IMU csv
 ```
-msckf_ws/devel/lib/msckf/okvis_node $HOME/docker_documents/msckf_ws/src/msckf/config/config_parkinglot_jisun_s6.yaml 
+msckf_ws/devel/lib/msckf/okvis_node $HOME/Documents/docker/msckf_ws/src/msckf/config/config_parkinglot_jisun_s6.yaml
  --output_dir=/media/$USER/Seagate/temp/parkinglot/
  --video_file="/media/$USER/Seagate/data/spin-lab/west_campus_parking_lot/Jisun/20151111_120342.mp4" 
  --imu_file="/media/$USER/Seagate/data/spin-lab/west_campus_parking_lot/Jisun/mystream_11_11_12_3_13.csv" 
- --use_AIDP=true  --start_index=18800 --finish_index=28900 --max_inc_tol=10.0 
- --dump_output_option=0 --feature_tracking_method=0 --estimator_algorithm=1
+ --start_index=18800 --finish_index=28900 --max_inc_tol=10.0
+ --dump_output_option=0
 ```
 The running program will exit once the sequence finishes.
 
@@ -234,28 +340,46 @@ The running program will exit once the sequence finishes.
    You will find a corresponding calibration / estimator configuration in the 
    okvis/config folder.
 
-2. Run the node
+2. Process a rosbag.
 
 ```
-rosrun msckf okvis_node $HOME/docker_documents/msckf_ws/src/msckf/config/config_fpga_p2_euroc_dissertation.yaml 
- --dump_output_option=0 --load_input_option=0 --output_dir=$HOME/Desktop/temp 
- --use_AIDP=true --feature_tracking_method=0 --estimator_algorithm=1
+export MSCKF_WS=$HOME/Documents/docker/msckf_ws
+rosrun msckf okvis_node $MSCKF_WS/src/msckf/config/config_fpga_p2_euroc.yaml \
+ $MSCKF_WS/src/msckf/config/LcdParams.yaml \
+ --vocabulary_path=$MSCKF_WS/src/msckf/vocabulary/ORBvoc.yml \
+ --dump_output_option=0 --load_input_option=0 --output_dir=$HOME/Desktop/temp
 
-rosbag play --pause --start=5.0 --rate=1.0 /media/$USER/Seagate/data/euroc/MH_01_easy.bag /cam0/image_raw:=/camera0 /imu0:=/imu
+rosbag play --pause --start=5.0 --rate=1.0 /media/$USER/Seagate/$USER/data/euroc/MH_01_easy.bag /cam0/image_raw:=/camera0 /imu0:=/imu
 
-rosrun rviz rviz -d $HOME/docker_documents/msckf_ws/src/msckf/config/rviz.rviz
+rosrun rviz rviz -d $MSCKF_WS/src/msckf/config/rviz.rviz
 ```
 
 In this case, the program will exit once the Ctrl+C is entered in the terminal that runs the msckf_node.
 Note the program will not exit if Ctrl+C is entered in the terminal of roscore.
 
+3. Process the zip synchronously.
+
+```
+export MSCKF_WS=$HOME/Documents/docker/msckf_ws
+source $MSCKF_WS/devel/setup.bash
+rosrun msckf okvis_node_synchronous $MSCKF_WS/src/msckf/config/config_fpga_p2_euroc.yaml \
+ $MSCKF_WS/src/msckf/config/LcdParams.yaml \
+ --vocabulary_path=$MSCKF_WS/src/msckf/vocabulary/ORBvoc.yml \
+ --bagname=/media/$USER/Seagate/$USER/data/euroc/MH_01_easy.bag --skip_first_seconds=0 --max_inc_tol=30.0 \
+ --camera_topics="/cam0/image_raw,/cam1/image_raw" --imu_topic="/imu0" \
+ --dump_output_option=3 --output_dir=$HOME/Desktop/temp --publish_via_ros=true
+
+rosrun rviz rviz -d $MSCKF_WS/src/msckf/config/rviz.rviz
+```
+
+
 ### Process the TUM VI dataset
 
 ```
-$HOME/docker_documents/msckf_ws/src/msckf/config/config_tum_vi_50_20_msckf.yaml \
+$HOME/Documents/docker/msckf_ws/src/msckf/config/config_tum_vi_50_20_msckf.yaml \
  --output_dir=$HOME/Seagate/data/TUM-VI/postprocessed/ \
- --use_AIDP=true --max_inc_tol=10.0 --dump_output_option=0 \
- --feature_tracking_method=0 --estimator_algorithm=1 --load_input_option=0
+ --max_inc_tol=10.0 --dump_output_option=0 \
+ --load_input_option=0
 
 ```
 
@@ -334,14 +458,25 @@ To perform a calibration yourself, we recommend the following:
 * Code review: please create a pull request for all changes proposed. The pull 
   request will be reviewed by an admin before merging.
 
-* Static program analysis
-linter
+## Static program analysis with linter
+The below instructions installs linter which requres python2 following the
+guide at [here](https://github.com/ethz-asl/linter/tree/master).
+
 ```
+sudo pip2 install yapf requests pylint
+sudo apt install clang-format-6.0
+cd $SLAM_TOOL_PATH
 git clone https://github.com/JzHuai0108/linter.git
+cd linter
 git fetch origin
 git checkout -b feature/onespacecppcomment
+
+echo ". $(realpath setup_linter.sh)" >> ~/.bashrc
+bash
+
+cd msckf_ws/src/msckf
+init_linter_git_hooks
 ```
-Then follow the instructions in linter README.md to init linter git hooks for the msckf repo.
 
 ## Support
 

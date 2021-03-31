@@ -1,225 +1,87 @@
 
-#include <msckf/ImuOdometry.h>
-#include <okvis/ceres/ImuError.hpp>
-#include <okvis/timing/Timer.hpp>
-#include "vio/ImuErrorModel.h"
-#include "vio/Sample.h"
-
 #include <gtest/gtest.h>
 
-static void check_q_near(const Eigen::Quaterniond& q_WS0,
-                         const Eigen::Quaterniond& q_WS1, const double tol) {
-  ASSERT_TRUE(
-      std::fabs(q_WS0.w() - q_WS1.w()) < tol && std::fabs(q_WS0.x() - q_WS1.x()) < tol &&
-      std::fabs(q_WS0.y() - q_WS1.y()) < tol && std::fabs(q_WS0.z() - q_WS1.z()) < tol);
-}
+#include "gtsam/ImuFactorTestHelpers.h"
 
-static void check_sb_near(const Eigen::Matrix<double, 9, 1>& sb0,
-                          const Eigen::Matrix<double, 9, 1>& sb1,
-                          const double tol) {
-  EXPECT_LT(((sb1 - sb0).norm()), tol);
-}
+#include "msckf/imu/ImuErrorModel.h"
+#include <msckf/imu/ImuOdometry.h>
+#include <msckf/ImuOdometryLegacy.hpp>
 
-static void check_v_near(const Eigen::Matrix<double, 9, 1>& sb0,
-                         const Eigen::Matrix<double, 9, 1>& sb1,
-                         const double tol) {
-  EXPECT_LT(((sb1 - sb0).head<3>().norm()), tol);
-}
+#include <okvis/ceres/ImuError.hpp>
+#include <okvis/timing/Timer.hpp>
 
-static void check_p_near(const Eigen::Matrix<double, 3, 1>& p_WS_W0,
-                         const Eigen::Matrix<double, 3, 1>& p_WS_W1,
-                         const double tol) {
-  EXPECT_LT((p_WS_W1 - p_WS_W0).norm(), tol);
-}
+#include "vio/Sample.h"
+#include "vio/eigen_utils.h"
 
-struct CovPropConfig {
- private:
-  const double g;
-  const double sigma_g_c;
-  const double sigma_a_c;
-  const double sigma_gw_c;
-  const double sigma_aw_c;
-  const double dt;
+#include "sophus/se3.hpp"
 
-  Eigen::Vector3d p_WS_W0;
-  Eigen::Quaterniond q_WS0;
-  okvis::SpeedAndBiases sb0;
-  okvis::ImuMeasurementDeque imuMeasurements;
-  Eigen::Matrix<double, 27, 1> vTgTsTa;
-  okvis::ImuParameters imuParams;
+#include "CovPropConfig.hpp"
 
-  const bool bNominalTgTsTa;  // use nominal values for Tg Ts Ta, i.e.,
-                              // identity, zero, identity?
-                              // if false, add noise to them, therefore,
-  // set true if testing a method that does not support Tg Ts Ta model
- public:
-  CovPropConfig(bool nominalPose, bool nominalTgTsTa)
-      : g(9.81),
-        sigma_g_c(5e-2),
-        sigma_a_c(3e-2),
-        sigma_gw_c(7e-3),
-        sigma_aw_c(2e-3),
-        dt(0.1),
-        bNominalTgTsTa(nominalTgTsTa) {
-    imuParams.g_max = 7.8;
-    imuParams.a_max = 176;
-    imuParams.sigma_g_c = sigma_g_c;
-    imuParams.sigma_a_c = sigma_a_c;
-    imuParams.sigma_gw_c = sigma_gw_c;
-    imuParams.sigma_aw_c = sigma_aw_c;
-    imuParams.g = g;
-
-    if (nominalPose) {
-      p_WS_W0 = Eigen::Vector3d(0, 0, 0);
-      q_WS0 = Eigen::Quaterniond(1, 0, 0, 0);
-    } else {
-      p_WS_W0 = Eigen::Vector3d(vio::gauss_rand(0, 1), vio::gauss_rand(0, 1),
-                                vio::gauss_rand(0, 1));
-      q_WS0 = Eigen::Quaterniond(vio::gauss_rand(0, 1), vio::gauss_rand(0, 1),
-                                 vio::gauss_rand(0, 1), vio::gauss_rand(0, 1));
-      q_WS0.normalize();
-    }
-    sb0 << 0, 0, 0, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1;
-    for (int jack = 0; jack < 1000; ++jack) {
-      Eigen::Vector3d gyr = Eigen::Vector3d::Random();  // range from [-1, 1]
-      Eigen::Vector3d acc = Eigen::Vector3d::Random();
-      acc[2] = 10 + vio::gauss_rand(0.0, 0.1);
-      imuMeasurements.push_back(okvis::ImuMeasurement(
-          okvis::Time(jack * dt), okvis::ImuSensorReadings(gyr, acc)));
-    }
-    // if to test Leutenegger's propagation method, set vTgTsTa as nominal
-    // values
-    vTgTsTa = Eigen::Matrix<double, 27, 1>::Zero();
-    // otherwise, random initialization is OK
-    if (!bNominalTgTsTa)
-      vTgTsTa = 1e-2 * (Eigen::Matrix<double, 27, 1>::Random());
-
-    for (int jack = 0; jack < 3; ++jack) {
-      vTgTsTa[jack * 4] += 1;
-      vTgTsTa[jack * 4 + 18] += 1;
-    }
-  }
-
-  double get_g() const { return g; }
-  double get_sigma_g_c() const { return sigma_g_c; }
-  double get_sigma_a_c() const { return sigma_a_c; }
-  double get_sigma_gw_c() const { return sigma_gw_c; }
-  double get_sigma_aw_c() const { return sigma_aw_c; }
-  double get_dt() const { return dt; }
-  Eigen::Vector3d get_p_WS_W0() const { return p_WS_W0; }
-  Eigen::Quaterniond get_q_WS0() const { return q_WS0; }
-  okvis::SpeedAndBiases get_sb0() const { return sb0; }
-  okvis::ImuMeasurementDeque get_imu_measurements() const {
-    return imuMeasurements;
-  }
-  Eigen::Matrix<double, 27, 1> get_vTgTsTa() const { return vTgTsTa; }
-  okvis::ImuParameters get_imu_params() const { return imuParams; }
-  okvis::Time get_meas_begin_time() const {
-    return imuMeasurements.begin()->timeStamp;
-  }
-  okvis::Time get_meas_end_time() const {
-    return imuMeasurements.rbegin()->timeStamp;
-  }
-  size_t get_meas_size() const { return imuMeasurements.size(); }
-
-  Eigen::Matrix<double, 12, 1> get_q_n_aw_babw() const {
-    Eigen::Matrix<double, 12, 1> q_n_aw_babw;
-    q_n_aw_babw << pow(imuParams.sigma_a_c, 2), pow(imuParams.sigma_a_c, 2),
-        pow(imuParams.sigma_a_c, 2), pow(imuParams.sigma_g_c, 2),
-        pow(imuParams.sigma_g_c, 2), pow(imuParams.sigma_g_c, 2),
-        pow(imuParams.sigma_aw_c, 2), pow(imuParams.sigma_aw_c, 2),
-        pow(imuParams.sigma_aw_c, 2), pow(imuParams.sigma_gw_c, 2),
-        pow(imuParams.sigma_gw_c, 2), pow(imuParams.sigma_gw_c, 2);
-    return q_n_aw_babw;
-  }
-  std::vector<Eigen::Matrix<double, 7, 1>,
-              Eigen::aligned_allocator<Eigen::Matrix<double, 7, 1>>>
-  get_imu_measurement_vector() const {
-    std::vector<Eigen::Matrix<double, 7, 1>,
-                Eigen::aligned_allocator<Eigen::Matrix<double, 7, 1>>>
-        measurements;
-
-    Eigen::Matrix<double, 7, 1> meas;
-    for (auto iter = imuMeasurements.begin(); iter != imuMeasurements.end();
-         ++iter) {
-      meas << iter->timeStamp.toSec(), iter->measurement.gyroscopes,
-          iter->measurement.accelerometers;
-      measurements.push_back(meas);
-    }
-    return measurements;
-  }
-
-  void check_q_near(const Eigen::Quaterniond& q_WS1, const double tol) const {
-    ::check_q_near(q_WS0, q_WS1, tol);
-  }
-  void check_v_near(const Eigen::Matrix<double, 9, 1>& sb1,
-                    const double tol) const {
-    ::check_v_near(sb0, sb1, tol);
-  }
-
-  void check_p_near(const Eigen::Matrix<double, 3, 1>& p_WS_W1,
-                    const double tol) {
-    ::check_p_near(p_WS_W0, p_WS_W1, tol);
-  }
-};
-
-static void print_p_q_sb(const Eigen::Vector3d& p_WS_W,
-                         const Eigen::Quaterniond& q_WS,
-                         const Eigen::Matrix<double, 9, 1>& sb) {
-  std::cout << "p:" << p_WS_W.transpose() << std::endl;
-  std::cout << "q:" << q_WS.x() << " " << q_WS.y() << " " << q_WS.z() << " "
-            << q_WS.w() << std::endl;
-  std::cout << "v:" << sb.head<3>().transpose() << std::endl;
-  std::cout << "bg ba:" << sb.tail<6>().transpose() << std::endl;
-}
 
 // compare RungeKutta and Euler forward and backward integration
-TEST(IMUOdometry, BackwardIntegration) {
-  srand((unsigned int)time(0));
+class BackwardIntegrationTest : public ::testing::Test {
+public:
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
-  CovPropConfig cpc(true, false);
+  BackwardIntegrationTest() :
+      cpc(true, false),
+      p_WS_W(cpc.get_p_WS_W0()),
+      q_WS(cpc.get_q_WS0()),
+      sb(cpc.get_sb0()),
+      T_WB(cpc.get_p_WS_W0(), cpc.get_q_WS0()),
+      imuParams(cpc.get_imu_params()) {
+    std::cout << "States before forward integration:" << std::endl;
+    print_p_q_sb(p_WS_W, q_WS, sb);
+  }
 
-  Eigen::Vector3d p_WS_W = cpc.get_p_WS_W0();
-  Eigen::Quaterniond q_WS = cpc.get_q_WS0();
-  okvis::SpeedAndBiases sb = cpc.get_sb0();
-  okvis::kinematics::Transformation T_WB(cpc.get_p_WS_W0(), cpc.get_q_WS0());
+  void SetUp() override {};
 
-  std::cout << "States before forward-backward RK integration:" << std::endl;
-  print_p_q_sb(p_WS_W, q_WS, sb);
-  okvis::IMUOdometry::propagation_RungeKutta(
+  CovPropConfig cpc;
+  Eigen::Vector3d p_WS_W;
+  Eigen::Quaterniond q_WS;
+  okvis::SpeedAndBiases sb;
+  okvis::kinematics::Transformation T_WB;
+  okvis::ImuParameters imuParams;
+private:
+};
+
+TEST_F(BackwardIntegrationTest, BackwardRK) {
+  ImuErrorModel<double> iem(sb.tail<6>(), cpc.get_vTgTsTa());
+  okvis::ImuOdometry::propagation_RungeKutta(
       cpc.get_imu_measurements(), cpc.get_imu_params(), T_WB, sb,
-      cpc.get_vTgTsTa(), cpc.get_meas_begin_time(), cpc.get_meas_end_time());
-
-  okvis::IMUOdometry::propagationBackward_RungeKutta(
-      cpc.get_imu_measurements(), cpc.get_imu_params(), T_WB, sb,
-      cpc.get_vTgTsTa(), cpc.get_meas_end_time(), cpc.get_meas_begin_time());
+      iem, cpc.get_meas_begin_time(), cpc.get_meas_end_time());
+  okvis::ImuOdometry::propagationBackward_RungeKutta(
+      cpc.get_imu_measurements(), imuParams, T_WB, sb,
+      iem, cpc.get_meas_end_time(), cpc.get_meas_begin_time());
   p_WS_W = T_WB.r();
   q_WS = T_WB.q();
 
-  Eigen::Vector3d p_WS_W1 = p_WS_W;
-  Eigen::Quaterniond q_WS1 = q_WS;
-  okvis::SpeedAndBiases sb1 = sb;
+  Eigen::Vector3d p_WS_RoundTrip = p_WS_W;
+  Eigen::Quaterniond q_WS_RoundTrip = q_WS;
+  okvis::SpeedAndBiases speedAndBiasRoundTrip = sb;
   std::cout << "States after forward-backward RK integration:" << std::endl;
-  print_p_q_sb(p_WS_W, q_WS, sb);
+  print_p_q_sb(p_WS_RoundTrip, q_WS_RoundTrip, speedAndBiasRoundTrip);
 
+  // Runge Kutta return to the starting position ?
+  cpc.check_q_near(q_WS_RoundTrip, 1e-8);
+  cpc.check_v_near(speedAndBiasRoundTrip, 2e-2);
+  cpc.check_p_near(p_WS_RoundTrip, 1.5);
+}
+
+TEST_F(BackwardIntegrationTest, StepwiseBackwardRK) {
   // DETAILED INTEGRATION
-  p_WS_W = cpc.get_p_WS_W0();
-  q_WS = cpc.get_q_WS0();
-  sb = cpc.get_sb0();
-  std::cout << "States before forward RK integration:" << std::endl;
-  print_p_q_sb(p_WS_W, q_WS, sb);
-
   okvis::ImuMeasurementDeque imuMeasurements = cpc.get_imu_measurements();
   auto iterLast = imuMeasurements.begin();
   for (auto iter = imuMeasurements.begin(); iter != imuMeasurements.end();
        ++iter) {
     if (iter == imuMeasurements.begin()) continue;
+    ImuErrorModel<double> iem(sb.tail<6>(), cpc.get_vTgTsTa());
     okvis::ceres::ode::integrateOneStep_RungeKutta(
         iterLast->measurement.gyroscopes, iterLast->measurement.accelerometers,
         iter->measurement.gyroscopes, iter->measurement.accelerometers,
         cpc.get_g(), cpc.get_sigma_g_c(), cpc.get_sigma_a_c(),
         cpc.get_sigma_gw_c(), cpc.get_sigma_aw_c(), cpc.get_dt(), p_WS_W, q_WS,
-        sb, cpc.get_vTgTsTa());
+        sb, iem);
     iterLast = iter;
   }
 
@@ -231,31 +93,32 @@ TEST(IMUOdometry, BackwardIntegration) {
   for (auto iterR = imuMeasurements.rbegin(); iterR != imuMeasurements.rend();
        ++iterR) {
     if (iterR == imuMeasurements.rbegin()) continue;
+    ImuErrorModel<double> iem(sb.tail<6>(), cpc.get_vTgTsTa());
     okvis::ceres::ode::integrateOneStepBackward_RungeKutta(
         iterR->measurement.gyroscopes, iterR->measurement.accelerometers,
         iterRLast->measurement.gyroscopes,
         iterRLast->measurement.accelerometers, cpc.get_g(), cpc.get_sigma_g_c(),
         cpc.get_sigma_a_c(), cpc.get_sigma_gw_c(), cpc.get_sigma_aw_c(),
-        cpc.get_dt(), p_WS_W, q_WS, sb, cpc.get_vTgTsTa());
+        cpc.get_dt(), p_WS_W, q_WS, sb, iem);
     iterRLast = iterR;
   }
 
   std::cout << "States after backward RK integration:" << std::endl;
   print_p_q_sb(p_WS_W, q_WS, sb);
 
-  Eigen::Vector3d p_WS_W2 = p_WS_W;
-  Eigen::Quaterniond q_WS2 = q_WS;
-  okvis::SpeedAndBiases sb2 = sb;
+  Eigen::Vector3d p_WS_RoundTrip = p_WS_W;
+  Eigen::Quaterniond q_WS_RoundTrip = q_WS;
+  okvis::SpeedAndBiases speedAndBiasRoundTrip = sb;
 
-  // NUMERICAL_INTEGRATION EULER
-  std::cout << "States before forward Euler integration:" << std::endl;
-  print_p_q_sb(cpc.get_p_WS_W0(), cpc.get_q_WS0(), cpc.get_sb0());
+  cpc.check_q_near(q_WS_RoundTrip, 1e-8);
+  cpc.check_v_near(speedAndBiasRoundTrip, 2e-2);
+  cpc.check_p_near(p_WS_RoundTrip, 1.5);
+}
 
-  sb = cpc.get_sb0();
-  T_WB = okvis::kinematics::Transformation(cpc.get_p_WS_W0(), cpc.get_q_WS0());
+TEST_F(BackwardIntegrationTest, BackwardEuler) {
   Eigen::Vector3d tempV_WS = sb.head<3>();
-  IMUErrorModel<double> iem(sb.tail<6>(), cpc.get_vTgTsTa());
-  okvis::IMUOdometry::propagation(cpc.get_imu_measurements(), cpc.get_imu_params(),
+  ImuErrorModel<double> iem(sb.tail<6>(), cpc.get_vTgTsTa());
+  okvis::ImuOdometry::propagation(cpc.get_imu_measurements(), cpc.get_imu_params(),
                            T_WB, tempV_WS, iem, cpc.get_meas_begin_time(),
                            cpc.get_meas_end_time());
 
@@ -263,8 +126,8 @@ TEST(IMUOdometry, BackwardIntegration) {
   sb.head<3>() = tempV_WS;
   print_p_q_sb(T_WB.r(), T_WB.q(), sb);
 
-  okvis::IMUOdometry::propagationBackward(
-      cpc.get_imu_measurements(), cpc.get_imu_params(), T_WB, tempV_WS, iem,
+  okvis::ImuOdometry::propagationBackward(
+      cpc.get_imu_measurements(), imuParams, T_WB, tempV_WS, iem,
       cpc.get_meas_end_time(), cpc.get_meas_begin_time());
   p_WS_W = T_WB.r();
   q_WS = T_WB.q();
@@ -272,101 +135,122 @@ TEST(IMUOdometry, BackwardIntegration) {
   std::cout << "States after backward Euler integration:" << std::endl;
   print_p_q_sb(T_WB.r(), T_WB.q(), sb);
 
-  Eigen::Vector3d p_WS_W3 = p_WS_W;
-  Eigen::Quaterniond q_WS3 = q_WS;
-  okvis::SpeedAndBiases sb3 = sb;
-
-  // two methods results the same?
-  check_q_near(q_WS1, q_WS2, 1e-8);
-  check_p_near(p_WS_W1, p_WS_W2, 1e-8);
-  check_sb_near(sb1, sb2, 1e-8);
-
-  // Runge Kutta return to the starting position ?
-  cpc.check_q_near(q_WS1, 1e-8);
-  cpc.check_v_near(sb1, 2e-2);
-  cpc.check_p_near(p_WS_W1, 1.5);
+  Eigen::Vector3d p_WS_RoundTrip = p_WS_W;
+  Eigen::Quaterniond q_WS_RoundTrip = q_WS;
+  okvis::SpeedAndBiases speedAndBiasRoundTrip = sb;
 
   // Euler return to the starting position ?
-  cpc.check_q_near(q_WS3, 1e-6);
-  cpc.check_v_near(sb3, 0.1);
-  cpc.check_p_near(p_WS_W3, 5.0);
+  cpc.check_q_near(q_WS_RoundTrip, 1e-6);
+  cpc.check_v_near(speedAndBiasRoundTrip, 0.1);
+  cpc.check_p_near(p_WS_RoundTrip, 5.0);
 }
 
 void IMUOdometryTrapezoidRule(
-    const Eigen::Vector3d& p_WS_W0, const Eigen::Quaterniond& q_WS0,
-    const okvis::SpeedAndBiases& sb0,
-    const Eigen::Matrix<double, 27, 1>& vTgTsTa,
-    const okvis::ImuMeasurementDeque& imuMeasurements,
-    const okvis::ImuParameters& imuParams, Eigen::Vector3d* p_WS_W2,
-    Eigen::Quaterniond* q_WS2, okvis::SpeedAndBiases* sb2,
-    Eigen::Matrix<double, 42, 1>* sqrtDiagCov2,
-    Eigen::Matrix<double, 42, 1>* firstRow2,
-    bool bVarianceForShapeMatrices = false, bool bVerbose = false) {
+    const CovPropConfig& cpc,
+    Eigen::Vector3d* p_WS_W1,
+    Eigen::Quaterniond* q_WS1, okvis::SpeedAndBiases* sb1,
+    Eigen::MatrixXd* covariance,
+    Eigen::MatrixXd* jacobian,
+    bool zeroVarianceForImuExtraParams = true,
+    bool usePositionVelocityLin = true,
+    bool verbose = false) {
+  const Eigen::Vector3d p_WS_W0 = cpc.get_p_WS_W0();
+  const Eigen::Quaterniond q_WS0 = cpc.get_q_WS0();
+  const okvis::SpeedAndBiases sb0 = cpc.get_sb0();
+  const Eigen::Matrix<double, kImuAugmentedParamsDim, 1>& vTgTsTa = cpc.get_vTgTsTa();
+  const okvis::ImuMeasurementDeque& imuMeasurements = cpc.get_imu_measurements();
+  const okvis::ImuParameters& imuParams = cpc.get_imu_params();
+
   okvis::kinematics::Transformation T_WS(p_WS_W0, q_WS0);
   okvis::SpeedAndBiases sb = sb0;
   okvis::timing::Timer okvisTimer("okvis", false);
 
-  Eigen::Matrix<double, 42, 42> P2;
-  P2.setIdentity();
-  if (!bVarianceForShapeMatrices) P2.bottomRightCorner<27, 27>().setZero();
-  Eigen::Matrix<double, okvis::ceres::ode::OdoErrorStateDim,
-                okvis::ceres::ode::OdoErrorStateDim>
-      F_tot;
-  F_tot.setIdentity();
+  *covariance = Eigen::Matrix<double, kNavAndImuParamsDim, kNavAndImuParamsDim>::Identity();
+  if (zeroVarianceForImuExtraParams) {
+    covariance->bottomRightCorner<kImuAugmentedParamsDim, kImuAugmentedParamsDim>().setZero();
+  }
+  *jacobian = Eigen::Matrix<double, kNavAndImuParamsDim, kNavAndImuParamsDim>::Identity();
 
   int numUsedImuMeasurements = 0;
-  if (0) {  // this is the same as the first case in effect which uses
-            // integrateOneStep_RungeKutta
-    numUsedImuMeasurements = okvis::IMUOdometry::propagation_RungeKutta(
-        imuMeasurements, imuParams, T_WS, sb, vTgTsTa,
-        imuMeasurements.begin()->timeStamp, imuMeasurements.rbegin()->timeStamp,
-        &P2, &F_tot);
-  } else {
-    Eigen::Vector3d tempV_WS = sb.head<3>();
-    IMUErrorModel<double> tempIEM(sb.tail<6>(), vTgTsTa);
-    Eigen::Matrix<double, 6, 1> lP;
-    lP << T_WS.r(), tempV_WS;
-    numUsedImuMeasurements = okvis::IMUOdometry::propagation(
-        imuMeasurements, imuParams, T_WS, tempV_WS, tempIEM,
-        imuMeasurements.begin()->timeStamp, imuMeasurements.rbegin()->timeStamp,
-        &P2, &F_tot, &lP);
-    sb.head<3>() = tempV_WS;
-  }
 
+  Eigen::Vector3d v_WS = sb.head<3>();
+  ImuErrorModel<double> imuModel(sb.tail<6>(), vTgTsTa);
+  Eigen::Matrix<double, 6, 1> linearizationPoint;
+  linearizationPoint << T_WS.r(), v_WS;
+  numUsedImuMeasurements = okvis::ImuOdometry::propagation(
+      imuMeasurements, imuParams, T_WS, v_WS, imuModel,
+      imuMeasurements.begin()->timeStamp, imuMeasurements.rbegin()->timeStamp,
+      covariance, jacobian,
+      usePositionVelocityLin ? &linearizationPoint : nullptr);
+  sb.head<3>() = v_WS;
   double timeElapsed = okvisTimer.stop();
 
-  *p_WS_W2 = T_WS.r();
-  *q_WS2 = T_WS.q();
-  *sb2 = sb;
-  Eigen::Matrix<double, 42, 1> P2Diag = P2.diagonal();
-  *sqrtDiagCov2 = P2Diag.cwiseSqrt();
-  *firstRow2 = F_tot.row(0).transpose();
+  *p_WS_W1 = T_WS.r();
+  *q_WS1 = T_WS.q();
+  *sb1 = sb;
+  Eigen::Matrix<double, 42, 1> covDiagonal = covariance->diagonal();
+  Eigen::Matrix<double, 42, 1> sqrtCovDiagonal = covDiagonal.cwiseSqrt();
+  Eigen::Matrix<double, 42, 1> jacobianFirstRow = jacobian->row(0);
 
   std::cout
       << "time used by huai trapezoid rule forward propagtion with covariance "
       << timeElapsed << std::endl;
-  if (bVerbose) {
+  if (verbose) {
     std::cout << "numUsedMeas " << numUsedImuMeasurements << " totalMeas "
               << (int)imuMeasurements.size() << std::endl;
-    std::cout << "q_WS " << q_WS2->w() << " " << q_WS2->x() << " " << q_WS2->y()
-              << " " << q_WS2->z() << std::endl;
-    std::cout << "p_WS_W " << p_WS_W2->transpose() << std::endl;
-    std::cout << "speed and bias " << sb2->transpose() << std::endl;
+    std::cout << "q_WS " << q_WS1->w() << " " << q_WS1->x() << " " << q_WS1->y()
+              << " " << q_WS1->z() << std::endl;
+    std::cout << "p_WS_W " << p_WS_W1->transpose() << std::endl;
+    std::cout << "speed and bias " << sb1->transpose() << std::endl;
     std::cout << "cov diagonal sqrt " << std::endl;
-    std::cout << sqrtDiagCov2->transpose() << std::endl;
+    std::cout << sqrtCovDiagonal.transpose() << std::endl;
     std::cout << "Jacobian diagonal " << std::endl;
-    std::cout << vio::superdiagonal(F_tot).transpose() << std::endl;
+    std::cout << vio::superdiagonal(*jacobian).transpose() << std::endl;
     std::cout << "Jacobian first row " << std::endl;
-    std::cout << firstRow2->transpose() << std::endl;
+    std::cout << jacobianFirstRow.transpose() << std::endl;
   }
+}
+
+TEST(ImuOdometry, linearizationPointForPV) {
+  srand((unsigned int)time(0));
+  CovPropConfig cpc(false, true);
+  bool zeroVarForImuExtraParams = true;
+  bool verbose = false;
+
+  bool usePositionVelocityLin = false;
+  Eigen::Vector3d p_WS;
+  Eigen::Quaterniond q_WS;
+  okvis::SpeedAndBiases speedAndBias;
+
+  Eigen::MatrixXd cov;
+  Eigen::MatrixXd jacobian;
+  IMUOdometryTrapezoidRule(cpc, &p_WS, &q_WS, &speedAndBias, &cov, &jacobian,
+                           zeroVarForImuExtraParams, usePositionVelocityLin,
+                           verbose);
+
+  usePositionVelocityLin = true;
+  Eigen::Vector3d p_WS_lin;
+  Eigen::Quaterniond q_WS_lin;
+  okvis::SpeedAndBiases speedAndBiasLin;
+  Eigen::MatrixXd covLin;
+  Eigen::MatrixXd jacobianLin;
+  IMUOdometryTrapezoidRule(cpc, &p_WS_lin, &q_WS_lin, &speedAndBiasLin, &covLin,
+                           &jacobianLin, zeroVarForImuExtraParams,
+                           usePositionVelocityLin, verbose);
+
+  checkSelectiveRatio(p_WS, p_WS_lin, 1e-4, 1e-4, 1e-3);
+  check_q_near(q_WS, q_WS_lin, 1e-6);
+  checkSelectiveRatio(speedAndBias, speedAndBiasLin, 1e-4, 1e-4, 1e-3);
+  checkSelectiveRatio(cov, covLin, 1e-4, 1e-4, 1e-3);
+  checkSelectiveRatio(jacobian, jacobianLin, 1e-4, 1e-4, 1e-3);
 }
 
 /// test and compare the propagation for both states and covariance by both the
 /// classic RK4 and okvis's state transition method
-TEST(IMUOdometry, IMUCovariancePropagation) {
-  bool bVarianceForShapeMatrices =
-      false;             // use positive variance for elements in Tg Ts Ta?
-  bool bVerbose = true;  // print the covariance and jacobian results
+TEST(ImuOdometry, IMUCovariancePropagation) {
+  // use positive variance for elements in Tg Ts Ta?
+  bool zeroVarForImuExtraParams = true;
+  bool verbose = true;  // print the covariance and jacobian results
 
   srand((unsigned int)time(0));
   CovPropConfig cpc(false, true);
@@ -376,67 +260,67 @@ TEST(IMUOdometry, IMUCovariancePropagation) {
   Eigen::Quaterniond q_WS = cpc.get_q_WS0();
   okvis::SpeedAndBiases sb = cpc.get_sb0();
 
-  Eigen::Matrix<double, okvis::ceres::ode::OdoErrorStateDim,
-                okvis::ceres::ode::OdoErrorStateDim>
-      P1;
-  P1.setIdentity();
-  if (!bVarianceForShapeMatrices) P1.bottomRightCorner<27, 27>().setZero();
-  Eigen::Matrix<double, okvis::ceres::ode::OdoErrorStateDim,
-                okvis::ceres::ode::OdoErrorStateDim>
-      F_tot;
-  F_tot.setIdentity();
+  Eigen::MatrixXd covRK4 = Eigen::MatrixXd::Identity(kNavAndImuParamsDim, kNavAndImuParamsDim);
+  if (zeroVarForImuExtraParams) {
+    covRK4.bottomRightCorner<kImuAugmentedParamsDim, kImuAugmentedParamsDim>().setZero();
+  }
+  Eigen::MatrixXd jacobianRK4 = Eigen::MatrixXd::Identity(kNavAndImuParamsDim, kNavAndImuParamsDim);
 
   okvis::timing::Timer RK4Timer("RK4", false);
-  okvis::ImuMeasurementDeque imuMeasurements = cpc.get_imu_measurements();
+  const okvis::ImuMeasurementDeque& imuMeasurements = cpc.get_imu_measurements();
   auto iterLast = imuMeasurements.begin();
   for (auto iter = imuMeasurements.begin(); iter != imuMeasurements.end();
        ++iter) {
     if (iter == imuMeasurements.begin()) continue;
+    ImuErrorModel<double> iem(sb.tail<6>(), cpc.get_vTgTsTa());
     okvis::ceres::ode::integrateOneStep_RungeKutta(
         iterLast->measurement.gyroscopes, iterLast->measurement.accelerometers,
         iter->measurement.gyroscopes, iter->measurement.accelerometers,
         cpc.get_g(), cpc.get_sigma_g_c(), cpc.get_sigma_a_c(),
         cpc.get_sigma_gw_c(), cpc.get_sigma_aw_c(), cpc.get_dt(), p_WS_W, q_WS,
-        sb, cpc.get_vTgTsTa(), &P1, &F_tot);
+        sb, iem, &covRK4, &jacobianRK4);
     iterLast = iter;
   }
   double timeElapsed = RK4Timer.stop();
 
-  Eigen::Vector3d p_WS_W1 = p_WS_W;
-  Eigen::Quaterniond q_WS1 = q_WS;
-  okvis::SpeedAndBiases sb1 = sb;
-  Eigen::Matrix<double, 42, 1> P1Diag = P1.diagonal();
-  Eigen::Matrix<double, 42, 1> sqrtDiagCov1 = P1Diag.cwiseSqrt();
-  Eigen::Matrix<double, 42, 1> firstRow1 = F_tot.row(0).transpose();
+  Eigen::Vector3d p_WS_W_RK4 = p_WS_W;
+  Eigen::Quaterniond q_WS_RK4 = q_WS;
+  okvis::SpeedAndBiases speedAndBiasRK4 = sb;
+  Eigen::Matrix<double, 42, 1> covDiagonal = covRK4.diagonal();
+  Eigen::Matrix<double, 42, 1> sqrtCovDiagonalRK4 = covDiagonal.cwiseSqrt();
+  Eigen::Matrix<double, 42, 1> jacobianFirstRowRK4 = jacobianRK4.row(0).transpose();
   std::cout << "time used by RK4 forward propagtion with covariance "
             << timeElapsed << std::endl;
 
-  if (bVerbose) {
-    std::cout << "q_WS " << q_WS1.w() << " " << q_WS1.x() << " " << q_WS1.y()
-              << " " << q_WS1.z() << std::endl;
-    std::cout << "p_WS_W " << p_WS_W1.transpose() << std::endl;
-    std::cout << "speed and bias " << sb1.transpose() << std::endl;
+  if (verbose) {
+    std::cout << "q_WS " << q_WS_RK4.w() << " " << q_WS_RK4.x() << " " << q_WS_RK4.y()
+              << " " << q_WS_RK4.z() << std::endl;
+    std::cout << "p_WS_W " << p_WS_W_RK4.transpose() << std::endl;
+    std::cout << "speed and bias " << speedAndBiasRK4.transpose() << std::endl;
 
     std::cout << "cov(r_s^w, \\phi^w, v_s^w, b_g, b_a, T_g, T_s, T_a), its "
                  "diagonal sqrt "
               << std::endl;
-    std::cout << sqrtDiagCov1.transpose() << std::endl;
+    std::cout << sqrtCovDiagonalRK4.transpose() << std::endl;
     std::cout << "Jacobian superdiagonal " << std::endl;
-    std::cout << vio::superdiagonal(F_tot).transpose() << std::endl;
+    std::cout << vio::superdiagonal(jacobianRK4).transpose() << std::endl;
     std::cout << "Jacobian first row " << std::endl;
-    std::cout << firstRow1.transpose() << std::endl;
+    std::cout << jacobianFirstRowRK4.transpose() << std::endl;
   }
 
-  /// method 2 : huai implementation of trapezoid rules
-  Eigen::Vector3d p_WS_W2;
-  Eigen::Quaterniond q_WS2;
-  okvis::SpeedAndBiases sb2;
-  Eigen::Matrix<double, 42, 1> sqrtDiagCov2;
-  Eigen::Matrix<double, 42, 1> firstRow2;
-  IMUOdometryTrapezoidRule(
-      cpc.get_p_WS_W0(), cpc.get_q_WS0(), cpc.get_sb0(), cpc.get_vTgTsTa(),
-      cpc.get_imu_measurements(), cpc.get_imu_params(), &p_WS_W2, &q_WS2, &sb2,
-      &sqrtDiagCov2, &firstRow2, bVarianceForShapeMatrices, bVerbose);
+  /// method 2 : propagation by using trapezoid rules implemented with okvis error convention.
+  Eigen::Vector3d p_WS_Trapezoid;
+  Eigen::Quaterniond q_WS_Trapezoid;
+  okvis::SpeedAndBiases speedAndBiasTrapezoid;
+  bool usePositionVelocityLin = true;
+  Eigen::MatrixXd covTrapezoid;
+  Eigen::MatrixXd jacobianTrapezoid;
+  IMUOdometryTrapezoidRule(cpc, &p_WS_Trapezoid, &q_WS_Trapezoid,
+                           &speedAndBiasTrapezoid, &covTrapezoid,
+                           &jacobianTrapezoid, zeroVarForImuExtraParams,
+                           usePositionVelocityLin, verbose);
+  Eigen::Matrix<double, 42, 1> sqrtCovDiagonalTrapezoid = covTrapezoid.diagonal().cwiseSqrt();
+  Eigen::Matrix<double, 42, 1> jacobianFirstRowTrapezoid = jacobianTrapezoid.row(0);
 
   /// method 3 : okvis propagation leutenegger's implementation
   okvis::kinematics::Transformation T_WS =
@@ -444,89 +328,48 @@ TEST(IMUOdometry, IMUCovariancePropagation) {
   sb = cpc.get_sb0();
   okvis::timing::Timer leutenTimer("leutenegger", false);
 
-  Eigen::Matrix<double, 15, 15> leutenP;
-  leutenP.setIdentity();
-  Eigen::Matrix<double, 15, 15> leutenF;
-  leutenF.setIdentity();
+  Eigen::Matrix<double, 15, 15> covOkvis;
+  covOkvis.setIdentity();
+  Eigen::Matrix<double, 15, 15> jacobianOkvis;
+  jacobianOkvis.setIdentity();
 
   // The Leutenegger's ImuError propagation function starts propagation with an
   // zero covariance. The original implementation has some issue in covariance
   // propagation, its Jacobian is correct though.
   int numUsedImuMeasurements = okvis::ceres::ImuError::propagation(
       cpc.get_imu_measurements(), cpc.get_imu_params(), T_WS, sb,
-      cpc.get_meas_begin_time(), cpc.get_meas_end_time(), &leutenP, &leutenF);
+      cpc.get_meas_begin_time(), cpc.get_meas_end_time(), &covOkvis, &jacobianOkvis);
   timeElapsed = leutenTimer.stop();
 
-  Eigen::Vector3d leuten_p_WS_W = T_WS.r();
-  Eigen::Quaterniond leuten_q_WS = T_WS.q();
-  okvis::SpeedAndBiases leuten_sb = sb;
-  Eigen::Matrix<double, 15, 1> leuten_PDiag = leutenP.diagonal();
-  Eigen::Matrix<double, 15, 1> leuten_sqrtDiagCov = leuten_PDiag.cwiseSqrt();
-  Eigen::Matrix<double, 15, 1> leuten_firstRow = leutenF.row(0).transpose();
+  Eigen::Vector3d p_WS_Okvis = T_WS.r();
+  Eigen::Quaterniond q_WS_Okvis = T_WS.q();
+  okvis::SpeedAndBiases speedAndBiasOkvis = sb;
+  Eigen::Matrix<double, 15, 1> covDiagonalOkvis = covOkvis.diagonal();
+  Eigen::Matrix<double, 15, 1> sqrtCovDiagonalOkvis = covDiagonalOkvis.cwiseSqrt();
+  Eigen::Matrix<double, 15, 1> jacobianFirstRowOkvis = jacobianOkvis.row(0).transpose();
 
-  std::cout << "time used by leutenegger forward propagtion with covariance "
+  std::cout << "time used by OKVIS Leutenegger forward propagtion with covariance "
             << timeElapsed << std::endl;
-  if (bVerbose) {
+  if (verbose) {
     std::cout << "numUsedMeas " << numUsedImuMeasurements << " totalMeas "
               << (int)cpc.get_meas_size() << std::endl;
-    std::cout << "q_WS " << leuten_q_WS.w() << " " << leuten_q_WS.x() << " "
-              << leuten_q_WS.y() << " " << leuten_q_WS.z() << std::endl;
-    std::cout << "p_WS_W " << leuten_p_WS_W.transpose() << std::endl;
-    std::cout << "speed and bias " << leuten_sb.transpose() << std::endl;
+    std::cout << "q_WS " << q_WS_Okvis.w() << " " << q_WS_Okvis.x() << " "
+              << q_WS_Okvis.y() << " " << q_WS_Okvis.z() << std::endl;
+    std::cout << "p_WS_W " << p_WS_Okvis.transpose() << std::endl;
+    std::cout << "speed and bias " << speedAndBiasOkvis.transpose() << std::endl;
     std::cout << "starting with 0s, cov diagonal sqrt " << std::endl;
-    std::cout << leuten_sqrtDiagCov.transpose() << std::endl;
+    std::cout << sqrtCovDiagonalOkvis.transpose() << std::endl;
     std::cout << "Jacobian diagonal " << std::endl;
-    std::cout << vio::superdiagonal(leutenF).transpose() << std::endl;
+    std::cout << vio::superdiagonal(jacobianOkvis).transpose() << std::endl;
     std::cout << "Jacobian first row " << std::endl;
-    std::cout << leuten_firstRow.transpose() << std::endl;
+    std::cout << jacobianFirstRowOkvis.transpose() << std::endl;
   }
 
-  /// method 4 : okvis propagation leutenegger's implementation corrected by
-  /// huai
-  T_WS = okvis::kinematics::Transformation(cpc.get_p_WS_W0(), cpc.get_q_WS0());
-  sb = cpc.get_sb0();
-  okvis::timing::Timer leutenTimer2("leuteneggerCorrected", false);
-  Eigen::Matrix<double, 15, 15> leutenP2, leutenF2;
-  leutenP2.setIdentity();
-  leutenF2.setIdentity();
+  /// method 4: simple integration
+  Eigen::Matrix<double, 15, 15> covEuler;
+  covEuler.setIdentity();
 
-  numUsedImuMeasurements =
-      okvis::IMUOdometry::propagation_leutenegger_corrected(
-          cpc.get_imu_measurements(), cpc.get_imu_params(), T_WS, sb,
-          cpc.get_meas_begin_time(), cpc.get_meas_end_time(), &leutenP2,
-          &leutenF2);
-  timeElapsed = leutenTimer2.stop();
-
-  Eigen::Vector3d leuten_p_WS_W2 = T_WS.r();
-  Eigen::Quaterniond leuten_q_WS2 = T_WS.q();
-  okvis::SpeedAndBiases leuten_sb2 = sb;
-  Eigen::Matrix<double, 15, 1> leuten_PDiag2 = leutenP2.diagonal();
-  Eigen::Matrix<double, 15, 1> leuten_sqrtDiagCov2 = leuten_PDiag2.cwiseSqrt();
-  Eigen::Matrix<double, 15, 1> leuten_firstRow2 = leutenF2.row(0).transpose();
-
-  std::cout << "time used by leutenegger corrected forward propagtion with "
-               "covariance "
-            << timeElapsed << std::endl;
-  if (bVerbose) {
-    std::cout << "numUsedMeas " << numUsedImuMeasurements << " totalMeas "
-              << (int)cpc.get_meas_size() << std::endl;
-    std::cout << "q_WS " << leuten_q_WS2.w() << " " << leuten_q_WS2.x() << " "
-              << leuten_q_WS2.y() << " " << leuten_q_WS2.z() << std::endl;
-    std::cout << "p_WS_W " << leuten_p_WS_W2.transpose() << std::endl;
-    std::cout << "speed and bias " << leuten_sb2.transpose() << std::endl;
-    std::cout << "cov diagonal sqrt " << std::endl;
-    std::cout << leuten_sqrtDiagCov2.transpose() << std::endl;
-    std::cout << "Jacobian diagonal " << std::endl;
-    std::cout << vio::superdiagonal(leutenF2).transpose() << std::endl;
-    std::cout << "Jacobian first row " << std::endl;
-    std::cout << leuten_firstRow2.transpose() << std::endl;
-  }
-
-  /// method 5: simple integration
-  Eigen::Matrix<double, 15, 15> P3;
-  P3.setIdentity();
-
-  Sophus::SE3d T_s1_to_w(cpc.get_q_WS0(), cpc.get_p_WS_W0());
+  Sophus::SE3d T_WS0_se3(cpc.get_q_WS0(), cpc.get_p_WS_W0());
   sb = cpc.get_sb0();
   double time_pair[2] = {cpc.get_meas_begin_time().toSec(),
                          cpc.get_meas_end_time().toSec()};
@@ -536,115 +379,279 @@ TEST(IMUOdometry, IMUCovariancePropagation) {
 
   Eigen::Matrix<double, 6, 1> gwomegaw;
   gwomegaw.setZero();
-  Eigen::Vector3d g_W =
-      -cpc.get_g() * Eigen::Vector3d(0, 0, 6371009).normalized();
-  gwomegaw.head<3>() = g_W;
+  gwomegaw.head<3>() = Eigen::Vector3d(0, 0, -cpc.get_g());
 
   Eigen::Matrix<double, 12, 1> q_n_aw_babw = cpc.get_q_n_aw_babw();
 
-  Sophus::SE3d pred_T_s2_to_w;
-  Eigen::Matrix<double, 3, 1> pred_speed_2;
+  Sophus::SE3d T_WS1_se3;
+  Eigen::Matrix<double, 3, 1> v_WS1_Euler;
   okvis::timing::Timer simpleTimer("simple", false);
-  okvis::ceres::ode::predictStates(T_s1_to_w, sb, time_pair, measurements,
-                                   gwomegaw, q_n_aw_babw, &pred_T_s2_to_w,
-                                   &pred_speed_2, &P3, cpc.get_vTgTsTa());
+  okvis::ceres::ode::predictStates(T_WS0_se3, sb, time_pair, measurements,
+                                   gwomegaw, q_n_aw_babw, &T_WS1_se3,
+                                   &v_WS1_Euler, &covEuler, cpc.get_vTgTsTa());
   timeElapsed = simpleTimer.stop();
 
   std::cout << "time used by 1st order propagtion with covariance "
             << timeElapsed << std::endl;
 
-  Eigen::Vector3d p_WS_W3 = pred_T_s2_to_w.translation();
-  Eigen::Quaterniond q_WS3 = pred_T_s2_to_w.unit_quaternion();
-  okvis::SpeedAndBiases sb3 = sb;
-  sb3.head<3>() = pred_speed_2;
-  Eigen::Matrix<double, 15, 1> P3Diag = P3.diagonal();
-  Eigen::Matrix<double, 15, 1> sqrtDiagCov3 = P3Diag.cwiseSqrt();
-  Eigen::Matrix<double, 15, 1> tempSqrtDiagCov3 = sqrtDiagCov3;
-  tempSqrtDiagCov3.segment<3>(3) = sqrtDiagCov3.segment<3>(6);
-  tempSqrtDiagCov3.segment<3>(6) = sqrtDiagCov3.segment<3>(3);
-  tempSqrtDiagCov3.segment<3>(12) = sqrtDiagCov3.segment<3>(9);
-  tempSqrtDiagCov3.segment<3>(9) = sqrtDiagCov3.segment<3>(12);
-  sqrtDiagCov3 = tempSqrtDiagCov3;
-  if (bVerbose) {
-    std::cout << "q_WS " << q_WS3.w() << " " << q_WS3.x() << " " << q_WS3.y()
-              << " " << q_WS3.z() << std::endl;
-    std::cout << "p_WS_W " << p_WS_W3.transpose() << std::endl;
-    std::cout << "speed and bias " << sb3.transpose() << std::endl;
+  Eigen::Vector3d p_WS_Euler = T_WS1_se3.translation();
+  Eigen::Quaterniond q_WS_Euler = T_WS1_se3.unit_quaternion();
+  okvis::SpeedAndBiases speedAndBiasEuler = sb;
+  speedAndBiasEuler.head<3>() = v_WS1_Euler;
+  Eigen::Matrix<double, 15, 1> covDiagonalEuler = covEuler.diagonal();
+  Eigen::Matrix<double, 15, 1> sqrtCovDiagonalEuler = covDiagonalEuler.cwiseSqrt();
+  Eigen::Matrix<double, 15, 1> sqrtCovDiagonalPermutated = sqrtCovDiagonalEuler;
+  sqrtCovDiagonalPermutated.segment<3>(3) = sqrtCovDiagonalEuler.segment<3>(6);
+  sqrtCovDiagonalPermutated.segment<3>(6) = sqrtCovDiagonalEuler.segment<3>(3);
+  sqrtCovDiagonalPermutated.segment<3>(12) = sqrtCovDiagonalEuler.segment<3>(9);
+  sqrtCovDiagonalPermutated.segment<3>(9) = sqrtCovDiagonalEuler.segment<3>(12);
+  sqrtCovDiagonalEuler = sqrtCovDiagonalPermutated;
+  if (verbose) {
+    std::cout << "q_WS " << q_WS_Euler.w() << " " << q_WS_Euler.x() << " " << q_WS_Euler.y()
+              << " " << q_WS_Euler.z() << std::endl;
+    std::cout << "p_WS_W " << p_WS_Euler.transpose() << std::endl;
+    std::cout << "speed and bias " << speedAndBiasEuler.transpose() << std::endl;
     std::cout << "cov diagonal sqrt " << std::endl;
-    std::cout << sqrtDiagCov3.transpose() << std::endl;
+    std::cout << sqrtCovDiagonalEuler.transpose() << std::endl;
   }
-  // 1,2 states
-  EXPECT_TRUE(std::fabs(q_WS2.w() - q_WS1.w()) < 1e-5 &&
-              std::fabs(q_WS2.x() - q_WS1.x()) < 1e-5 &&
-              std::fabs(q_WS2.y() - q_WS1.y()) < 1e-5 &&
-              std::fabs(q_WS2.z() - q_WS1.z()) < 1e-5);
-  EXPECT_LT((p_WS_W1 - p_WS_W2).norm(), 50);
-  EXPECT_LT((sb1 - sb2).norm(), 2);
-  // 1,5 states
-  EXPECT_TRUE(std::fabs(q_WS3.w() - q_WS1.w()) < 5e-2 &&
-              std::fabs(q_WS3.x() - q_WS1.x()) < 5e-2 &&
-              std::fabs(q_WS3.y() - q_WS1.y()) < 5e-2 &&
-              std::fabs(q_WS3.z() - q_WS1.z()) < 5e-2);
-  EXPECT_LT((p_WS_W1 - p_WS_W3).norm(), 2000);
-  EXPECT_LT((sb1 - sb3).norm(), 50);
 
-  // 1,2 covariance
-  EXPECT_LT((sqrtDiagCov2.head<3>() - sqrtDiagCov1.head<3>()).norm(), 300);
-  EXPECT_LT((sqrtDiagCov2.segment<3>(3) - sqrtDiagCov1.segment<3>(3)).norm(),
+  // RK4 vs Trapezoid state
+  EXPECT_TRUE(std::fabs(q_WS_Trapezoid.w() - q_WS_RK4.w()) < 1e-5 &&
+              std::fabs(q_WS_Trapezoid.x() - q_WS_RK4.x()) < 1e-5 &&
+              std::fabs(q_WS_Trapezoid.y() - q_WS_RK4.y()) < 1e-5 &&
+              std::fabs(q_WS_Trapezoid.z() - q_WS_RK4.z()) < 1e-5);
+  EXPECT_LT((p_WS_W_RK4 - p_WS_Trapezoid).norm(), 50);
+  EXPECT_LT((speedAndBiasRK4 - speedAndBiasTrapezoid).norm(), 2);
+
+  // RK4 vs Euler state
+  EXPECT_TRUE(std::fabs(q_WS_Euler.w() - q_WS_RK4.w()) < 5e-2 &&
+              std::fabs(q_WS_Euler.x() - q_WS_RK4.x()) < 5e-2 &&
+              std::fabs(q_WS_Euler.y() - q_WS_RK4.y()) < 5e-2 &&
+              std::fabs(q_WS_Euler.z() - q_WS_RK4.z()) < 5e-2);
+  EXPECT_LT((p_WS_W_RK4 - p_WS_Euler).norm(), 2000);
+  EXPECT_LT((speedAndBiasRK4 - speedAndBiasEuler).norm(), 50);
+
+  // RK4 vs Trapezoid covariance
+  EXPECT_LT((sqrtCovDiagonalTrapezoid.head<3>() - sqrtCovDiagonalRK4.head<3>()).norm(), 300);
+  EXPECT_LT((sqrtCovDiagonalTrapezoid.segment<3>(3) - sqrtCovDiagonalRK4.segment<3>(3)).norm(),
             2e-2);
-  EXPECT_LT((sqrtDiagCov2.segment<3>(6) - sqrtDiagCov1.segment<3>(6)).norm(),
+  EXPECT_LT((sqrtCovDiagonalTrapezoid.segment<3>(6) - sqrtCovDiagonalRK4.segment<3>(6)).norm(),
             10);
 
-  EXPECT_LT((sqrtDiagCov2.segment<3>(9) - sqrtDiagCov1.segment<3>(9)).norm(),
+  EXPECT_LT((sqrtCovDiagonalTrapezoid.segment<3>(9) - sqrtCovDiagonalRK4.segment<3>(9)).norm(),
             1e-6);
-  EXPECT_LT((sqrtDiagCov2.segment<3>(12) - sqrtDiagCov1.segment<3>(12)).norm(),
-            1e-6);
-
-  EXPECT_LT((sqrtDiagCov2.segment<9>(15) - sqrtDiagCov1.segment<9>(15)).norm(),
-            1e-6);
-  EXPECT_LT((sqrtDiagCov2.segment<9>(24) - sqrtDiagCov1.segment<9>(24)).norm(),
-            1e-6);
-  EXPECT_LT((sqrtDiagCov2.segment<9>(33) - sqrtDiagCov1.segment<9>(33)).norm(),
+  EXPECT_LT((sqrtCovDiagonalTrapezoid.segment<3>(12) - sqrtCovDiagonalRK4.segment<3>(12)).norm(),
             1e-6);
 
-  // 1,2 jacobian
-  EXPECT_LT((firstRow1.head<3>() - firstRow2.head<3>()).norm() /
-                firstRow1.head<3>().norm(),
+  EXPECT_LT((sqrtCovDiagonalTrapezoid.segment<9>(15) - sqrtCovDiagonalRK4.segment<9>(15)).norm(),
+            1e-6);
+  EXPECT_LT((sqrtCovDiagonalTrapezoid.segment<9>(24) - sqrtCovDiagonalRK4.segment<9>(24)).norm(),
+            1e-6);
+  EXPECT_LT((sqrtCovDiagonalTrapezoid.segment<9>(33) - sqrtCovDiagonalRK4.segment<9>(33)).norm(),
+            1e-6);
+
+  // RK4 vs Trapezoid jacobian
+  EXPECT_LT((jacobianFirstRowRK4.head<3>() - jacobianFirstRowTrapezoid.head<3>()).norm() /
+                jacobianFirstRowRK4.head<3>().norm(),
             1e-3);
-  EXPECT_LT((firstRow1.segment<6>(3) - firstRow2.segment<6>(3)).norm() /
-                firstRow1.segment<6>(3).norm(),
+  EXPECT_LT((jacobianFirstRowRK4.segment<6>(3) - jacobianFirstRowTrapezoid.segment<6>(3)).norm() /
+                jacobianFirstRowRK4.segment<6>(3).norm(),
             1e-3);
-  EXPECT_LT((firstRow1.segment<6>(9) - firstRow2.segment<6>(9)).norm() /
-                firstRow1.segment<6>(9).norm(),
+  EXPECT_LT((jacobianFirstRowRK4.segment<6>(9) - jacobianFirstRowTrapezoid.segment<6>(9)).norm() /
+                jacobianFirstRowRK4.segment<6>(9).norm(),
             1e-3);
-  EXPECT_LT((firstRow1.segment<9>(15) - firstRow2.segment<9>(15)).norm() /
-                firstRow1.segment<9>(15).norm(),
+  EXPECT_LT((jacobianFirstRowRK4.segment<9>(15) - jacobianFirstRowTrapezoid.segment<9>(15)).norm() /
+                jacobianFirstRowRK4.segment<9>(15).norm(),
             5e-3);
-  EXPECT_LT((firstRow1.segment<9>(24) - firstRow2.segment<9>(24)).norm() /
-                firstRow1.segment<9>(24).norm(),
+  EXPECT_LT((jacobianFirstRowRK4.segment<9>(24) - jacobianFirstRowTrapezoid.segment<9>(24)).norm() /
+                jacobianFirstRowRK4.segment<9>(24).norm(),
             1e-3);
-  EXPECT_LT((firstRow1.segment<9>(33) - firstRow2.segment<9>(33)).norm() /
-                firstRow1.segment<9>(33).norm(),
+  EXPECT_LT((jacobianFirstRowRK4.segment<9>(33) - jacobianFirstRowTrapezoid.segment<9>(33)).norm() /
+                jacobianFirstRowRK4.segment<9>(33).norm(),
             1e-3);
 
-  // 1,5 covariance
-  EXPECT_LT((sqrtDiagCov3.head<3>() - sqrtDiagCov1.head<3>()).norm() /
-                sqrtDiagCov3.head<3>().norm(),
+  // RK4 vs Euler covariance
+  EXPECT_LT((sqrtCovDiagonalEuler.head<3>() - sqrtCovDiagonalRK4.head<3>()).norm() /
+                sqrtCovDiagonalEuler.head<3>().norm(),
             8e-2);
-  EXPECT_LT((sqrtDiagCov3.segment<3>(3) - sqrtDiagCov1.segment<3>(3)).norm() /
-                sqrtDiagCov3.segment<3>(3).norm(),
+  EXPECT_LT((sqrtCovDiagonalEuler.segment<3>(3) - sqrtCovDiagonalRK4.segment<3>(3)).norm() /
+                sqrtCovDiagonalEuler.segment<3>(3).norm(),
             5e-2);
-  EXPECT_LT((sqrtDiagCov3.segment<3>(6) - sqrtDiagCov1.segment<3>(6)).norm() /
-                sqrtDiagCov3.segment<3>(6).norm(),
+  EXPECT_LT((sqrtCovDiagonalEuler.segment<3>(6) - sqrtCovDiagonalRK4.segment<3>(6)).norm() /
+                sqrtCovDiagonalEuler.segment<3>(6).norm(),
             0.1);
 
-  EXPECT_LT((sqrtDiagCov3.segment<3>(9) - sqrtDiagCov1.segment<3>(9)).norm(),
+  EXPECT_LT((sqrtCovDiagonalEuler.segment<3>(9) - sqrtCovDiagonalRK4.segment<3>(9)).norm(),
             1e-6);
-  EXPECT_LT((sqrtDiagCov3.segment<3>(12) - sqrtDiagCov1.segment<3>(12)).norm(),
+  EXPECT_LT((sqrtCovDiagonalEuler.segment<3>(12) - sqrtCovDiagonalRK4.segment<3>(12)).norm(),
             1e-6);
 }
 
-TEST(IMUOdometry, InitPoseFromImu) {
+TEST(ImuFactor, dokvis_dri) {
+  okvis::kinematics::Transformation T_WB;
+  T_WB.setRandom();
+  Eigen::Vector3d v_WB;
+  v_WB.setRandom();
+  Eigen::Matrix<double, 15, 15> permutator = gtsam::dokvis_drightinvariant(T_WB, v_WB);
+  Eigen::Matrix<double, 15, 15> permutator_inv =
+      gtsam::drightinvariant_dokvis(T_WB, v_WB);
+  EXPECT_LT(((permutator * permutator_inv) -
+             Eigen::Matrix<double, 15, 15>::Identity())
+                .lpNorm<Eigen::Infinity>(),
+            1e-8);
+}
+
+TEST(ImuFactor, dokvis_dforster) {
+  okvis::kinematics::Transformation T_WB;
+  T_WB.setRandom();
+  Eigen::Matrix<double, 15, 15> permutator = gtsam::dokvis_dforster(T_WB.C());
+  Eigen::Matrix<double, 15, 15> permutator_inv =
+      gtsam::dforster_dokvis(T_WB.C());
+  EXPECT_LT(((permutator * permutator_inv) -
+             Eigen::Matrix<double, 15, 15>::Identity())
+                .lpNorm<Eigen::Infinity>(),
+            1e-8);
+}
+
+void propagateRiCovarianceFromZero(
+    std::shared_ptr<const Eigen::Vector3d> p_WS0_ptr,
+    std::shared_ptr<const Eigen::Vector3d> v_WS0_ptr, bool verbose) {
+  srand((unsigned int)time(0));
+  CovPropConfig cpc(false, true);
+  Eigen::Vector3d initialPosition = cpc.get_p_WS_W0();
+  if (p_WS0_ptr) {
+    initialPosition = *p_WS0_ptr;
+  }
+  Eigen::Vector3d initialVelocity = cpc.get_sb0().head<3>();
+  if (v_WS0_ptr) {
+    initialVelocity = *v_WS0_ptr;
+  }
+  if (verbose) {
+    std::cout << "Initial position " << initialPosition.transpose()
+              << " velocity " << initialVelocity.transpose() << "\n";
+  }
+  okvis::kinematics::Transformation T_WS =
+      okvis::kinematics::Transformation(initialPosition, cpc.get_q_WS0());
+  okvis::SpeedAndBiases sb = cpc.get_sb0();
+  sb.head<3>() = initialVelocity;
+  okvis::timing::Timer okvisTimer("OKVIS Corrected", false);
+  Eigen::Matrix<double, 15, 15> covOkvis, jacobianOkvis;
+  covOkvis.setZero();
+  jacobianOkvis.setIdentity();
+
+  int numUsedImuMeasurements =
+      okvis::ceres::ImuError::propagation(
+          cpc.get_imu_measurements(), cpc.get_imu_params(), T_WS, sb,
+          cpc.get_meas_begin_time(), cpc.get_meas_end_time(), &covOkvis,
+          &jacobianOkvis);
+  double timeElapsed = okvisTimer.stop();
+
+  Eigen::Vector3d p_WS_Okvis = T_WS.r();
+  Eigen::Quaterniond q_WS_Okvis = T_WS.q();
+  okvis::SpeedAndBiases speedAndBiasOkvis = sb;
+  Eigen::Matrix<double, 15, 1> covDiagonalOkvis = covOkvis.diagonal();
+  Eigen::Matrix<double, 15, 1> sqrtCovDiagonalOkvis = covDiagonalOkvis.cwiseSqrt();
+
+  if (verbose) {
+    std::cout
+        << "time used by OKVIS Leutenegger corrected forward propagtion with "
+           "0 initial covariance: "
+        << timeElapsed << "\n";
+    std::cout << "numUsedMeas " << numUsedImuMeasurements << " totalMeas "
+              << (int)cpc.get_meas_size() << std::endl;
+    std::cout << "q_WS " << q_WS_Okvis.w() << " " << q_WS_Okvis.x() << " "
+              << q_WS_Okvis.y() << " " << q_WS_Okvis.z() << std::endl;
+    std::cout << "p_WS_W " << p_WS_Okvis.transpose() << std::endl;
+    std::cout << "speed and bias " << speedAndBiasOkvis.transpose() << std::endl;
+    std::cout << "cov diagonal sqrt " << std::endl;
+    std::cout << sqrtCovDiagonalOkvis.transpose() << std::endl;
+    std::cout << "Jacobian super diagonal " << std::endl;
+    std::cout << vio::superdiagonal(jacobianOkvis).transpose() << std::endl;
+    std::cout << "cov\n" << covOkvis << "\njac\n" << jacobianOkvis << "\n";
+  }
+
+  // Right invariant error method.
+  Eigen::Matrix<double, 15, 15> covariance_ri = Eigen::Matrix<double, 15, 15>::Zero();
+  Eigen::Matrix<double, 15, 15> jacobian_ri;
+
+  okvis::kinematics::Transformation T_WS_ri(initialPosition, cpc.get_q_WS0());
+  Eigen::Matrix<double, 9, 1> speedAndBias_ri = cpc.get_sb0();
+  speedAndBias_ri.head<3>() = initialVelocity;
+  Eigen::Vector3d v_WS_ri = initialVelocity;
+  ImuErrorModel<double> iem(speedAndBias_ri.tail<6>());
+
+  okvis::timing::Timer riTimer("right invariant error", false);
+  numUsedImuMeasurements = okvis::ImuOdometry::propagationRightInvariantError(
+      cpc.get_imu_measurements(), cpc.get_imu_params(), T_WS_ri, v_WS_ri, iem,
+      cpc.get_meas_begin_time(), cpc.get_meas_end_time(), &covariance_ri,
+      &jacobian_ri);
+  double riElapsed = riTimer.stop();
+
+  speedAndBias_ri.head<3>() = v_WS_ri;
+
+  EXPECT_LT((p_WS_Okvis - T_WS_ri.r()).norm() / p_WS_Okvis.norm(), 5e-3);
+  check_q_near(q_WS_Okvis, T_WS_ri.q(), 1e-5);
+  EXPECT_LT((speedAndBiasOkvis - speedAndBias_ri).head<3>().norm() /
+                speedAndBiasOkvis.norm(),
+            1e-3);
+  EXPECT_LT((speedAndBiasOkvis - speedAndBias_ri).tail<6>().norm(), 1e-6);
+
+  Eigen::Matrix<double, 15, 15> permutator_j =
+      gtsam::dokvis_drightinvariant(T_WS_ri, v_WS_ri);
+
+  Eigen::Matrix<double, 15, 15> permutator_i_inv = gtsam::drightinvariant_dokvis(
+      okvis::kinematics::Transformation(initialPosition, cpc.get_q_WS0()),
+      initialVelocity);
+
+  jacobian_ri = permutator_j * jacobian_ri * permutator_i_inv;
+  covariance_ri = permutator_j * covariance_ri * permutator_j.transpose();
+
+  if (verbose) {
+    std::cout << "time used by right invariant error forward propagtion with "
+                 "0 initial covariance: "
+              << riElapsed << "\n";
+    std::cout << "cov diag sqrt\n"
+              << covariance_ri.diagonal().cwiseSqrt().transpose() << "\n";
+    std::cout << "Jacobian super diagonal\n"
+              << vio::superdiagonal(jacobian_ri).transpose() << "\n";
+    std::cout << "cov\n" << covariance_ri << "\njac\n" << jacobian_ri << "\n";
+  }
+
+  std::cout << "Check jacobians of okvis and right invariant error\n";
+  checkSelectiveRatio(jacobianOkvis.topLeftCorner<15, 9>(),
+                      jacobian_ri.topLeftCorner<15, 9>(), 0.09, 1e-3);
+  checkSelectiveRatio(jacobianOkvis.topRightCorner<15, 6>(),
+                      jacobian_ri.topRightCorner<15, 6>(), 0.1, 1e-3);
+
+  std::cout << "Check P, Q, V covariance of okvis and right invariant error\n";
+  checkSelectiveRatio(covOkvis.topLeftCorner<15, 9>(),
+                      covariance_ri.topLeftCorner<15, 9>(), 0.35, 3, 1);
+  std::cout << "Check Bg Ba covariance of okvis and right invariant error\n";
+  checkSelectiveRatio(covOkvis.topRightCorner<15, 6>(),
+                      covariance_ri.topRightCorner<15, 6>(), 2.5e-1, 10, 5);
+}
+
+TEST(ImuOdometry, RiCovariancePropagationFromZero) {
+  propagateRiCovarianceFromZero(nullptr, nullptr, true);
+}
+
+TEST(ImuOdometry, RiCovariancePropagationWithLargeP) {
+  // Propagation from a large position does not seem to worsen covariance or
+  // jacobian.
+  std::shared_ptr<const Eigen::Vector3d> positionPtr(
+      new Eigen::Vector3d(Eigen::Vector3d::Random() * 1000));
+  propagateRiCovarianceFromZero(positionPtr, nullptr, true);
+}
+
+TEST(ImuOdometry, RiCovariancePropagationWithLargeV) {
+  // Propagation from a large velocity does not seem to worsen covariance or
+  // jacobian.
+  std::shared_ptr<const Eigen::Vector3d> velocityPtr(
+      new Eigen::Vector3d(Eigen::Vector3d::Random() * 1000));
+  propagateRiCovarianceFromZero(nullptr, velocityPtr, true);
+}
+
+TEST(ImuOdometry, InitPoseFromImu) {
   using namespace okvis;
   Eigen::Vector3d acc_B(2, -1, 3);
   Eigen::Vector3d e_acc = acc_B.normalized();

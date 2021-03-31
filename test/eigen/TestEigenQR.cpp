@@ -183,6 +183,5 @@ TEST(Eigen, LDLT) {
       0.2750;
   Eigen::Vector3d b = Eigen::Vector3d::Random();
   Eigen::Vector3d error = A.ldlt().solve(b) - Ainv * b;
-  std::cout << "ldlt diff with true inv " << error.transpose() << std::endl;
   EXPECT_LT(error.lpNorm<Eigen::Infinity>(), 1e-8);
 }

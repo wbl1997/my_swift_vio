@@ -27,8 +27,9 @@ end
 startIndex = find(abs(startTime + avg_since_start*sec_to_nanos - msckf2_data(:,1)) ...
     < sticky_time_range, 1);
 if(isempty(startIndex))
-    disp(['unable to locate start index at time since start ', num2str(startTime)]);
-    return;
+    disp(['Unable to locate start index at time since start ', num2str(startTime)]);
+    disp('Start from the first entry instead.');
+    startIndex = 1;
 end
 
 estimate_average = mean(msckf2_data(startIndex:endIndex, :), 1);
@@ -44,24 +45,37 @@ fprintf(fileID, '+/- ');
 fprintf(fileID, '%.5f ', estimate_average(msckf_index_server.b_g_std) * 180/pi);
 fprintf(fileID, '\nb_a[m/s^2]:');
 fprintf(fileID, '%.4f ', estimate_average(msckf_index_server.b_a));
+
 fprintf(fileID, '+/- ');
 fprintf(fileID, '%.5f ', estimate_average(msckf_index_server.b_a_std));
 fprintf(fileID, '\np_{BC}[cm]:');
-fprintf(fileID, '%.3f ', estimate_average(msckf_index_server.p_BC)*100);
+fprintf(fileID, '%.3f ', estimate_average(msckf_index_server.p_BC(1:3))*100);
+if size(msckf_index_server.p_BC, 2) > 3
+fprintf(fileID, '%.3f ', estimate_average(msckf_index_server.p_BC(4:end)));
+end
+if ~isempty(msckf_index_server.p_BC_std)
 fprintf(fileID, '+/- ');
 fprintf(fileID, '%.4f ', estimate_average(msckf_index_server.p_BC_std)*100);
+end
+
 fprintf(fileID, '\nfx fy cx cy[px]:');
 fprintf(fileID, '%.3f ', estimate_average(msckf_index_server.fxy_cxy));
+if ~isempty(msckf_index_server.fxy_cxy_std)
 fprintf(fileID, '+/- ');
 fprintf(fileID, '%.4f ', estimate_average(msckf_index_server.fxy_cxy_std));
+end
 fprintf(fileID, '\nk1 k2[1]:');
 fprintf(fileID, '%.3f ', estimate_average(msckf_index_server.k1_k2));
+if ~isempty(msckf_index_server.k1_k2_std)
 fprintf(fileID, '+/- ');
 fprintf(fileID, '%.4f ', estimate_average(msckf_index_server.k1_k2_std));
+end
 fprintf(fileID, '\np1 p2[1]:');
 fprintf(fileID, '%.6f ', estimate_average(msckf_index_server.p1_p2));
+if ~isempty(msckf_index_server.p1_p2_std)
 fprintf(fileID, '+/- ');
 fprintf(fileID, '%.6f ', estimate_average(msckf_index_server.p1_p2_std));
+end
 fprintf(fileID, '\ntd[ms]:');
 fprintf(fileID, '%.3f ', estimate_average(msckf_index_server.td)*1e3);
 fprintf(fileID, '+/- ');

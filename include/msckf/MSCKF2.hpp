@@ -22,25 +22,14 @@
 #include <okvis/ceres/ReprojectionError.hpp>
 #include <okvis/ceres/SpeedAndBiasParameterBlock.hpp>
 
-#include <okvis/timing/Timer.hpp>
-#include "msckf/InitialPVandStd.hpp"
-#include "vio/CsvReader.h"
-#include <vio/ImuErrorModel.h>
-
 /// \brief okvis Main namespace of this package.
 namespace okvis {
 
-//! The estimator class
-/*!
- The estimator class. This does all the backend work.
- Frames:
- W: World
- B: Body
- C: Camera
- S: Sensor (IMU)
+/**
+ * @brief The MSCKF2 class implement the MSCKF with first estimate Jacobian technique.
+ * It does not include landmarks in the state vector but supports iterative EKF.
  */
 class MSCKF2 : public HybridFilter {
-  // landmarks are not in the EKF states in contrast to HybridFilter
  public:
   OKVIS_DEFINE_EXCEPTION(Exception, std::runtime_error)
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
@@ -48,104 +37,108 @@ class MSCKF2 : public HybridFilter {
   /**
    * @brief The default constructor.
    */
-  MSCKF2(const double readoutTime);
+  MSCKF2();
 
   /**
    * @brief Constructor if a ceres map is already available.
    * @param mapPtr Shared pointer to ceres map.
    */
-  MSCKF2(std::shared_ptr<okvis::ceres::Map> mapPtr,
-         const double readoutTime = 0.0);
+  MSCKF2(std::shared_ptr<okvis::ceres::Map> mapPtr);
 
   virtual ~MSCKF2();
 
-  /**
-   * @brief add a state to the state map
-   * @param multiFrame Matched multiFrame.
-   * @param imuMeasurements IMU measurements from last state to new one.
-   * imuMeasurements covers at least the current state and the last state in
-   * time, with an extension on both sides.
-   * @param asKeyframe Is this new frame a keyframe?
-   * @return True if successful.
-   * If it is the first state, initialize it and the covariance matrix. In
-   * initialization, please make sure the world frame has z axis in negative
-   * gravity direction which is assumed in the IMU propagation Only one IMU is
-   * supported for now
-   */
-  virtual bool addStates(okvis::MultiFramePtr multiFrame,
-                         const okvis::ImuMeasurementDeque& imuMeasurements,
-                         bool asKeyframe) final;
+  void optimize(size_t numIter, size_t numThreads = 1,
+                bool verbose = false) final;
 
   /**
-   * @brief Applies the dropping/marginalization strategy according to the
-   * RSS'13/IJRR'14 paper. The new number of frames in the window will be
-   * numKeyframes+numImuFrames.
-   * @return True if successful.
+   * @brief measurementJacobianAIDPMono
+   * @obsolete legacy method to check measurementJacobian in monocular case
+   * with anchored inverse depth parameterization.
+   * @param ab1rho
+   * @param obs
+   * @param observationIndex
+   * @param pointDataPtr
+   * @param H_x
+   * @param J_pfi
+   * @param residual
+   * @return
    */
-  virtual bool applyMarginalizationStrategy(
-      size_t numKeyframes, size_t numImuFrames,
-      okvis::MapPointVector& removedLandmarks) final;
-
-  virtual void optimize(size_t numIter, size_t numThreads = 1,
-                        bool verbose = false) final;
-
-  bool measurementJacobianAIDP(
+  bool measurementJacobianAIDPMono(
       const Eigen::Vector4d& ab1rho,
-      const std::shared_ptr<okvis::cameras::CameraBase> tempCameraGeometry,
-      const Eigen::Vector2d& obs, uint64_t poseId, int camIdx,
-      uint64_t anchorId, const okvis::kinematics::Transformation& T_WBa,
+      const Eigen::Vector2d& obs, size_t observationIndex,
+      std::shared_ptr<const msckf::PointSharedData> pointDataPtr,
       Eigen::Matrix<double, 2, Eigen::Dynamic>* H_x,
       Eigen::Matrix<double, 2, 3>* J_pfi, Eigen::Vector2d* residual) const;
 
-  bool measurementJacobian(
+  /**
+   * @brief measurementJacobianHPPMono
+   * @obsolete legacy method to check measurementJacobian
+   * in monocular homogeneous parameterization case.
+   * @param v4Xhomog
+   * @param obs
+   * @param observationIndex
+   * @param pointData
+   * @param J_Xc
+   * @param J_XBj
+   * @param J_pfi
+   * @param residual
+   * @return
+   */
+  bool measurementJacobianHPPMono(
       const Eigen::Vector4d& v4Xhomog,
-      const std::shared_ptr<okvis::cameras::CameraBase> tempCameraGeometry,
-      const Eigen::Vector2d& obs, uint64_t poseId, int camIdx,
+      const Eigen::Vector2d& obs, int observationIndex,
+      std::shared_ptr<const msckf::PointSharedData> pointData,
       Eigen::Matrix<double, 2, Eigen::Dynamic>* J_Xc,
       Eigen::Matrix<double, 2, 9>* J_XBj, Eigen::Matrix<double, 2, 3>* J_pfi,
       Eigen::Vector2d* residual) const;
 
- private:
-  uint64_t getMinValidStateID() const;
-
   /**
-   * @brief compute the marginalized Jacobian for a feature i's
-   * track assume the number of observations of the map points is at least two
-   * @param hpbid homogeneous point parameter block id of the map point
-   * @param mp mappoint
-   * @param r_oi residuals
-   * @param H_oi Jacobians of feature observations w.r.t variables related to
-   * camera intrinsics, camera poses (13+9(m-1))
-   * @param R_oi covariance matrix of these observations
-   * r_oi H_oi and R_oi are values after marginalizing H_fi
-   * @param involved_frame_ids if not null, all the included frames must observe mp
-   * @return true if succeeded in computing the residual and Jacobians
+   * @brief Generic measurement Jacobian to handle different camera measurement
+   * factors, e.g., reprojection error, chordal distance, etc.
+   * @warning only supports one camera.
+   * @param pointLandmark
+   * @param tempCameraGeometry
+   * @param obs
+   * @param obsCovariance
+   * @param observationIndex
+   * @param pointDataPtr
+   * @param J_X
+   * @param J_pfi
+   * @param J_n
+   * @param residual
+   * @return
    */
-  bool featureJacobian(const MapPoint& mp,
-                  Eigen::MatrixXd& H_oi,
-                  Eigen::Matrix<double, Eigen::Dynamic, 1>& r_oi,
-                  Eigen::MatrixXd& R_oi,
-                  const std::vector<uint64_t>* involved_frame_ids=nullptr) const;
+  msckf::MeasurementJacobianStatus measurementJacobianGeneric(
+      const msckf::PointLandmark &pointLandmark,
+      std::shared_ptr<const okvis::cameras::CameraBase> tempCameraGeometry,
+      const Eigen::Vector2d &obs, const Eigen::Matrix2d &obsCovariance,
+      int observationIndex,
+      std::shared_ptr<const msckf::PointSharedData> pointDataPtr,
+      Eigen::MatrixXd *J_X, Eigen::Matrix<double, Eigen::Dynamic, 3> *J_pfi,
+      Eigen::Matrix<double, Eigen::Dynamic, 2> *J_n,
+      Eigen::VectorXd *residual) const;
+
+  bool
+  featureJacobian(const MapPoint &mp, msckf::PointLandmark *pointLandmark,
+                  Eigen::MatrixXd &H_oi,
+                  Eigen::Matrix<double, Eigen::Dynamic, 1> &r_oi,
+                  Eigen::MatrixXd &R_oi,
+                  Eigen::Matrix<double, Eigen::Dynamic, 3> *pH_fi = nullptr,
+                  std::vector<uint64_t> *involved_frame_ids = nullptr) const override;
+
+  bool featureJacobianGeneric(
+      const MapPoint &mp, msckf::PointLandmark *pointLandmark,
+      Eigen::MatrixXd &H_oi,
+      Eigen::Matrix<double, Eigen::Dynamic, 1> &r_oi, Eigen::MatrixXd &R_oi,
+      Eigen::Matrix<double, Eigen::Dynamic, 3> *pH_fi = nullptr,
+      std::vector<uint64_t> *involved_frame_ids = nullptr) const;
 
   int computeStackedJacobianAndResidual(
-      Eigen::MatrixXd* T_H, Eigen::Matrix<double, Eigen::Dynamic, 1>* r_q,
-      Eigen::MatrixXd* R_q) const;
+      Eigen::MatrixXd *T_H, Eigen::Matrix<double, Eigen::Dynamic, 1> *r_q,
+      Eigen::MatrixXd *R_q) final;
 
-  void findRedundantCamStates(
-      std::vector<uint64_t>* rm_cam_state_ids);
-
-  // param: max number of cloned frame vector states
-  // return number of marginalized frames
-  int marginalizeRedundantFrames(size_t maxClonedStates);
-
-
-  // minimum number of culled frames in each prune frame state
-  // step if cloned states size hit maxClonedStates_
-  // should be at least 3 for the monocular case so that
-  // the marginalized observations can contribute innovation to the states,
-  // see Sun 2017 Robust stereo appendix D
-  static const int minCulledFrames_ = 3;
 };
+
 
 }  // namespace okvis
 

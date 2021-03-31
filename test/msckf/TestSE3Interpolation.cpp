@@ -1,6 +1,7 @@
-#include "msckf/ImuSimulator.h"
+#include "msckf/InterpolateImuDataBSplines.h"
+#include <gtest/gtest.h>
 
-void testSE3Interpolation() {
+TEST(SE3Interpolation, CoarseInitialization) {
   // constant linear acceleration case
   const double aing = 1.5;
   const double tEnd = 5;
@@ -28,9 +29,8 @@ void testSE3Interpolation() {
   // check the results
   size_t removeEnds = (size_t)(interval * outputFreq);
   for (size_t jack = removeEnds; jack < samples.size() - removeEnds; ++jack) {
-    assert(std::fabs(samples[jack][1] - aing) < 1e-8);
-
-    assert(samples[jack].segment<5>(2).lpNorm<Eigen::Infinity>() < 1e-8);
+    EXPECT_LT(std::fabs(samples[jack][1] - aing), 1e-8);
+    EXPECT_LT(samples[jack].segment<5>(2).lpNorm<Eigen::Infinity>(), 1e-8);
   }
 
   // constant angular rate case
@@ -52,20 +52,19 @@ void testSE3Interpolation() {
   InterpolateIMUData(q02n, times, outputFreq, samplePoses, samples, gw);
 
   // check the results
-
   for (size_t jack = removeEnds; jack < samples.size() - removeEnds; ++jack) {
     double time = samples[jack][0];
     double theta = wing * time;
-    std::cout << samples[jack].transpose() << std::endl;
-    assert(std::fabs(samples[jack][1] + radius * wing * wing) < 1e-8);
-    assert(std::fabs(samples[jack][2]) < 1e-8);
-    assert(std::fabs(samples[jack][3] + gw[2]) < 1e-8);
+//    std::cout << samples[jack].transpose() << std::endl;
+    EXPECT_LT(std::fabs(samples[jack][1] + radius * wing * wing), 1e-8);
+    EXPECT_LT(std::fabs(samples[jack][2]), 1e-8);
+    EXPECT_LT(std::fabs(samples[jack][3] + gw[2]), 1e-8);
 
-    assert((samples[jack].segment<3>(4) - Eigen::Vector3d(0, 0, wing))
-               .lpNorm<Eigen::Infinity>() < 1e-8);
+    EXPECT_LT((samples[jack].segment<3>(4) - Eigen::Vector3d(0, 0, wing))
+               .lpNorm<Eigen::Infinity>(), 1e-8);
 
-    assert(std::fabs(samples[jack][7] + radius * sin(theta) * wing) < 1e-8);
-    assert(std::fabs(samples[jack][8] - radius * cos(theta) * wing) < 1e-8);
-    assert(std::fabs(samples[jack][9]) < 1e-8);
+    EXPECT_LT(std::fabs(samples[jack][7] + radius * sin(theta) * wing), 1e-8);
+    EXPECT_LT(std::fabs(samples[jack][8] - radius * cos(theta) * wing), 1e-8);
+    EXPECT_LT(std::fabs(samples[jack][9]), 1e-8);
   }
 }

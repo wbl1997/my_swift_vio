@@ -34,7 +34,6 @@
 #define MOCK_VIO_INTERFACE_HPP_
 
 #define GTEST_USE_OWN_TR1_TUPLE 0
-#include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
 #include <okvis/VioInterface.hpp>
@@ -44,18 +43,22 @@ namespace okvis {
 
 class MockVioInterface : public VioInterface {
  public:
-  MOCK_METHOD6(addImage, bool(const okvis::Time& stamp, size_t cameraIndex,
-                              const cv::Mat& image,
-                              const std::vector<cv::KeyPoint>* keypoints,
-                              int frameIdInSource, bool* asKeyframe));
-  MOCK_METHOD6(addKeypoints,
-               bool(const okvis::Time& stamp, size_t cameraIndex,
-                    const std::vector<cv::KeyPoint>& keypoints,
-                    const std::vector<uint64_t>& landmarkIds,
-                    const cv::Mat& descriptors, bool* asKeyframe));
-  MOCK_METHOD3(addImuMeasurement,
-               bool(const okvis::Time& stamp, const Eigen::Vector3d& alpha,
-                    const Eigen::Vector3d& omega));
+  bool addImage(const okvis::Time& /*stamp*/, size_t /*cameraIndex*/,
+                const cv::Mat& /*image*/,
+                const std::vector<cv::KeyPoint>* /*keypoints*/,
+                int /*frameIdInSource*/, bool* /*asKeyframe*/) {
+    return true;
+  }
+  bool addKeypoints(const okvis::Time& /*stamp*/, size_t /*cameraIndex*/,
+                    const std::vector<cv::KeyPoint>& /*keypoints*/,
+                    const std::vector<uint64_t>& /*landmarkIds*/,
+                    const cv::Mat& /*descriptors*/, bool* /*asKeyframe*/) {
+    return true;
+  }
+  bool addImuMeasurement(const okvis::Time& /*stamp*/, const Eigen::Vector3d& /*alpha*/,
+                         const Eigen::Vector3d& /*omega*/) {
+    return true;
+  }
 };
 
 }  // namespace okvis

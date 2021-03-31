@@ -75,7 +75,7 @@ imageDelay: 0.0  # in case you are using a custom setup, you will have to calibr
 displayImages: false  # displays debug video and keyframe matches. May be slow.
 
 # use direct driver
-useDriver: false 
+useDriver: true 
 
 # some options for how and what to publish -- optional in ROS-free version
 publishing_options:

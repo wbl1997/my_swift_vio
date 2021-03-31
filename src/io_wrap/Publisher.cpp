@@ -4,7 +4,7 @@
  *
  *  Redistribution and use in source and binary forms, with or without
  *  modification, are permitted provided that the following conditions are met:
- *
+ * 
  *   * Redistributions of source code must retain the above copyright notice,
  *     this list of conditions and the following disclaimer.
  *   * Redistributions in binary form must reproduce the above copyright notice,
@@ -55,20 +55,30 @@
 #include <okvis/FrameTypedefs.hpp>
 #include <msckf/CameraRig.hpp>
 #include <msckf/ExtrinsicModels.hpp>
-#include <msckf/ImuRig.hpp>
+#include <msckf/imu/ImuRig.hpp>
 #include <msckf/ProjParamOptModels.hpp>
 
-DEFINE_string(datafile_separator, ",",
-              "the separator used for a ASCII output file");
+DECLARE_string(datafile_separator);
 
 /// \brief okvis Main namespace of this package.
 namespace okvis {
 
 // Default constructor.
-Publisher::Publisher(const DUMP_RESULT_OPTION dro)
-    : nh_(nullptr), ctr2_(0), result_option_(dro) {}
+Publisher::Publisher()
+    : nh_(nullptr),
+      ctr2_(0), cameraPoseVisual_(0, 1, 0, 1)
+{
+  cameraPoseVisual_.setScale(1);
+  cameraPoseVisual_.setLineWidth(0.05);
+}
 
-Publisher::~Publisher() {
+Publisher::~Publisher() {}
+
+StreamPublisher::StreamPublisher() {
+
+}
+
+StreamPublisher::~StreamPublisher() {
   // close file
   if (csvLandmarksFile_) {
     // write down also the current landmarks
@@ -87,27 +97,33 @@ Publisher::~Publisher() {
     }
     csvLandmarksFile_->close();
   }
-  if (csvFile_) csvFile_->close();
+  if (csvFile_)
+    csvFile_->close();
 }
 
 // Constructor. Calls setNodeHandle().
-Publisher::Publisher(ros::NodeHandle &nh, const DUMP_RESULT_OPTION dro)
-    : Publisher(dro) {
+Publisher::Publisher(ros::NodeHandle& nh)
+    : Publisher()
+{
   setNodeHandle(nh);
 }
 
 // Set the node handle and advertise topics.
-void Publisher::setNodeHandle(ros::NodeHandle &nh) {
+void Publisher::setNodeHandle(ros::NodeHandle& nh)
+{
   nh_ = &nh;
 
   // advertise
-  //  pubPointsMatched_ = nh_->advertise<sensor_msgs::PointCloud2>(
-  //      "okvis_points_matched", 1);
-  //  pubPointsUnmatched_ = nh_->advertise<sensor_msgs::PointCloud2>(
-  //      "okvis_points_unmatched", 1);
-  //  pubPointsTransferred_ = nh_->advertise<sensor_msgs::PointCloud2>(
-  //      "okvis_points_transferred", 1);
-  // Configure Reference MapPoints
+#ifdef HAVE_PCL
+  pubPointsMatched_ = nh_->advertise<sensor_msgs::PointCloud2>(
+      "okvis_points_matched", 1);
+  pubPointsUnmatched_ = nh_->advertise<sensor_msgs::PointCloud2>(
+      "okvis_points_unmatched", 1);
+  pubPointsTransferred_ = nh_->advertise<sensor_msgs::PointCloud2>(
+      "okvis_points_transferred", 1);
+#else
+  // Alternatively, use Marker::Points instead of PointCloud2,
+  // but it appears visually worse than PointCloud2.
   float fPointSize = 0.01;
   pointsMatched_.header.frame_id = "world";
   pointsMatched_.ns = "okvis_points_matched";
@@ -148,71 +164,36 @@ void Publisher::setNodeHandle(ros::NodeHandle &nh) {
       nh_->advertise<visualization_msgs::Marker>("okvis_points_unmatched", 1);
   pubPointsTransferred_ =
       nh_->advertise<visualization_msgs::Marker>("okvis_points_transferred", 1);
+#endif
 
   pubObometry_ = nh_->advertise<nav_msgs::Odometry>("okvis_odometry", 1);
   pubPath_ = nh_->advertise<nav_msgs::Path>("okvis_path", 1);
-  pubTransform_ =
-      nh_->advertise<geometry_msgs::TransformStamped>("okvis_transform", 1);
+  pubTransform_ = nh_->advertise<geometry_msgs::TransformStamped>(
+      "okvis_transform", 1);
+  pubPoseStd_ = nh_->advertise<geometry_msgs::TwistStamped>(
+        "ksf_pose_std", 1);
+  pubMesh_ = nh_->advertise<visualization_msgs::Marker>( "okvis_mesh", 0 );
+  // where to get the mesh from
+  std::string mesh_file;
+  if (nh_->getParam("mesh_file", mesh_file)) {
+    meshMsg_.mesh_resource = "package://okvis_ros/meshes/"+mesh_file;
+  } else {
+    LOG(INFO) << "no mesh found for visualisation, set ros param mesh_file, if desired";
+    meshMsg_.mesh_resource = "";
+  }
+  pubCameraPoseVisual_ = nh_->advertise<visualization_msgs::MarkerArray>("camera_pose_visual", 1000);
 }
 
 // Write CSV header.
-bool Publisher::writeCsvDescription(const std::string& headerLine) {
+bool StreamPublisher::writeCsvDescription(const std::string& headerLine) {
   if (!csvFile_) return false;
   if (!csvFile_->good()) return false;
   *csvFile_ << headerLine << std::endl;
   return true;
 }
 
-void Publisher::composeHeaderLine(const std::string &imu_model,
-                                  const std::string &cam0_proj_opt_rep,
-                                  const std::string &cam0_extrinsic_opt_rep,
-                                  const std::string &cam0_distortion_rep,
-                                  std::string *header_line) {
-  std::stringstream stream;
-  stream << "%timestamp" << FLAGS_datafile_separator << "frameIdInSource"
-            << FLAGS_datafile_separator << "p_WS_W_x"
-            << FLAGS_datafile_separator << "p_WS_W_y"
-            << FLAGS_datafile_separator << "p_WS_W_z"
-            << FLAGS_datafile_separator << "q_WS_x" << FLAGS_datafile_separator
-            << "q_WS_y" << FLAGS_datafile_separator << "q_WS_z"
-            << FLAGS_datafile_separator << "q_WS_w" << FLAGS_datafile_separator
-            << "v_WS_W_x" << FLAGS_datafile_separator << "v_WS_W_y"
-            << FLAGS_datafile_separator << "v_WS_W_z";
-  std::string imu_param_format;
-  ImuModelToFormatString(ImuModelNameToId(imu_model), FLAGS_datafile_separator,
-                       &imu_param_format);
-  std::string cam_proj_intrinsic_format;
-  ProjectionOptToParamsInfo(ProjectionOptNameToId(cam0_proj_opt_rep),
-                            FLAGS_datafile_separator,
-                            &cam_proj_intrinsic_format);
-  std::string cam_extrinsic_format;
-  ExtrinsicModelToParamsInfo(ExtrinsicModelNameToId(cam0_extrinsic_opt_rep),
-                             FLAGS_datafile_separator, &cam_extrinsic_format);
-  std::string cam_distortion_format;
-  okvis::cameras::DistortionNameToParamsInfo(cam0_distortion_rep, FLAGS_datafile_separator,
-                                             &cam_distortion_format);
-
-  if (result_option_ == FULL_STATE_WITH_ALL_CALIBRATION) {
-    stream << FLAGS_datafile_separator << imu_param_format;
-    stream << FLAGS_datafile_separator << cam_extrinsic_format;
-    stream << FLAGS_datafile_separator << cam_proj_intrinsic_format;
-    stream << FLAGS_datafile_separator << cam_distortion_format;
-    stream << FLAGS_datafile_separator << "td[s]" << FLAGS_datafile_separator
-              << "tr[s]";
-  } else if (result_option_ == FULL_STATE_WITH_EXTRINSICS) {
-    stream << FLAGS_datafile_separator << imu_param_format;
-    stream << FLAGS_datafile_separator << cam_extrinsic_format;
-  } else {
-    std::string imu_param_format;
-    ImuModelToFormatString(ImuModelNameToId("BG_BA"), FLAGS_datafile_separator,
-                         &imu_param_format);
-    stream << FLAGS_datafile_separator << imu_param_format;
-  }
-  *header_line = stream.str();
-}
-
 // Write CSV header for landmarks file.
-bool Publisher::writeLandmarksCsvDescription() {
+bool StreamPublisher::writeLandmarksCsvDescription() {
   if (!csvLandmarksFile_) return false;
   if (!csvLandmarksFile_->good()) return false;
   *csvLandmarksFile_ << FLAGS_datafile_separator << "id"
@@ -226,7 +207,7 @@ bool Publisher::writeLandmarksCsvDescription() {
 }
 
 // Set an odometry output CSV file.
-bool Publisher::setCsvFile(std::fstream &csvFile, const std::string& headerLine) {
+bool StreamPublisher::setCsvFile(std::fstream &csvFile, const std::string& headerLine) {
   if (csvFile_) {
     csvFile_->close();
   }
@@ -234,15 +215,17 @@ bool Publisher::setCsvFile(std::fstream &csvFile, const std::string& headerLine)
   writeCsvDescription(headerLine);
   return csvFile_->good();
 }
+
 // Set an odometry output CSV file.
-bool Publisher::setCsvFile(const std::string &csvFileName, const std::string& headerLine) {
+bool StreamPublisher::setCsvFile(const std::string &csvFileName, const std::string& headerLine) {
   csvFile_.reset(new std::fstream(csvFileName.c_str(), std::ios_base::out));
   writeCsvDescription(headerLine);
   return csvFile_->good();
 }
 
 // Set a CVS file where the landmarks will be saved to.
-bool Publisher::setLandmarksCsvFile(std::fstream &csvFile) {
+bool StreamPublisher::setLandmarksCsvFile(std::fstream& csvFile)
+{
   if (csvLandmarksFile_) {
     csvLandmarksFile_->close();
   }
@@ -251,14 +234,16 @@ bool Publisher::setLandmarksCsvFile(std::fstream &csvFile) {
   return csvLandmarksFile_->good();
 }
 // Set a CVS file where the landmarks will be saved to.
-bool Publisher::setLandmarksCsvFile(std::string &csvFileName) {
+bool StreamPublisher::setLandmarksCsvFile(std::string& csvFileName)
+{
   csvLandmarksFile_.reset(
       new std::fstream(csvFileName.c_str(), std::ios_base::out));
   writeLandmarksCsvDescription();
   return csvLandmarksFile_->good();
 }
 // Set a CVS file where the landmarks will be saved to.
-bool Publisher::setLandmarksCsvFile(std::string csvFileName) {
+bool StreamPublisher::setLandmarksCsvFile(std::string csvFileName)
+{
   csvLandmarksFile_.reset(
       new std::fstream(csvFileName.c_str(), std::ios_base::out));
   writeLandmarksCsvDescription();
@@ -266,7 +251,9 @@ bool Publisher::setLandmarksCsvFile(std::string csvFileName) {
 }
 
 // Set the pose message that is published next.
-void Publisher::setPose(const okvis::kinematics::Transformation &T_WS) {
+void Publisher::setPose(const okvis::kinematics::Transformation& T_WS)
+{
+
   okvis::kinematics::Transformation T;
   if (parameters_.publishing.trackedBodyFrame == FrameName::S) {
     poseMsg_.child_frame_id = "sensor";
@@ -275,8 +262,8 @@ void Publisher::setPose(const okvis::kinematics::Transformation &T_WS) {
     poseMsg_.child_frame_id = "body";
     T = parameters_.publishing.T_Wc_W * T_WS * parameters_.imu.T_BS.inverse();
   } else {
-    LOG(ERROR) << "Pose frame does not exist for publishing."
-                  " Choose 'S' or 'B'.";
+    LOG(ERROR) <<
+        "Pose frame does not exist for publishing. Choose 'S' or 'B'.";
     poseMsg_.child_frame_id = "body";
     T = parameters_.publishing.T_Wc_W * T_WS * parameters_.imu.T_BS.inverse();
   }
@@ -298,49 +285,93 @@ void Publisher::setPose(const okvis::kinematics::Transformation &T_WS) {
   poseMsg_.transform.translation.x = r[0];
   poseMsg_.transform.translation.y = r[1];
   poseMsg_.transform.translation.z = r[2];
+
+  // also do the mesh
+  /*if (parameters_.publishing.trackedBodyFrame == FrameName::S) {
+    meshMsg_.child_frame_id = "sensor";
+  } else if (parameters_.publishing.trackedBodyFrame == FrameName::B) {
+    meshMsg_.child_frame_id = "body";
+  } else {
+    meshMsg_.child_frame_id = "body";
+  }*/
+  meshMsg_.header.frame_id = "world";
+  meshMsg_.header.stamp = _t;
+  meshMsg_.type = visualization_msgs::Marker::MESH_RESOURCE;
+  if ((ros::Time::now() - _t).toSec() > 10.0)
+    meshMsg_.header.stamp = ros::Time::now();
+
+  // fill orientation
+  meshMsg_.pose.orientation.x = q.x();
+  meshMsg_.pose.orientation.y = q.y();
+  meshMsg_.pose.orientation.z = q.z();
+  meshMsg_.pose.orientation.w = q.w();
+
+  // fill position
+  meshMsg_.pose.position.x = r[0];
+  meshMsg_.pose.position.y = r[1];
+  meshMsg_.pose.position.z = r[2];
+
+  // scale -- needed
+  meshMsg_.scale.x = 1.0;
+  meshMsg_.scale.y = 1.0;
+  meshMsg_.scale.z = 1.0;
+	
+  meshMsg_.action = visualization_msgs::Marker::ADD;
+  meshMsg_.color.a = 1.0; // Don't forget to set the alpha!
+  meshMsg_.color.r = 1.0;
+  meshMsg_.color.g = 1.0;
+  meshMsg_.color.b = 1.0;
+
+  // embedded material / colour
+  //meshMsg_.mesh_use_embedded_materials = true;
+}
+
+void Publisher::setPoseStd(const Eigen::Matrix<double, -1, 1> &stateStd) {
+  poseStdMsg_.header.frame_id = "world";
+  poseStdMsg_.header.stamp = _t;
+  if ((ros::Time::now() - _t).toSec() > 10.0)
+    poseStdMsg_.header.stamp = ros::Time::now();
+  poseStdMsg_.twist.linear.x = stateStd[0];
+  poseStdMsg_.twist.linear.y = stateStd[1];
+  poseStdMsg_.twist.linear.z = stateStd[2];
+  poseStdMsg_.twist.angular.x = stateStd[3];
+  poseStdMsg_.twist.angular.y = stateStd[4];
+  poseStdMsg_.twist.angular.z = stateStd[5];
 }
 
 // Set the odometry message that is published next.
-void Publisher::setOdometry(const okvis::kinematics::Transformation &T_WS,
-                            const okvis::SpeedAndBiases &speedAndBiases,
-                            const Eigen::Vector3d &omega_S) {
-  // header.frame_id is the frame in which the pose is given.
-  //   I.e. world frame in our case
-  // child_frame_id is the frame in which the twist part of the
-  //   odometry message is given.
+void Publisher::setOdometry(const okvis::kinematics::Transformation& T_WS,
+                            const okvis::SpeedAndBiases& speedAndBiases,
+                            const Eigen::Vector3d& omega_S)
+{
+
+  // header.frame_id is the frame in which the pose is given. I.e. world frame in our case
+  // child_frame_id is the frame in which the twist part of the odometry message is given.
   // see also nav_msgs/Odometry Message documentation
 
   odometryMsg_.header.stamp = _t;
-  // the pose to be published. T_WS or T_WB depending on 'trackedBodyFrame'
-  okvis::kinematics::Transformation T;
-  Eigen::Vector3d omega_W =
-      parameters_.publishing.T_Wc_W.C() * T_WS.C() * omega_S;
+  okvis::kinematics::Transformation T; // the pose to be published. T_WS or T_WB depending on 'trackedBodyFrame'
+  Eigen::Vector3d omega_W = parameters_.publishing.T_Wc_W.C() * T_WS.C() * omega_S;
   Eigen::Vector3d t_W_ofFrame;  // lever arm in W-system
   Eigen::Vector3d v_W_ofFrame;  // velocity in W-system. v_S_in_W or v_B_in_W
 
   if (parameters_.publishing.trackedBodyFrame == FrameName::S) {
     odometryMsg_.header.frame_id = "world";
     T = parameters_.publishing.T_Wc_W * T_WS;
-    t_W_ofFrame.setZero();  // r_SS_in_W
-    v_W_ofFrame = parameters_.publishing.T_Wc_W.C() *
-                  speedAndBiases.head<3>();  // world-centric
+    t_W_ofFrame.setZero(); // r_SS_in_W
+    v_W_ofFrame = parameters_.publishing.T_Wc_W.C()*speedAndBiases.head<3>();  // world-centric speedAndBiases.head<3>()
   } else if (parameters_.publishing.trackedBodyFrame == FrameName::B) {
     odometryMsg_.header.frame_id = "world";
     T = parameters_.publishing.T_Wc_W * T_WS * parameters_.imu.T_BS.inverse();
-    t_W_ofFrame =
-        (parameters_.publishing.T_Wc_W * T_WS * parameters_.imu.T_BS.inverse())
-            .r() -
-        (parameters_.publishing.T_Wc_W * T_WS).r();  // r_BS_in_W
-    v_W_ofFrame =
-        speedAndBiases.head<3>() + omega_W.cross(t_W_ofFrame);  // world-centric
+    t_W_ofFrame = (parameters_.publishing.T_Wc_W * T_WS * parameters_.imu.T_BS.inverse()).r() - (parameters_.publishing.T_Wc_W * T_WS).r();  // r_BS_in_W
+    v_W_ofFrame = parameters_.publishing.T_Wc_W.C()*speedAndBiases.head<3>() + omega_W.cross(t_W_ofFrame);  // world-centric speedAndBiases.head<3>()
   } else {
-    LOG(ERROR) << "Pose frame does not exist for publishing. "
-                  "Choose 'S' or 'B'.";
+    LOG(ERROR) <<
+        "Pose frame does not exist for publishing. Choose 'S' or 'B'.";
     odometryMsg_.header.frame_id = "world";
     T = parameters_.publishing.T_Wc_W * T_WS;
-    t_W_ofFrame.setZero();  // r_SS_in_W
-    v_W_ofFrame = parameters_.publishing.T_Wc_W.C() *
-                  speedAndBiases.head<3>();  // world-centric
+    t_W_ofFrame.setZero(); // r_SS_in_W
+    v_W_ofFrame = parameters_.publishing.T_Wc_W.C()*speedAndBiases.head<3>();  // world-centric speedAndBiases.head<3>()
   }
 
   // fill orientation
@@ -363,26 +394,23 @@ void Publisher::setOdometry(const okvis::kinematics::Transformation &T_WS,
     C_omega.setIdentity();
     odometryMsg_.child_frame_id = "sensor";
   } else if (parameters_.publishing.velocitiesFrame == FrameName::B) {
-    C_v = (parameters_.imu.T_BS * T_WS.inverse()).C() *
-          parameters_.publishing.T_Wc_W.inverse().C();
+    C_v = (parameters_.imu.T_BS * T_WS.inverse()).C() * parameters_.publishing.T_Wc_W.inverse().C();
     C_omega = parameters_.imu.T_BS.C();
     odometryMsg_.child_frame_id = "body";
   } else if (parameters_.publishing.velocitiesFrame == FrameName::Wc) {
     C_v.setIdentity();
-    C_omega = T_WS.C();
+    C_omega = parameters_.publishing.T_Wc_W.C() * T_WS.C();
     odometryMsg_.child_frame_id = "world";
   } else {
-    LOG(ERROR) << "Speeds frame does not exist for publishing. "
-                  "Choose 'S', 'B', or 'Wc'.";
-    C_v = (parameters_.imu.T_BS * T_WS.inverse()).C() *
-          parameters_.publishing.T_Wc_W.inverse().C();
+    LOG(ERROR) <<
+        "Speeds frame does not exist for publishing. Choose 'S', 'B', or 'Wc'.";
+    C_v = (parameters_.imu.T_BS * T_WS.inverse()).C() * parameters_.publishing.T_Wc_W.inverse().C();
     C_omega = parameters_.imu.T_BS.C();
     odometryMsg_.child_frame_id = "body";
   }
 
   // fill velocity
-  // v_S_in_'speedsInThisFrame' or v_B_in_'speedsInThisFrame'
-  Eigen::Vector3d v = C_v * v_W_ofFrame;
+  Eigen::Vector3d v = C_v * v_W_ofFrame;    // v_S_in_'speedsInThisFrame' or v_B_in_'speedsInThisFrame'
   odometryMsg_.twist.twist.linear.x = v[0];
   odometryMsg_.twist.twist.linear.y = v[1];
   odometryMsg_.twist.twist.linear.z = v[2];
@@ -396,19 +424,48 @@ void Publisher::setOdometry(const okvis::kinematics::Transformation &T_WS,
   // linear acceleration ?? - would also need point of percussion mapping!!
 }
 
+void Publisher::setFrustum(const okvis::kinematics::Transformation& T_WB,
+                  const okvis::kinematics::Transformation& T_BC) {
+  okvis::kinematics::Transformation T; // the pose to be published. T_WS or T_WB depending on 'trackedBodyFrame'
+  if (parameters_.publishing.trackedBodyFrame == FrameName::S) {
+    odometryMsg_.header.frame_id = "world";
+    T = parameters_.publishing.T_Wc_W * T_WB;
+  } else if (parameters_.publishing.trackedBodyFrame == FrameName::B) {
+    odometryMsg_.header.frame_id = "world";
+    T = parameters_.publishing.T_Wc_W * T_WB * parameters_.imu.T_BS.inverse();
+  } else {
+    LOG(ERROR) <<
+        "Pose frame does not exist for publishing. Choose 'S' or 'B'.";
+    odometryMsg_.header.frame_id = "world";
+    T = parameters_.publishing.T_Wc_W * T_WB;
+  }
+  cameraPoseVisual_.reset();
+  okvis::kinematics::Transformation T_WC = T * T_BC;
+  cameraPoseVisual_.add_pose(T_WC.r(), T_WC.q());
+}
+
 // Set the points that are published next.
-void Publisher::setPoints(const okvis::MapPointVector &pointsMatched,
-                          const okvis::MapPointVector &pointsUnmatched,
-                          const okvis::MapPointVector &pointsTransferred) {
-  // Huai{
+void Publisher::setPoints(const okvis::MapPointVector& pointsMatched,
+                          const okvis::MapPointVector& pointsUnmatched,
+                          const okvis::MapPointVector& pointsTransferred)
+{
   pointsMatched2_.clear();
   pointsMatched2_ = pointsMatched;
+#ifdef HAVE_PCL
+  pointsMatched_.clear();
+  pointsUnmatched_.clear();
+  pointsTransferred_.clear();
+#else
   pointsMatched_.points.clear();
   pointsMatched_.colors.clear();
   pointsUnmatched_.points.clear();
   pointsUnmatched_.colors.clear();
   pointsTransferred_.points.clear();
   pointsTransferred_.colors.clear();
+#endif
+  
+  // transform points into custom world frame:
+  const Eigen::Matrix4d T_Wc_W = parameters_.publishing.T_Wc_W.T(); 
   for (size_t i = 0; i < pointsMatched.size(); ++i) {
     // check infinity
     if (fabs(static_cast<double>(pointsMatched[i].pointHomog[3])) < 1.0e-8)
@@ -419,6 +476,16 @@ void Publisher::setPoints(const okvis::MapPointVector &pointsMatched,
         parameters_.publishing.landmarkQualityThreshold)
       continue;
 
+#ifdef HAVE_PCL
+    pointsMatched_.push_back(pcl::PointXYZRGB());
+    const Eigen::Vector4d point = T_Wc_W * pointsMatched[i].pointHomog;
+    pointsMatched_.back().x = point[0] / point[3];
+    pointsMatched_.back().y = point[1] / point[3];
+    pointsMatched_.back().z = point[2] / point[3];
+    pointsMatched_.back().g = 255
+        * (std::min(parameters_.publishing.maxLandmarkQuality, (float)pointsMatched[i].quality)
+            / parameters_.publishing.maxLandmarkQuality);
+#else
     pointsMatched_.points.push_back(geometry_msgs::Point());
     const Eigen::Vector4d point = pointsMatched[i].pointHomog;
     pointsMatched_.points.back().x = point[0] / point[3];
@@ -430,10 +497,21 @@ void Publisher::setPoints(const okvis::MapPointVector &pointsMatched,
                          static_cast<float>(pointsMatched[i].quality)) /
                 parameters_.publishing.maxLandmarkQuality);
     pointsMatched_.colors.back().a = 1.0f;
+#endif
   }
   pointsMatched_.header.frame_id = "world";
 
-  pointsMatched_.header.stamp = _t;
+#ifdef HAVE_PCL
+#if PCL_VERSION >= PCL_VERSION_CALC(1,7,0)
+  std_msgs::Header header;
+  header.stamp = _t;
+  pointsMatched_.header.stamp = pcl_conversions::toPCL(header).stamp;
+#else
+  pointsMatched_.header.stamp=_t;
+#endif
+#else
+  pointsMatched_.header.stamp=_t;
+#endif
 
   for (size_t i = 0; i < pointsUnmatched.size(); ++i) {
     // check infinity
@@ -441,10 +519,18 @@ void Publisher::setPoints(const okvis::MapPointVector &pointsMatched,
       continue;
 
     // check quality
-    if (pointsUnmatched[i].quality <
-        parameters_.publishing.landmarkQualityThreshold)
+    if (pointsUnmatched[i].quality < parameters_.publishing.landmarkQualityThreshold)
       continue;
-
+#ifdef HAVE_PCL
+    pointsUnmatched_.push_back(pcl::PointXYZRGB());
+    const Eigen::Vector4d point = T_Wc_W * pointsUnmatched[i].pointHomog;
+    pointsUnmatched_.back().x = point[0] / point[3];
+    pointsUnmatched_.back().y = point[1] / point[3];
+    pointsUnmatched_.back().z = point[2] / point[3];
+    pointsUnmatched_.back().b = 255
+        * (std::min(parameters_.publishing.maxLandmarkQuality, (float)pointsUnmatched[i].quality)
+            / parameters_.publishing.maxLandmarkQuality);
+#else
     pointsUnmatched_.points.push_back(geometry_msgs::Point());
     const Eigen::Vector4d point = pointsUnmatched[i].pointHomog;
     pointsUnmatched_.points.back().x = point[0] / point[3];
@@ -456,10 +542,19 @@ void Publisher::setPoints(const okvis::MapPointVector &pointsMatched,
                          static_cast<float>(pointsUnmatched[i].quality)) /
                 parameters_.publishing.maxLandmarkQuality);
     pointsUnmatched_.colors.back().a = 1.0f;
+#endif    
   }
   pointsUnmatched_.header.frame_id = "world";
 
-  pointsUnmatched_.header.stamp = _t;
+#ifdef HAVE_PCL
+#if PCL_VERSION >= PCL_VERSION_CALC(1,7,0)
+  pointsUnmatched_.header.stamp = pcl_conversions::toPCL(header).stamp;
+#else
+  pointsUnmatched_.header.stamp=_t;
+#endif
+#else
+  pointsUnmatched_.header.stamp=_t;
+#endif
 
   for (size_t i = 0; i < pointsTransferred.size(); ++i) {
     // check infinity
@@ -468,16 +563,29 @@ void Publisher::setPoints(const okvis::MapPointVector &pointsMatched,
       continue;
 
     // check quality
-    if (pointsTransferred[i].quality <
-        parameters_.publishing.landmarkQualityThreshold)
+    if (pointsTransferred[i].quality < parameters_.publishing.landmarkQualityThreshold)
       continue;
+#ifdef HAVE_PCL
+    pointsTransferred_.push_back(pcl::PointXYZRGB());
+    const Eigen::Vector4d point = T_Wc_W * pointsTransferred[i].pointHomog;
+    pointsTransferred_.back().x = point[0] / point[3];
+    pointsTransferred_.back().y = point[1] / point[3];
+    pointsTransferred_.back().z = point[2] / point[3];
+    float intensity = std::min(parameters_.publishing.maxLandmarkQuality,
+                               (float)pointsTransferred[i].quality)
+        / parameters_.publishing.maxLandmarkQuality;
+    pointsTransferred_.back().r = 255 * intensity;
+    pointsTransferred_.back().g = 255 * intensity;
+    pointsTransferred_.back().b = 255 * intensity;
 
+    //_omfile << point[0] << " " << point[1] << " " << point[2] << ";" <<std::endl;
+#else
     pointsTransferred_.points.push_back(geometry_msgs::Point());
     const Eigen::Vector4d point = pointsTransferred[i].pointHomog;
     pointsTransferred_.points.back().x = point[0] / point[3];
     pointsTransferred_.points.back().y = point[1] / point[3];
     pointsTransferred_.points.back().z = point[2] / point[3];
-    /*float intensity =*/
+    float intensity =
         std::min(parameters_.publishing.maxLandmarkQuality,
                  static_cast<float>(pointsTransferred[i].quality)) /
         parameters_.publishing.maxLandmarkQuality;
@@ -486,58 +594,79 @@ void Publisher::setPoints(const okvis::MapPointVector &pointsMatched,
     pointsTransferred_.colors.back().g = 0;    // intensity;
     pointsTransferred_.colors.back().b = 0;    // intensity;
     pointsTransferred_.colors.back().a = 1.0f;
-    // _omfile << point[0] << " " << point[1] << " "
-    // << point[2] << ";" <<std::endl;
+#endif
   }
   pointsTransferred_.header.frame_id = "world";
   pointsTransferred_.header.seq = ctr2_++;
 
-  pointsTransferred_.header.stamp = _t;
-  // }Huai
+#ifdef HAVE_PCL
+#if PCL_VERSION >= PCL_VERSION_CALC(1,7,0)
+  pointsTransferred_.header.stamp = pcl_conversions::toPCL(header).stamp;
+#else
+  pointsTransferred_.header.stamp=_t;
+#endif
+#else
+  pointsTransferred_.header.stamp=_t;
+#endif
 }
 
 // Publish the pose.
-void Publisher::publishPose() {
-  if ((_t - lastOdometryTime2_).toSec() <
-      1.0 / parameters_.publishing.publishRate)
+void Publisher::publishPose()
+{
+  if ((_t - lastOdometryTime2_).toSec() < 1.0 / parameters_.publishing.publishRate)
     return;  // control the publish rate
   pubTf_.sendTransform(poseMsg_);
+  if(!meshMsg_.mesh_resource.empty())
+    pubMesh_.publish(meshMsg_);  //publish stamped mesh
   lastOdometryTime2_ = _t;  // remember
 }
 
 // Publish the last set odometry.
-void Publisher::publishOdometry() {
-  if ((_t - lastOdometryTime_).toSec() <
-      1.0 / parameters_.publishing.publishRate)
+void Publisher::publishOdometry()
+{
+  if ((_t - lastOdometryTime_).toSec() < 1.0 / parameters_.publishing.publishRate)
     return;  // control the publish rate
   pubObometry_.publish(odometryMsg_);
+  cameraPoseVisual_.publish_by(pubCameraPoseVisual_, odometryMsg_.header);
+  if(!meshMsg_.mesh_resource.empty())
+    pubMesh_.publish(meshMsg_);  //publish stamped mesh
   lastOdometryTime_ = _t;  // remember
 }
 
 // Publish the T_WS transform.
-void Publisher::publishTransform() {
-  if ((_t - lastTransfromTime_).toSec() <
-      1.0 / parameters_.publishing.publishRate)
-    return;                         // control the publish rate
-  pubTransform_.publish(poseMsg_);  // publish stamped transform for MSF
-  lastTransfromTime_ = _t;          // remember
+void Publisher::publishTransform()
+{
+  if ((_t - lastTransfromTime_).toSec() < 1.0 / parameters_.publishing.publishRate)
+    return;  // control the publish rate
+  pubTransform_.publish(poseMsg_);  //publish stamped transform for MSF
+  lastTransfromTime_ = _t;  // remember
+}
+
+void Publisher::publishPoseStd()
+{
+  if ((_t - lastStdTime_).toSec() < 1.0 / parameters_.publishing.publishRate)
+    return;  // control the publish rate
+  pubPoseStd_.publish(poseStdMsg_);  //publish stamped pose std for MSF
+  lastStdTime_ = _t;
 }
 
 // Set and publish pose.
 void Publisher::publishStateAsCallback(
-    const okvis::Time &t, const okvis::kinematics::Transformation &T_WS) {
+    const okvis::Time & t, const okvis::kinematics::Transformation & T_WS)
+{
   setTime(t);
-  setPose(T_WS);  // TODO(sleuten): provide setters for this hack
+  setPose(T_WS);  // TODO: provide setters for this hack
   publishPose();
 }
 // Set and publish full state.
 void Publisher::publishFullStateAsCallback(
-    const okvis::Time &t, const okvis::kinematics::Transformation &T_WS,
-    const Eigen::Matrix<double, 9, 1> &speedAndBiases,
-    const Eigen::Matrix<double, 3, 1> &omega_S) {
+    const okvis::Time & t, const okvis::kinematics::Transformation & T_WS,
+    const Eigen::Matrix<double, 9, 1> & speedAndBiases,
+    const Eigen::Matrix<double, 3, 1> & omega_S)
+{
   setTime(t);
-  setOdometry(T_WS, speedAndBiases,
-              omega_S);  // TODO(sleuten): provide setters for this hack
+  setOdometry(T_WS, speedAndBiases, omega_S);  // TODO: provide setters for this hack
+  setFrustum(T_WS, *parameters_.nCameraSystem.T_SC(0));
   setPath(T_WS);
   publishOdometry();
   publishTransform();
@@ -550,17 +679,23 @@ void Publisher::csvSaveFullStateAsCallback(
     const Eigen::Matrix<double, 9, 1> &speedAndBiases,
     const Eigen::Matrix<double, 3, 1> &omega_S, const int frameIdInSource) {
   setTime(t);
-  setOdometry(T_WS, speedAndBiases,
-              omega_S);  // TODO(sleuten): provide setters for this hack
+  setOdometry(T_WS, speedAndBiases, omega_S);  // TODO: provide setters for this hack
+  setFrustum(T_WS, *parameters_.nCameraSystem.T_SC(0));
+  StreamPublisher::csvSaveFullStateAsCallback(t, T_WS, speedAndBiases, omega_S,
+                                              frameIdInSource);
+}
+
+void StreamPublisher::csvSaveFullStateAsCallback(
+    const okvis::Time &t, const okvis::kinematics::Transformation &T_WS,
+    const Eigen::Matrix<double, 9, 1> &speedAndBiases,
+    const Eigen::Matrix<double, 3, 1> &/*omega_S*/, const int frameIdInSource) {
   if (csvFile_) {
-    // LOG(INFO)<<"filePtr: ok; ";
+    //LOG(INFO)<<"filePtr: ok; ";
     if (csvFile_->good()) {
-      // LOG(INFO)<<"file: good.";
+      //LOG(INFO)<<"file: good.";
       Eigen::Vector3d p_WS_W = T_WS.r();
       Eigen::Quaterniond q_WS = T_WS.q();
-      std::stringstream time;
-      time << t.sec << std::setw(9) << std::setfill('0') << t.nsec;
-      *csvFile_ << time.str() << FLAGS_datafile_separator << frameIdInSource
+      *csvFile_ << t << FLAGS_datafile_separator << frameIdInSource
                 << FLAGS_datafile_separator << std::scientific
                 << std::setprecision(8) << p_WS_W[0] << FLAGS_datafile_separator
                 << p_WS_W[1] << FLAGS_datafile_separator << p_WS_W[2]
@@ -591,15 +726,25 @@ void Publisher::csvSaveFullStateWithExtrinsicsAsCallback(
         Eigen::aligned_allocator<okvis::kinematics::Transformation>>
         &extrinsics) {
   setTime(t);
-  setOdometry(T_WS, speedAndBiases,
-              omega_S);  // TODO(sleuten): provide setters for this hack
+  setOdometry(T_WS, speedAndBiases, omega_S);  // TODO: provide setters for this hack
+  setFrustum(T_WS, extrinsics[0]);
+  StreamPublisher::csvSaveFullStateWithExtrinsicsAsCallback(
+      t, T_WS, speedAndBiases, omega_S, frameIdInSource, extrinsics);
+}
+
+void StreamPublisher::csvSaveFullStateWithExtrinsicsAsCallback(
+    const okvis::Time &t, const okvis::kinematics::Transformation &T_WS,
+    const Eigen::Matrix<double, 9, 1> &speedAndBiases,
+    const Eigen::Matrix<double, 3, 1> &/*omega_S*/, const int frameIdInSource,
+    const std::vector<
+        okvis::kinematics::Transformation,
+        Eigen::aligned_allocator<okvis::kinematics::Transformation>>
+        &extrinsics) {
   if (csvFile_) {
     if (csvFile_->good()) {
       Eigen::Vector3d p_WS_W = T_WS.r();
       Eigen::Quaterniond q_WS = T_WS.q();
-      std::stringstream time;
-      time << t.sec << std::setw(9) << std::setfill('0') << t.nsec;
-      *csvFile_ << time.str() << FLAGS_datafile_separator << frameIdInSource
+      *csvFile_ << t << FLAGS_datafile_separator << frameIdInSource
                 << FLAGS_datafile_separator << std::setprecision(6) << p_WS_W[0]
                 << FLAGS_datafile_separator << p_WS_W[1]
                 << FLAGS_datafile_separator << p_WS_W[2]
@@ -617,15 +762,15 @@ void Publisher::csvSaveFullStateWithExtrinsicsAsCallback(
                 << FLAGS_datafile_separator << speedAndBiases[7]
                 << FLAGS_datafile_separator << speedAndBiases[8];
       for (size_t i = 0; i < extrinsics.size(); ++i) {
-        Eigen::Vector3d p_SCi = extrinsics[i].r();
-        Eigen::Quaterniond q_SCi = extrinsics[i].q();
-        *csvFile_ << FLAGS_datafile_separator << p_SCi[0]
-                  << FLAGS_datafile_separator << p_SCi[1]
-                  << FLAGS_datafile_separator << p_SCi[2]
-                  << FLAGS_datafile_separator << q_SCi.x()
-                  << FLAGS_datafile_separator << q_SCi.y()
-                  << FLAGS_datafile_separator << q_SCi.z()
-                  << FLAGS_datafile_separator << q_SCi.w();
+        Eigen::Vector3d p_BCi = extrinsics[i].r();
+        Eigen::Quaterniond q_BCi = extrinsics[i].q();
+        *csvFile_ << FLAGS_datafile_separator << p_BCi[0]
+                  << FLAGS_datafile_separator << p_BCi[1]
+                  << FLAGS_datafile_separator << p_BCi[2]
+                  << FLAGS_datafile_separator << q_BCi.x()
+                  << FLAGS_datafile_separator << q_BCi.y()
+                  << FLAGS_datafile_separator << q_BCi.z()
+                  << FLAGS_datafile_separator << q_BCi.w();
       }
 
       *csvFile_ << std::endl;
@@ -639,22 +784,42 @@ void Publisher::csvSaveFullStateWithAllCalibrationAsCallback(
     const Eigen::Matrix<double, 9, 1> &speedAndBiases,
     const Eigen::Matrix<double, 3, 1> &omega_S, const int frameIdInSource,
     const std::vector<
-        okvis::kinematics::Transformation,
-        Eigen::aligned_allocator<okvis::kinematics::Transformation>>
-        &extrinsics,
-    const Eigen::Matrix<double, Eigen::Dynamic, 1> &vTgsa,
-    const Eigen::Matrix<double, Eigen::Dynamic, 1> &vfckptdr,
-    const Eigen::Matrix<double, Eigen::Dynamic, 1> &vVariance) {
+        Eigen::VectorXd,
+        Eigen::aligned_allocator<Eigen::VectorXd>>& extrinsics,
+    const Eigen::Matrix<double, Eigen::Dynamic, 1> &imuAugmentedParams,
+    const Eigen::Matrix<double, Eigen::Dynamic, 1> &cameraParams,
+    const Eigen::Matrix<double, Eigen::Dynamic, 1> &stateStd,
+    const std::vector<okvis::kinematics::Transformation,
+          Eigen::aligned_allocator<okvis::kinematics::Transformation> >& T_BC_list) {
   setTime(t);
   setOdometry(T_WS, speedAndBiases,
               omega_S);  // TODO(sleuten): provide setters for this hack
+  setFrustum(T_WS, T_BC_list[0]);
+  setPoseStd(stateStd);
+  publishPoseStd();
+  StreamPublisher::csvSaveFullStateWithAllCalibrationAsCallback(
+      t, T_WS, speedAndBiases, omega_S, frameIdInSource, extrinsics,
+      imuAugmentedParams, cameraParams, stateStd, T_BC_list);
+}
+
+void StreamPublisher::csvSaveFullStateWithAllCalibrationAsCallback(
+    const okvis::Time &t, const okvis::kinematics::Transformation &T_WS,
+    const Eigen::Matrix<double, 9, 1> &speedAndBiases,
+    const Eigen::Matrix<double, 3, 1> &/*omega_S*/, const int frameIdInSource,
+    const std::vector<Eigen::VectorXd,
+                      Eigen::aligned_allocator<Eigen::VectorXd>> &extrinsics,
+    const Eigen::Matrix<double, Eigen::Dynamic, 1> &imuAugmentedParams,
+    const Eigen::Matrix<double, Eigen::Dynamic, 1> &cameraParams,
+    const Eigen::Matrix<double, Eigen::Dynamic, 1> &stateStd,
+    const std::vector<
+        okvis::kinematics::Transformation,
+        Eigen::aligned_allocator<okvis::kinematics::Transformation>>
+        &/*T_BC_list*/) {
   if (csvFile_) {
     if (csvFile_->good()) {
       Eigen::Vector3d p_WS_W = T_WS.r();
       Eigen::Quaterniond q_WS = T_WS.q();
-      std::stringstream time;
-      time << t.sec << std::setw(9) << std::setfill('0') << t.nsec;
-      *csvFile_ << time.str() << FLAGS_datafile_separator << frameIdInSource
+      *csvFile_ << t << FLAGS_datafile_separator << frameIdInSource
                 << FLAGS_datafile_separator << std::setprecision(6) << p_WS_W[0]
                 << FLAGS_datafile_separator << p_WS_W[1]
                 << FLAGS_datafile_separator << p_WS_W[2]
@@ -672,21 +837,22 @@ void Publisher::csvSaveFullStateWithAllCalibrationAsCallback(
                 << FLAGS_datafile_separator << speedAndBiases[7]
                 << FLAGS_datafile_separator << speedAndBiases[8];
 
-      for (int jack = 0; jack < vTgsa.size(); ++jack)
-        *csvFile_ << FLAGS_datafile_separator << vTgsa[jack];
+      for (int jack = 0; jack < imuAugmentedParams.size(); ++jack)
+        *csvFile_ << FLAGS_datafile_separator << imuAugmentedParams[jack];
 
       for (size_t i = 0; i < extrinsics.size(); ++i) {
-        Eigen::Vector3d p_SCi = extrinsics[i].r();
-        *csvFile_ << FLAGS_datafile_separator << p_SCi[0]
-                  << FLAGS_datafile_separator << p_SCi[1]
-                  << FLAGS_datafile_separator << p_SCi[2];
+        int n = extrinsics[i].size();
+        const Eigen::VectorXd& T_BC_coeffs = extrinsics[i];
+        for (int jack = 0; jack < n; ++jack) {
+          *csvFile_ << FLAGS_datafile_separator << T_BC_coeffs[jack];
+        }
       }
 
-      for (int jack = 0; jack < vfckptdr.size(); ++jack)
-        *csvFile_ << FLAGS_datafile_separator << vfckptdr[jack];
+      for (int jack = 0; jack < cameraParams.size(); ++jack)
+        *csvFile_ << FLAGS_datafile_separator << cameraParams[jack];
 
-      for (int jack = 0; jack < vVariance.size(); ++jack)
-        *csvFile_ << FLAGS_datafile_separator << std::sqrt(vVariance[jack]);
+      for (int jack = 0; jack < stateStd.size(); ++jack)
+        *csvFile_ << FLAGS_datafile_separator << stateStd[jack];
 
       *csvFile_ << std::endl;
     }
@@ -695,9 +861,10 @@ void Publisher::csvSaveFullStateWithAllCalibrationAsCallback(
 
 // Set and publish landmarks.
 void Publisher::publishLandmarksAsCallback(
-    const okvis::Time & /*t*/, const okvis::MapPointVector &actualLandmarks,
-    const okvis::MapPointVector &transferredLandmarks) {
-  if (parameters_.publishing.publishLandmarks) {
+    const okvis::Time & /*t*/, const okvis::MapPointVector & actualLandmarks,
+    const okvis::MapPointVector & transferredLandmarks)
+{
+  if(parameters_.publishing.publishLandmarks){
     okvis::MapPointVector empty;
     setPoints(actualLandmarks, empty, transferredLandmarks);
     publishPoints();
@@ -706,10 +873,17 @@ void Publisher::publishLandmarksAsCallback(
 
 // Set and write landmarks to file.
 void Publisher::csvSaveLandmarksAsCallback(
-    const okvis::Time & /*t*/, const okvis::MapPointVector &actualLandmarks,
+    const okvis::Time &t, const okvis::MapPointVector &actualLandmarks,
     const okvis::MapPointVector &transferredLandmarks) {
   okvis::MapPointVector empty;
   setPoints(actualLandmarks, empty, transferredLandmarks);
+  StreamPublisher::csvSaveLandmarksAsCallback(t, actualLandmarks,
+                                              transferredLandmarks);
+}
+
+void StreamPublisher::csvSaveLandmarksAsCallback(
+    const okvis::Time & /*t*/, const okvis::MapPointVector &actualLandmarks,
+    const okvis::MapPointVector &/*transferredLandmarks*/) {
   if (csvLandmarksFile_) {
     if (csvLandmarksFile_->good()) {
       for (size_t l = 0; l < actualLandmarks.size(); ++l) {
@@ -730,23 +904,45 @@ void Publisher::csvSaveLandmarksAsCallback(
 }
 
 // Publish the last set points.
-void Publisher::publishPoints() {
+void Publisher::publishPoints()
+{
   pubPointsMatched_.publish(pointsMatched_);
   pubPointsUnmatched_.publish(pointsUnmatched_);
   pubPointsTransferred_.publish(pointsTransferred_);
 }
 
 // Set the images to be published next.
-void Publisher::setImages(const std::vector<cv::Mat> &images) {
+void StreamPublisher::setImages(const std::vector<cv::Mat> & images)
+{
   // copy over
   images_.resize(images.size());
-  for (size_t i = 0; i < images.size(); ++i) images_[i] = images[i];
+  for (size_t i = 0; i < images.size(); ++i)
+    images_[i] = images[i];
 }
 
-// Add a pose to the path that is published next. The path contains a maximum
-// of maxPathLength poses that are published. Once the maximum is reached,
-// the last pose is copied in a new path message. The rest are deleted.
-void Publisher::setPath(const okvis::kinematics::Transformation &T_WS) {
+void StreamPublisher::publishFullStateAsCallback(
+    const okvis::Time & /*t*/, const okvis::kinematics::Transformation & /*T_WS*/,
+    const Eigen::Matrix<double, 9, 1> & /*speedAndBiases*/,
+    const Eigen::Matrix<double, 3, 1> & /*omega_S*/) {
+
+}
+
+void StreamPublisher::publishStateAsCallback(
+    const okvis::Time& /*t*/, const okvis::kinematics::Transformation& /*T_WS*/) {
+
+}
+
+void StreamPublisher::publishLandmarksAsCallback(
+    const okvis::Time & /*t*/, const okvis::MapPointVector & /*actualLandmarks*/,
+    const okvis::MapPointVector & /*transferredLandmarks*/) {
+
+}
+
+// Add a pose to the path that is published next. The path contains a maximum of
+// maxPathLength poses that are published. Once the
+// maximum is reached, the last pose is copied in a new path message. The rest are deleted.
+void Publisher::setPath(const okvis::kinematics::Transformation &T_WS)
+{
   if (path_.poses.size() >= parameters_.publishing.maxPathLength) {
     geometry_msgs::PoseStamped lastPose = path_.poses.back();
     path_.poses.clear();
@@ -756,11 +952,24 @@ void Publisher::setPath(const okvis::kinematics::Transformation &T_WS) {
   geometry_msgs::PoseStamped pose;
   pose.header.stamp = _t;
   pose.header.frame_id = "world";
-  const Eigen::Vector3d &r = T_WS.r();
+  okvis::kinematics::Transformation T = parameters_.publishing.T_Wc_W*T_WS;
+
+  // put the path into the origin of the selected tracked frame
+  if (parameters_.publishing.trackedBodyFrame == FrameName::S) {
+    // nothing
+  } else if (parameters_.publishing.trackedBodyFrame == FrameName::B) {
+    T = T * parameters_.imu.T_BS.inverse();
+  } else {
+    LOG(ERROR) <<
+        "Pose frame does not exist for publishing. Choose 'S' or 'B'.";
+    T = T * parameters_.imu.T_BS.inverse();
+  }
+  
+  const Eigen::Vector3d& r = T.r();
   pose.pose.position.x = r[0];
   pose.pose.position.y = r[1];
   pose.pose.position.z = r[2];
-  const Eigen::Quaterniond &q = T_WS.q();
+  const Eigen::Quaterniond& q = T.q();
   pose.pose.orientation.x = q.x();
   pose.pose.orientation.y = q.y();
   pose.pose.orientation.z = q.z();
@@ -772,7 +981,8 @@ void Publisher::setPath(const okvis::kinematics::Transformation &T_WS) {
 }
 
 // Publish the last set images.
-void Publisher::publishImages() {
+void Publisher::publishImages()
+{
   // advertise what's been missing:
   if (images_.size() != pubImagesVector_.size()) {
     pubImagesVector_.clear();
@@ -800,6 +1010,9 @@ void Publisher::publishImages() {
 }
 
 // Publish the last set path.
-void Publisher::publishPath() { pubPath_.publish(path_); }
+void Publisher::publishPath()
+{
+  pubPath_.publish(path_);
+}
 
 }  // namespace okvis

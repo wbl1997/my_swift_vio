@@ -1,28 +1,6 @@
 cmake_minimum_required(VERSION 2.8.3)
 project(msckf)
 
-# { Begin: special handling for building with QtCreator
-if(NOT CMAKE_SOURCE_DIR MATCHES "src$" AND NOT CMAKE_BINARY_DIR MATCHES "build$")
-# If catkin_make is to be invoked, CMAKE_SOURCE_DIR will be like <workspace>/src
-# and CMAKE_BINARY_DIR will be like <workspace>/build
-# If Build within QtCreator is invoked, CMAKE_SOURCE_DIR will be like <workspace>/src/msckf
-# and CMAKE_BINARY_DIR will be like <workspace>/build/msckf
-
-get_filename_component(SUPER_SOURCE_DIR ${CMAKE_SOURCE_DIR} DIRECTORY)
-get_filename_component(SUPER_BINARY_DIR ${CMAKE_BINARY_DIR} DIRECTORY)
-if(NOT SUPER_SOURCE_DIR MATCHES "src$" OR NOT SUPER_BINARY_DIR MATCHES "build$")
-    message(WARNING "CMAKE_SOURCE_DIR is ${CMAKE_SOURCE_DIR} and"
-        " CMAKE_BINARY_DIR is ${CMAKE_BINARY_DIR}.\n"
-        "They should look like <workspace>/src/${PROJECT_NAME}"
-        " and <workspace>/build/${PROJECT_NAME}")
-endif()
-
-get_filename_component(WORKSPACE_DIR ${SUPER_SOURCE_DIR} DIRECTORY)
-set(CATKIN_DEVEL_PREFIX ${WORKSPACE_DIR}/devel) # this ensures binaries are put into correct location of catkin_ws
-endif()
-# } End
-message("CATKIN_DEVEL_PREFIX ${CATKIN_DEVEL_PREFIX}")
-
 IF(NOT CMAKE_BUILD_TYPE)
   SET(CMAKE_BUILD_TYPE Release)
 ENDIF()
@@ -30,41 +8,76 @@ IF(CMAKE_BUILD_TYPE MATCHES Release)
   ADD_DEFINITIONS(-DNDEBUG)
 ENDIF()
 
-# ADD_DEFINITIONS(-DDEACTIVATE_TIMERS)
-
 message(STATUS "Building MSCKF with ${CMAKE_BUILD_TYPE}")
 
-set(OKVIS_SOURCE_PATH okvis)
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS}  -Wall -O3 -march=native ")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -O3 -march=native")
+option(DO_TIMING "Time routines." OFF)
+if(NOT DO_TIMING)
+  add_definitions(-DDEACTIVATE_TIMERS)
+  message(STATUS "Deactivating timers.")
+endif()
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mssse3")
-MESSAGE ("ssse3 ON")
+if(APPLE)
+  # The clang compiler (on osx) is somehow much more strict
+  # than the compilers on ubuntu and so this does not seem
+  # possible on OSX just yet.
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native -Wall -std=c++11 -fPIC")
+else()
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native -Wall -std=c++11 -fPIC")
+endif()
 
-find_package(catkin REQUIRED  
-  roscpp
+# https://github.com/StableCoder/cmake-scripts.git
+include(./cmake/sanitizers.cmake)
+
+if(${CMAKE_HOST_SYSTEM_PROCESSOR} MATCHES "arm*")
+  message(STATUS "ARM processor detected, will attempt to use NEON.")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mfpu=neon")
+else()
+  message(STATUS "Assuming SSE instructions available.")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mssse3")
+endif()
+
+list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/okvis/cmake")
+find_package(Eigen REQUIRED)
+include_directories(${EIGEN_INCLUDE_DIR}) 
+
+LIST(APPEND ROS_DEPENDENT_PACKAGES
   rosbag
-  tf
-  std_msgs
+  roscpp
   sensor_msgs
   image_transport
   cv_bridge
   dynamic_reconfigure
   geometry_msgs
   image_geometry
+  tf
 )
 
-find_package(vio_common)
+if($ENV{ROS_DISTRO} STREQUAL "melodic")
+  LIST(APPEND ROS_DEPENDENT_PACKAGES
+    pcl_conversions
+    pcl_ros)
+  add_definitions(-DHAVE_PCL)
+elseif($ENV{ROS_DISTRO} STREQUAL "kinetic")
+  message("Publishing with PCL point cloud is disabled with ROS kinetic because"
+      " libpcl-dev on Ubuntu 16 depends on the system-wide Eigen \nwhich"
+      " is incompatible with ceres solver 14.0.")
+else()
+  message("Unknown ROS distro:")
+  message($ENV{ROS_DISTRO})
+endif()
 
-set(CERES_INCLUDE_DIRS ${CMAKE_BINARY_DIR}/include)
+find_package(catkin REQUIRED  
+  ${ROS_DEPENDENT_PACKAGES}
+)
+
+find_package(vio_common REQUIRED)
 
 # generate dynamic reconfigure stuff
 generate_dynamic_reconfigure_options(cfg/Camera.cfg)
 
 catkin_package(
     DEPENDS
-    CATKIN_DEPENDS rosbag tf roscpp cv_bridge message_runtime 
-        std_msgs sensor_msgs vio_common
+    CATKIN_DEPENDS
     INCLUDE_DIRS include
     LIBRARIES ${PROJECT_NAME}
 )
@@ -77,69 +90,163 @@ file(MAKE_DIRECTORY ${CATKIN_DEVEL_PREFIX}/include)
 set(BUILD_SHARED_LIBS OFF)
 add_subdirectory(okvis)
 
-list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
-find_package(Eigen REQUIRED)
+# libvisensor
+find_package(VISensor)
 
+if(VISENSORDRIVER_FOUND)
+  add_definitions(-DHAVE_LIBVISENSOR)
+  message(STATUS "Found libvisensor in ROS interface.")
+  include_directories(${VISensorDriver_INCLUDE_DIR})
+else()
+  message(WARNING "libvisensor not found")
+endif()
+
+find_package(GTSAM)
+if(GTSAM_FOUND)
+  add_definitions(-DHAVE_GTSAM)
+  include_directories(${GTSAM_INCLUDE_DIR})
+  list(APPEND LINK_LIBRARIES
+    gtsam
+    gtsam_unstable)
+  message(STATUS "Found GTSAM at ${GTSAM_INCLUDE_DIR}.")
+else()
+  message(WARNING "GTSAM not found")
+endif()
+
+include_directories(include)
 include_directories(
-  include
-  ${EIGEN_INCLUDE_DIR}
   ${catkin_INCLUDE_DIRS}
+  ${CMAKE_BINARY_DIR}/include
 )
+
+# https://github.com/Crascit/DownloadProject/blob/master/CMakeLists.txt
+if (CMAKE_VERSION VERSION_LESS 3.2)
+    set(UPDATE_DISCONNECTED_IF_AVAILABLE "")
+else()
+    set(UPDATE_DISCONNECTED_IF_AVAILABLE "UPDATE_DISCONNECTED 1")
+endif()
+
+include("${PROJECT_SOURCE_DIR}/okvis/cmake/DownloadProject/DownloadProject.cmake")
+download_project(PROJ                DBoW2
+                 PREFIX ${CMAKE_CURRENT_BINARY_DIR}/DBoW2
+                 GIT_REPOSITORY      https://github.com/dorian3d/DBoW2.git
+                 GIT_TAG             master
+                 ${UPDATE_DISCONNECTED_IF_AVAILABLE}
+)
+
+add_subdirectory(${DBoW2_SOURCE_DIR} ${DBoW2_BINARY_DIR})
+
+# When using CMake 2.8.11 or later, header path dependencies
+# should be automatically added to the targets.
+# But this does not work for DBoW2.
+# For earlier CMake versions, we have to explicitly add the
+# required directories to the header search path ourselves.
+# if (CMAKE_VERSION VERSION_LESS 2.8.11)
+    include_directories("${DBoW2_SOURCE_DIR}/include")
+# endif()
+
+### Download and unzip the vocabularly file
+if(NOT EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/vocabulary/ORBvoc.yml)
+  message(STATUS "Downloading vocabulary file from dropbox.")
+  file(DOWNLOAD
+       http://www.dropbox.com/s/lyo0qgbdxn6eg6o/ORBvoc.zip?dl=1
+       ${CMAKE_CURRENT_SOURCE_DIR}/vocabulary/ORBvoc.zip
+       SHOW_PROGRESS
+       STATUS orbvoc_download_success
+       TIMEOUT 60
+       EXPECTED_MD5 41c290ca05ab2b68548dc6542632d69f)
+  if(orbvoc_download_success)
+    message(STATUS "Unzipping vocabulary file.")
+
+    execute_process(COMMAND ${CMAKE_COMMAND} -E tar xzf ${CMAKE_CURRENT_SOURCE_DIR}/vocabulary/ORBvoc.zip
+                            WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/vocabulary/)
+    message(STATUS "Moving vocabulary file.")
+    execute_process(COMMAND ${CMAKE_COMMAND} -E copy_directory
+                    ${CMAKE_CURRENT_SOURCE_DIR}/vocabulary/ORBvoc/
+                    ${CMAKE_CURRENT_SOURCE_DIR}/vocabulary/)
+    execute_process(COMMAND ${CMAKE_COMMAND} -E remove_directory ${CMAKE_CURRENT_SOURCE_DIR}/vocabulary/ORBvoc/)
+  else(orbvoc_download_success)
+    message(STATUS "Failed to download vocabulary file. Please download manually.")
+  endif(orbvoc_download_success)
+else()
+  message(STATUS "Vocabulary file exists, will not download.")
+endif()
+
+if(GTSAM_FOUND)
+  add_subdirectory(Kimera-RPGO)
+  include_directories(Kimera-RPGO)
+  list(APPEND LINK_LIBRARIES KimeraRPGO)
+endif()
 
 # compile the ROS dependent stuff into a library
 add_definitions(-fPIC -march=native -Wextra -Winit-self -Woverloaded-virtual
                 -Wnon-virtual-dtor -Wsign-promo -Wno-long-long -std=c++0x)
 
 LIST(APPEND SOURCEFILES
-    src/io_wrap/Subscriber.cpp
+    src/feature_tracker/feature_tracker.cpp
+
+    src/gtsam/VioBackEndParams.cpp
+    src/gtsam/ImuFactorTestHelpers.cpp
+
+    src/io_wrap/CameraPoseVisualization.cpp
+    src/io_wrap/CommonGflags.cpp
+    src/io_wrap/PgoPublisher.cpp
     src/io_wrap/Player.cpp
+    src/io_wrap/PoseViewer.cpp
     src/io_wrap/Publisher.cpp
     src/io_wrap/RosParametersReader.cpp
-    src/io_wrap/PoseViewer.cpp
+    src/io_wrap/StreamHelper.cpp
+    src/io_wrap/Subscriber.cpp
 
-    src/okvis/ceres/CameraTimeParamBlock.cpp
+    src/loop_closure/LcdThirdPartyWrapper.cpp
+    src/loop_closure/LoopClosureDetectorParams.cpp
 
-    src/msckf/BoundedImuDeque.cpp
+    src/msckf/BaseFilter.cpp
+    src/msckf/EkfUpdater.cpp
+    src/msckf/FeatureTriangulation.cpp
     src/msckf/FilterHelper.cpp
-    src/msckf/ImuOdometry.cpp
-    src/msckf/HybridVio.cpp
-    src/msckf/InitialPVandStd.cpp
-    src/msckf/HybridFrontend.cpp
-    src/msckf/triangulate.cpp
-    src/msckf/triangulateFast.cpp
-    src/msckf/VioFrameMatchingAlgorithm.cpp
-    src/msckf/HybridFrameRelativeAdapter.cpp
-    src/msckf/HybridFrameNoncentralAbsoluteAdapter.cpp
-    src/msckf/ImuSimulator.cpp
-    src/msckf/PreconditionedEkfUpdater.cpp
+    src/msckf/GeneralEstimator.cpp
     src/msckf/HybridFilter.cpp
+    src/msckf/HybridFrontend.cpp
+    src/msckf/MotionAndStructureStats.cpp
     src/msckf/MSCKF2.cpp
-    src/msckf/TwoViewPair.cpp
-    src/msckf/TFVIO.cpp
+    src/msckf/PointLandmark.cpp
 
-    src/feature_tracker/TrackResultReader.cpp
-    src/feature_tracker/TrailManager.cpp
-    src/feature_tracker/FeatureTrail.cpp
+    src/msckf/StatAccumulator.cpp
+    src/msckf/TFVIO.cpp
+    src/msckf/TwoViewPair.cpp
+    src/msckf/VioEvaluationCallback.cpp
+    src/msckf/VioFactoryMethods.cpp
+    src/msckf/triangulate.cpp
+
+    src/simul/CameraSystemCreator.cpp
+    src/simul/curves.cpp
+    src/simul/ImuNoiseSimulator.cpp
+    src/simul/numeric_ceres_residual_Jacobian.cpp
+    src/simul/PointLandmarkSimulationRS.cpp
+    src/simul/SimulationFrontend.cpp
+    src/simul/VioTestSystemBuilder.cpp
 )
+
+if(GTSAM_FOUND)
+list(APPEND SOURCEFILES
+    src/loop_closure/GtsamWrap.cpp
+    src/loop_closure/LoopClosureDetector.cpp
+
+    src/gtsam/ImuFrontEnd.cpp
+    src/gtsam/ImuFrontEndParams.cpp
+    src/gtsam/RiProjectionFactorIDP.cpp
+    src/gtsam/RiProjectionFactorIDPAnchor.cpp
+    src/gtsam/RiExtendedPose3.cpp
+    src/gtsam/RiExtendedPose3Prior.cpp
+    src/gtsam/RiImuFactor.cpp
+    src/gtsam/RiSlidingWindowSmoother.cpp
+    src/gtsam/SlidingWindowSmoother.cpp
+)
+endif(GTSAM_FOUND)
 
 add_library(${PROJECT_NAME} STATIC
   ${SOURCEFILES}
-)
-
-include_directories(
-  ${OKVIS_SOURCE_PATH}/okvis_util/include
-  ${OKVIS_SOURCE_PATH}/okvis_kinematics/include
-  ${OKVIS_SOURCE_PATH}/okvis_time/include
-  ${OKVIS_SOURCE_PATH}/okvis_cv/include
-  ${OKVIS_SOURCE_PATH}/okvis_common/include
-  ${OKVIS_SOURCE_PATH}/okvis_ceres/include
-  ${OKVIS_SOURCE_PATH}/okvis_timing/include
-  ${OKVIS_SOURCE_PATH}/okvis_matcher/include
-  ${OKVIS_SOURCE_PATH}/okvis_frontend/include
-  ${OKVIS_SOURCE_PATH}/okvis_multisensor_processing/include
-  sophus
-  ${vio_common_INCLUDE_DIRS}
-  ${CERES_INCLUDE_DIRS}
 )
 
 add_dependencies(${PROJECT_NAME} okvis_multisensor_processing)
@@ -154,12 +261,14 @@ list(APPEND LINK_LIBRARIES
     okvis_time
     okvis_cv
     okvis_common
+    loop_closure
     okvis_ceres
     okvis_timing
     okvis_matcher
     okvis_frontend
     okvis_multisensor_processing
     ${vio_common_LIBRARIES}
+    DBoW2
     gflags
     pthread
 )
@@ -168,16 +277,37 @@ target_link_libraries(${PROJECT_NAME}
   ${LINK_LIBRARIES}
 )
 
-# now the actual applications
-# a wrapper to invoke a specific test
-add_executable(invoke_one_test src/apps/invoke_one_test.cpp )
-target_link_libraries(invoke_one_test ${PROJECT_NAME})
+if(VISENSORDRIVER_FOUND)
+  target_link_libraries(${PROJECT_NAME} ${VISensorDriver_LIBRARY})
+endif()
 
-add_executable(okvis_node src/apps/okvis_node.cpp)
+include_directories(
+  okvis/okvis_util/include
+  okvis/okvis_kinematics/include
+  okvis/okvis_time/include
+  okvis/okvis_cv/include
+  okvis/okvis_common/include
+  okvis/loop_closure/include
+  okvis/okvis_ceres/include
+  okvis/okvis_timing/include
+  okvis/okvis_matcher/include
+  okvis/okvis_frontend/include 
+  okvis/okvis_multisensor_processing/include
+
+  sophus
+  ${vio_common_INCLUDE_DIRS}
+)
+
+# now the actual applications
+add_executable(okvis_node src/apps/okvis_node.cpp src/apps/VioSystemWrap.cpp)
 target_link_libraries(okvis_node ${PROJECT_NAME})
 
-add_executable(okvis_node_synchronous src/apps/okvis_node_synchronous.cpp)
+add_executable(okvis_node_synchronous src/apps/okvis_node_synchronous.cpp
+    src/apps/VioSystemWrap.cpp)
 target_link_libraries(okvis_node_synchronous ${PROJECT_NAME} )
+
+add_executable(dataset_convertor src/apps/dataset_convertor.cpp)
+target_link_libraries(dataset_convertor ${PROJECT_NAME} )
 
 list(APPEND TEST_SRC_FILES
     test/test_main.cpp
@@ -185,50 +315,80 @@ list(APPEND TEST_SRC_FILES
     test/boost/TestBoostAccumulators.cpp
     test/boost/TestChiSquared.cpp
 
+    test/eigen/TestEigen2CV.cpp
     test/eigen/TestEigenMatrixInitialization.cpp
     test/eigen/TestEigenQR.cpp
+    test/eigen/TestEigenQuaternion.cpp
 
-    test/std/TestBinaryOperators.cpp
-    test/std/TestDerivedClass.cpp
-    test/std/TestMapKeyOrder.cpp
-    test/std/TestSizeof.cpp
-    test/std/TestStdAccumulate.cpp
+    test/io_wrap/TestVioDatasetPlayer.cpp
+   
+    test/loop_closure/TestLcdThirdPartyWrapper.cpp
 
-    test/msckf/TestFeatureInitialization.cpp
-    test/msckf/TestPointObsJacobian.cpp
+    test/msckf/TestBoundedImuDeque.cpp
+    test/msckf/TestCovarianceEstimation.cpp
+    test/msckf/TestEkf.cpp
+    test/msckf/TestEpipolarFactor.cpp
+    test/msckf/TestEpipolarJacobian.cpp
+    test/msckf/TestEuclideanParamError.cpp
     test/msckf/TestExtrinsicJacobian.cpp
+    test/msckf/TestFeatureInitialization.cpp
+    test/msckf/TestFeatureJacobian.cpp
+    test/msckf/TestFilterHelper.cpp
     test/msckf/TestHybridFilter.cpp
     test/msckf/TestImuOdometry.cpp
-    test/msckf/TestTriangulate.cpp
-    test/msckf/TestBoundedImuDeque.cpp
+    test/msckf/TestCurves.cpp
+    test/msckf/TestMergeTwoLandmarks.cpp
+    test/msckf/TestOkvisTriangulateFast.cpp
+    test/msckf/TestOkvisTime.cpp
+    test/msckf/TestPointLandmark.cpp
+    test/msckf/TestPointLandmarkSimulationRS.cpp
+    test/msckf/TestPointObsJacobian.cpp
+    test/msckf/TestQuaternionFromSmallAngle.cpp
     test/msckf/TestRelativeMotionJacobian.cpp
-    test/msckf/TestEpipolarJacobian.cpp
+    test/msckf/TestRsReprojectionError.cpp
+    test/msckf/TestReprojectionErrorWithPap.cpp
+    test/msckf/TestSE3Interpolation.cpp
+    test/msckf/TestTriangulate.cpp
     test/msckf/TestTwoViewPair.cpp
-    test/io_wrap/TestVioDatasetPlayer.cpp
-    )
 
-#QtCreator may not create the allTests target
-#if(CATKIN_ENABLE_TESTING)
-#  set(PROJECT_TEST_NAME ${PROJECT_NAME}_test)
-#  catkin_add_gtest(${PROJECT_TEST_NAME} ${TEST_SRC_FILES})
-#  target_link_libraries(${PROJECT_TEST_NAME} ${PROJECT_NAME} gtest gmock pthread)
-#endif()
+    test/opencv/TestOpenCVDistortion.cpp
 
-if(BUILD_TESTS)
-# The below lines cause tr1 not found issue in Ubuntu 16.04
-#  if(APPLE)
-#    add_definitions(-DGTEST_HAS_TR1_TUPLE=1)
-#  else()
-#    add_definitions(-DGTEST_HAS_TR1_TUPLE=0)
-#  endif(APPLE)
-  enable_testing()
+    test/ros/TestRosbag.cpp
+
+    test/std/TestBinaryOperators.cpp
+    test/std/TestCallMemberFunctionAtConstruction.cpp
+    test/std/TestConstStaticInBaseClass.cpp
+    test/std/TestDequeIterator.cpp
+    test/std/TestDerivedClass.cpp
+    test/std/TestMapKeyOrder.cpp
+    test/std/TestModifyThisInConstMethod.cpp
+    test/std/TestPointerCompare.cpp
+    test/std/TestSizeof.cpp
+    test/std/TestStdAccumulate.cpp
+)
+
+if(GTSAM_FOUND)
+list(APPEND TEST_SRC_FILES
+    test/gtsam/TestTriangulate.cpp
+    test/gtsam/TestGtsamImuFactor.cpp
+    test/gtsam/TestImuFrontEnd.cpp
+    test/gtsam/TestIncrementalFixedLagSmoother.cpp
+    test/gtsam/TestRiExtendedPose3.cpp
+    test/gtsam/TestRiExtendedPose3Prior.cpp
+    test/gtsam/TestRiImuFactor.cpp
+    test/gtsam/TestRiProjectionFactorIDP.cpp
+    test/gtsam/TestRiSmartProjectionFactor.cpp
+    test/gtsam/TestRiTransformPointJacobian.cpp
+    test/loop_closure/TestGtsamBetweenFactor.cpp
+    test/loop_closure/TestLoopClosureMethod.cpp
+    test/loop_closure/TestRPGO.cpp
+    test/loop_closure/TestSimpleProjectionFactor.cpp
+)
+endif(GTSAM_FOUND)
+
+# In a catkin package, do not use or link gtest which is supported poorly.
+if(CATKIN_ENABLE_TESTING)
   set(PROJECT_TEST_NAME ${PROJECT_NAME}_test)
-  add_executable(${PROJECT_TEST_NAME}
-    ${TEST_SRC_FILES}
-  )
-  target_link_libraries(${PROJECT_TEST_NAME}
-    ${PROJECT_NAME}
-    gtest gmock
-    pthread)
-  add_test(test ${PROJECT_TEST_NAME})
+  catkin_add_gtest(${PROJECT_TEST_NAME} ${TEST_SRC_FILES})
+  target_link_libraries(${PROJECT_TEST_NAME} ${PROJECT_NAME})
 endif()

@@ -12,7 +12,9 @@ class TwoViewPair {
   enum TWO_VIEW_CONSTRAINT_SCHEME {
     FIXED_HEAD_RECEDING_TAIL = 0,
     FIXED_TAIL_RECEDING_HEAD,
+    FIXED_MIDDLE,
     MAX_GAP_EVEN_CHANCE,
+    SINGLE_HEAD_TAIL,
   };
 
   /**
@@ -24,7 +26,7 @@ class TwoViewPair {
    *  for n>=8, {(i, i + n/2 - 1)} + {(i, i + n/2)} +
    *  {(i, i + n/2 + 1)} + {(i, i + n/2 + 2)}
    * @param numFeatures number of observations
-   * @return pairs of 0-based frame indices
+   * @return pairs of 0-based frame indices, the first entry is always less than the second
    */
   static std::vector<std::pair<int, int>> getFramePairs(
       int numFeatures,

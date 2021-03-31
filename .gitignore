@@ -33,3 +33,11 @@ documentation/html/
 CMakeLists\.txt\.user
 
 *.m~
+
+*.pyc
+
+evaluation/.idea/
+
+vocabulary/ORBvoc.yml
+
+sensor_calib/build/

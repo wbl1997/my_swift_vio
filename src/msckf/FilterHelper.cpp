@@ -11,12 +11,13 @@ DEFINE_bool(
 
 void FilterHelper::stackJacobianAndResidual(
     const std::vector<Eigen::MatrixXd,
-                      Eigen::aligned_allocator<Eigen::MatrixXd>>& vH_o,
+                      Eigen::aligned_allocator<Eigen::MatrixXd>> &vH_o,
+    const std::vector<Eigen::Matrix<double, -1, 1>,
+                      Eigen::aligned_allocator<Eigen::Matrix<double, -1, 1>>>
+        &vr_o,
     const std::vector<Eigen::MatrixXd,
-                      Eigen::aligned_allocator<Eigen::MatrixXd>>& vr_o,
-    const std::vector<Eigen::MatrixXd,
-                      Eigen::aligned_allocator<Eigen::MatrixXd>>& vR_o,
-    Eigen::MatrixXd* H_o, Eigen::MatrixXd* r_o, Eigen::MatrixXd* R_o) {
+                      Eigen::aligned_allocator<Eigen::MatrixXd>> &vR_o,
+    Eigen::MatrixXd *H_o, Eigen::Matrix<double, -1, 1> *r_o, Eigen::MatrixXd *R_o) {
   int startRow = 0;
   int cols = vH_o[0].cols();
   for (size_t jack = 0; jack < vH_o.size(); ++jack) {
@@ -39,12 +40,6 @@ void FilterHelper::shrinkResidual(const Eigen::MatrixXd& H_o,
     *r_q = r_o;
     *T_H = H_o;
     *R_q = R_o;
-
-    // make T_H compatible with covariance dimension by expanding T_H with
-    // zeros corresponding to the rest states besides nVariableDim
-    //        Eigen::MatrixXd expandedT_H(dimH_o[0], cov.rows());
-    //        expandedT_H<< Eigen::MatrixXd::Zero(dimH_o[0], 42), *T_H,
-    //        Eigen::MatrixXd::Zero(dimH_o[0], 9); *T_H = expandedT_H;
   } else {  // project H_o, reduce the residual dimension
     // TODO(jhuai): use SPQR instead for computing T_H, refer to MSCKF_stereo
     // https://github.com/KumarRobotics/msckf_vio/blob/master/src/msckf_vio.cpp#L930-L950
@@ -86,6 +81,63 @@ int FilterHelper::pruneSquareMatrix(int rm_state_start, int rm_state_end,
     state_cov->conservativeResize(new_cov_dim, new_cov_dim);
   }
   return new_cov_dim;
+}
+
+Eigen::MatrixXd FilterHelper::leftNullspaceWithRankCheck(
+    const Eigen::MatrixXd& A, int columnRankHint) {
+  int rank = A.cols();
+  while (A.col(rank - 1).norm() < 1e-4) {
+    rank--;
+  }
+  rank = columnRankHint < rank ? columnRankHint : rank;
+
+  Eigen::HouseholderQR<Eigen::MatrixXd> qr(A.leftCols(rank));
+  Eigen::MatrixXd nullQ = qr.householderQ();
+
+  int rows = A.rows();
+  nullQ = nullQ.block(0, rank, rows, rows - rank).eval();
+  return nullQ;
+}
+
+bool FilterHelper::multiplyLeftNullspaceWithGivens(
+    Eigen::MatrixXd* Hf, Eigen::MatrixXd* Hx,
+    Eigen::Matrix<double, Eigen::Dynamic, 1>* residual, Eigen::MatrixXd* R,
+    int columnRankHint) {
+  int M = Hf->rows();
+  int N = Hf->cols();
+  if (Hf->col(N - 1).norm() < 1e-4) {
+    N--;
+  }
+  N = columnRankHint < N ? columnRankHint : N;
+  Eigen::JacobiRotation<double> Hf_GR;
+  for (int n = 0; n < N; ++n) {
+    for (int m = M - 1; m > n; m--) {
+      // Givens matrix G
+      Hf_GR.makeGivens((*Hf)(m - 1, n), (*Hf)(m, n));
+
+      // Multiply G' to the corresponding lines (m-1,m) in each matrix
+
+      // Hf
+      // Note: we only apply G' to the nonzero cols [n:N-1], which is
+      //       equivalent to applying G' to the entire row [0:N-1].
+      (Hf->block(m - 1, n, 2, N - n)).applyOnTheLeft(0, 1, Hf_GR.adjoint());
+
+      // G'*Hx
+      (Hx->block(m - 1, 0, 2, Hx->cols()))
+          .applyOnTheLeft(0, 1, Hf_GR.adjoint());
+
+      // G'*r
+      (residual->block(m - 1, 0, 2, 1)).applyOnTheLeft(0, 1, Hf_GR.adjoint());
+    }
+  }
+  // remove the zero section
+  int nDOF = M - N;
+  *residual = residual->block(N, 0, nDOF, 1);
+  *Hx = Hx->block(N, 0, nDOF, Hx->cols());
+  // TODO(jhuai): apply Givens to R
+  R->setZero(nDOF, nDOF);
+  R->diagonal().setOnes();
+  return true;
 }
 
 const double FilterHelper::chi2_95percentile[] = {
@@ -142,24 +194,20 @@ const double FilterHelper::chi2_95percentile[] = {
     543.656319, 544.708807, 545.761243, 546.813625, 547.865954, 548.918230, 549.970453, 551.022624, 552.074743, 553.126809
 };
 
-bool FilterHelper::gatingTest(
-    const Eigen::MatrixXd& H, const Eigen::VectorXd& r,
-    const Eigen::MatrixXd& R, const Eigen::MatrixXd& cov) {
-
+bool FilterHelper::gatingTest(const Eigen::MatrixXd &H,
+                              const Eigen::VectorXd &r,
+                              const Eigen::MatrixXd &R,
+                              const Eigen::MatrixXd &cov) {
   if (FLAGS_use_mahalanobis) {
-    // cf. 1. Li ijrr2014 visual inertial navigation with rolling shutter cameras
-    // cf. 2. Li RSS12 optimization based ... eq 6
     double gamma =
-        r.transpose() *
-        (H * cov * H.transpose() + R).ldlt().solve(r);
-
+        r.transpose() * (H * cov * H.transpose() + R).ldlt().solve(r);
     if (gamma < chi2_95percentile[r.rows()]) {
       return true;
     } else {
       return false;
     }
   } else {
-      return true;
+    return true;
   }
 }
 

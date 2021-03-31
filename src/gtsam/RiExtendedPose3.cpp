@@ -1,0 +1,482 @@
+
+/**
+ * @file  RiExtendedPose3.cpp
+ * @brief right invariant ExtendedPose3
+ */
+
+#include "gtsam/RiExtendedPose3.h"
+
+#include <gtsam/geometry/concepts.h>
+#include <gtsam/geometry/Rot3.h>
+#include <gtsam/base/concepts.h>
+
+#include <cmath>
+#include <iostream>
+#include <limits>
+#include <string>
+
+using namespace std;
+
+namespace gtsam {
+
+namespace geometry {
+
+Eigen::Matrix3d SO3Jr_eigen(const Eigen::Vector3d& omega) {
+  const double theta2 = omega.dot(omega);
+  double theta = std::sqrt(theta2);
+  Eigen::Matrix3d W, K, KK;
+
+  double sin_theta, one_minus_cos;  // only defined if !nearZero
+  const double wx = omega.x(), wy = omega.y(), wz = omega.z();
+  W << 0.0, -wz, +wy, +wz, 0.0, -wx, -wy, +wx, 0.0;
+  bool nearZero = (theta2 <= std::numeric_limits<double>::epsilon());
+  if (!nearZero) {
+    sin_theta = std::sin(theta);
+    const double s2 = std::sin(theta / 2.0);
+    one_minus_cos = 2.0 * s2 * s2;  // numerically better than [1 - cos(theta)]
+  }
+  if (!nearZero) {
+    K = W / theta;
+    KK = K * K;
+  }
+
+  double a, b;
+  Eigen::Matrix3d dexp;
+  if (nearZero) {
+    dexp = I_3x3 - 0.5 * W;
+  } else {
+    a = one_minus_cos / theta;
+    b = 1.0 - sin_theta / theta;
+    dexp = I_3x3 - a * K + b * KK;
+  }
+  return dexp;
+}
+
+// The closed-form formula in Barfoot14tro eq. (102)
+Eigen::Matrix3d SE3Ql(const Eigen::Vector3d& omega,
+                      const Eigen::Vector3d& rho) {
+  const Matrix3 W = skewSymmetric(omega);
+  const Matrix3 P = skewSymmetric(rho);
+  double phi = omega.norm();
+  Eigen::Matrix3d Q;
+  if (std::abs(phi) > 1e-5) {
+    const double sinPhi = sin(phi), cosPhi = cos(phi);
+    const double phi2 = phi * phi, phi3 = phi2 * phi, phi4 = phi3 * phi,
+                 phi5 = phi4 * phi;
+    Q = 0.5 * P + (phi - sinPhi) / phi3 * (W * P + P * W + W * P * W) -
+        (1 - phi2 / 2 - cosPhi) / phi4 *
+            (W * W * P + P * W * W - 3 * W * P * W) -
+        0.5 *
+            ((1 - phi2 / 2 - cosPhi) / phi4 -
+             3 * (phi - sinPhi - phi3 / 6.) / phi5) *
+            (W * P * W * W + W * W * P * W);
+  } else {
+    Q = 0.5 * P + 1. / 6. * (W * P + P * W + W * P * W) +
+        1. / 24. * (W * W * P + P * W * W - 3 * W * P * W) +
+        1. / 120. * (W * P * W * W + W * W * P * W);
+  }
+  return Q;
+}
+
+Matrix63 computeQrforExpmapDerivative(const Vector9& xi) {
+  const auto omega = xi.head<3>();
+  const auto nu = xi.segment<3>(3);
+  const auto rho = xi.tail<3>();
+
+  Matrix3 Qv, Qp;
+  Matrix63 Q;
+  Qv = SE3Qr(omega, nu);
+  Qp = SE3Qr(omega, rho);
+  Q << Qv, Qp;
+  return Q;
+}
+
+Matrix9 SEK3Jr(const Vector9& xi) {
+  const Vector3 w = xi.head<3>();
+  const Matrix3 Jw = Rot3::ExpmapDerivative(w);
+  const Matrix63 Q = computeQrforExpmapDerivative(xi);
+  const Matrix3 Qv = Q.topRows<3>();
+  const Matrix3 Qp = Q.bottomRows<3>();
+  Matrix9 J;
+  J << Jw, Z_3x3, Z_3x3, Qv, Jw, Z_3x3, Qp, Z_3x3, Jw;
+  return J;
+}
+
+Matrix9 SEK3Jr_inv(const Vector9& xi) {
+  // Teng Zhang 2018 UTS thesis eq (2.32)
+  const Vector3 w = xi.head<3>();
+  const Matrix3 Jw = Rot3::LogmapDerivative(w);
+  const Matrix63 Q = computeQrforExpmapDerivative(xi);
+  const Matrix3 Qv = Q.topRows<3>();
+  const Matrix3 Qp = Q.bottomRows<3>();
+  const Matrix3 Qv2 = -Jw * Qv * Jw;
+  const Matrix3 Qp2 = -Jw * Qp * Jw;
+  Matrix9 J;
+
+  J << Jw, Z_3x3, Z_3x3, Qv2, Jw, Z_3x3, Qp2, Z_3x3, Jw;
+  return J;
+}
+}  // namespace geometry
+
+/** instantiate concept checks */
+GTSAM_CONCEPT_POSE_INST(RiExtendedPose3);
+
+/* ************************************************************************* */
+//RiExtendedPose3 RiExtendedPose3::Create(const Rot3& R, const Point3& v, const Point3& p, OptionalJacobian<9, 3> HR, OptionalJacobian<9, 3> Hv,
+//              OptionalJacobian<9, 3> Hp) {
+//  if (HR) *HR << I_3x3, Z_3x3, Z_3x3;
+//  if (Hv) *Hv << Z_3x3, R.transpose(), Z_3x3;
+//  if (Hp) *Hp << Z_3x3, Z_3x3, R.transpose();
+//  return RiExtendedPose3(R, v, p);
+//}
+
+/* ************************************************************************* */
+RiExtendedPose3 RiExtendedPose3::inverse() const {
+  Rot3 Rt = R_.inverse();
+  return RiExtendedPose3(Rt, Rt * (-v_), Rt * (-p_));
+}
+
+/* ************************************************************************* */
+// Calculate Adjoint map
+// Ad_pose is 9*9 matrix that when applied to twist xi, returns Ad_pose(xi)
+Matrix9 RiExtendedPose3::AdjointMap() const {
+  const Matrix3 R = R_.matrix();
+  Matrix3 A = skewSymmetric(v_.x(), v_.y(), v_.z()) * R;
+  Matrix3 B = skewSymmetric(p_.x(), p_.y(), p_.z()) * R;
+  Matrix9 adj;
+  adj << R, Z_3x3, Z_3x3,
+         A, R, Z_3x3,
+         B, Z_3x3, R;
+  return adj;
+}
+
+/* ************************************************************************* */
+Matrix9 RiExtendedPose3::adjointMap(const Vector9& xi) {
+  Matrix3 w_hat = skewSymmetric(xi(0), xi(1), xi(2));
+  Matrix3 v_hat = skewSymmetric(xi(3), xi(4), xi(5));
+  Matrix3 a_hat = skewSymmetric(xi(6), xi(7), xi(8));
+  Matrix9 adj;
+  adj << w_hat, Z_3x3, Z_3x3,
+         v_hat, w_hat, Z_3x3,
+         a_hat, Z_3x3, w_hat;
+  return adj;
+}
+
+/* ************************************************************************* */
+Vector9 RiExtendedPose3::adjoint(const Vector9& xi, const Vector9& y,
+    OptionalJacobian<9, 9> Hxi) {
+  if (Hxi) {
+    Hxi->setZero();
+    for (int i = 0; i < 9; ++i) {
+      Vector9 dxi;
+      dxi.setZero();
+      dxi(i) = 1.0;
+      Matrix9 Gi = adjointMap(dxi);
+      Hxi->col(i) = Gi * y;
+    }
+  }
+  return adjointMap(xi) * y;
+}
+
+/* ************************************************************************* */
+Vector9 RiExtendedPose3::adjointTranspose(const Vector9& xi, const Vector9& y,
+    OptionalJacobian<9, 9> Hxi) {
+  if (Hxi) {
+    Hxi->setZero();
+    for (int i = 0; i < 9; ++i) {
+      Vector9 dxi;
+      dxi.setZero();
+      dxi(i) = 1.0;
+      Matrix9 GTi = adjointMap(dxi).transpose();
+      Hxi->col(i) = GTi * y;
+    }
+  }
+  return adjointMap(xi).transpose() * y;
+}
+
+
+/* ************************************************************************* */
+void RiExtendedPose3::print(const string& s) const {
+  cout << s;
+  R_.print("R:\n");
+  cout << "v:" << v_ << ";" << endl;
+  cout << "p:" << p_ << ";" << endl;
+}
+
+/* ************************************************************************* */
+bool RiExtendedPose3::equals(const RiExtendedPose3& pose, double tol) const {
+  return R_.equals(pose.R_, tol) && traits<Point3>::Equals(v_, pose.v_, tol) && traits<Point3>::Equals(p_, pose.p_, tol);
+}
+
+
+/**
+ * Main retract function, call on during optimization
+ */
+RiExtendedPose3 RiExtendedPose3::retract(const Vector9 &xi) const {
+  return expmap(xi);
+}
+
+/**
+ * Local coordinates of our state
+ * This should NOT be called....
+ * This is basically a "box-minus" operation
+ * Expanding about the current node's tangent space
+ */
+Vector9 RiExtendedPose3::localCoordinates(const RiExtendedPose3 &b) const {
+    return logmap(b);
+}
+
+RiExtendedPose3 RiExtendedPose3::expmap(const Vector9 &xi) const {
+  return Expmap(xi) * *this;
+}
+
+Vector9 RiExtendedPose3::logmap(const RiExtendedPose3 &b) const {
+  return Logmap(b * inverse());
+}
+
+/* ************************************************************************* */
+RiExtendedPose3 RiExtendedPose3::Expmap(const Vector9& xi, OptionalJacobian<9, 9> Hxi) {
+  if (Hxi) *Hxi = ExpmapDerivative(xi);
+
+  Vector3 phi(xi(0), xi(1), xi(2)), nu(xi(3), xi(4), xi(5)), rho(xi(6), xi(7), xi(8));
+
+  Rot3 R = Rot3::Expmap(phi);
+
+  double phi_norm = phi.norm();
+  if (phi_norm < 1e-8)
+    return RiExtendedPose3(Rot3(), Point3(nu), Point3(rho));
+  else {
+    Matrix W = skewSymmetric(phi/phi_norm);
+    Matrix A = I_3x3 + ((1 - cos(phi_norm)) / phi_norm) * W + ((phi_norm - sin(phi_norm)) / phi_norm) * (W * W);
+    return RiExtendedPose3(Rot3::Expmap(phi), Point3(A * nu), Point3(A * rho));
+  }
+
+}
+
+/* ************************************************************************* */
+Vector9 RiExtendedPose3::Logmap(const RiExtendedPose3& pose, OptionalJacobian<9, 9> Hpose) {
+  if (Hpose) *Hpose = LogmapDerivative(pose);
+  const Vector3 phi = Rot3::Logmap(pose.rotation());
+  const Vector3 v = pose.velocity();
+  const Vector3 p = pose.position();
+  const double t = phi.norm();
+  if (t < 1e-8) {
+    Vector9 log;
+    log << phi, v, p;
+    return log;
+  } else {
+    const Matrix3 W = skewSymmetric(phi / t);
+
+    const double Tan = tan(0.5 * t);
+    const Vector3 Wp = W * p;
+    const Vector3 Wv = W * v;
+    const Vector3 nu = v - (0.5 * t) * Wv + (1 - t / (2. * Tan)) * (W * Wv);
+    const Vector3 rho = p - (0.5 * t) * Wp + (1 - t / (2. * Tan)) * (W * Wp);
+    Vector9 log;
+    log << phi, nu, rho;
+    return log;
+  }
+}
+
+RiExtendedPose3 RiExtendedPose3::ChartAtOrigin::Retract(const Vector9& xi, ChartJacobian Hxi) {
+  return Expmap(xi, Hxi);
+}
+
+Vector9 RiExtendedPose3::ChartAtOrigin::Local(const RiExtendedPose3& pose, ChartJacobian Hpose) {
+  return Logmap(pose, Hpose);
+}
+
+/* ************************************************************************* */
+  Vector9 RiExtendedPose3::boxminus(const RiExtendedPose3& g) const {
+  // Matrix3 D_dR_R, D_dt_R, D_dv_R;
+  // const Rot3 dR = R_.between(g.R_, H1 ? &D_dR_R : 0);
+  // const Point3 dt = R_.unrotate(g.p_ - p_, H1 ? &D_dt_R : 0);
+  // const Vector dv = R_.unrotate(g.v_ - v_, H1 ? &D_dv_R : 0);
+
+
+  // Vector9 xi;
+  // Matrix3 D_xi_R;
+  // xi << Rot3::Logmap(dR, (H1 || H2) ? &D_xi_R : 0), dt, dv;
+  // if (H1) {
+  //   *H1 << D_xi_R * D_dR_R, Z_3x3, Z_3x3, //
+  //   D_dt_R, -I_3x3, Z_3x3, //
+  //   D_dv_R, Z_3x3, -I_3x3;
+  // }
+  // if (H2) {
+  //   *H2 << D_xi_R, Z_3x3, Z_3x3, //
+  //   Z_3x3, dR.matrix(), Z_3x3, //
+  //   Z_3x3, Z_3x3, dR.matrix();
+  // }
+
+  Matrix3 D_dR_R, D_dt_R, D_dv_R;
+  const Rot3 dR = g.R_;
+  const Point3 dt = g.p_;
+  const Vector dv = g.v_;
+
+  Vector9 xi;
+  xi << Rot3::Logmap(dR), dt, dv;
+  return xi;
+}
+
+/* ************************************************************************* */
+// warning This assumes right invariant error formulation which leads to
+// Jl. Left invariant error formulation will leads to Jr.
+Matrix9 RiExtendedPose3::ExpmapDerivative(const Vector9& xi) {
+  return geometry::SEK3Jl(xi);
+}
+
+/* ************************************************************************* */
+// warning This assumes right invariant error formulation which leads to
+// Jlinv. Left invariant error formulation will leads to Jrinv.
+Matrix9 RiExtendedPose3::LogmapDerivative(const RiExtendedPose3& pose) {
+  const Vector9 xi = Logmap(pose);
+  return geometry::SEK3Jl_inv(xi);
+}
+
+/* ************************************************************************* */
+const Point3& RiExtendedPose3::position(OptionalJacobian<3, 9> Hself) const {
+  if (Hself) *Hself << Z_3x3, Z_3x3, rotation().matrix();
+  return p_;
+}
+
+const Point3& RiExtendedPose3::translation(OptionalJacobian<3, 9> Hself) const {
+  if (Hself) *Hself << Z_3x3, Z_3x3, rotation().matrix();
+  return p_;
+}
+
+/* ************************************************************************* */
+
+const Point3& RiExtendedPose3::velocity(OptionalJacobian<3, 9> Hself) const {
+  if (Hself) {
+    *Hself << Z_3x3, rotation().matrix(), Z_3x3;
+  }
+  return v_;
+}
+
+/* ************************************************************************* */
+
+const Rot3& RiExtendedPose3::rotation(OptionalJacobian<3, 9> Hself) const {
+  if (Hself) {
+    *Hself << I_3x3, Z_3x3, Z_3x3;
+  }
+  return R_;
+}
+
+/* ************************************************************************* */
+Matrix5 RiExtendedPose3::matrix() const {
+  Matrix5 mat;
+  mat << R_.matrix(), v_, p_,
+        0.0, 0.0, 0.0, 1.0, 0.0,
+        0.0, 0.0, 0.0, 0.0, 1.0;
+  return mat;
+}
+
+/* ************************************************************************* */
+RiExtendedPose3 RiExtendedPose3::transformPoseTo(const RiExtendedPose3& wTb, OptionalJacobian<9, 9> Hself, OptionalJacobian<9, 9> HwTb) const {
+  if (Hself) *Hself = -wTb.inverse().AdjointMap() * AdjointMap();
+  if (HwTb) *HwTb = I_9x9;
+  const RiExtendedPose3& wTa = *this;
+  return wTa.inverse() * wTb;
+}
+
+/* ************************************************************************* */
+Point3 RiExtendedPose3::transformFrom(const Point3& point, OptionalJacobian<3, 9> Hself,
+    OptionalJacobian<3, 3> Hpoint) const {
+  // Only get matrix once, to avoid multiple allocations,
+  // as well as multiple conversions in the Quaternion case
+  const Matrix3 R = R_.matrix();
+  if (Hself) {
+    Hself->leftCols<3>() = R * skewSymmetric(-point.x(), -point.y(), -point.z());
+    Hself->rightCols<3>() = R;
+  }
+  if (Hpoint) {
+    *Hpoint = R;
+  }
+  return R_ * point + p_;
+}
+
+/* ************************************************************************* */
+Point3 RiExtendedPose3::transformTo(const Point3& point, OptionalJacobian<3, 9> Hself,
+    OptionalJacobian<3, 3> Hpoint) const {
+  // Only get transpose once, to avoid multiple allocations,
+  // as well as multiple conversions in the Quaternion case
+  const Matrix3 Rt = R_.transpose();
+  const Point3 q(Rt*(point - p_));
+  if (Hself) {
+    const double wx = q.x(), wy = q.y(), wz = q.z();
+    (*Hself) <<
+        0.0, -wz, +wy,0.0,0.0,0.0,-1.0, 0.0, 0.0,
+        +wz, 0.0, -wx,0.0,0.0,0.0, 0.0,-1.0, 0.0,
+        -wy, +wx, 0.0,0.0,0.0,0.0, 0.0, 0.0,-1.0;
+  }
+  if (Hpoint) {
+    *Hpoint = Rt;
+  }
+  return q;
+}
+
+/* ************************************************************************* */
+double RiExtendedPose3::range(const Point3& point, OptionalJacobian<1, 9> Hself,
+                    OptionalJacobian<1, 3> Hpoint) const {
+  Matrix39 D_local_pose;
+  Matrix3 D_local_point;
+  Point3 local = transformTo(point, Hself ? &D_local_pose : 0, Hpoint ? &D_local_point : 0);
+  if (!Hself && !Hpoint) {
+    return local.norm();
+  } else {
+    Matrix13 D_r_local;
+    const double r = norm3(local, D_r_local);
+    if (Hself) *Hself = D_r_local * D_local_pose;
+    if (Hpoint) *Hpoint = D_r_local * D_local_point;
+    return r;
+  }
+}
+
+/* ************************************************************************* */
+double RiExtendedPose3::range(const RiExtendedPose3& pose, OptionalJacobian<1, 9> Hself,
+                    OptionalJacobian<1, 9> Hpose) const {
+  Matrix13 D_local_point;
+  double r = range(pose.translation(), Hself, Hpose ? &D_local_point : 0);
+  if (Hpose) *Hpose << Matrix13::Zero(), D_local_point * pose.rotation().matrix();
+  return r;
+}
+
+/* ************************************************************************* */
+Unit3 RiExtendedPose3::bearing(const Point3& point, OptionalJacobian<2, 9> Hself,
+                     OptionalJacobian<2, 3> Hpoint) const {
+  Matrix39 D_local_pose;
+  Matrix3 D_local_point;
+  Point3 local = transformTo(point, Hself ? &D_local_pose : 0, Hpoint ? &D_local_point : 0);
+  if (!Hself && !Hpoint) {
+    return Unit3(local);
+  } else {
+    Matrix23 D_b_local;
+    Unit3 b = Unit3::FromPoint3(local, D_b_local);
+    if (Hself) *Hself = D_b_local * D_local_pose;
+    if (Hpoint) *Hpoint = D_b_local * D_local_point;
+    return b;
+  }
+}
+
+/* ************************************************************************* */
+Unit3 RiExtendedPose3::bearing(const RiExtendedPose3& pose, OptionalJacobian<2, 9> Hself,
+                     OptionalJacobian<2, 9> Hpose) const {
+  if (Hpose) {
+    Hpose->setZero();
+    return bearing(pose.translation(), Hself, Hpose.cols<3>(3));
+  }
+  return bearing(pose.translation(), Hself, boost::none);
+}
+
+
+/* ************************************************************************* */
+std::ostream &operator<<(std::ostream &os, const RiExtendedPose3& pose) {
+  os << pose.rotation();
+  const Point3& v = pose.velocity();
+  const Point3& p = pose.position();
+  os << "v:[" << v.x() << ", " << v.y() << ", " << v.z() << "];\n";
+  os << "p:[" << p.x() << ", " << p.y() << ", " << p.z() << "];\n";
+  return os;
+}
+
+} // namespace gtsam

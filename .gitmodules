@@ -4,3 +4,7 @@
 [submodule "sophus"]
 	path = sophus
 	url = https://github.com/stevenlovegrove/Sophus.git
+[submodule "Kimera-RPGO"]
+	path = Kimera-RPGO
+	url = https://github.com/JzHuai0108/Kimera-RPGO.git
+	branch = master

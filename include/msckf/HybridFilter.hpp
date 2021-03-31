@@ -21,24 +21,20 @@
 #include <okvis/ceres/PoseParameterBlock.hpp>
 #include <okvis/ceres/ReprojectionError.hpp>
 #include <okvis/ceres/SpeedAndBiasParameterBlock.hpp>
-#include <okvis/ceres/EuclideanParamBlockSized.hpp>
-
-#include <msckf/ImuOdometry.h>
-#include <msckf/CameraRig.hpp>
+#include <msckf/EuclideanParamBlockSized.hpp>
+#include <okvis/Estimator.hpp>
 #include <okvis/timing/Timer.hpp>
 
-#include <vio/CsvReader.h>
-#include <vio/ImuErrorModel.h>
-
-#include "msckf/BoundedImuDeque.hpp"
-#include "msckf/InitialPVandStd.hpp"
+#include <msckf/BaseFilter.h>
+#include <msckf/CameraRig.hpp>
+#include <msckf/MotionAndStructureStats.h>
+#include <msckf/PointLandmark.hpp>
+#include <msckf/PointSharedData.hpp>
+#include <msckf/memory.h>
+#include <msckf/imu/ImuOdometry.h>
 
 /// \brief okvis Main namespace of this package.
 namespace okvis {
-
-namespace ceres {
-typedef EuclideanParamBlockSized<9> ShapeMatrixParamBlock;
-}
 
 enum RetrieveObsSeqType {
     ENTIRE_TRACK=0,
@@ -46,26 +42,20 @@ enum RetrieveObsSeqType {
     HEAD_TAIL,
 };
 
-//! The estimator class
-/*!
- The estimator class. This does all the backend work.
+/**
+ * @brief The HybridFilter class uses short feature track observations in the
+ * MSCKF manner and long feature track observations in the SLAM manner, i.e.,
+ * putting the landmark into the state vector.
+ * It does not support iterative EKF.
+
  Frames:
  W: World
- B: Body, usu. tied to S and denoted by S in this codebase
  C: Camera
- S: Sensor (IMU), S frame is defined such that its rotation component is
-     fixed to the nominal value of R_SC0 and its origin is at the
-     accelerometer intersection as discussed in Huai diss. In this case, the
-     remaining misalignment between the conventional IMU frame (A) and the C
-     frame will be absorbed into T_a, the IMU accelerometer misalignment matrix
-
-     w_m = T_g * w_B + T_s * a_B + b_w + n_w
-     a_m = T_a * a_B + b_a + n_a = S * M * R_AB * a_B + b_a + n_a
-
-     The conventional IMU frame has origin at the accelerometers intersection
-     and x-axis aligned with accelerometer x.
+ S: Sensor (IMU)
+ B: Body, defined by the IMU model, e.g., Imu_BG_BA, usually defined close to S.
+ Its relation to the camera frame is modeled by the extrinsic model, e.g., Extrinsic_p_CB.
  */
-class HybridFilter : public VioBackendInterface {
+class HybridFilter : public Estimator, public BaseFilter {
  public:
   OKVIS_DEFINE_EXCEPTION(Exception, std::runtime_error)
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
@@ -73,48 +63,17 @@ class HybridFilter : public VioBackendInterface {
   /**
    * @brief The default constructor.
    */
-  HybridFilter(const double readoutTime);
+  HybridFilter();
 
   /**
    * @brief Constructor if a ceres map is already available.
    * @param mapPtr Shared pointer to ceres map.
    */
-  HybridFilter(std::shared_ptr<okvis::ceres::Map> mapPtr,
-               const double readoutTime = 0.0);
+  HybridFilter(std::shared_ptr<okvis::ceres::Map> mapPtr);
 
   virtual ~HybridFilter();
 
-  /// @name Sensor configuration related
-  ///@{
-  /**
-   * @brief Add a camera to the configuration. Sensors can only be added and
-   * never removed.
-   * @param extrinsicsEstimationParameters The parameters that tell how to
-   * estimate extrinsics.
-   * @return Index of new camera.
-   */
-  int addCamera(const okvis::ExtrinsicsEstimationParameters
-                    &extrinsicsEstimationParameters);
-
-  /**
-   * @brief Add an IMU to the configuration.
-   * @warning Currently there is only one IMU supported.
-   * @param imuParameters The IMU parameters.
-   * @return index of IMU.
-   */
-  int addImu(const okvis::ImuParameters &imuParameters);
-
-  /**
-   * @brief Remove all cameras from the configuration
-   */
-  void clearCameras();
-
-  /**
-   * @brief Remove all IMUs from the configuration.
-   */
-  void clearImus();
-
-  /// @}
+  void addCameraSystem(const okvis::cameras::NCameraSystem& cameras) final;
 
   /**
    * @brief add a state to the state map
@@ -129,804 +88,623 @@ class HybridFilter : public VioBackendInterface {
    * gravity direction which is assumed in the IMU propagation Only one IMU is
    * supported for now
    */
-  virtual bool addStates(okvis::MultiFramePtr multiFrame,
-                         const okvis::ImuMeasurementDeque &imuMeasurements,
-                         bool asKeyframe);
+  bool addStates(okvis::MultiFramePtr multiFrame,
+                 const okvis::ImuMeasurementDeque &imuMeasurements,
+                 bool asKeyframe) final;
 
   /**
-   * @brief Prints state information to buffer.
-   * @param poseId The pose Id for which to print.
-   * @param buffer The puffer to print into.
+   * @brief optimize
+   * @param numIter
+   * @param numThreads
+   * @param verbose
    */
-  void printStates(uint64_t poseId, std::ostream &buffer) const;
+  void optimize(size_t numIter, size_t numThreads = 1,
+                bool verbose = false) override;
 
   /**
-   * @brief Add a landmark.
-   * @param landmarkId ID of the new landmark.
-   * @param landmark Homogeneous coordinates of landmark in W-frame.
-   * @return True if successful.
-   */
-  bool addLandmark(uint64_t landmarkId, const Eigen::Vector4d &landmark);
-
-  /**
-   * @brief Add an observation to a landmark.
-   * \tparam GEOMETRY_TYPE The camera geometry type for this observation.
-   * @param landmarkId ID of landmark.
-   * @param poseId ID of pose where the landmark was observed.
-   * @param camIdx ID of camera frame where the landmark was observed.
-   * @param keypointIdx ID of keypoint corresponding to the landmark.
-   * @return Residual block ID for that observation.
-   */
-  template <class GEOMETRY_TYPE>
-  ::ceres::ResidualBlockId addObservation(uint64_t landmarkId, uint64_t poseId,
-                                          size_t camIdx, size_t keypointIdx);
-  /**
-   * @brief Remove an observation from a landmark, if available.
-   * @param landmarkId ID of landmark.
-   * @param poseId ID of pose where the landmark was observed.
-   * @param camIdx ID of camera frame where the landmark was observed.
-   * @param keypointIdx ID of keypoint corresponding to the landmark.
-   * @return True if observation was present and successfully removed.
-   */
-  bool removeObservation(uint64_t landmarkId, uint64_t poseId, size_t camIdx,
-                         size_t keypointIdx);
-
-  /**
-   * @brief Applies the dropping/marginalization strategy according to the
-   * RSS'13/IJRR'14 paper. The new number of frames in the window will be
+   * @brief Drop out redundant frames if the number of frames in the window is greater than
    * numKeyframes+numImuFrames.
    * @return True if successful.
    */
-  virtual bool applyMarginalizationStrategy(
+  bool applyMarginalizationStrategy(
       size_t numKeyframes, size_t numImuFrames,
-      okvis::MapPointVector &removedLandmarks);
-
-  /**
-   * @brief Initialise pose from IMU measurements. For convenience as static.
-   * @param[in]  imuMeasurements The IMU measurements to be used for this.
-   * @param[out] T_WS initialised pose.
-   * @return True if successful.
-   */
-  static bool initPoseFromImu(const okvis::ImuMeasurementDeque &imuMeasurements,
-                              okvis::kinematics::Transformation &T_WS);
-
-  virtual void optimize(size_t numIter, size_t numThreads = 1,
-                        bool verbose = false);
-
-  /**
-   * @brief Set a time limit for the optimization process.
-   * @param[in] timeLimit Time limit in seconds. If timeLimit < 0 the time limit
-   * is removed.
-   * @param[in] minIterations minimum iterations the optimization process should
-   * do disregarding the time limit.
-   * @return True if successful.
-   */
-  bool setOptimizationTimeLimit(double timeLimit, int minIterations);
-
-  /**
-   * @brief Checks whether the landmark is added to the estimator.
-   * @param landmarkId The ID.
-   * @return True if added.
-   */
-  bool isLandmarkAdded(uint64_t landmarkId) const {
-    bool isAdded = landmarksMap_.find(landmarkId) != landmarksMap_.end();
-    OKVIS_ASSERT_TRUE_DBG(
-        Exception, isAdded == mapPtr_->parameterBlockExists(landmarkId),
-        "id=" << landmarkId << " inconsistent. isAdded = " << isAdded);
-    return isAdded;
-  }
-
-  /**
-   * @brief Checks whether the landmark is initialized.
-   * @param landmarkId The ID.
-   * @return True if initialised.
-   */
-  bool isLandmarkInitialized(uint64_t landmarkId) const;
+      okvis::MapPointVector &removedLandmarks) override;
 
   /// @name Getters
   ///\{
-  /**
-   * @brief Get a specific landmark.
-   * @param[in]  landmarkId ID of desired landmark.
-   * @param[out] mapPoint Landmark information, such as quality, coordinates
-   * etc.
-   * @return True if successful.
-   */
-  bool getLandmark(uint64_t landmarkId, okvis::MapPoint &mapPoint) const;
 
-  /**
-   * @brief Get a copy of all the landmarks as a PointMap.
-   * @param[out] landmarks The landmarks.
-   * @return number of landmarks.
-   */
-  size_t getLandmarks(okvis::PointMap &landmarks) const;
-
-  /**
-   * @brief Get a copy of all the landmark in a MapPointVector. This is for
-   * legacy support. Use getLandmarks(okvis::PointMap&) if possible.
-   * @param[out] landmarks A vector of all landmarks.
-   * @see getLandmarks().
-   * @return number of landmarks.
-   */
-  size_t getLandmarks(okvis::MapPointVector &landmarks) const;
-
-  /**
-   * @brief Get a multiframe.
-   * @param frameId ID of desired multiframe.
-   * @return Shared pointer to multiframe.
-   */
-  okvis::MultiFramePtr multiFrame(uint64_t frameId) const {
-    OKVIS_ASSERT_TRUE_DBG(
-        Exception, multiFramePtrMap_.find(frameId) != multiFramePtrMap_.end(),
-        "Requested multi-frame does not exist in estimator.");
-    return multiFramePtrMap_.at(frameId);
+  int getEstimatedVariableMinimalDim() const final {
+    return covariance_.rows();
   }
 
-  /**
-   * @brief Get pose for a given pose ID.
-   * @param[in]  poseId ID of desired pose.
-   * @param[out] T_WS Homogeneous transformation of this pose.
-   * @return True if successful.
-   */
-  bool get_T_WS(uint64_t poseId, okvis::kinematics::Transformation &T_WS) const;
-
-  // the following access the optimization graph, so are not very fast.
-  // Feel free to implement caching for them...
-  /**
-   * @brief Get speeds and IMU biases for a given pose ID.
-   * @warning This accesses the optimization graph, so not very fast.
-   * @param[in]  poseId ID of pose to get speeds and biases for.
-   * @param[in]  imuIdx index of IMU to get biases for. As only one IMU is
-   * supported this is always 0.
-   * @param[out] speedAndBias Speed And bias requested.
-   * @return True if successful.
-   */
-  bool getSpeedAndBias(uint64_t poseId, uint64_t imuIdx,
-                       okvis::SpeedAndBiases &speedAndBias) const;
-
-  bool getTimeDelay(uint64_t poseId, int camIdx, okvis::Duration *td) const;
-
-  /**
-   * @brief Get camera states for a given pose ID.
-   * @warning This accesses the optimization graph, so not very fast.
-   * @param[in]  poseId ID of pose to get camera state for.
-   * @param[in]  cameraIdx index of camera to get state for.
-   * @param[out] T_SCi Homogeneous transformation from sensor (IMU) frame to
-   * camera frame.
-   * @return True if successful.
-   */
-  bool getCameraSensorStates(uint64_t poseId, size_t cameraIdx,
-                             okvis::kinematics::Transformation &T_SCi) const;
-
-  /// @brief Get the number of states/frames in the estimator.
-  /// \return The number of frames.
-  size_t numFrames() const { return statesMap_.size(); }
-
-  /// @brief Get the number of landmarks in the estimator
-  /// \return The number of landmarks.
-  size_t numLandmarks() const { return landmarksMap_.size(); }
-
-  /// @brief Get the ID of the current keyframe.
-  /// \return The ID of the current keyframe.
-  uint64_t currentKeyframeId() const;
-
-  /**
-   * @brief Get the ID of an older frame.
-   * @param[in] age age of desired frame. 0 would be the newest frame added to
-   * the state.
-   * @return ID of the desired frame or 0 if parameter age was out of range.
-   */
-  uint64_t frameIdByAge(size_t age) const;
-
-  /// @brief Get the ID of the newest frame added to the state.
-  /// \return The ID of the current frame.
-  uint64_t currentFrameId() const;
-
-  ///@}
-
-  /**
-   * @brief Checks if a particular frame is a keyframe.
-   * @param[in] frameId ID of frame to check.
-   * @return True if the frame is a keyframe.
-   */
-  bool isKeyframe(uint64_t frameId) const {
-    return statesMap_.at(frameId).isKeyframe;
-  }
-
-  /**
-   * @brief Checks if a particular frame is still in the IMU window.
-   * @param[in] frameId ID of frame to check.
-   * @return True if the frame is in IMU window.
-   */
-  bool isInImuWindow(uint64_t frameId) const;
-
-  /// @name Getters
-  /// @{
-  /**
-   * @brief Get the timestamp for a particular frame.
-   * @param[in] frameId ID of frame.
-   * @return Timestamp of frame.
-   */
-  okvis::Time timestamp(uint64_t frameId) const {
-    return statesMap_.at(frameId).timestamp;
-  }
-
-  ///@}
-  /// @name Setters
-  ///@{
-  /**
-   * @brief Set pose for a given pose ID.
-   * @warning This accesses the optimization graph, so not very fast.
-   * @param[in] poseId ID of the pose that should be changed.
-   * @param[in] T_WS new homogeneous transformation.
-   * @return True if successful.
-   */
-  bool set_T_WS(uint64_t poseId, const okvis::kinematics::Transformation &T_WS);
-
-  /**
-   * @brief Set the speeds and IMU biases for a given pose ID.
-   * @warning This accesses the optimization graph, so not very fast.
-   * @param[in] poseId ID of the pose to change corresponding speeds and biases
-   * for.
-   * @param[in] imuIdx index of IMU to get biases for. As only one IMU is
-   * supported this is always 0.
-   * @param[in] speedAndBias new speeds and biases.
-   * @return True if successful.
-   */
-  bool setSpeedAndBias(uint64_t poseId, size_t imuIdx,
-                       const okvis::SpeedAndBiases &speedAndBias);
-
-  /**
-   * @brief Set the transformation from sensor to camera frame for a given pose
-   * ID.
-   * @warning This accesses the optimization graph, so not very fast.
-   * @param[in] poseId ID of the pose to change corresponding camera states for.
-   * @param[in] cameraIdx Index of camera to set state for.
-   * @param[in] T_SCi new homogeneous transformation from sensor (IMU) to camera
-   * frame.
-   * @return True if successful.
-   */
-  bool setCameraSensorStates(uint64_t poseId, size_t cameraIdx,
-                             const okvis::kinematics::Transformation &T_SCi);
-
-  /// @brief Set the homogeneous coordinates for a landmark.
-  /// @param[in] landmarkId The landmark ID.
-  /// @param[in] landmark Homogeneous coordinates of landmark in W-frame.
-  /// @return True if successful.
-  bool setLandmark(uint64_t landmarkId, const Eigen::Vector4d &landmark);
-
-  /// @brief Set the landmark initialization state.
-  /// @param[in] landmarkId The landmark ID.
-  /// @param[in] initialized Whether or not initialised.
-  void setLandmarkInitialized(uint64_t landmarkId, bool initialized);
-
-  /// @brief Set whether a frame is a keyframe or not.
-  /// @param[in] frameId The frame ID.
-  /// @param[in] isKeyframe Whether or not keyrame.
-  void setKeyframe(uint64_t frameId, bool isKeyframe) {
-    statesMap_.at(frameId).isKeyframe = isKeyframe;
-  }
-
-  /// @brief set ceres map
-  /// @param[in] mapPtr The pointer to the okvis::ceres::Map.
-  void setMap(std::shared_ptr<okvis::ceres::Map> mapPtr) { mapPtr_ = mapPtr; }
-  ///@}
-
- private:
- public:  // huai
-  /**
-   * @brief Remove an observation from a landmark.
-   * @param residualBlockId Residual ID for this landmark.
-   * @return True if successful.
-   */
-  bool removeObservation(::ceres::ResidualBlockId residualBlockId);
-
-  /// \brief StateInfo This configures the state vector ordering
-  struct StateInfo {
-    /// \brief Constructor
-    /// @param[in] id The Id.
-    /// @param[in] isRequired Whether or not we require the state.
-    /// @param[in] exists Whether or not this exists in the ceres problem.
-    StateInfo(uint64_t id = 0, bool isRequired = true, bool exists = false)
-        : id(id), isRequired(isRequired), exists(exists) {}
-    uint64_t id;       ///< The ID.
-    bool isRequired;   ///< Whether or not we require the state.
-    bool exists;       ///< Whether or not this exists in the ceres problem.
-    uint64_t idInCov;  ///< start id of the state within the covariance matrix
-    int minimalDim;    ///< minimal dimension of this state, which can acctually
-                       ///< replace member "exists"
-  };
-
-  /// \brief GlobalStates The global states enumerated
-  enum GlobalStates {
-    T_WS = 0,           ///< Pose.
-    MagneticZBias = 1,  ///< Magnetometer z-bias, currently unused
-    Qff = 2,            ///< QFF (pressure at sea level), currently unused
-    T_GW = 3            ///< Alignment of global frame, currently unused
-  };
-
-  /// \brief SensorStates The sensor-internal states enumerated
-  enum SensorStates {
-    Camera = 0,      ///< Camera
-    Imu,             ///< IMU
-    Position,        ///< Position, currently unused
-    Gps,             ///< GPS, currently unused
-    Magnetometer,    ///< Magnetometer, currently unused
-    StaticPressure,  ///< Static pressure, currently unused
-    DynamicPressure  ///< Dynamic pressure, currently unused
-  };
-
-  /// \brief CameraSensorStates The camera-internal states enumerated
-  enum CameraSensorStates {
-    T_SCi = 0,   ///< Extrinsics as T_SC, in MSCKF, only p_SC is changing, R_SC
-                 ///< is contant
-    Intrinsic,   ///< Intrinsics, for pinhole camera, fx ,fy, cx, cy
-    Distortion,  ///< Distortion coefficients, for radial tangential distoriton
-                 ///< of pinhole cameras, k1, k2, p1, p2, [k3], this ordering is
-                 ///< OpenCV style
-    TD,          ///< time delay of the image timestamp with respect to the IMU
-                 ///< timescale, Raw t_Ci + t_d = t_Ci in IMU time,
-    TR  ///< t_r is the read out time of a whole frames of a rolling shutter
-        ///< camera
-  };
-
-  /// \brief ImuSensorStates The IMU-internal states enumerated
-  /// \warning This is slightly inconsistent, since the velocity should be
-  /// global.
-  enum ImuSensorStates {
-    SpeedAndBias =
-        0,  ///< Speed and biases as v in /*S*/W-frame, then b_g and b_a
-    TG,     ///< T_g, T_s, T_a in row major order as defined in Li icra14 high
-            ///< fedeltiy
-    TS,
-    TA
-  };
-
-  /// \brief PositionSensorStates, currently unused
-  enum PositionSensorStates {
-    T_PiW = 0,  ///< position sensor frame to world, currently unused
-    PositionSensorB_t_BA = 1  ///< antenna offset, currently unused
-  };
-
-  /// \brief GpsSensorStates, currently unused
-  enum GpsSensorStates {
-    GpsB_t_BA = 0  ///< antenna offset, currently unused
-  };
-
-  /// \brief MagnetometerSensorStates, currently unused
-  enum MagnetometerSensorStates {
-    MagnetometerBias = 0  ///< currently unused
-  };
-
-  /// \brief GpsSensorStates, currently unused
-  enum StaticPressureSensorStates {
-    StaticPressureBias = 0  ///< currently unused
-  };
-
-  /// \brief GpsSensorStates, currently unused
-  enum DynamicPressureSensorStates {
-    DynamicPressureBias = 0  ///< currently unused
-  };
-
-  // getters
-  bool getGlobalStateParameterBlockPtr(
-      uint64_t poseId, int stateType,
-      std::shared_ptr<ceres::ParameterBlock> &stateParameterBlockPtr) const;
-  template <class PARAMETER_BLOCK_T>
-  bool getGlobalStateParameterBlockAs(
-      uint64_t poseId, int stateType,
-      PARAMETER_BLOCK_T &stateParameterBlock) const;
-  template <class PARAMETER_BLOCK_T>
-  bool getGlobalStateEstimateAs(
-      uint64_t poseId, int stateType,
-      typename PARAMETER_BLOCK_T::estimate_t &state) const;
-
-  bool getSensorStateParameterBlockPtr(
-      uint64_t poseId, int sensorIdx, int sensorType, int stateType,
-      std::shared_ptr<ceres::ParameterBlock> &stateParameterBlockPtr) const;
-
-  template <class PARAMETER_BLOCK_T>
-  bool getSensorStateEstimateAs(
-      uint64_t poseId, int sensorIdx, int sensorType, int stateType,
-      typename PARAMETER_BLOCK_T::estimate_t &state) const;
-
-  // setters
-  template <class PARAMETER_BLOCK_T>
-  bool setGlobalStateEstimateAs(
-      uint64_t poseId, int stateType,
-      const typename PARAMETER_BLOCK_T::estimate_t &state);
-
-  template <class PARAMETER_BLOCK_T>
-  bool setSensorStateEstimateAs(
-      uint64_t poseId, int sensorIdx, int sensorType, int stateType,
-      const typename PARAMETER_BLOCK_T::estimate_t &state) {
-    // check existence in states set
-    if (statesMap_.find(poseId) == statesMap_.end()) {
-      OKVIS_THROW_DBG(Exception,
-                      "pose with id = " << poseId << " does not exist.")
-      return false;
-    }
-
-    // obtain the parameter block ID
-    uint64_t id = statesMap_.at(poseId)
-                      .sensors.at(sensorType)
-                      .at(sensorIdx)
-                      .at(stateType)
-                      .id;
-    if (!mapPtr_->parameterBlockExists(id)) {
-      OKVIS_THROW_DBG(Exception,
-                      "pose with id = " << poseId << " does not exist.")
-      return false;
-    }
-
-    std::shared_ptr<ceres::ParameterBlock> parameterBlockPtr =
-        mapPtr_->parameterBlockPtr(id);
-#ifndef NDEBUG
-    std::shared_ptr<PARAMETER_BLOCK_T> derivedParameterBlockPtr =
-        std::dynamic_pointer_cast<PARAMETER_BLOCK_T>(parameterBlockPtr);
-    if (!derivedParameterBlockPtr) {
-      OKVIS_THROW_DBG(Exception, "wrong pointer type requested.")
-      return false;
-    }
-    derivedParameterBlockPtr->setEstimate(state);
-#else
-    std::static_pointer_cast<PARAMETER_BLOCK_T>(parameterBlockPtr)
-        ->setEstimate(state);
-#endif
+  bool computeCovariance(Eigen::MatrixXd* cov) const final {
+    *cov = covariance_;
     return true;
   }
+  ///@}
 
-  // the following are just fixed-size containers for related parameterBlockIds:
-  typedef std::array<StateInfo, 6>
-      GlobalStatesContainer;  ///< Container for global states.
-  typedef std::vector<StateInfo>
-      SpecificSensorStatesContainer;  ///< Container for sensor states. The
-                                      ///< dimension can vary from sensor to
-                                      ///< sensor...
-  typedef std::array<std::vector<SpecificSensorStatesContainer>, 7>
-      AllSensorStatesContainer;  ///< Union of all sensor states.
+  uint64_t mergeTwoLandmarks(uint64_t lmIdA, uint64_t lmIdB) override;
 
-  /// \brief States This summarizes all the possible states -- i.e. their ids:
-  /// t_j = t_{j_0} - imageDelay + t_{d_j}
-  /// here t_{j_0} is the raw timestamp of image j,
-  /// t_{d_j} is the current estimated time offset between the visual and
-  /// inertial data, after correcting the initial time offset
-  /// imageDelay. Therefore, t_{d_j} is set 0 at the beginning t_j is the
-  /// timestamp of the state, remains constant after initialization t_{f_i} =
-  /// t_j - t_{d_j} + t_d + (v-N/2)t_r/N here t_d and t_r are the true time
-  /// offset and image readout time t_{f_i} is the time feature i is observed
-  struct States {
-    EIGEN_MAKE_ALIGNED_OPERATOR_NEW
-    States() : isKeyframe(false), id(0), tdAtCreation(0) {}
-    // _timestamp = image timestamp - imageDelay + _tdAtCreation
-    States(bool isKeyframe, uint64_t id, okvis::Time _timestamp,
-           okvis::Duration _tdAtCreation = okvis::Duration())
-        : isKeyframe(isKeyframe),
-          id(id),
-          timestamp(_timestamp),
-          tdAtCreation(_tdAtCreation) {}
-    GlobalStatesContainer global;
-    AllSensorStatesContainer sensors;
-    bool isKeyframe;
-    uint64_t id;
-    const okvis::Time timestamp;         // t_j, fixed once initialized
-    const okvis::Duration tdAtCreation;  // t_{d_j}, fixed once initialized
-    Eigen::Matrix<double, 6, 1>
-        linearizationPoint;  /// first estimate of position r_WB and velocity
-                             /// v_WB
-  };
-
-  // the following keeps track of all the states at different time instances
-  // (key=poseId)
-  std::map<uint64_t, States, std::less<uint64_t>,
-           Eigen::aligned_allocator<std::pair<const uint64_t, States>>>
-      statesMap_;  ///< Buffer for currently considered states.
-  std::map<uint64_t, okvis::MultiFramePtr>
-      multiFramePtrMap_;  ///< remember all needed okvis::MultiFrame.
-  std::shared_ptr<okvis::ceres::Map> mapPtr_;  ///< The underlying okvis::Map.
-
-  // this is the reference pose
-  uint64_t referencePoseId_;  ///< The pose ID of the reference (currently not
-                              ///< changing)
-
-  // the following are updated after the optimization
-  okvis::PointMap
-      landmarksMap_;  ///< Contains all the current landmarks (synched after
-                      ///< optimisation). maps landmarkId(i.e., homogeneous
-                      ///< point parameter block id) to MapPoint pointer
-  mutable std::mutex statesMutex_;  ///< Regulate access of landmarksMap_.
-
-  // parameters
-  std::vector<okvis::ExtrinsicsEstimationParameters,
-              Eigen::aligned_allocator<okvis::ExtrinsicsEstimationParameters>>
-      extrinsicsEstimationParametersVec_;  ///< Extrinsics parameters.
-  std::vector<okvis::ImuParameters,
-              Eigen::aligned_allocator<okvis::ImuParameters>>
-      imuParametersVec_;  ///< IMU parameters.
-
-  // loss function for reprojection errors
-  std::shared_ptr<::ceres::LossFunction>
-      cauchyLossFunctionPtr_;  ///< Cauchy loss.
-  std::shared_ptr<::ceres::LossFunction>
-      huberLossFunctionPtr_;  ///< Huber loss.
-
-  // the marginalized error term
-  std::shared_ptr<ceres::MarginalizationError>
-      marginalizationErrorPtr_;  ///< The marginalisation class
-  ::ceres::ResidualBlockId
-      marginalizationResidualId_;  ///< Remembers the marginalisation object's
-                                   ///< Id
-
-  // ceres iteration callback object
-  std::unique_ptr<okvis::ceres::CeresIterationCallback>
-      ceresCallback_;  ///< Maybe there was a callback registered, store it
-                       ///< here.
-
- protected:
-  // set latest estimates to intermediate variables for the assumed constant
-  // states which are commonly used in computing Jacobians of all feature
-  // observations
-  void retrieveEstimatesOfConstants();
-
-  void updateStates(const Eigen::Matrix<double, Eigen::Dynamic, 1> &deltaX);
-
- public:
-  okvis::Time firstStateTimestamp();
-
-  void gatherPoseObservForTriang(
+  /**
+   * @brief gatherMapPointObservations
+   * @param mp
+   * @param pointDataPtr
+   * @param obsDirections Each observation is in image plane z=1, (\bar{x}, \bar{y}, 1).
+   * @param obsInPixel
+   * @param vSigmai
+   * @param orderedBadFrameIds[out] Ids of frames that have bad back
+   *     projections of the mappoint.
+   * @param seqType
+   * @return number of gathered valid observations
+   */
+  size_t gatherMapPointObservations(
       const MapPoint &mp,
-      const std::shared_ptr<cameras::CameraBase> cameraGeometry,
-      std::vector<uint64_t> *frameIds,
-      std::vector<okvis::kinematics::Transformation,
-                  Eigen::aligned_allocator<okvis::kinematics::Transformation>>
-          *T_WSs,
+      msckf::PointSharedData *pointDataPtr,
       std::vector<Eigen::Vector3d, Eigen::aligned_allocator<Eigen::Vector3d>>
           *obsDirections,
       std::vector<Eigen::Vector2d, Eigen::aligned_allocator<Eigen::Vector2d>>
           *obsInPixel,
       std::vector<double> *vSigmai,
-      RetrieveObsSeqType seqType=ENTIRE_TRACK) const;
+      std::vector<std::pair<uint64_t, int>>* orderedBadFrameIds,
+      RetrieveObsSeqType seqType = ENTIRE_TRACK) const;
 
   /**
-   * @brief triangulateAMapPoint, does not support rays which arise from static
-   * mode, pure rotation, or points at infinity. Assume the same camera model
-   * for all observations, and rolling shutter effect is not accounted for
+   * @brief hasLowDisparity check if a feature track has low disparity at its endpoints
+   * @param obsDirections [x, y, 1]
+   * @param T_WSs assume the poses are either optimized or propagated with IMU data
+   * @return true if low disparity at its endpoints
+   */
+  bool hasLowDisparity(
+      const std::vector<Eigen::Vector3d,
+                        Eigen::aligned_allocator<Eigen::Vector3d>>
+          &obsDirections,
+      const std::vector<
+          okvis::kinematics::Transformation,
+          Eigen::aligned_allocator<okvis::kinematics::Transformation>> &T_WSs,
+      const Eigen::AlignedVector<okvis::kinematics::Transformation>& T_BCs,
+      const std::vector<size_t>& camIndices) const;
+
+  bool isPureRotation(const MapPoint& mp) const;
+
+  void propagatePoseAndVelocityForMapPoint(msckf::PointSharedData* pointDataPtr) const;
+
+  /**
+   * @brief triangulateAMapPoint initialize a landmark with proper
+   * parameterization. If not PAP, then it does not support rays which arise
+   * from static mode, pure rotation, or points at infinity. Assume the same
+   * camera model for all observations, and rolling shutter effect is not
+   * accounted for in triangulation.
+   * This function will determine the anchor frames if applicable.
    * @param mp
    * @param obsInPixel
    * @param frameIds, id of frames observing this feature in the ascending order
    *    because the MapPoint.observations is an ordinary ordered map
-   * @param v4Xhomog, stores [X,Y,Z,1] in the global frame or the anchor frame
-   *    depending on anchorSeqId
+   * @param pointLandmark, stores [X,Y,Z,1] in the global frame,
+   *  or [X,Y,Z,1] in the anchor frame,
+   *  or [cos\theta, sin\theta, n_x, n_y, n_z] depending on anchorSeqId.
    * @param vSigmai, the diagonal elements of the observation noise matrix, in
    *    pixels, size 2Nx1
-   * @param cameraGeometry, used for point projection
-   * @param T_SC0
-   * @param anchorSeqId index of the anchor frame in the ordered observation map
-   *    -1 by default meaning that AIDP is not used
+   * @param pointDataPtr[in/out] shared data of the map point for computing
+   * poses and velocity at observation.
+   * The anchor frames will be set depending on the landmarkModelId_.
+   * If 0, none anchor.
+   * else if 1, last frame (of orderedCulledFrameIds if not null) observing the map point
+   * else if 2, last frame (of orderedCulledFrameIds if not null) is main anchor,
+   * first frame is associate anchor.
+   * @param orderedCulledFrameIds[in/out] Ordered Ids of frames to be used for
+   * update, e.g., in marginalization. Some frame Ids may be erased in this
+   * function due to bad back projection.
    * @return true if triangulation successful
    */
-  bool triangulateAMapPoint(
+  msckf::TriangulationStatus triangulateAMapPoint(
       const MapPoint &mp,
       std::vector<Eigen::Vector2d, Eigen::aligned_allocator<Eigen::Vector2d>>
           &obsInPixel,
-      std::vector<uint64_t> &frameIds, Eigen::Vector4d &v4Xhomog,
+      msckf::PointLandmark& pointLandmark,
       std::vector<double> &vSigmai,
-      const std::shared_ptr<okvis::cameras::CameraBase> cameraGeometry,
-      const okvis::kinematics::Transformation &T_SC0,
-      int anchorSeqId = -1) const;
-  /**
-   * @brief computeHxf, compute the residual and Jacobians for a SLAM feature i
-   * observed in current frame
-   * @param hpbid homogeneous point parameter block id of the map point
-   * @param mp mappoint
-   * @param r_i residual of the observation of the map point in the latest frame
-   * @param H_x Jacobian w.r.t variables related to camera intrinsics, camera
-   * poses (13+9m)
-   * @param H_f Jacobian w.r.t variables of features (3s_k)
-   * @param R_i covariance matrix of this observation (2x2)
-   * @return true if succeeded in computing the residual and Jacobians
-   */
-  bool computeHxf(const uint64_t hpbid, const MapPoint &mp,
-                  Eigen::Matrix<double, 2, 1> &r_i,
-                  Eigen::Matrix<double, 2, Eigen::Dynamic> &H_x,
-                  Eigen::Matrix<double, 2, Eigen::Dynamic> &H_f,
-                  Eigen::Matrix2d &R_i);
+      msckf::PointSharedData* pointDataPtr,
+      std::vector<uint64_t>* orderedCulledFrameIds,
+      bool checkDisparity = false) const;
+
 
   /**
-   * @brief compute the marginalized Jacobian for a feature i's
-   track
-   * assume the number of observations of the map points is at least two
+   * @brief measurementJacobian compute Jacobians for a reprojection residual error.
+   * @warning Both poseId and anchorId should be older than the latest frame Id.
+   * @param homogeneousPoint, if landmarkModel is AIDP,
+   * \f$[\alpha, \beta, 1, \rho] = [X, Y, Z, 1]^C_a / Z^C_a\f$,
+   * if landmarkModel is HPP, \f$[X,Y,Z,1]^W\f$.
+   * \f $[\alpha, \beta, 1]^T = \rho p_{C{t(i, a)}} \f$ or
+   * \f $[\alpha, \beta, 1]^T = \rho p_{C{t(a)}} \f$
+   * \f $t(a) \f$ is the epoch of the anchor state/frame.
+   * \f $t(i, a) \f$ is the observation epoch of feature i in anchor frame a.
+   * @param obs image observation in pixels.
+   * @param observationIndex index of the observation inside the point's shared data.
+   * @param pointDataPtr shared data of the point.
+   * @param J_x Jacobians of the image observation relative to the camera parameters and cloned states.
+   *     It ought to be allocated in advance.
+   * @param J_pfi Jacobian of the image observation relative to landmark parameters, e.g., [\alpha, \beta, \rho].
+   * @param residual
+   * @return true if Jacobians are computed successfully.
+   */
+  virtual bool measurementJacobian(
+      const Eigen::Vector4d& homogeneousPoint,
+      const Eigen::Vector2d& obs, size_t observationIndex,
+      std::shared_ptr<const msckf::PointSharedData> pointDataPtr,
+      Eigen::Matrix<double, 2, Eigen::Dynamic>* J_x,
+      Eigen::Matrix<double, 2, 3>* J_pfi, Eigen::Vector2d* residual) const;
+
+  /**
+   * @brief slamFeatureJacobian, compute the residual and Jacobians for a SLAM
+   * feature i observed in the current frame which may have multiple cameras.
+   * We assume that the landmark is well observed including its depth.
+   * @param mp mappoint
+   * @param H_x Jacobian w.r.t variables related to camera intrinsics, camera
+   * poses, with e.g. (13+9m) columns where m is the number of cloned nav
+   * states.
+   * @param r_i residual of the observation of the map point in the latest
+   * frame.
+   * @param R_i covariance matrix of this observation.
+   * @param H_f Jacobian w.r.t variables of features, of columns 3k
+   * where k is the number of features in the state vector.
+   * @return true if succeeded in computing the residual and Jacobians.
+   */
+  bool slamFeatureJacobian(const MapPoint &mp,
+                           Eigen::MatrixXd &H_x,
+                           Eigen::Matrix<double, -1, 1> &r_i,
+                           Eigen::MatrixXd &R_i,
+                           Eigen::MatrixXd &H_f) const;
+
+  /**
+   * @brief compute the marginalized Jacobian for a feature i's track.
+   * A landmark is first triangulated with the feature track, then Jacobians for
+   * the list of observations are computed. The landmark Jacobian is optionally marginalized.
+   * @warning The number of observations of the map points is at least two.
    * @param mp mappoint
    * @param H_oi Jacobians of feature observations w.r.t variables related to
-   camera intrinsics, camera poses (13+9(m-1)-3)
+   * camera intrinsics, camera poses, e.g., (13+9(m-1)), where m is the number
+   * of cloned nav states.
    * @param r_oi residuals
-   * @param R_oi covariance matrix of these observations
-   * @param ab1rho [\alpha, \beta, 1, \rho] of the point in the anchor frame,
-   representing either an ordinary point or a ray
+   * @param R_oi covariance matrix of these observations.
    * @param pH_fi pointer to the Jacobian of feature observations w.r.t the
-   feature parameterization,[\alpha, \beta, \rho]
+   * feature parameterization, e.g., [\alpha, \beta, \rho].
    * if pH_fi is NULL, r_oi H_oi and R_oi are values after marginalizing H_fi,
-   H_oi is of size (2n-3)x(13+9(m-1)-3);
-   * otherwise, H_oi is of size 2nx(13+9(m-1)-3)
+   * H_oi is of size e.g., (2n-3)x(13+9(m-1)-3);
+   * otherwise, H_oi is of size 2nx(13+9(m-1)-3).
+   * @param involved_frame_ids frames for which to compute Jacobians.
    * @return true if succeeded in computing the residual and Jacobians
    */
-  bool featureJacobian(
-      const MapPoint &mp, Eigen::MatrixXd &H_oi,
-      Eigen::Matrix<double, Eigen::Dynamic, 1> &r_oi, Eigen::MatrixXd &R_oi,
-      Eigen::Vector4d &ab1rho,
-      Eigen::Matrix<double, Eigen::Dynamic, 3> *pH_fi =
-          (Eigen::Matrix<double, Eigen::Dynamic, 3> *)(NULL)) const;
+  virtual bool
+  featureJacobian(const MapPoint &mp,
+                  msckf::PointLandmark *pointLandmark,
+                  Eigen::MatrixXd &H_oi,
+                  Eigen::Matrix<double, Eigen::Dynamic, 1> &r_oi,
+                  Eigen::MatrixXd &R_oi,
+                  Eigen::Matrix<double, Eigen::Dynamic, 3> *pH_fi = nullptr,
+                  std::vector<uint64_t> *involved_frame_ids = nullptr) const;
 
-
-  /// print out the most recent state vector and the stds of its elements. This
-  /// function can be called in the optimizationLoop, but a better way to save
-  /// results is use the publisher loop
-  bool print(const std::string) const;
-
-  bool print(std::ostream &mDebug) const;
-
-  void printTrackLengthHistogram(std::ostream &mDebug) const;
-
-  /// reset initial condition
-  inline void resetInitialPVandStd(const InitialPVandStd &rhs,
-                                   bool bUseExternalPose = false) {
-    pvstd_ = rhs;
-    useExternalInitialPose_ = bUseExternalPose;
-  }
-
-  size_t numObservations(uint64_t landmarkId);
-  /**
-   * @brief getCameraCalibrationEstimate get the latest estimate of camera
-   * calibration parameters
-   * @param vfckptdr
-   * @return the last pose id
-   */
-  uint64_t getCameraCalibrationEstimate(Eigen::Matrix<double, Eigen::Dynamic, 1> &vfckptdr);
-  /**
-   * @brief getTgTsTaEstimate, get the lastest estimate of Tg Ts Ta with entries
-   * in row major order
-   * @param vTGTSTA
-   * @return the last pose id
-   */
-  uint64_t getTgTsTaEstimate(Eigen::Matrix<double, Eigen::Dynamic, 1> &vTGTSTA);
+  Eigen::Vector4d
+  anchoredInverseDepthToWorldCoordinates(const Eigen::Vector4d &ab1rho,
+                                         uint64_t anchorStateId,
+                                         size_t anchorCameraId) const;
 
   /**
-   * @brief get variance for nav, imu, camera extrinsic, intrinsic, td, tr
-   * @param variances
+   * @brief computeStackedJacobianAndResidual
+   * @warning This function is not const because it modifies map point's status member.
+   * @param T_H
+   * @param r_q
+   * @param R_q
+   * @return
    */
-  void getVariance(Eigen::Matrix<double, Eigen::Dynamic, 1> &variances) const;
+  int computeStackedJacobianAndResidual(
+      Eigen::MatrixXd* T_H, Eigen::Matrix<double, Eigen::Dynamic, 1>* r_q,
+      Eigen::MatrixXd* R_q) override;
 
-  bool getFrameId(uint64_t poseId, int &frameIdInSource, bool &isKF) const;
+  void cloneFilterStates(StatePointerAndEstimateList *currentStates) const override;
 
-  void setKeyframeRedundancyThresholds(double dist, double angle,
-                                       double trackingRate,
-                                       size_t minTrackLength);
+  void boxminusFromInput(
+      const StatePointerAndEstimateList& refState,
+      Eigen::Matrix<double, Eigen::Dynamic, 1>* deltaX) const override;
 
-  // will remove state parameter blocks and all of their related residuals
-  okvis::Time removeState(uint64_t stateId);
+  void updateStates(const Eigen::Matrix<double, Eigen::Dynamic, 1> &deltaX) override;
 
-  void initCovariance(int camIdx = 0);
+  void initializeLandmarksInFilter();
 
-  // currently only support one camera
-  void initCameraParamCovariance(int camIdx = 0);
+  /// print out the most recent state vector and the stds of its elements.
+  /// It can be called in the optimizationLoop, but a better way to save
+  /// results is to save in the publisher loop
+  bool print(std::ostream &stream) const final;
+
+  void printTrackLengthHistogram(std::ostream &stream) const final;
+
+  void getCameraTimeParameterPtrs(
+      std::vector<std::shared_ptr<const okvis::ceres::ParameterBlock>>
+          *cameraDelayParameterPtrs,
+      std::vector<std::shared_ptr<const okvis::ceres::ParameterBlock>>
+          *cameraReadoutTimeParameterPtrs) const;
+
+  std::vector<std::shared_ptr<const okvis::ceres::ParameterBlock>>
+      getImuAugmentedParameterPtrs() const;
+
+  void getCameraCalibrationEstimate(
+      Eigen::Matrix<double, Eigen::Dynamic, 1>* cameraParams) const final;
+
+  void getImuAugmentedStatesEstimate(
+      Eigen::Matrix<double, Eigen::Dynamic, 1>* extraParams) const final;
+
+  bool getStateStd(Eigen::Matrix<double, Eigen::Dynamic, 1>* stateStd) const final;
+
+  void initCovariance();
+
+  void initCameraParamCovariance(int camIdx);
 
   void addCovForClonedStates();
 
-  // camera parameters and all cloned states including the last inserted
-  // and all landmarks.
-  // p_B^C, f_x, f_y, c_x, c_y, k_1, k_2, p_1, p_2, [k_3], t_d, t_r,
-  // \pi_{B_i}(=[p_{B_i}^G, q_{B_i}^G, v_{B_i}^G]), l_i
-  inline int cameraParamPoseAndLandmarkMinimalDimen() const {
-    return cameraParamsMinimalDimen() +
+  /**
+   * @brief minimalDimOfAllCameraParams
+   * @warning call this no earlier than first call of addStates().
+   * @return
+   */
+  inline size_t minimalDimOfAllCameraParams() const {
+    size_t totalCamDim = statesMap_.rbegin()
+                             ->second.sensors.at(SensorStates::Camera)
+                             .back()
+                             .at(CameraSensorStates::TR)
+                             .startIndexInCov +
+                         1;
+    size_t totalImuDim = statesMap_.rbegin()
+                             ->second.sensors.at(SensorStates::Camera)
+                             .at(0u)
+                             .at(CameraSensorStates::T_SCi)
+                             .startIndexInCov;
+    return totalCamDim - totalImuDim;
+  }
+
+  /**
+   * @brief cameraParamsMinimalDimFast
+   * @warning call this no earlier than first call of addStates().
+   * @param camIdx
+   * @return
+   */
+  size_t cameraParamsMinimalDimFast(size_t camIdx) const {
+    size_t totalInclusiveDim = statesMap_.rbegin()
+                                   ->second.sensors.at(SensorStates::Camera)
+                                   .at(camIdx)
+                                   .at(CameraSensorStates::TR)
+                                   .startIndexInCov +
+                               1;
+    size_t totalExclusiveDim = statesMap_.rbegin()
+                                   ->second.sensors.at(SensorStates::Camera)
+                                   .at(camIdx)
+                                   .at(CameraSensorStates::T_SCi)
+                                   .startIndexInCov;
+    return totalInclusiveDim - totalExclusiveDim;
+  }
+
+  /**
+   * @brief minimal dim of camera parameters and all cloned states including the last
+   * inserted one and all landmarks.
+   * Ex: C_p_B, f_x, f_y, c_x, c_y, k_1, k_2, p_1, p_2, [k_3], t_d, t_r,
+   * C0_p_Ci, C0_q_Ci, f_x, f_y, c_x, c_y, k_1, k_2, p_1, p_2, [k_3], t_d, t_r,
+   * \pi_{B_i}(=[p_{B_i}^G, q_{B_i}^G, v_{B_i}^G]), l_i
+   * @warning call this no earlier than first call of addStates().
+   * @return
+   */
+  inline size_t cameraParamPoseAndLandmarkMinimalDimen() const {
+    return minimalDimOfAllCameraParams() +
            kClonedStateMinimalDimen * statesMap_.size() +
            3 * mInCovLmIds.size();
   }
 
-  inline int cameraParamsMinimalDimen() const {
-    const int camIdx = 0;
-    return camera_rig_.getCameraParamsMininalDimen(camIdx);
+  inline size_t startIndexOfClonedStates() const {
+    size_t dim = okvis::ceres::ode::kNavErrorStateDim + imu_rig_.getImuParamsMinimalDim(0);
+    for (size_t j = 0; j < camera_rig_.numberCameras(); ++j) {
+      dim += cameraParamsMinimalDimen(j);
+    }
+    return dim;
   }
 
-  inline int startIndexOfClonedStates() const {
-    const int camIdx = 0;
-    return ceres::ode::OdoErrorStateDim +
-           camera_rig_.getCameraParamsMininalDimen(camIdx);
+  /**
+   * @brief startIndexOfClonedStatesFast
+   * @warning call this no earlier than first call of addStates().
+   * @return
+   */
+  inline size_t startIndexOfClonedStatesFast() const {
+    return statesMap_.rbegin()
+               ->second.sensors.at(SensorStates::Camera)
+               .back()
+               .at(CameraSensorStates::TR)
+               .startIndexInCov +
+           1;
   }
 
-  inline int startIndexOfCameraParams() const {
-    return ceres::ode::OdoErrorStateDim;
+  inline size_t startIndexOfCameraParams(size_t camIdx = 0u) const {
+    size_t dim = okvis::ceres::ode::kNavErrorStateDim + imu_rig_.getImuParamsMinimalDim(0);
+    for (size_t i = 0u; i < camIdx; ++i) {
+      dim += cameraParamsMinimalDimen(i);
+    }
+    return dim;
+  }
+
+  /**
+   * @brief startIndexOfCameraParamsFast
+   * @warning call this no earlier than first call of addStates().
+   * @param camIdx
+   * @return
+   */
+  inline size_t startIndexOfCameraParamsFast(
+      size_t camIdx,
+      CameraSensorStates camParamBlockName = CameraSensorStates::T_SCi) const {
+    return statesMap_.rbegin()
+        ->second.sensors.at(SensorStates::Camera)
+        .at(camIdx)
+        .at(camParamBlockName)
+        .startIndexInCov;
+  }
+
+  /**
+   * @brief intraStartIndexOfCameraParams
+   * @warning call this no earlier than first call of addStates().
+   * @param camIdx
+   * @return
+   */
+  inline size_t intraStartIndexOfCameraParams(
+      size_t camIdx,
+      CameraSensorStates camParamBlockName = CameraSensorStates::T_SCi) const {
+    size_t totalInclusiveDim = statesMap_.rbegin()
+                                   ->second.sensors.at(SensorStates::Camera)
+                                   .at(camIdx)
+                                   .at(camParamBlockName)
+                                   .startIndexInCov;
+    size_t totalExclusiveDim = statesMap_.rbegin()
+                                   ->second.sensors.at(SensorStates::Camera)
+                                   .at(0u)
+                                   .at(CameraSensorStates::T_SCi)
+                                   .startIndexInCov;
+    return totalInclusiveDim - totalExclusiveDim;
+  }
+
+  /**
+   * @brief navStateAndImuParamsMinimalDim
+   * @warning assume only one IMU is used.
+   * @param imuIdx
+   * @return
+   */
+  inline size_t navStateAndImuParamsMinimalDim(size_t imuIdx = 0u) {
+    return okvis::ceres::ode::kNavErrorStateDim +
+           imu_rig_.getImuParamsMinimalDim(imuIdx);
   }
 
   // error state: \delta p, \alpha for q, \delta v
   // state: \pi_{B_i}(=[p_{B_i}^G, q_{B_i}^G, v_{B_i}^G])
   static const int kClonedStateMinimalDimen = 9;
 
-  Eigen::MatrixXd
-      covariance_;  ///< covariance of the error vector of all states, error is
-                    ///< defined as \tilde{x} = x - \hat{x} except for rotations
-  /// the error vector corresponds to states x_B | x_imu | x_c | \pi{B_{N-m}}
-  /// ... \pi{B_{N-1}} following Li icra 2014 x_B = [^{G}p_B] ^{G}q_B ^{G}v_B
-  /// b_g b_a]
-  const double imageReadoutTime;  // time to read out one image of the rolling
-                                  // shutter camera
+ protected:
+  void findRedundantCamStates(
+      std::vector<uint64_t>* rm_cam_state_ids,
+      size_t numImuFrames);
 
-  // map from state ID to segments of imu measurements, the imu measurements
-  // covers the last state and current state of the id and extends on both sides
-  okvis::BoundedImuDeque mStateID2Imu;
+  /**
+   * @brief marginalizeRedundantFrames
+   * @param numKeyframes
+   * @param numImuFrames
+   * @return number of marginalized frames
+   */
+  int marginalizeRedundantFrames(size_t numKeyframes, size_t numImuFrames);
 
-  std::map<uint64_t, int>
-      mStateID2CovID_;  // maps state id to the ordered cloned states in the
-                        // covariance matrix
+  /**
+   * @brief changeAnchors Change the anchor frame for a landmark in the state that is losing its anchor frame.
+   * This function handles the case when the landmarks are expressed in a world frame.
+   * @param sortedRemovedStateIds
+   */
+  void changeAnchors(const std::vector<uint64_t>& sortedRemovedStateIds);
 
-  // transformation from the camera frame to the sensor frame
-  kinematics::Transformation T_SC0_;
+  /**
+   * @brief removeAnchorlessLandmarks Remove the landmarks in the state that are losing their anchor frame.
+   * This is an alternative to changeAnchors().
+   * @param sortedRemovedStateIds
+   */
+  void removeAnchorlessLandmarks(const std::vector<uint64_t>& sortedRemovedStateIds);
 
-  double tdLatestEstimate;
-  double trLatestEstimate;
+  bool getOdometryConstraintsForKeyframe(
+      std::shared_ptr<okvis::LoopQueryKeyframeMessage> queryKeyframe) const final;
 
-  // an evolving camera rig to temporarily store the optimized camera
-  // raw parameters and to interface with the camera models
-  okvis::cameras::CameraRig camera_rig_;
+  // using latest state estimates set imu_rig_ and camera_rig_ which are then
+  // used in computing Jacobians of all feature observations
+  void updateSensorRigs();
 
-  Eigen::Matrix<double, 27, 1> vTGTSTA_;
-  IMUErrorModel<double> iem_;
+  void cloneImuAugmentedStates(
+      const States &stateInQuestion,
+      StatePointerAndEstimateList *currentStates) const;
 
-  // minimum of the ids of the states that have tracked features
-  uint64_t minValidStateID;
+  void cloneCameraParameterStates(
+      const States &stateInQuestion,
+      StatePointerAndEstimateList *currentStates,
+      size_t camIdx) const;
+
+  uint64_t getMinValidStateId() const;
+
+  void addImuAugmentedStates(const okvis::Time stateTime, int imu_id,
+                             SpecificSensorStatesContainer* imuInfo);
+
+  /**
+   * @brief updateImuRig update imu_rig_ from states.
+   * @param
+   */
+  void updateImuRig();
+
+  void updateCovarianceIndex();
+
+  /**
+   * @brief updateImuAugmentedStates update states with correction.
+   * @param stateInQuestion
+   * @param deltaAugmentedParams
+   */
+  void updateImuAugmentedStates(const States& stateInQuestion,
+                                const Eigen::VectorXd deltaAugmentedParams);
+
+  void updateCameraSensorStates(const States& stateInQuestion,
+                                const Eigen::VectorXd& deltaX);
+
+  void usePreviousCameraParamBlocks(
+      std::map<uint64_t, States>::const_reverse_iterator prevStateRevIter,
+      size_t cameraIndex, SpecificSensorStatesContainer* cameraInfos) const;
+
+  void initializeCameraParamBlocks(okvis::Time stateEpoch, size_t cameraIndex,
+                                   SpecificSensorStatesContainer *cameraInfos);
+
+  // epipolar measurement used by filters for computing Jacobians
+  // https://en.cppreference.com/w/cpp/language/nested_types
+  class EpipolarMeasurement {
+   public:
+    EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+    EpipolarMeasurement(
+        const HybridFilter& filter,
+        const uint32_t imageHeight,
+        int camIdx, int extrinsicModelId, int minExtrinsicDim, int minProjDim,
+        int minDistortDim);
+
+    void prepareTwoViewConstraint(
+        const std::vector<Eigen::Vector3d,
+                          Eigen::aligned_allocator<Eigen::Vector3d>>
+            &obsDirections,
+        const std::vector<Eigen::Vector2d,
+                          Eigen::aligned_allocator<Eigen::Vector2d>>
+            &obsInPixels,
+        const std::vector<
+            Eigen::Matrix<double, 3, Eigen::Dynamic>,
+            Eigen::aligned_allocator<Eigen::Matrix<double, 3, Eigen::Dynamic>>>
+            &dfj_dXcam,
+        const std::vector<int> &index_vec);
+
+    /**
+     @ @obsolete the Jacobians do not support ncameras.
+     * @brief measurementJacobian
+     *     The Jacobians for state variables except for states related to time
+     *     can be computed with automatic differentiation.
+     * z = h(X, n) \\
+     * X = \hat{X} \oplus \delta \chi \\
+     * e.g., R = exp(\delta \theta)\hat{R}\\
+     * r = z - h(\hat{X}, 0) = J_x \delta \chi + J_n n \\
+     * J_x = \lim_{\delta \chi \rightarrow 0} \frac{h(\hat{x}\oplus\delta\chi) - h(\hat{x})}{\delta \chi}
+     * The last equation can be used in ceres AutoDifferentiate function for computing the Jacobian.
+     * @param H_xjk
+     * @param H_fjk
+     * @param residual
+     * @return
+     */
+    bool measurementJacobian(
+        std::shared_ptr<const msckf::PointSharedData> pointDataPtr,
+        const std::vector<int> observationIndexPairs,
+        Eigen::Matrix<double, 1, Eigen::Dynamic> *H_xjk,
+        std::vector<Eigen::Matrix<double, 1, 3>,
+                    Eigen::aligned_allocator<Eigen::Matrix<double, 1, 3>>>
+            *H_fjk,
+        double *residual) const;
+
+   private:
+    const HybridFilter& filter_;
+    const int camIdx_;
+    const uint32_t imageHeight_;
+    const int extrinsicModelId_;
+    const int minExtrinsicDim_;
+    const int minProjDim_;
+    const int minDistortDim_;
+
+    std::vector<uint64_t> frameId2;
+    std::vector<okvis::kinematics::Transformation,
+                Eigen::aligned_allocator<okvis::kinematics::Transformation>>
+        T_WS2;
+    std::vector<Eigen::Vector3d, Eigen::aligned_allocator<Eigen::Vector3d>>
+        obsDirection2;
+    std::vector<Eigen::Vector2d, Eigen::aligned_allocator<Eigen::Vector2d>>
+        obsInPixel2;
+    std::vector<
+        Eigen::Matrix<double, 3, Eigen::Dynamic>,
+        Eigen::aligned_allocator<Eigen::Matrix<double, 3, Eigen::Dynamic>>>
+        dfj_dXcam2;
+    std::vector<Eigen::Matrix3d, Eigen::aligned_allocator<Eigen::Matrix3d>>
+        cov_fj2;
+  };
+
+  /**
+   * @brief featureJacobianEpipolar
+   * @warn Number of columns of Hi equals to the required variable dimen.
+   * @param mp MapPoint from which all observations are retrieved
+   * @param Hi de_dX.
+   * @param ri residual 0 - \hat{e}
+   * @param Ri cov(\hat{e})
+   * @return true if Jacobian is computed successfully
+   */
+  bool featureJacobianEpipolar(
+      const MapPoint &mp,
+      Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> *Hi,
+      Eigen::Matrix<double, Eigen::Dynamic, 1> *ri,
+      Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> *Ri,
+      RetrieveObsSeqType seqType) const;
+
+  template <class CameraGeometry, class ProjectionIntrinsicModel,
+  class ExtrinsicModel, class PointLandmarkModel, class ImuModel>
+  msckf::MeasurementJacobianStatus computeCameraObservationJacobians(
+      const msckf::PointLandmark& pointLandmark,
+      std::shared_ptr<const okvis::cameras::CameraBase> baseCameraGeometry,
+      const Eigen::Vector2d& obs,
+      const Eigen::Matrix2d& obsCov, int observationIndex,
+      std::shared_ptr<const msckf::PointSharedData> pointDataPtr,
+      Eigen::MatrixXd* J_X, Eigen::Matrix<double, Eigen::Dynamic, 3>* J_pfi,
+      Eigen::Matrix<double, Eigen::Dynamic, 2>* J_n,
+      Eigen::VectorXd* residual) const;
 
   mutable okvis::timing::Timer triangulateTimer;
   mutable okvis::timing::Timer computeHTimer;
-  okvis::timing::Timer computeKalmanGainTimer;
-  okvis::timing::Timer updateStatesTimer;
-  okvis::timing::Timer updateCovarianceTimer;
   okvis::timing::Timer updateLandmarksTimer;
 
-  // for each point in the state vector/covariance,
-  // its landmark id which points to the parameter block
-  std::deque<uint64_t> mInCovLmIds;
-
-  InitialPVandStd pvstd_;
-  bool useExternalInitialPose_;  // do we use external pose for initialization
-
-  // maximum number of consecutive observations until a landmark is added as a
-  // state, but can be set dynamically as done in
-  // Li, icra14 optimization based ...
-  static const size_t maxTrackLength_ = 12;
-  // i.e., max cloned states in the cov matrix
-
-  size_t minTrackLength_;
-  // i.e., min observs to triang a landmark for the monocular case
 
   std::vector<size_t>
       mTrackLengthAccumulator;  // histogram of the track lengths, start from
                                 // 0,1,2, to a fixed number
-
+  msckf::MotionAndStructureStats slamStats_;
   double trackingRate_;
-  // Threshold for determine keyframes
-  double translationThreshold_;
-  double rotationThreshold_;
-  double trackingRateThreshold_;
 
-  // The window centered at a stateEpoch for retrieving the inertial data
-  // which is used for propagating the camera pose to epochs in the window,
-  // i.e., timestamps of observations in a rolling shutter image.
-  // A value greater than (t_d + t_r)/2 is recommended.
-  // Note camera observations in MSCKF will not occur at the latest frame.
-  static const okvis::Duration half_window_;
+  // minimum number of culled frames in each prune frame state
+  // step if cloned states size hit maxClonedStates_
+  // should be at least 3 for the monocular case so that
+  // the marginalized observations can contribute innovation to the states,
+  // see Sun 2017 Robust stereo appendix D
+  size_t minCulledFrames_;
+
+private:
+  bool hasLandmarkParameterBlock(uint64_t landmarkId) const;
+
+  bool removeLandmarkParameterBlock(uint64_t landmarkId);
+
+  void decimateCovarianceForLandmarks(const std::vector<uint64_t>& toRemoveLmIds);
+
+  // for each point in the state vector/covariance,
+  // its landmark id which points to the parameter block
+  Eigen::AlignedDeque<okvis::ceres::HomogeneousPointParameterBlock> mInCovLmIds;
+
 };
 
-struct IsObservedInFrame {
-  IsObservedInFrame(uint64_t x) : frameId(x) {}
-  bool operator()(
-      const std::pair<okvis::KeypointIdentifier, uint64_t> &v) const {
-    return v.first.frameId == frameId;
-  }
+/**
+ * @brief compute the Jacobians of T_BC relative to extrinsic parameters.
+ * Perturbation in T_BC is defined by kinematics::oplus.
+ * Perturbation in extrinsic parameters are defined by extrinsic models.
+ * @param T_BCi Transform from i camera frame to body frame.
+ * @param T_BC0 Transform from main camera frame to body frame.
+ * @param cameraExtrinsicModelId
+ * @param mainCameraExtrinsicModelId
+ * @param[out] dT_BCi_dExtrinsics list of Jacobians for T_BC.
+ * @param[in, out] involvedCameraIndices observation camera index, and main camera index if T_C0Ci extrinsic model is used.
+ * @pre involvedCameraIndices has exactly one camera index for i camera frame.
+ */
+void computeExtrinsicJacobians(
+    const okvis::kinematics::Transformation& T_BCi,
+    const okvis::kinematics::Transformation& T_BC0,
+    int cameraExtrinsicModelId, int mainCameraExtrinsicModelId,
+    Eigen::AlignedVector<Eigen::MatrixXd>* dT_BCi_dExtrinsics,
+    std::vector<size_t>* involvedCameraIndices,
+    size_t mainCameraIndex);
 
- private:
-  uint64_t frameId;  ///< Multiframe ID.
-};
 }  // namespace okvis
-
-#include "implementation/HybridFilter.hpp"
-
+#include <msckf/implementation/HybridFilter.hpp>
 #endif /* INCLUDE_OKVIS_HYBRID_FILTER_HPP_ */

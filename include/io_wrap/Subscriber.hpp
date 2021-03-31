@@ -64,7 +64,6 @@
 #endif
 
 #include <io_wrap/Publisher.hpp>
-#include <msckf/HybridVio.hpp>
 #include <okvis/Time.hpp>
 #include <okvis/VioInterface.hpp>
 #include <okvis/VioParametersReader.hpp>
@@ -140,7 +139,7 @@ class Subscriber {
   void directFrameCornerCallback(visensor::ViFrame::Ptr frame_ptr,
                                  visensor::ViCorner::Ptr corners_ptr);
   /// \brief Dynamic reconfigure callback
-  void configCallback(okvis_ros::CameraConfig& config, uint32_t level);
+  void configCallback(msckf::CameraConfig& config, uint32_t level);
 #endif
 
   /// @}
@@ -157,11 +156,11 @@ class Subscriber {
 
 #ifdef HAVE_LIBVISENSOR
   std::shared_ptr<visensor::ViSensorDriver> sensor_;  ///< The sensor API.
-  dynamic_reconfigure::Server<okvis_ros::CameraConfig>
+  dynamic_reconfigure::Server<msckf::CameraConfig>
       cameraConfigReconfigureService_;  ///< dynamic reconfigure service.
 #endif
 
-  okvis::VioInterface* vioInterface_;  ///< The VioInterface. (E.g. HybridVio)
+  okvis::VioInterface* vioInterface_;  ///< The VioInterface.
   okvis::VioParameters
       vioParameters_;  ///< The parameters and settings. //huai: although
                        ///< cameraGeometry info is included but not used through

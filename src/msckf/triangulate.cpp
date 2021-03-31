@@ -1,8 +1,6 @@
 #include "msckf/triangulate.h"
 #include <iostream>
 
-#define HAVE_CERES
-#ifdef HAVE_CERES
 #include "ceres/ceres.h"  //LM and Dogleg optimization
 #include "ceres/rotation.h"
 #include "glog/logging.h"
@@ -12,12 +10,12 @@ using ceres::CostFunction;
 using ceres::Problem;
 using ceres::Solve;
 using ceres::Solver;
-#endif
 
-Eigen::Vector4d Get_X_from_xP_lin(
-    std::vector<Eigen::Vector3d, Eigen::aligned_allocator<Eigen::Vector3d>>&
-        vV3Xn,
-    std::vector<Sophus::SE3d, Eigen::aligned_allocator<Sophus::SE3d>>& vSE3,
+Eigen::Vector4d triangulateHomogeneousDLT(
+    const std::vector<Eigen::Vector3d,
+                      Eigen::aligned_allocator<Eigen::Vector3d>>& vV3Xn,
+    const std::vector<Sophus::SE3d, Eigen::aligned_allocator<Sophus::SE3d>>&
+        vSE3,
     Eigen::Matrix<double, Eigen::Dynamic, 1>* pSingular) {
   assert(vV3Xn.size() == vSE3.size());
   int K = vV3Xn.size();
@@ -38,14 +36,18 @@ Eigen::Vector4d Get_X_from_xP_lin(
   }
   Eigen::JacobiSVD<Eigen::MatrixXd> svdM(A, Eigen::ComputeThinV);
   if (pSingular) *pSingular = svdM.singularValues();
-  Eigen::Vector4d v4Xhomog = svdM.matrixV().col(3);
-  return v4Xhomog;
+  if (svdM.singularValues()[2] < 1e-4) {
+    return svdM.matrixV().col(2);
+  } else {
+    return svdM.matrixV().col(3);
+  }
 }
 
-Eigen::Vector4d Get_X_from_xP_lin(
-    std::vector<Eigen::Vector3d, Eigen::aligned_allocator<Eigen::Vector3d>>&
-        vV3Xn,
-    std::vector<Sophus::SE3d, Eigen::aligned_allocator<Sophus::SE3d>>& vSE3,
+Eigen::Vector4d triangulateHomogeneousDLT(
+    const std::vector<Eigen::Vector3d,
+                      Eigen::aligned_allocator<Eigen::Vector3d>>& vV3Xn,
+    const std::vector<Sophus::SE3d, Eigen::aligned_allocator<Sophus::SE3d>>&
+        vSE3,
     bool& isValid, bool& isParallel) {
   assert(vV3Xn.size() == vSE3.size());
   int K = vV3Xn.size();
@@ -102,6 +104,7 @@ Eigen::Vector3d triangulate2View_midpoint(
       vSE3[0].unit_quaternion().conjugate().toRotationMatrix();
   return rot * Ap * unproject2d(v3Xhomog) / 2;
 }
+
 Eigen::Matrix<double, 2, 3> householder(Eigen::Vector3d x) {
   // Compute a 2x3 matrix where the rows are orthogonal to x and orthogonal to
   // each other.
@@ -121,6 +124,7 @@ Eigen::Matrix<double, 2, 3> householder(Eigen::Vector3d x) {
   res.col(1) = v;
   return res.transpose();
 }
+
 Eigen::Vector3d triangulate_midpoint(
     std::vector<Eigen::Vector2d, Eigen::aligned_allocator<Eigen::Vector2d>>&
         vV2Xn,
@@ -209,7 +213,6 @@ void triangulate_refine_GN(
 #endif
 }
 
-#ifdef HAVE_CERES
 // Templated pinhole camera model for used with Ceres.  The camera is
 // parameterized using 7 parameters: 4 for rotation, 3 for translation, qxyzw,
 // txyz assume observations are at the z=1 image plane Warning: use templated
@@ -239,9 +242,12 @@ struct ReprojectionError {
     return (new ceres::AutoDiffCostFunction<ReprojectionError, 2, 3>(
         new ReprojectionError(Tw2c, observed)));
   }
+
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
   Sophus::SE3Group<double> Tw2c;
   Eigen::Matrix<double, 2, 1> observed;
 };
+
 void triangulate_refine(
     const std::vector<Eigen::Vector3d,
                       Eigen::aligned_allocator<Eigen::Vector3d>>& obs,
@@ -304,9 +310,12 @@ class ReprojectionErrorJ : public ceres::SizedCostFunction<2, 3> {
     }
     return true;
   }
+
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
   Sophus::SE3Group<double> Tw2c;
   Eigen::Matrix<double, 2, 1> observed;
 };
+
 void triangulate_refineJ(
     const std::vector<Eigen::Vector3d,
                       Eigen::aligned_allocator<Eigen::Vector3d>>& obs,
@@ -339,4 +348,3 @@ void triangulate_refineJ(
   ceres::Solve(options, &problem, &summary);
   //    std::cout << summary.FullReport() << "\n";
 }
-#endif
