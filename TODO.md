@@ -23,19 +23,43 @@ The IMU specs has a important role in convergence, esp sigma_g_c, you may want t
 use all feature tracks to update states at the last frame
 
 ## Use the IMU model defined in Rheder ICRA 2016 extending Kalibr
-In msckf2 implementation
-w_m = T_g * w_b + T_s * a_b + b_w + n_w
+### A. In msckf2 implementation
+w_m = T_g * w_b + T_s * a_b + b_g + n_g
 a_m = T_a * a_b + b_a + n_a
 where body frame {b} is aligned with the camera frame by a nominal R_SC in orientation,
 but its origin is at the accelerometer triad intersection,
-T_g, T_s, and T_a are fully populated
+T_g, T_s, and T_a are fully populated.
 
-In ICRA 16 Extending Kalibr, ignoring the lever arm between accelerometers
-w_m = T_g * w_b + T_s * a_b + b_w + n_w
-a_m = T_a * a_b + b_a + n_a
-where b is aligned with the x-axis of the accelerometer triad, and has an
-origin at the accelerometer triad intersection
-T_g, T_s is fully populated, T_a is a lower triangular matrix
+### B. The simplified model is used in Jung et al. Observability Analysis of IMU Intrinsic Parameters,
+w_m = N_g * w_b + b_g + n_g
+a_m = N_a * a_b + b_a + n_a
+where both N_g and N_a are fully populated.
+The inverse model is given by
+w_calibrated = M_g * w_m + b_g + n_g
+a_calibrated = M_a * a_m + b_a + n_a
+where M_g = N_g^{-1} and M_a = N_a^{-1}.
+This is done for easy observability analysis.
+
+### C. In ICRA 16 Extending Kalibr, for the reference IMU in a bundle of IMUs, its scaled misalignment model is given by
+w_m = M_g * C_gyro_i * w_b + M_ga * C_gyro_i * a_b + b_g + n_g
+a_m = M_a * C_i_w * (a_w - g_w) + b_a + n_a
+where the i frame is the nominal frame of the accelerometer triad, and has an origin at the accelerometer triad intersection;
+the b frame is identical to the i frame of the reference IMU;
+the gyro frame is the nominal frame of the gyro triad, and assuming to have the same origin as i;
+M_g and M_ga are fully populated, and M_a is a lower triangular matrix.
+
+### D. In TUM VI dataset 2018 paper, the IMU model is defined by
+w_calibrated = M_g * w_m + b_g
+a_calibrated = M_a * a_m + b_a
+where M_a is a lower triangular matrix, and M_g is fully populated.
+
+### E. In Schneider 2019 Observability-aware self-calibration of visual and inertial sensors, 
+the body frame coincides with the gyro frame, the IMU model is given by
+w_m = T_g * w_b + b_g + n_g
+a_m = T_a * C_a_g * C_g_w * (a_w - g_w) + b_a + n_a
+where a is the accelerometer frame, g is the gyro frame,
+and T_g and T_a are upper triangular matrices.
+This model is used for observability analysis and degenerate motion identification in Yang 2020 "Online IMU intrinsic calibration: Is it necessary?"
 
 
 ## Design the coding structure for the okvis and msckf methods adaptive to different camera and IMU models,
