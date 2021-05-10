@@ -1,8 +1,8 @@
 #include "io_wrap/StreamHelper.hpp"
-#include "msckf/CameraRig.hpp"
-#include "msckf/ExtrinsicModels.hpp"
-#include "msckf/imu/ImuModels.hpp"
-#include "msckf/ProjParamOptModels.hpp"
+#include "swift_vio/CameraRig.hpp"
+#include "swift_vio/ExtrinsicModels.hpp"
+#include "swift_vio/imu/ImuModels.hpp"
+#include "swift_vio/ProjParamOptModels.hpp"
 
 DEFINE_string(datafile_separator, ",",
               "the separator used for a ASCII output file");

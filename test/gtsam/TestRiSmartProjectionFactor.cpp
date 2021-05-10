@@ -33,7 +33,7 @@
 
 #include <gtest/gtest.h>
 
-#include <msckf/memory.h>
+#include <swift_vio/memory.h>
 
 #include <okvis/cameras/PinholeCamera.hpp>
 #include <okvis/cameras/RadialTangentialDistortion.hpp>

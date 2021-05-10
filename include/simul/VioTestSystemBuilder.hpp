@@ -1,9 +1,9 @@
-#ifndef INCLUDE_MSCKF_VIO_TEST_SYSTEM_BUILDER_HPP_
-#define INCLUDE_MSCKF_VIO_TEST_SYSTEM_BUILDER_HPP_
+#ifndef INCLUDE_SWIFT_VIO_VIO_TEST_SYSTEM_BUILDER_HPP_
+#define INCLUDE_SWIFT_VIO_VIO_TEST_SYSTEM_BUILDER_HPP_
 
 #include <gtsam/VioBackEndParams.h>
 
-#include <msckf/MSCKF2.hpp>
+#include <swift_vio/MSCKF.hpp>
 
 #include <simul/CameraSystemCreator.hpp>
 #include <simul/curves.h>
@@ -86,4 +86,4 @@ private:
 };
 
 } // namespace simul
-#endif // INCLUDE_MSCKF_VIO_TEST_SYSTEM_BUILDER_HPP_
+#endif // INCLUDE_SWIFT_VIO_VIO_TEST_SYSTEM_BUILDER_HPP_

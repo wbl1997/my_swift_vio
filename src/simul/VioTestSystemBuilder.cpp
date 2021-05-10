@@ -4,10 +4,10 @@
 
 #include <gtsam/SlidingWindowSmoother.hpp>
 
-#include <msckf/GeneralEstimator.hpp>
-#include <msckf/TFVIO.hpp>
-#include <msckf/VioEvaluationCallback.hpp>
-#include <msckf/VioFactoryMethods.hpp>
+#include <swift_vio/GeneralEstimator.hpp>
+#include <swift_vio/TFVIO.hpp>
+#include <swift_vio/VioEvaluationCallback.hpp>
+#include <swift_vio/VioFactoryMethods.hpp>
 
 #include <simul/CameraSystemCreator.hpp>
 
@@ -110,7 +110,7 @@ void VioTestSystemBuilder::createVioSystem(
   CHECK_EQ(tempIter != trueBiases_.end(), true) << "No imu reading close to motion start epoch by 1e-8";
   trueBiases_.erase(trueBiases_.begin(), tempIter);
 
-  evaluationCallback_.reset(new msckf::VioEvaluationCallback());
+  evaluationCallback_.reset(new swift_vio::VioEvaluationCallback());
   std::shared_ptr<okvis::ceres::Map> mapPtr(new okvis::ceres::Map(evaluationCallback_.get()));
   // std::shared_ptr<okvis::ceres::Map> mapPtr(new okvis::ceres::Map());
 
@@ -137,7 +137,7 @@ void VioTestSystemBuilder::createVioSystem(
   }
   distortionType_ = cameraSystem2->cameraGeometry(0)->distortionType();
 
-  estimator = msckf::createBackend(testSetting.estimator_algorithm,
+  estimator = swift_vio::createBackend(testSetting.estimator_algorithm,
                                    backendParams, mapPtr);
 
   okvis::VisualConstraints constraintScheme(okvis::OnlyReprojectionErrors);

@@ -17,7 +17,7 @@
 #include <okvis/ceres/ImuError.hpp>
 #include <okvis/timing/Timer.hpp>
 
-#include "../msckf/CovPropConfig.hpp"
+#include "../swift_vio/CovPropConfig.hpp"
 
 Eigen::IOFormat commaInitFmt(Eigen::StreamPrecision, 0, ", ", "\n", "", "",
                              "", "");

@@ -28,8 +28,8 @@
 #include "io_wrap/CommonGflags.hpp"
 #include "io_wrap/StreamHelper.hpp"
 
-#include "msckf/ceres/tiny_solver.h"
-#include "msckf/RemoveFromVector.hpp"
+#include "swift_vio/ceres/tiny_solver.h"
+#include "swift_vio/RemoveFromVector.hpp"
 
 #include <eigen/matrix_sqrt.hpp>
 #include <opengv/sac/Ransac.hpp>
@@ -549,7 +549,7 @@ bool LoopClosureDetector::geometricVerificationCheck(
           Eigen::Matrix<double, 7, 1> optimized_T_BlBq_coeffs = T_BlBq.coeffs();
 
           GtsamPose3Parameterization localParameterization;
-          msckf::ceres::TinySolver<StackedProjectionFactorDynamic> solver(
+          swift_vio::ceres::TinySolver<StackedProjectionFactorDynamic> solver(
               &localParameterization);
           solver.options.max_num_iterations =
               lcd_params_->relative_pose_opt_iterations_;
@@ -559,7 +559,7 @@ bool LoopClosureDetector::geometricVerificationCheck(
 //          LOG(INFO) << "T_BlBq: opengv:" << T_BlBq.coeffs().transpose()
 //                    << "\nTiny Solver: " << optimized_T_BlBq.coeffs().transpose();
           if (solver.summary.status !=
-              msckf::ceres::TinySolver<
+              swift_vio::ceres::TinySolver<
                   StackedProjectionFactorDynamic>::Status::HIT_MAX_ITERATIONS) {
             // compute info of T_BlBq whose perturbation is defined in gtsam::Pose3.
             Eigen::Matrix<double, -1, 6> jacColMajor(numInliers * 2, 6);

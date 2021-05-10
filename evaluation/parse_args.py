@@ -185,7 +185,7 @@ in terms of T_WB where W is a quasi inertial frame, and B is the body frame
 defined to be the IMU sensor frame. Note the Snapdragon flight and mDavis sensor
 unit have different IMUs, and thus different ground truth.
 
-The output of msckf/OKVIS are lists of T_WB where B is the IMU sensor frame
+The output of swift_vio are lists of T_WB where B is the IMU sensor frame
 defined according to the used IMU model.
 
 """
@@ -213,7 +213,7 @@ def check_common_args(args):
 
 def parse_args():
     parser = argparse.ArgumentParser(
-        description='''Evaluate algorithms inside msckf project on many EUROC 
+        description='''Evaluate algorithms inside swift_vio project on EUROC 
         and UZH-FPV missions with ground truth.''')
     parser.add_argument('vio_config_yaml', type=str,
                         help="path to vio template config yaml. Its content "

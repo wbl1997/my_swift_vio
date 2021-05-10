@@ -7,7 +7,7 @@ pylint: on
 # If this whitelist block is present, the linter only operates on the files and
 # directories listed in this whitelist.
 whitelist:
- - msckf/include
- - msckf/okvis
- - msckf/src
- - msckf/test
+ - swift_vio/include
+ - swift_vio/okvis
+ - swift_vio/src
+ - swift_vio/test

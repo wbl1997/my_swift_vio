@@ -1,6 +1,6 @@
 
 trials = 3;
-res_dir = '/msckf_tumvi_miscell/vio/laptop/';
+res_dir = '/tumvi_miscell/vio/laptop/';
 algo = 'KSF_nframe';
 sessions = {'corridor1', 'corridor2', ...
 'corridor3', ...

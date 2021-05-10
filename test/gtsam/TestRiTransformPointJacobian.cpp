@@ -14,7 +14,7 @@
 
 #include "gtest/gtest.h"
 
-#include <msckf/MultipleTransformPointJacobian.hpp>
+#include <swift_vio/MultipleTransformPointJacobian.hpp>
 
 Eigen::Matrix<double, 4, 1> TpWrap(const gtsam::RiExtendedPose3& state,
                                    const Eigen::Matrix<double, 4, 1>& hp) {

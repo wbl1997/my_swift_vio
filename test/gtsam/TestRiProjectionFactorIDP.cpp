@@ -12,7 +12,7 @@
 #include "gtsam/RiProjectionFactorIDP.h"
 #include "gtsam/RiProjectionFactorIDPAnchor.h"
 
-#include <msckf/memory.h>
+#include <swift_vio/memory.h>
 #include "simul/CameraSystemCreator.hpp"
 #include "simul/SimulationNView.h"
 

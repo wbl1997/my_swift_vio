@@ -1,5 +1,4 @@
-## use akaze features instead of brisk for feature detection, description, and matching. But it may require opencv 3.0 and later.
-This may cause conflict with current opencv library used by msckf.
+## Use freak feature descriptor instead of brisk for feature description, and matching.
 
 ## There may be negative diagonal elements in the covariance matrix. Are these elements all are very small and
 such occurrences are very rare, e.g. for the beginning of a test?
@@ -23,7 +22,7 @@ The IMU specs has a important role in convergence, esp sigma_g_c, you may want t
 use all feature tracks to update states at the last frame
 
 ## Use the IMU model defined in Rheder ICRA 2016 extending Kalibr
-### A. In msckf2 implementation
+### A. In HybridFilter
 w_m = T_g * w_b + T_s * a_b + b_g + n_g
 a_m = T_a * a_b + b_a + n_a
 where body frame {b} is aligned with the camera frame by a nominal R_SC in orientation,
@@ -62,7 +61,7 @@ and T_g and T_a are upper triangular matrices.
 This model is used for observability analysis and degenerate motion identification in Yang 2020 "Online IMU intrinsic calibration: Is it necessary?"
 
 
-## Design the coding structure for the okvis and msckf methods adaptive to different camera and IMU models,
+## Design the coding structure for the swift_vio methods adaptive to different camera and IMU models,
 minor thing: absorb the camera model parameters like T_SC0, tdLatestEstimate, etc, of the HybridFilter to the camera_rig_,
 
 Foundation level: IMU camera landmark speedBias parameter blocks, expressed essentially by Eigen::Vectors
@@ -98,28 +97,28 @@ A better approach is to separate adding observations to feature tracks and addin
 
 ## ThreadedKFVio mock test failed in MockVioBackendInterface even with the github okvis master branch.
 
-## The deadreckoning in okvis and that in MSCKF give different results, see testHybridFilter DeadreckoningM and DeadreckoningO.
-Answer: Disabling marginalization in OKVIS deadreckoning makes its result similar to MSCKF deadreckoning.
+## The deadreckoning in okvis and that in swift_vio give different results, see testHybridFilter DeadreckoningM and DeadreckoningO.
+Answer: Disabling marginalization in OKVIS deadreckoning makes its result similar to swift_vio deadreckoning.
 
 ## Vector access over the boundary when running command:
-/media/jhuai/Seagate/jhuai/temp/msckf_ws_rel/devel/lib/msckf/okvis_node_synchronous
-/home/jhuai/Desktop/temp/msckf_rel/vio/laptop/MSCKF_aidp/laptop_MSCKF_aidp_MH_01/config_fpga_p2_euroc.yaml
-/home/jhuai/Desktop/temp/msckf_rel/vio/laptop/MSCKF_aidp/laptop_MSCKF_aidp_MH_01/LcdParams.yaml
---output_dir=/home/jhuai/Desktop/temp/msckf_rel/vio/laptop/MSCKF_aidp/laptop_MSCKF_aidp_MH_01/MSCKF4
+/media/jhuai/Seagate/jhuai/temp/swift_vio_ws/devel/lib/swift_vio/swift_vio_node_synchronous
+/home/jhuai/Desktop/temp/swift_vio/vio/laptop/MSCKF_aidp/laptop_MSCKF_aidp_MH_01/config_fpga_p2_euroc.yaml
+/home/jhuai/Desktop/temp/swift_vio/vio/laptop/MSCKF_aidp/laptop_MSCKF_aidp_MH_01/LcdParams.yaml
+--output_dir=/home/jhuai/Desktop/temp/swift_vio/vio/laptop/MSCKF_aidp/laptop_MSCKF_aidp_MH_01/MSCKF4
 --skip_first_seconds=0 --max_inc_tol=10.0 --dump_output_option=3
 --bagname=/media/jhuai/OldWin8OS/jhuai/data/euroc/ijrr_euroc_mav_dataset/machine_hall/MH_01_easy/MH_01_easy.bag
---vocabulary_path=/media/jhuai/docker/msckf_ws/src/msckf/evaluation/../vocabulary/ORBvoc.yml
+--vocabulary_path=/media/jhuai/docker/swift_vio_ws/src/swift_vio/evaluation/../vocabulary/ORBvoc.yml
 --camera_topics="/cam0/image_raw,/cam1/image_raw" --imu_topic=/imu0 
 
 The below are the logs:
 I0506 00:09:33.438650 13717 LoopClosureDetector.cpp:520] P3P inliers 11 out of 16 ransac iteration 23 max iterations 100
 I0506 00:09:33.438757 13717 LoopClosureDetector.cpp:441] LoopClosureDetector: LOOP CLOSURE detected between loop keyframe 5326 with dbow id 21 and query keyframe 73619 with dbow id 131
-I0506 00:09:33.446796 13715 MSCKF2.cpp:1184] MSCKF receives #loop frames 1 but has not implemented relocalization yet!
-I0506 00:09:33.473873 13695 okvis_node_synchronous.cpp:311] Progress: 25%  
+I0506 00:09:33.446796 13715 MSCKF.cpp:1184] MSCKF receives #loop frames 1 but has not implemented relocalization yet!
+I0506 00:09:33.473873 13695 swift_vio_node_synchronous.cpp:311] Progress: 25%  
 I0506 00:09:33.513044 13717 LoopClosureDetector.cpp:493] knnmatch 3d landmarks 31 to 2d keypoints 149 correspondences 16
 I0506 00:09:33.513265 13717 LoopClosureDetector.cpp:520] P3P inliers 13 out of 16 ransac iteration 9 max iterations 100
 I0506 00:09:33.513334 13717 LoopClosureDetector.cpp:441] LoopClosureDetector: LOOP CLOSURE detected between loop keyframe 6967 with dbow id 24 and query keyframe 74336 with dbow id 132
-I0506 00:09:33.521447 13715 MSCKF2.cpp:1184] MSCKF receives #loop frames 1 but has not implemented relocalization yet!
+I0506 00:09:33.521447 13715 MSCKF.cpp:1184] MSCKF receives #loop frames 1 but has not implemented relocalization yet!
 I0506 00:09:33.704480 13717 LoopClosureDetector.cpp:493] knnmatch 3d landmarks 32 to 2d keypoints 159 correspondences 10
 terminate called after throwing an instance of 'std::out_of_range'
   what():  vector::_M_range_check: __n (which is 5) >= this->size() (which is 5)
@@ -127,31 +126,36 @@ Aborted (core dumped)
 
 I believe this issue has been resolved but not rememebering what is the exact solution.
 
-## MSCKF jumps forth and then back at the beginning
+
+## The progress percentage in building swift_vio jumps back and forth with catkin build.
+This effect is not observed with OKVIS_ROS.
+An comparison of the CMakeLists.txt between swift_vio and okvis_ros does not reveal suspicious differences.
+
+## HybridFilter jumps forth and then back at the beginning
 To reproduce,
 ```
-/media/jhuai/Seagate/jhuai/temp/msckf_ws_rel/devel/lib/msckf/okvis_node_synchronous 
-/home/jhuai/Desktop/temp/msckf_advio_noise0/vio/laptop/KSF_0.5_0.2/laptop_KSF_0.5_0.2_advio15/config_fpga_p2_euroc.yaml 
-/home/jhuai/Desktop/temp/msckf_advio_noise0/vio/laptop/KSF_0.5_0.2/laptop_KSF_0.5_0.2_advio15/LcdParams.yaml 
---output_dir=/home/jhuai/Desktop/temp/msckf_advio_noise0/vio/laptop/KSF_0.5_0.2/laptop_KSF_0.5_0.2_advio15/MSCKF0 
+/media/jhuai/Seagate/jhuai/temp/swift_vio_ws/devel/lib/swift_vio/swift_vio_node_synchronous 
+/home/jhuai/Desktop/temp/advio_noise0/vio/laptop/KSF_0.5_0.2/laptop_KSF_0.5_0.2_advio15/config_fpga_p2_euroc.yaml 
+/home/jhuai/Desktop/temp/advio_noise0/vio/laptop/KSF_0.5_0.2/laptop_KSF_0.5_0.2_advio15/LcdParams.yaml 
+--output_dir=/home/jhuai/Desktop/temp/advio_noise0/vio/laptop/KSF_0.5_0.2/laptop_KSF_0.5_0.2_advio15/MSCKF0 
 --skip_first_seconds=0 --max_inc_tol=30.0 --dump_output_option=3 
 --bagname=/media/jhuai/OldWin8OS/jhuai/data/advio/rosbag/iphone/advio-15.bag 
---vocabulary_path=/media/jhuai/docker/msckf_ws/src/msckf/vocabulary/ORBvoc.yml 
+--vocabulary_path=/media/jhuai/docker/swift_vio_ws/src/swift_vio/vocabulary/ORBvoc.yml 
 --camera_topics="/cam0/image_raw," --imu_topic=/imu0 --publish_via_ros=false
 ```
 Also check the impact of initWithoutEnoughParallax.
 Improve this with better initial motion check.
 
-## *** Error in `/home/jhuai/Documents/docker/msckf_ws/devel/lib/msckf/okvis_node_synchronous': malloc(): smallbin double linked list corrupted: 0x0000000002028420 ***
+## *** Error in `/home/jhuai/Documents/docker/swift_vio_ws/devel/lib/swift_vio/swift_vio_node_synchronous': malloc(): smallbin double linked list corrupted: 0x0000000002028420 ***
 ======= Backtrace: =========
 /lib/x86_64-linux-gnu/libc.so.6(+0x777e5)[0x7ff5ecf407e5]
 /lib/x86_64-linux-gnu/libc.so.6(+0x82651)[0x7ff5ecf4b651]
 /lib/x86_64-linux-gnu/libc.so.6(__libc_malloc+0x54)[0x7ff5ecf4d184]
 /usr/lib/nvidia-396/tls/libnvidia-tls.so.396.37(+0x24c0)[0x7ff5d9a1d4c0]
 ======= Memory map: ========
-00400000-017ab000 r-xp 00000000 08:06 1587543                            /home/jhuai/Documents/docker/msckf_ws/devel/lib/msckf/okvis_node_synchronous
-019aa000-019d5000 r--p 013aa000 08:06 1587543                            /home/jhuai/Documents/docker/msckf_ws/devel/lib/msckf/okvis_node_synchronous
-019d5000-019d6000 rw-p 013d5000 08:06 1587543                            /home/jhuai/Documents/docker/msckf_ws/devel/lib/msckf/okvis_node_synchronous
+00400000-017ab000 r-xp 00000000 08:06 1587543                            /home/jhuai/Documents/docker/swift_vio_ws/devel/lib/swift_vio/swift_vio_node_synchronous
+019aa000-019d5000 r--p 013aa000 08:06 1587543                            /home/jhuai/Documents/docker/swift_vio_ws/devel/lib/swift_vio/swift_vio_node_synchronous
+019d5000-019d6000 rw-p 013d5000 08:06 1587543                            /home/jhuai/Documents/docker/swift_vio_ws/devel/lib/swift_vio/swift_vio_node_synchronous
 019d6000-019d8000 rw-p 00000000 00:00 0 
 01f6a000-030f0000 rw-p 00000000 00:00 0                                  [heap]
 
@@ -164,29 +168,29 @@ when the pose estimates drifted so much that there was almost no tracked feature
 The same core dumped error (seg fault or aborted) occurred twice at about 34% of the TUM VI room3 sequence.
 
 The command to reproduce the problem:
-/home/jhuai/Documents/docker/msckf_ws/devel/lib/msckf/okvis_node_synchronous /home/
-jhuai/Desktop/msckf_tumvi_calib0/vio/laptop/KSF_n_calibrated/laptop_KSF_n_calibrated_room3/config_fpga_p2_euroc.yaml
-/home/jhuai/Desktop/msckf_tumvi_calib0/vio/laptop/KSF_n_calibrated/laptop_KSF_n_calibrated_room3/LcdParams.yaml
---output_dir=/home/jhuai/Desktop/msckf_tumvi_calib0/vio/laptop/KSF_n_calibrated/laptop_KSF_n_calibrated_room3/MSCKF2
+/home/jhuai/Documents/docker/swift_vio_ws/devel/lib/swift_vio/swift_vio_node_synchronous /home/
+jhuai/Desktop/tumvi_calib0/vio/laptop/KSF_n_calibrated/laptop_KSF_n_calibrated_room3/config_fpga_p2_euroc.yaml
+/home/jhuai/Desktop/tumvi_calib0/vio/laptop/KSF_n_calibrated/laptop_KSF_n_calibrated_room3/LcdParams.yaml
+--output_dir=/home/jhuai/Desktop/tumvi_calib0/vio/laptop/KSF_n_calibrated/laptop_KSF_n_calibrated_room3/MSCKF
 --skip_first_seconds=0 --max_inc_tol=30.0 --dump_output_option=3 --bagname=/media/jhuai/viola/jhuai/data/TUM-
 VI/raw/room/dataset-room3_512_16.bag
---vocabulary_path=/home/jhuai/Documents/docker/msckf_ws/src/msckf/evaluation/../vocabulary/ORBvoc.yml
+--vocabulary_path=/home/jhuai/Documents/docker/swift_vio_ws/src/swift_vio/evaluation/../vocabulary/ORBvoc.yml
 --camera_topics="/cam0/image_raw,/cam1/image_raw" --imu_topic=/imu0 --publish_via_ros=false
 
 Or,
-/home/jhuai/Documents/docker/msckf_ws/devel/lib/msckf/okvis_node_synchronous /home/
-jhuai/Desktop/msckf_tumvi_calib0/vio/laptop/KSF_n_fix_TgTsTa/laptop_KSF_n_fix_TgTsTa_room3/config_fpga_p2_euroc.yaml
-/home/jhuai/Desktop/msckf_tumvi_calib0/vio/laptop/KSF_n_fix_TgTsTa/laptop_KSF_n_fix_TgTsTa_room3/LcdParams.yaml
---output_dir=/home/jhuai/Desktop/msckf_tumvi_calib0/vio/laptop/KSF_n_fix_TgTsTa/laptop_KSF_n_fix_TgTsTa_room3/MSCKF0
+/home/jhuai/Documents/docker/swift_vio_ws/devel/lib/swift_vio/swift_vio_node_synchronous /home/
+jhuai/Desktop/tumvi_calib0/vio/laptop/KSF_n_fix_TgTsTa/laptop_KSF_n_fix_TgTsTa_room3/config_fpga_p2_euroc.yaml
+/home/jhuai/Desktop/tumvi_calib0/vio/laptop/KSF_n_fix_TgTsTa/laptop_KSF_n_fix_TgTsTa_room3/LcdParams.yaml
+--output_dir=/home/jhuai/Desktop/tumvi_calib0/vio/laptop/KSF_n_fix_TgTsTa/laptop_KSF_n_fix_TgTsTa_room3/MSCKF0
 --skip_first_seconds=0 --max_inc_tol=30.0 --dump_output_option=3 --bagname=/media/jhuai/viola/jhuai/data/TUM-
 VI/raw/room/dataset-room3_512_16.bag
---vocabulary_path=/home/jhuai/Documents/docker/msckf_ws/src/msckf/evaluation/../vocabulary/ORBvoc.yml
+--vocabulary_path=/home/jhuai/Documents/docker/swift_vio_ws/src/swift_vio/evaluation/../vocabulary/ORBvoc.yml
 --camera_topics="/cam0/image_raw,/cam1/image_raw" --imu_topic=/imu0 --publish_via_ros=false
 
 Several errors possibly of the same origin can be found with the below command
 ```
 RES_DIR=/keyframe_based_filter_2020/results
-grep error $RES_DIR/tumvi-calibration/msckf_tumvi_calib0/log.txt -B 3 -A 10
+grep error $RES_DIR/tumvi-calibration/tumvi_calib0/log.txt -B 3 -A 10
 ```
 The failure cases have the below configurations:
 KSF_n_fix_TgTsTa_room3
@@ -201,7 +205,5 @@ They all fixed Tg Ts Ta and had a huge drift and possibly tracking failures.
 
 ## Will marginalization cause the observable parameters, e.g., calibration parameters, to have wrongly optimistic covariance? 
 I believe that marginalization will not cause overconfident covariance for these parameters.
-To test, run MSCKF in simulation to estimate camera extrinsic parameters, and compute their NEES.
-
-
+To test, run HybridFilter or MSCKF in simulation to estimate camera extrinsic parameters, and compute their NEES.
 

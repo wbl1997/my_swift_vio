@@ -8,7 +8,7 @@
 #include "gtsam/RiProjectionFactorIDP.h"
 #include "gtsam/RiTransformPointJacobian.h"
 
-#include "msckf/MultipleTransformPointJacobian.hpp"
+#include "swift_vio/MultipleTransformPointJacobian.hpp"
 
 namespace gtsam {
 RiProjectionFactorIDP::RiProjectionFactorIDP(

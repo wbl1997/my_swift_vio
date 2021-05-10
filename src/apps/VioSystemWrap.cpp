@@ -18,7 +18,7 @@ void VioSystemWrap::registerCallbacks(
       &okvis::StreamPublisher::publishLandmarksAsCallback, publisher,
       std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
 
-  std::string stateFilename = path + "/msckf_estimates.csv";
+  std::string stateFilename = path + "/swift_vio.csv";
   std::string headerLine;
   size_t numCameras = parameters.nCameraSystem.numCameras();
   std::vector<std::string> extrinsicParamRepList(numCameras);

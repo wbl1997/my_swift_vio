@@ -4,8 +4,8 @@
  * @author Jianzhu Huai
  */
 
-#ifndef INCLUDE_MSCKF_PLAYER_HPP_
-#define INCLUDE_MSCKF_PLAYER_HPP_
+#ifndef INCLUDE_SWIFT_VIO_PLAYER_HPP_
+#define INCLUDE_SWIFT_VIO_PLAYER_HPP_
 
 #include <atomic>
 #include <deque>
@@ -95,4 +95,4 @@ class Player {
 
 }  // namespace okvis
 
-#endif /* INCLUDE_MSCKF_PLAYER_HPP_ */
+#endif /* INCLUDE_SWIFT_VIO_PLAYER_HPP_ */

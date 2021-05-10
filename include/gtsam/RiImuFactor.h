@@ -11,8 +11,8 @@
 #include <gtsam/navigation/ImuBias.h>
 #include <gtsam/RiExtendedPose3.h>
 
-#include <msckf/imu/ImuErrorModel.h>
-#include <msckf/imu/ImuOdometry.h>
+#include <swift_vio/imu/ImuErrorModel.h>
+#include <swift_vio/imu/ImuOdometry.h>
 
 #include <okvis/Measurements.hpp>
 #include <okvis/Parameters.hpp>

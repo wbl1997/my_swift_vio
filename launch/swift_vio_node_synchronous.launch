@@ -1,0 +1,8 @@
+<launch>
+  <node name="swift_vio_node" pkg="swift_vio" type="swift_vio_node_synchronous" output="screen" args="$(arg config) $(arg bag)">
+    <param name="mesh_file" value="firefly.dae" />
+    <param name="camera_topic_0" value="/cam0/image_raw" />
+    <param name="camera_topic_1" value="/cam1/image_raw" />
+    <param name="imu_topic" value="/imu0" />
+  </node>
+</launch>

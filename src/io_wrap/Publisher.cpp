@@ -53,10 +53,10 @@
 #include <sensor_msgs/image_encodings.h>
 
 #include <okvis/FrameTypedefs.hpp>
-#include <msckf/CameraRig.hpp>
-#include <msckf/ExtrinsicModels.hpp>
-#include <msckf/imu/ImuRig.hpp>
-#include <msckf/ProjParamOptModels.hpp>
+#include <swift_vio/CameraRig.hpp>
+#include <swift_vio/ExtrinsicModels.hpp>
+#include <swift_vio/imu/ImuRig.hpp>
+#include <swift_vio/ProjParamOptModels.hpp>
 
 DECLARE_string(datafile_separator);
 

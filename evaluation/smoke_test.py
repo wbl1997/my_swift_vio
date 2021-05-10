@@ -1,13 +1,5 @@
 """
-run several small tests to check the major modules of msckf
-
-Test setting euroc MH_01_easy bag with ground truth
-
-OKVIS_node okvis / msckf
-OKVIS_node_synchronous okvis / msckf, feature tracking method 0/1/2
-
-compare with ground truth
-set threshold
+run several small tests to check the major modules of swift_vio.
 
 """
 
@@ -207,5 +199,5 @@ if __name__ == '__main__':
 
     rpg_eval_tool_wrap.check_eval_result(eval_output_dir, args.cmp_eval_output_dir)
 
-    print('Successfully finished testing methods in msckf project!')
+    print('Successfully finished testing methods in swift_vio project!')
     sys.exit(0)

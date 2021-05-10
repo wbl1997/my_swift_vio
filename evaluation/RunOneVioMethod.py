@@ -53,10 +53,10 @@ class RunOneVioMethod(object):
         self.extra_lib_path = extra_library_path
 
     def get_sync_exe(self):
-        return os.path.join(self.catkin_ws, "devel/lib/msckf/okvis_node_synchronous")
+        return os.path.join(self.catkin_ws, "devel/lib/swift_vio/swift_vio_node_synchronous")
 
     def get_async_launch_file(self):
-        return os.path.join(self.catkin_ws, "src/msckf/launch/okvis_node_rosbag.launch")
+        return os.path.join(self.catkin_ws, "src/swift_vio/launch/swift_vio_node_rosbag.launch")
 
     def create_vio_config_yaml(self):
         """for each data mission, create a vio config yaml"""
@@ -126,7 +126,7 @@ class RunOneVioMethod(object):
     def create_async_command(self, custom_vio_config,
                              custom_lcd_config,
                              vio_trial_output_dir, bag_fullname):
-        launch_file = "okvis_node_rosbag.launch"
+        launch_file = "swift_vio_node_rosbag.launch"
         setup_bash_file = os.path.join(self.catkin_ws, "devel/setup.bash")
 
         data_type = dataset_parameters.dataset_code(bag_fullname)
@@ -138,7 +138,7 @@ class RunOneVioMethod(object):
         src_cmd = "cd {}\nsource {}\n".format(self.catkin_ws, setup_bash_file)
         export_lib_cmd = "export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:{}\n".\
             format(self.extra_lib_path)
-        launch_cmd = "roslaunch msckf {} config_filename:={} lcd_config_filename:={} " \
+        launch_cmd = "roslaunch swift_vio {} config_filename:={} lcd_config_filename:={} " \
                      "output_dir:={} {} bag_file:={} start_into_bag:=3 play_rate:=1.0".format(
             launch_file, custom_vio_config, custom_lcd_config, vio_trial_output_dir,
             arg_topics, bag_fullname)
@@ -214,7 +214,7 @@ class RunOneVioMethod(object):
                         format(rc, msg, cmd)
                     warnings.warn(textwrap.fill(err_msg, 120))
                     return_code = rc
-                vio_estimate_csv = os.path.join(output_dir_trial, 'msckf_estimates.csv')
+                vio_estimate_csv = os.path.join(output_dir_trial, 'swift_vio.csv')
                 converted_vio_file = os.path.join(
                     output_dir_mission, "stamped_traj_estimate{}.txt".format(index_str))
                 cmd = "python3 {} {} --outfile={} --output_delimiter=' '". \

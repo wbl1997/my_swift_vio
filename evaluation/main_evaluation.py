@@ -224,5 +224,5 @@ if __name__ == '__main__':
                 print(Fore.RED + "Error code {} in run_rpg_evaluation for method {}: {}".format(
                     rc, method_name, streamdata))
 
-    print('Successfully finished testing methods in msckf project!')
+    print('Successfully finished testing methods in swift_vio project!')
     sys.exit(0)

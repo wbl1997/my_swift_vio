@@ -4,7 +4,7 @@
 #include <okvis/cameras/EquidistantDistortion.hpp>
 #include <okvis/cameras/PinholeCamera.hpp>
 #include "glog/logging.h"
-#include "msckf/ceres/tiny_solver.h"
+#include "swift_vio/ceres/tiny_solver.h"
 
 TEST(GtsamWrap, StackedProjectionFactorDynamic) {
   // initialize random number generator
@@ -59,7 +59,7 @@ TEST(GtsamWrap, StackedProjectionFactorDynamic) {
   EXPECT_GT(residuals.squaredNorm() / 2.0, 1e-1);
   Eigen::Matrix<double, 7, 1> estimated_T_WS_coeffs = T_WS_init.coeffs();
   VIO::GtsamPose3Parameterization localParameterization;
-  msckf::ceres::TinySolver<VIO::StackedProjectionFactorDynamic> solver(
+  swift_vio::ceres::TinySolver<VIO::StackedProjectionFactorDynamic> solver(
       &localParameterization);
   solver.Solve(relativePoseProblem, &estimated_T_WS_coeffs);
   okvis::kinematics::Transformation estimated_T_WS;

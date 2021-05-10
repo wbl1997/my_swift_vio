@@ -12,7 +12,7 @@
 
 #include "gtsam/ImuFrontEnd.h"
 #include "gtsam/RiImuFactor.h"
-#include "../msckf/CovPropConfig.hpp"
+#include "../swift_vio/CovPropConfig.hpp"
 
 class RiImuFactorTest : public ::testing::Test {
  public:

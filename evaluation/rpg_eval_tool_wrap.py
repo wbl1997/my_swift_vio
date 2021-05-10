@@ -89,7 +89,7 @@ def change_eval_cfg(eval_cfg_fn, align_type, align_n=-1):
     :param eval_cfg_fn: the cfg yaml on which the changes will be applied.
     :param align_type: one of sim3 se3 posyaw none
     :param align_n align first number of frames
-    adapted from /media/jhuai/docker/msckf_ws/src/rpg_trajectory_evaluation/scripts/change_eval_cfg_recursive.py
+    adapted from rpg_trajectory_evaluation/scripts/change_eval_cfg_recursive.py
     :return:
     """
     with open(eval_cfg_fn, 'r') as f:

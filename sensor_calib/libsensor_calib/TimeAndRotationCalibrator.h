@@ -3,7 +3,7 @@
 #include <Eigen/Core>
 #include <Eigen/Geometry>
 
-#include "msckf/memory.h"
+#include "swift_vio/memory.h"
 #include "okvis/ImuMeasurements.hpp"
 
 namespace sensor_calib {

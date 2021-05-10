@@ -9,7 +9,7 @@
 
 #include <vio/Sample.h>
 
-#include <msckf/implementation/HybridFrontend.hpp>
+#include <swift_vio/implementation/HybridFrontend.hpp>
 
 #include <okvis/IdProvider.hpp>
 

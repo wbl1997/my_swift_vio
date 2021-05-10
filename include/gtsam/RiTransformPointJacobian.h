@@ -8,8 +8,8 @@
 #ifndef RITRANSFORMPOINTJACOBIAN_H
 #define RITRANSFORMPOINTJACOBIAN_H
 
-#include <msckf/InverseTransformPointJacobian.hpp>
-#include <msckf/TransformPointJacobian.hpp>
+#include <swift_vio/InverseTransformPointJacobian.hpp>
+#include <swift_vio/TransformPointJacobian.hpp>
 
 namespace gtsam {
 class RiTransformPointJacobian : public okvis::TransformPointJacobian {

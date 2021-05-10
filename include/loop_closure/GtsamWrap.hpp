@@ -11,7 +11,7 @@
 
 #include <gtsam/linear/NoiseModel.h>
 
-#include "msckf/memory.h"
+#include "swift_vio/memory.h"
 #include <okvis/kinematics/Transformation.hpp>
 
 namespace VIO {

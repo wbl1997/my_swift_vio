@@ -1,32 +1,16 @@
 README                        {#mainpage}
 ======
 
-Welcome to msckf/Hybrid Filter.
+Welcome to SWIFT VIO, short for Sliding WIndow FilTers for Visual Inertial Odometry.
+There are several sliding window filters and smoothers inside swift_vio for visual inertial odometry.
+The underlying data structures are largely borrowed from OKVIS.
 
-The msckf [1][2] has been fully implemented with the so-called first estimate Jacobian technique [2].
-Its derivation can be found in [1] and [4].
+* HybridFilter implements a keyframe-based hybrid of MSCKF and EKF-SLAM.
+* MSCKF implements a keyframe-based MSCKF.
+* SlidingWindowSmoother implements a fixed-lag smoother based on gtsam (without using keyframes).
+* Estimator is modified from the OKVIS sliding window smoother.
 
-The Hybrid filter [3] referring to a hybrid of MSCKF and EKF-SLAM is not yet fully implemented.
-The filters are developed based on the OKVIS library.
-
-[1] J. Huai, “Collaborative SLAM with crowdsourced data,” Ph.D., The Ohio State University, Columbus OH, 2017.
-
-[2] M. Li, H. Yu, X. Zheng, and A. I. Mourikis, “High-fidelity sensor modeling and self-calibration in vision-aided inertial navigation,” in 2014 IEEE International Conference on Robotics and Automation (ICRA), Hong Kong, China, 2014, pp. 409–416.
-
-[3] M. Li and A. I. Mourikis, “Optimization-based estimator design for vision-aided inertial navigation,” in Robotics: Science and Systems, 2013, pp. 241–248.
-
-[4] M. Shelley, “Monocular Visual Inertial Odometry on a Mobile Device,” Master, Technical University of Munich, Germany, 2014.
-
-Note that the codebase that you are provided here is free of charge and without 
-any warranty. This is bleeding edge research software.
-
-Also note that the quaternion standard has been adapted to match Eigen/ROS, 
-thus some related mathematical description in [1,2] will not match the 
-implementation here.
-
-If you publish work that relates to this software, please cite at least [1].
-
-## How do I get set up?
+## Build dependencies
 
 This is a catkin package that wraps the pure CMake project.
 
@@ -57,20 +41,20 @@ sudo apt-get install python-catkin-tools
 
 ros melodic will install the source files for the following three packages by default: googletest libgtest-dev google-mock.
 The googletest package includes source for both googletest and googlemock.
-*Do not manually cmake and install gtest libraries to /usr/lib. It is a bad practice*.
+*You do not need to cmake and install gtest libraries to /usr/lib.*.
 
 * vio_common
 
 ```
-cd msckf_ws/src
+cd swift_vio_ws/src
 git clone https://github.com/JzHuai0108/vio_common.git
 ```
 
-then clone the repository from github into your catkin workspace (assuming msckf_ws):
+then clone the repository from github into your catkin workspace (assuming swift_vio_ws):
 
 ```
-cd msckf_ws/src
-git clone --recursive https://JzHuai0108@bitbucket.org/JzHuai0108/msckf.git
+cd swift_vio_ws/src
+git clone --recursive https://jzhuai@bitbucket.org/jzhuai/swift_vio.git
 ```
 
 * gtsam (optional)
@@ -112,7 +96,7 @@ need to install gtsam to /usr/local, i.e., -DCMAKE_INSTALL_PREFIX=/usr/local.
 ## Build the project
 
 ```
-cd msckf_ws/
+cd swift_vio_ws/
 if [[ "x$(nproc)" = "x1" ]] ; then export USE_PROC=1 ;
 else export USE_PROC=$(($(nproc)/2)) ; 
 fi
@@ -126,7 +110,7 @@ catkin config --cmake-args -DUSE_ROS=ON -DBUILD_TESTS=ON \
 # -DEIGEN3_INCLUDE_DIR=$HOME/slam_devel/include/eigen3 -DEIGEN_INCLUDE_DIR=$HOME/slam_devel/include/eigen3
 
 
-catkin build vio_common msckf -DUSE_ROS=ON -DBUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Release -j$USE_PROC
+catkin build vio_common swift_vio -DUSE_ROS=ON -DBUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Release -j$USE_PROC
 # -DCMAKE_PREFIX_PATH=/opt/ros/$ROS_VERSION
 # -DDO_TIMING=ON
 # -DUSE_SANITIZER=Address
@@ -153,6 +137,7 @@ cd build
 cmake .. -DCMAKE_INSTALL_PREFIX="$HOME/slam_devel"
 make install
 ```
+
 ### 2. Why is CMAKE_PREFIX_PATH passed as a build argument?
 After opening and building the project with QtCreator (see Section Debug the Project with QtCreator),
 the following warning and associated errors may come up when the project is built again by catkin in a terminal.
@@ -162,10 +147,6 @@ yields a CMAKE_PREFIX_PATH which is different from the cached CMAKE_PREFIX_PATH
 used last time this workspace was built."
 
 To suppress these errors, CMAKE_PREFIX_PATH needs to be specified.
-
-TODO(jhuai): the progress percentage in building msckf jumps back and forth with catkin build.
-This effect is not observed with OKVIS_ROS.
-An comparison of the CMakeLists.txt between msckf and okvis_ros does not reveal suspicious differences.
 
 ### 3. CATKIN_ENABLE_TESTING
 BUILD_TESTS=ON tells the program to build tests which depends on gmock and gtest. 
@@ -190,23 +171,23 @@ no /usr/include/eigen3 should appear when searching in the workspace.
 ## Build and run tests
 * To build all tests
 ```
-catkin build msckf --catkin-make-args run_tests # or
-catkin build --make-args tests -- msckf
+catkin build swift_vio --catkin-make-args run_tests # or
+catkin build --make-args tests -- swift_vio
 ```
 * To run all tests,
 ```
-catkin build msckf --catkin-make-args run_tests # or
-rosrun msckf msckf_test
+catkin build swift_vio --catkin-make-args run_tests # or
+rosrun swift_vio swift_vio_test
 ```
 
 * To run selected tests, e.g.,
 ```
-rosrun msckf msckf_test --gtest_filter="*Eigen*"
+rosrun swift_vio swift_vio_test --gtest_filter="*Eigen*"
 ```
 
 * To test RPGO,
 ```
-cd msckf_ws/build/msckf/Kimera-RPGO
+cd swift_vio_ws/build/swift_vio/Kimera-RPGO
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$HOME/Documents/slam_devel/lib
 make check
 ```
@@ -226,15 +207,15 @@ pip3 install numpy matplotlib colorama pyyaml ruamel.yaml
 
 For tests, you will need to download the EuRoC dataset and optionally the UZH-FPV dataset.
 ```
-msckf/evaluation/smoke_test.py tests the program with one data session from EuRoC dataset.
-msckf/evaluation/main_evaluation.py tests the program with multiple data session from EuRoC and UZH-FPV dataset.
+swift_vio/evaluation/smoke_test.py tests the program with one data session from EuRoC dataset.
+swift_vio/evaluation/main_evaluation.py tests the program with multiple data session from EuRoC and UZH-FPV dataset.
 ```
 
 ## Debug the project with QtCreator
 
 Follow the below steps exactly, otherwise mysterious errors like missing generate_config file arise.
 
-### 1. Build msckf with catkin
+### 1. Build swift_vio with catkin
 
 Build the project with instructions in Section Build the project. 
 You may need to clean build and devel dirs under the workspace with
@@ -243,9 +224,9 @@ You may need to clean build and devel dirs under the workspace with
 catkin clean -y
 ```
 
-### 2. Open msckf with QtCreator
+### 2. Open swift_vio with QtCreator
 
-Open QtCreator, assuming msckf_ws is the workspace dir,
+Open QtCreator, assuming swift_vio_ws is the workspace dir,
 
 ```
 source /opt/ros/melodic/setup.bash # or .zsh depending on the terminal shell
@@ -261,7 +242,7 @@ source /opt/ros/kinetic/setup.zsh
 /opt/Qt/Tools/QtCreator/bin/qtcreator
 ```
 
-Then, open msckf_ws/src/msckf/CMakeLists.txt in QtCreator. 
+Then, open swift_vio_ws/src/swift_vio/CMakeLists.txt in QtCreator. 
 
 If a dialog warning "the CMakeCache.txt file or the project configuration has changed",
 comes up with two buttons, "Overwrite Changes in CMake" and 
@@ -289,48 +270,37 @@ Parameters of the second group are typically configured through yaml.
 | dump_output_option | 0 only publish to rostopics, 1 also save nav states to csv, 2, also save nav states and extrinsic parameters, 3 also save nav states and all calibration parameters to csv. | 3 |
 | use_IEKF | true iterated EKF, false EKF. For filters only | false |
 | max_inc_tol | the maximum infinity norm of the filter correction. 10.0 for outdoors, 2.0 for indoors, though its value should be insensitive | 2.0 |
-| head_tail | Use the fixed head and receding tail observations or the entire feature track to compose two-view constraints in TF_VIO | false |
-| image_noise_cov_multiplier | Scale up the image observation noise cov for TF_VIO. 9 is recommended for the two-view constraint scheme based on an entire feature track, 25 is recommended for the two-view head_tail constraint scheme | 9 |
+| head_tail | Use the fixed head and receding tail observations or the entire feature track to compose two-view constraints in TFVIO | false |
+| image_noise_cov_multiplier | Scale up the image observation noise cov for TFVIO. 9 is recommended for the two-view constraint scheme based on an entire feature track, 25 is recommended for the two-view head_tail constraint scheme | 9 |
 
 **Parameters through config yaml**
 Remark: set sigma_{param} to zero to disable estimating "param" in filtering methods.
 
 | Configuration parameters | Description | Default |
 |---|---|---|
-| extrinsic_opt_mode | For MSCKF and TF_VIO. "P_CB", estimate camera extrinsic translation, used with IMU TgTsTa 27 dim model [2]; "P_BC_R_BC", estimate camera extrinsics, used with say IMU BgBa model; "", fixed camera extrinsics | "" |
-| projection_opt_mode | For MSCKF and TF_VIO. "FXY_CXY", estimate fx fy cx cy; "FX_CXY", estimate fx=fy, cx, cy; "FX", estimate fx=fy; "", camera projection intrinsic parameters are fixed | "" |
+| extrinsic_opt_mode | For HybridFilter and TFVIO. "P_CB", estimate camera extrinsic translation, used with IMU TgTsTa 27 dim model [2]; "P_BC_R_BC", estimate camera extrinsics, used with say IMU BgBa model; "", fixed camera extrinsics | "" |
+| projection_opt_mode | For HybridFilter and TFVIO. "FXY_CXY", estimate fx fy cx cy; "FX_CXY", estimate fx=fy, cx, cy; "FX", estimate fx=fy; "", camera projection intrinsic parameters are fixed | "" |
 | down_scale | divide up the configured image width, image height, fx, fy, cx, cy by this divisor | 1 |
 | distortion_type | "radialtangential", "equidistant", "radialtangential8", "fov" | REQUIRED |
 | camera_rate | For processing data loaded from a video and an IMU csv, it determines the play speed. For debug mode, half of the normal camera rate is recommended, e.g., 15 Hz | 30 for Release, 15 for Debug |
 | image_readout_time | time to read out an entire frame, i.e., the rolling shutter skew. 0 for global shutter, ~0.030 for rolling shutter | 0 |
-| sigma_absolute_translation | The standard deviation [m] of the camera extrinsics translation. With OKVIS, e.g. 1.0e-10 for online-calib; With MSCKF or TF_VIO, 5e-2 for online extrinsic translation calib, 0 to fix the translation. |  0 |
-| sigma_absolute_orientation | The standard deviation [rad] of the camera extrinsics orientation. With OKVIS, e.g. 1.0e-3 for online-calib; With MSCKF or TF_VIO and extrinsic_opt_mode is "P_BC_R_BC", 5e-2 for online extrinsic orientation calib, 0 to fix the extrinsic orientation | 0 |
+| sigma_absolute_translation | The standard deviation [m] of the camera extrinsics translation. With OKVIS, e.g. 1.0e-10 for online-calib; With HybridFilter or TFVIO, 5e-2 for online extrinsic translation calib, 0 to fix the translation. |  0 |
+| sigma_absolute_orientation | The standard deviation [rad] of the camera extrinsics orientation. With OKVIS, e.g. 1.0e-3 for online-calib; With HybridFilter or TFVIO and extrinsic_opt_mode is "P_BC_R_BC", 5e-2 for online extrinsic orientation calib, 0 to fix the extrinsic orientation | 0 |
 | sigma_c_relative_translation | For OKVIS only, the std. dev. [m] of the cam. extr. transl. change between frames, e.g. 1.0e-6 for adaptive online calib (not less for numerics) | 0 |
 | sigma_c_relative_orientation | For OKVIS only, the std. dev. [rad] of the cam. extr. orient. change between frames, e.g. 1.0e-6 for adaptive online calib (not less for numerics) | 0 |
 | timestamp_tolerance | stereo frame out-of-sync tolerance [s] | 0.2/camera_rate, e.g., 0.005 |
-| sigma_focal_length | For MSCKF and TF_VIO only, set to say 5.0 to estimate focal lengths, set to 0 to fix them | 0.0 |
-| sigma_principal_point | For MSCKF and TF_VIO only, set to say 5.0 to estimate cx, cy, set to 0 to fix them | 0.0 |
-| sigma_distortion | For MSCKF and TF_VIO only, set to nonzeros to estimate distortion parameters, set to 0s to fix them. Adapt to distortion types, e.g., [0.01, 0.003, 0.0, 0.0] for "radialtangential", e.g., [0.01] for "fov" | [0.0] * k |
+| sigma_focal_length | For HybridFilter and TFVIO only, set to say 5.0 to estimate focal lengths, set to 0 to fix them | 0.0 |
+| sigma_principal_point | For HybridFilter and TFVIO only, set to say 5.0 to estimate cx, cy, set to 0 to fix them | 0.0 |
+| sigma_distortion | For HybridFilter and TFVIO only, set to nonzeros to estimate distortion parameters, set to 0s to fix them. Adapt to distortion types, e.g., [0.01, 0.003, 0.0, 0.0] for "radialtangential", e.g., [0.01] for "fov" | [0.0] * k |
 | imageDelay | Used e.g., when loading data from a video and an IMU csv, image frame time in the video clock - imageDelay = frame time in the IMU clock | 0.0 |
-| sigma_td | For MSCKF and TF_VIO only, set to say 5e-3 sec to estimate time delay between the camera and IMU, set to 0 to fix the delay as imageDelay | 0.0 |
-| sigma_tr | For MSCKF and TF_VIO only, set to say 5e-3 sec to estimate the rolling shutter readout time, set to 0 to fix the readout time as image_readout_time | 0.0 |
-| sigma_TGElement | For MSCKF and TF_VIO only, set to say 5e-3 to estimate the Tg matrix for gyros, set to 0 to fix the matrix as Identity | 0 |
-| sigma_TSElement | For MSCKF and TF_VIO only, set to say 1e-3 to estimate the gravity sensitivity Ts matrix for gyros, set to 0 to fix the matrix as Zero | 0 |
-| sigma_TAElement | For MSCKF and TF_VIO only, set to say 5e-3 to estimate the Ta matrix for accelerometers, set to 0 to fix the matrix as Identity | 0 |
+| sigma_td | For HybridFilter and TFVIO only, set to say 5e-3 sec to estimate time delay between the camera and IMU, set to 0 to fix the delay as imageDelay | 0.0 |
+| sigma_tr | For HybridFilter and TFVIO only, set to say 5e-3 sec to estimate the rolling shutter readout time, set to 0 to fix the readout time as image_readout_time | 0.0 |
+| sigma_TGElement | For HybridFilter and TFVIO only, set to say 5e-3 to estimate the Tg matrix for gyros, set to 0 to fix the matrix as Identity | 0 |
+| sigma_TSElement | For HybridFilter and TFVIO only, set to say 1e-3 to estimate the gravity sensitivity Ts matrix for gyros, set to 0 to fix the matrix as Zero | 0 |
+| sigma_TAElement | For HybridFilter and TFVIO only, set to say 5e-3 to estimate the Ta matrix for accelerometers, set to 0 to fix the matrix as Identity | 0 |
 | numKeyframes | For OKVIS, number of keyframes in optimisation window | 5 |
-| numImuFrames | For OKVIS, number of average frames in optimisation window, 3 recommended; For MSCKF and TF_VIO, numKeyframes + numImuFrames is the maximum allowed cloned states in the entire state vector, 30 recommended for their sum. | 2 |
+| numImuFrames | For OKVIS, number of average frames in optimisation window, 3 recommended; For HybridFilter and TFVIO, numKeyframes + numImuFrames is the maximum allowed cloned states in the entire state vector, 30 recommended for their sum. | 2 |
 | featureTrackingMethod | 0 BRISK brute force in OKVIS with 3d2d RANSAC, 1 KLT back-to-back, 2 BRISK back-to-back | 0 |
-
-### Process measurements from a video and an IMU csv
-```
-msckf_ws/devel/lib/msckf/okvis_node $HOME/Documents/docker/msckf_ws/src/msckf/config/config_parkinglot_jisun_s6.yaml
- --output_dir=/media/$USER/Seagate/temp/parkinglot/
- --video_file="/media/$USER/Seagate/data/spin-lab/west_campus_parking_lot/Jisun/20151111_120342.mp4" 
- --imu_file="/media/$USER/Seagate/data/spin-lab/west_campus_parking_lot/Jisun/mystream_11_11_12_3_13.csv" 
- --start_index=18800 --finish_index=28900 --max_inc_tol=10.0
- --dump_output_option=0
-```
-The running program will exit once the sequence finishes.
 
 ### Process measurements from rostopics
 
@@ -343,40 +313,40 @@ The running program will exit once the sequence finishes.
 2. Process a rosbag.
 
 ```
-export MSCKF_WS=$HOME/Documents/docker/msckf_ws
-rosrun msckf okvis_node $MSCKF_WS/src/msckf/config/config_fpga_p2_euroc.yaml \
- $MSCKF_WS/src/msckf/config/LcdParams.yaml \
- --vocabulary_path=$MSCKF_WS/src/msckf/vocabulary/ORBvoc.yml \
+export SWIFT_VIO_WS=$HOME/Documents/docker/swift_vio_ws
+rosrun swift_vio swift_vio_node $SWIFT_VIO_WS/src/swift_vio/config/config_fpga_p2_euroc.yaml \
+ $SWIFT_VIO_WS/src/swift_vio/config/LcdParams.yaml \
+ --vocabulary_path=$SWIFT_VIO_WS/src/swift_vio/vocabulary/ORBvoc.yml \
  --dump_output_option=0 --load_input_option=0 --output_dir=$HOME/Desktop/temp
 
 rosbag play --pause --start=5.0 --rate=1.0 /media/$USER/Seagate/$USER/data/euroc/MH_01_easy.bag /cam0/image_raw:=/camera0 /imu0:=/imu
 
-rosrun rviz rviz -d $MSCKF_WS/src/msckf/config/rviz.rviz
+rosrun rviz rviz -d $SWIFT_VIO_WS/src/swift_vio/config/rviz.rviz
 ```
 
-In this case, the program will exit once the Ctrl+C is entered in the terminal that runs the msckf_node.
+In this case, the program will exit once the Ctrl+C is entered in the terminal that runs the swift_vio_node.
 Note the program will not exit if Ctrl+C is entered in the terminal of roscore.
 
 3. Process the zip synchronously.
 
 ```
-export MSCKF_WS=$HOME/Documents/docker/msckf_ws
-source $MSCKF_WS/devel/setup.bash
-rosrun msckf okvis_node_synchronous $MSCKF_WS/src/msckf/config/config_fpga_p2_euroc.yaml \
- $MSCKF_WS/src/msckf/config/LcdParams.yaml \
- --vocabulary_path=$MSCKF_WS/src/msckf/vocabulary/ORBvoc.yml \
+export SWIFT_VIO_WS=$HOME/Documents/docker/swift_vio_ws
+source $SWIFT_VIO_WS/devel/setup.bash
+rosrun swift_vio swift_vio_node_synchronous $SWIFT_VIO_WS/src/swift_vio/config/config_fpga_p2_euroc.yaml \
+ $SWIFT_VIO_WS/src/swift_vio/config/LcdParams.yaml \
+ --vocabulary_path=$SWIFT_VIO_WS/src/swift_vio/vocabulary/ORBvoc.yml \
  --bagname=/media/$USER/Seagate/$USER/data/euroc/MH_01_easy.bag --skip_first_seconds=0 --max_inc_tol=30.0 \
  --camera_topics="/cam0/image_raw,/cam1/image_raw" --imu_topic="/imu0" \
  --dump_output_option=3 --output_dir=$HOME/Desktop/temp --publish_via_ros=true
 
-rosrun rviz rviz -d $MSCKF_WS/src/msckf/config/rviz.rviz
+rosrun rviz rviz -d $SWIFT_VIO_WS/src/swift_vio/config/rviz.rviz
 ```
 
 
 ### Process the TUM VI dataset
 
 ```
-$HOME/Documents/docker/msckf_ws/src/msckf/config/config_tum_vi_50_20_msckf.yaml \
+$HOME/Documents/docker/swift_vio_ws/src/swift_vio/config/config_tum_vi_50_20_swift_vio.yaml \
  --output_dir=$HOME/Seagate/data/TUM-VI/postprocessed/ \
  --max_inc_tol=10.0 --dump_output_option=0 \
  --load_input_option=0
@@ -392,14 +362,14 @@ In terms of coordinate frames and notation,
 * S denotes the IMU sensor frame,
 * B denotes a (user-specified) body frame.
 
-For MSCKF and TF_VIO, S and B are used interchangeably.
+For swift_vio, S and B are often used interchangeably.
 
 The output of the okvis library is the pose T\_WS as a position r\_WS and quaternion 
 q\_WS, followed by the velocity in World frame v\_W and gyro biases (b_g) as well as 
 accelerometer biases (b_a). See the example application to get an idea on how to
 use the estimator and its outputs (callbacks returning states).
 
-The okvis_node ROS application will publish a configurable state -- see just below.
+The swift_vio_node ROS application will publish a configurable state -- see just below.
 
 ## Configuration files
 
@@ -443,8 +413,6 @@ To perform a calibration yourself, we recommend the following:
 * Follow https://github.com/ethz-asl/kalibr/wiki/camera-imu-calibration to get 
   estimates for the spatial parameters of the cameras with respect to the IMU.
 
-* msckf/Hybrid filter does not support pure rotation, and cannot start from static mode, because it uses delayed triangulation. But it supports infinity points.
-
 ## Contribution guidelines
 
 * Contact s.leutenegger@imperial.ac.uk to request access to the bitbucket 
@@ -474,7 +442,7 @@ git checkout -b feature/onespacecppcomment
 echo ". $(realpath setup_linter.sh)" >> ~/.bashrc
 bash
 
-cd msckf_ws/src/msckf
+cd swift_vio_ws/src/swift_vio
 init_linter_git_hooks
 ```
 

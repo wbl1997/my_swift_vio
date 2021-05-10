@@ -18,11 +18,11 @@
 
 #include <loop_closure/LoopClosureDetectorParams.h>
 
-#include <msckf/memory.h>
+#include <swift_vio/memory.h>
 
-#include <msckf/RemoveFromVector.hpp>
-#include <msckf/VioFactoryMethods.hpp>
-#include <msckf/TwoViewGeometry.hpp>
+#include <swift_vio/RemoveFromVector.hpp>
+#include <swift_vio/VioFactoryMethods.hpp>
+#include <swift_vio/TwoViewGeometry.hpp>
 
 #include <okvis/cameras/PinholeCamera.hpp>
 #include <okvis/triangulation/ProbabilisticStereoTriangulator.hpp>
@@ -68,7 +68,7 @@ class LCDFixture :public ::testing::Test {
         FLAGS_test_data_path +
         std::string("/ForLoopClosureDetector/small_voc.yml.gz");
     lcd_detector_ = std::static_pointer_cast<LoopClosureDetector>(
-          msckf::createLoopClosureMethod(lcd_params_));
+          swift_vio::createLoopClosureMethod(lcd_params_));
 
     feature_matcher_ = cv::DescriptorMatcher::create(
         cv::DescriptorMatcher::BRUTEFORCE_HAMMING);
@@ -160,8 +160,8 @@ class LCDFixture :public ::testing::Test {
         status[k] = false;
       }
     }
-    msckf::removeUnsetElements(i_indices, status);
-    msckf::removeUnsetElements(j_indices, status);
+    swift_vio::removeUnsetElements(i_indices, status);
+    swift_vio::removeUnsetElements(j_indices, status);
     return true;
   }
 
@@ -204,8 +204,8 @@ class LCDFixture :public ::testing::Test {
         triangulatedLandmarks.push_back((*nframe->T_SC(camIdi)) * hP_Ci);
       }
     }
-    msckf::removeUnsetElements(i_indices, status);
-    msckf::removeUnsetElements(j_indices, status);
+    swift_vio::removeUnsetElements(i_indices, status);
+    swift_vio::removeUnsetElements(j_indices, status);
     return triangulatedLandmarks;
   }
 

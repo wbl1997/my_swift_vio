@@ -1,5 +1,5 @@
 #include "TimeAndRotationCalibrator.h"
-#include "msckf/imu/SimpleImuOdometry.hpp"
+#include "swift_vio/imu/SimpleImuOdometry.hpp"
 #include "okvis/kinematics/sophus_operators.hpp"
 
 namespace sensor_calib {

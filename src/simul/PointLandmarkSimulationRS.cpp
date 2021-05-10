@@ -6,8 +6,8 @@
 
 #include <Eigen/Core>
 
-#include <msckf/MultipleTransformPointJacobian.hpp>
-#include <msckf/TransformMultiplyJacobian.hpp>
+#include <swift_vio/MultipleTransformPointJacobian.hpp>
+#include <swift_vio/TransformMultiplyJacobian.hpp>
 
 void PointLandmarkSimulationRS::projectLandmarksToNFrame(
     const std::vector<Eigen::Vector4d,
@@ -66,7 +66,7 @@ void PointLandmarkSimulationRS::projectLandmarksToNFrame(
             Eigen::Vector3d omega_W =  simulatedTrajectory->computeGlobalAngularRate(featureTime);
             Eigen::Vector3d omega_B;
             omega_B.noalias() = T_WBt.C().transpose() * omega_W;
-            msckf::TransformMultiplyJacobian tmj(T_WBt, T_identity, v_WB, omega_B);
+            swift_vio::TransformMultiplyJacobian tmj(T_WBt, T_identity, v_WB, omega_B);
             Eigen::Matrix<double, 6, 1> dT_WB_dt;
             dT_WB_dt.head<3>() = tmj.dp_dt();
             dT_WB_dt.tail<3>() = tmj.dtheta_dt();

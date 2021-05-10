@@ -1,5 +1,5 @@
-#ifndef INCLUDE_MSCKF_NUMERIC_CERES_RESIDUAL_JACOBIAN_HPP_
-#define INCLUDE_MSCKF_NUMERIC_CERES_RESIDUAL_JACOBIAN_HPP_
+#ifndef INCLUDE_SWIFT_VIO_NUMERIC_CERES_RESIDUAL_JACOBIAN_HPP_
+#define INCLUDE_SWIFT_VIO_NUMERIC_CERES_RESIDUAL_JACOBIAN_HPP_
 #include <Eigen/Core>
 #include <okvis/ceres/ErrorInterface.hpp>
 #include <okvis/ceres/ParameterBlock.hpp>
@@ -98,4 +98,4 @@ void computeNumericJacPoint(
         jacNumeric,
     bool minimal);
 } // namespace simul
-#endif // INCLUDE_MSCKF_NUMERIC_CERES_RESIDUAL_JACOBIAN_HPP_
+#endif // INCLUDE_SWIFT_VIO_NUMERIC_CERES_RESIDUAL_JACOBIAN_HPP_

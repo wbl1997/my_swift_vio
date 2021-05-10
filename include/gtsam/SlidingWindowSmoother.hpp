@@ -13,7 +13,7 @@
 
 #include <okvis/Estimator.hpp>
 #include <okvis/timing/Timer.hpp>
-#include <msckf/memory.h>
+#include <swift_vio/memory.h>
 
 #ifdef HAVE_GTSAM
 #define INCREMENTAL_SMOOTHER

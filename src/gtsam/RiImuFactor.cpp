@@ -8,7 +8,7 @@
 
 #include <gtsam/ImuFrontEnd.h>
 
-#include <msckf/imu/ImuOdometry.h>
+#include <swift_vio/imu/ImuOdometry.h>
 
 namespace gtsam {
 

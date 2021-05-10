@@ -300,7 +300,7 @@ void Subscriber::directFrameCornerCallback(
 #endif
 
 #ifdef HAVE_LIBVISENSOR
-void Subscriber::configCallback(msckf::CameraConfig& config,
+void Subscriber::configCallback(swift_vio::CameraConfig& config,
                                 uint32_t level) {
   if (sensor_ == nullptr) {
     return;  // not yet set up -- do nothing...

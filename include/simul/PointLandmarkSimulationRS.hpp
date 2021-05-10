@@ -1,5 +1,5 @@
-#ifndef INCLUDE_MSCKF_POINT_LANDMARK_SIMULATION_HPP
-#define INCLUDE_MSCKF_POINT_LANDMARK_SIMULATION_HPP
+#ifndef INCLUDE_SWIFT_VIO_POINT_LANDMARK_SIMULATION_HPP
+#define INCLUDE_SWIFT_VIO_POINT_LANDMARK_SIMULATION_HPP
 
 #include <okvis/MultiFrame.hpp>
 #include <okvis/cameras/NCameraSystem.hpp>
@@ -36,4 +36,4 @@ class PointLandmarkSimulationRS
       const double* imageNoiseMag);
 };
 
-#endif // INCLUDE_MSCKF_POINT_LANDMARK_SIMULATION_HPP
+#endif // INCLUDE_SWIFT_VIO_POINT_LANDMARK_SIMULATION_HPP

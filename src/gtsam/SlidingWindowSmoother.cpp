@@ -17,7 +17,7 @@
 
 #include <loop_closure/GtsamWrap.hpp>
 
-#include <msckf/FeatureTriangulation.hpp>
+#include <swift_vio/FeatureTriangulation.hpp>
 
 #include <okvis/ceres/ImuError.hpp>
 #include <okvis/IdProvider.hpp>
@@ -1317,9 +1317,9 @@ bool SlidingWindowSmoother::triangulateWithDisparityCheck(
   if (numObs < pointLandmarkOptions_.minTrackLengthForMsckf) {
     return false;
   }
-  if (msckf::hasLowDisparity(obsDirections, T_CWs, imageNoiseStd, focalLength, raySigmaScalar))
+  if (swift_vio::hasLowDisparity(obsDirections, T_CWs, imageNoiseStd, focalLength, raySigmaScalar))
     return false;
-  *hpW = msckf::triangulateHomogeneousDLT(obsDirections, T_CWs);
+  *hpW = swift_vio::triangulateHomogeneousDLT(obsDirections, T_CWs);
   *hpW /= hpW->w();
   return true;
 }

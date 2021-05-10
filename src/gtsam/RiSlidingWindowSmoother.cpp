@@ -20,7 +20,7 @@
 
 #include <loop_closure/GtsamWrap.hpp>
 
-#include <msckf/FeatureTriangulation.hpp>
+#include <swift_vio/FeatureTriangulation.hpp>
 
 #include <okvis/IdProvider.hpp>
 #include <okvis/ceres/ImuError.hpp>

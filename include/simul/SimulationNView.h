@@ -1,5 +1,5 @@
-#ifndef INCLUDE_MSCKF_SIMULATION_NVIEW_H_
-#define INCLUDE_MSCKF_SIMULATION_NVIEW_H_
+#ifndef INCLUDE_SWIFT_VIO_SIMULATION_NVIEW_H_
+#define INCLUDE_SWIFT_VIO_SIMULATION_NVIEW_H_
 
 #include <okvis/kinematics/Transformation.hpp>
 
@@ -523,4 +523,4 @@ class SimulationNViewStatic : public SimulationNView {
 };
 
 } // namespace simul
-#endif // INCLUDE_MSCKF_SIMULATION_NVIEW_H_
+#endif // INCLUDE_SWIFT_VIO_SIMULATION_NVIEW_H_

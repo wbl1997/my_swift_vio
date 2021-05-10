@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 2.8.3)
-project(msckf)
+project(swift_vio)
 
 IF(NOT CMAKE_BUILD_TYPE)
   SET(CMAKE_BUILD_TYPE Release)
@@ -8,7 +8,7 @@ IF(CMAKE_BUILD_TYPE MATCHES Release)
   ADD_DEFINITIONS(-DNDEBUG)
 ENDIF()
 
-message(STATUS "Building MSCKF with ${CMAKE_BUILD_TYPE}")
+message(STATUS "Building swift_vio with ${CMAKE_BUILD_TYPE}")
 
 option(DO_TIMING "Time routines." OFF)
 if(NOT DO_TIMING)
@@ -201,23 +201,23 @@ LIST(APPEND SOURCEFILES
     src/loop_closure/LcdThirdPartyWrapper.cpp
     src/loop_closure/LoopClosureDetectorParams.cpp
 
-    src/msckf/BaseFilter.cpp
-    src/msckf/EkfUpdater.cpp
-    src/msckf/FeatureTriangulation.cpp
-    src/msckf/FilterHelper.cpp
-    src/msckf/GeneralEstimator.cpp
-    src/msckf/HybridFilter.cpp
-    src/msckf/HybridFrontend.cpp
-    src/msckf/MotionAndStructureStats.cpp
-    src/msckf/MSCKF2.cpp
-    src/msckf/PointLandmark.cpp
+    src/swift_vio/BaseFilter.cpp
+    src/swift_vio/EkfUpdater.cpp
+    src/swift_vio/FeatureTriangulation.cpp
+    src/swift_vio/FilterHelper.cpp
+    src/swift_vio/GeneralEstimator.cpp
+    src/swift_vio/HybridFilter.cpp
+    src/swift_vio/HybridFrontend.cpp
+    src/swift_vio/MotionAndStructureStats.cpp
+    src/swift_vio/MSCKF.cpp
+    src/swift_vio/PointLandmark.cpp
 
-    src/msckf/StatAccumulator.cpp
-    src/msckf/TFVIO.cpp
-    src/msckf/TwoViewPair.cpp
-    src/msckf/VioEvaluationCallback.cpp
-    src/msckf/VioFactoryMethods.cpp
-    src/msckf/triangulate.cpp
+    src/swift_vio/StatAccumulator.cpp
+    src/swift_vio/TFVIO.cpp
+    src/swift_vio/TwoViewPair.cpp
+    src/swift_vio/VioEvaluationCallback.cpp
+    src/swift_vio/VioFactoryMethods.cpp
+    src/swift_vio/triangulate.cpp
 
     src/simul/CameraSystemCreator.cpp
     src/simul/curves.cpp
@@ -299,15 +299,12 @@ include_directories(
 )
 
 # now the actual applications
-add_executable(okvis_node src/apps/okvis_node.cpp src/apps/VioSystemWrap.cpp)
-target_link_libraries(okvis_node ${PROJECT_NAME})
+add_executable(swift_vio_node src/apps/swift_vio_node.cpp src/apps/VioSystemWrap.cpp)
+target_link_libraries(swift_vio_node ${PROJECT_NAME})
 
-add_executable(okvis_node_synchronous src/apps/okvis_node_synchronous.cpp
+add_executable(swift_vio_node_synchronous src/apps/swift_vio_node_synchronous.cpp
     src/apps/VioSystemWrap.cpp)
-target_link_libraries(okvis_node_synchronous ${PROJECT_NAME} )
-
-add_executable(dataset_convertor src/apps/dataset_convertor.cpp)
-target_link_libraries(dataset_convertor ${PROJECT_NAME} )
+target_link_libraries(swift_vio_node_synchronous ${PROJECT_NAME} )
 
 list(APPEND TEST_SRC_FILES
     test/test_main.cpp
@@ -324,32 +321,32 @@ list(APPEND TEST_SRC_FILES
    
     test/loop_closure/TestLcdThirdPartyWrapper.cpp
 
-    test/msckf/TestBoundedImuDeque.cpp
-    test/msckf/TestCovarianceEstimation.cpp
-    test/msckf/TestEkf.cpp
-    test/msckf/TestEpipolarFactor.cpp
-    test/msckf/TestEpipolarJacobian.cpp
-    test/msckf/TestEuclideanParamError.cpp
-    test/msckf/TestExtrinsicJacobian.cpp
-    test/msckf/TestFeatureInitialization.cpp
-    test/msckf/TestFeatureJacobian.cpp
-    test/msckf/TestFilterHelper.cpp
-    test/msckf/TestHybridFilter.cpp
-    test/msckf/TestImuOdometry.cpp
-    test/msckf/TestCurves.cpp
-    test/msckf/TestMergeTwoLandmarks.cpp
-    test/msckf/TestOkvisTriangulateFast.cpp
-    test/msckf/TestOkvisTime.cpp
-    test/msckf/TestPointLandmark.cpp
-    test/msckf/TestPointLandmarkSimulationRS.cpp
-    test/msckf/TestPointObsJacobian.cpp
-    test/msckf/TestQuaternionFromSmallAngle.cpp
-    test/msckf/TestRelativeMotionJacobian.cpp
-    test/msckf/TestRsReprojectionError.cpp
-    test/msckf/TestReprojectionErrorWithPap.cpp
-    test/msckf/TestSE3Interpolation.cpp
-    test/msckf/TestTriangulate.cpp
-    test/msckf/TestTwoViewPair.cpp
+    test/swift_vio/TestBoundedImuDeque.cpp
+    test/swift_vio/TestCovarianceEstimation.cpp
+    test/swift_vio/TestEkf.cpp
+    test/swift_vio/TestEpipolarFactor.cpp
+    test/swift_vio/TestEpipolarJacobian.cpp
+    test/swift_vio/TestEuclideanParamError.cpp
+    test/swift_vio/TestExtrinsicJacobian.cpp
+    test/swift_vio/TestFeatureInitialization.cpp
+    test/swift_vio/TestFeatureJacobian.cpp
+    test/swift_vio/TestFilterHelper.cpp
+    test/swift_vio/TestHybridFilter.cpp
+    test/swift_vio/TestImuOdometry.cpp
+    test/swift_vio/TestCurves.cpp
+    test/swift_vio/TestMergeTwoLandmarks.cpp
+    test/swift_vio/TestOkvisTriangulateFast.cpp
+    test/swift_vio/TestOkvisTime.cpp
+    test/swift_vio/TestPointLandmark.cpp
+    test/swift_vio/TestPointLandmarkSimulationRS.cpp
+    test/swift_vio/TestPointObsJacobian.cpp
+    test/swift_vio/TestQuaternionFromSmallAngle.cpp
+    test/swift_vio/TestRelativeMotionJacobian.cpp
+    test/swift_vio/TestRsReprojectionError.cpp
+    test/swift_vio/TestReprojectionErrorWithPap.cpp
+    test/swift_vio/TestSE3Interpolation.cpp
+    test/swift_vio/TestTriangulate.cpp
+    test/swift_vio/TestTwoViewPair.cpp
 
     test/opencv/TestOpenCVDistortion.cpp
 

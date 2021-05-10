@@ -48,7 +48,7 @@
 #pragma GCC diagnostic ignored "-Wnon-virtual-dtor"
 #include <dynamic_reconfigure/server.h>
 #include <image_geometry/pinhole_camera_model.h>
-#include <msckf/CameraConfig.h>  // generated
+#include <swift_vio/CameraConfig.h>  // generated
 #include <ros/ros.h>
 #pragma GCC diagnostic pop
 #include <image_transport/image_transport.h>
@@ -139,7 +139,7 @@ class Subscriber {
   void directFrameCornerCallback(visensor::ViFrame::Ptr frame_ptr,
                                  visensor::ViCorner::Ptr corners_ptr);
   /// \brief Dynamic reconfigure callback
-  void configCallback(msckf::CameraConfig& config, uint32_t level);
+  void configCallback(swift_vio::CameraConfig& config, uint32_t level);
 #endif
 
   /// @}
@@ -156,7 +156,7 @@ class Subscriber {
 
 #ifdef HAVE_LIBVISENSOR
   std::shared_ptr<visensor::ViSensorDriver> sensor_;  ///< The sensor API.
-  dynamic_reconfigure::Server<msckf::CameraConfig>
+  dynamic_reconfigure::Server<swift_vio::CameraConfig>
       cameraConfigReconfigureService_;  ///< dynamic reconfigure service.
 #endif
 

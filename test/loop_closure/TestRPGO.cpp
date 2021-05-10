@@ -1,7 +1,7 @@
 #include "gtest/gtest.h"
 
 #include <Eigen/Core>
-#include "msckf/memory.h"
+#include "swift_vio/memory.h"
 #include "okvis/kinematics/Transformation.hpp"
 
 #include "KimeraRPGO/RobustSolver.h"

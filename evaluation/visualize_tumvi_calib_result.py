@@ -292,7 +292,7 @@ if __name__ == '__main__':
     estimate_file_list = []
     for dir_name, subdir_list, file_list in os.walk(output_dir):
         for fname in file_list:
-            if 'msckf_estimates.csv' in fname:
+            if 'swift_vio.csv' in fname:
                 estimate_file_list.append(os.path.join(dir_name, fname))
     print("Found {} calibration result files: {}".format(len(estimate_file_list), '\n'.join(estimate_file_list)))
     data_list = list()

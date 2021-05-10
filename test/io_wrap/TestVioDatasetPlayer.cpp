@@ -4,7 +4,7 @@
 #include <thread>
 
 #include <okvis/Parameters.hpp>
-#include "../test/msckf/MockVioInterface.hpp"
+#include "../test/swift_vio/MockVioInterface.hpp"
 #include "io_wrap/Player.hpp"
 
 TEST(Player, removeTrailingSlash) {
