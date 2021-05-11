@@ -362,47 +362,12 @@ In other words, the final pose published will be
 T\_Wc\_B = T\_Wc\_W * T\_WS * T\_BS^(-1) . You have the option to express the
 velocity as well as the rotation rates in either B, S, or Wc. 
 
-## HEALTH WARNING: calibration
+## Run with data captured by a smartphone
 
-If you would like to run the software/library on your own hardware setup, be 
-aware that good results (or results at all) may only be obtained with 
-appropriate calibration of the 
+* camera intrinsics can be read from the data sheet.
+* camera extrinsics relative to the IMU can be set to the conventional value.
+* The IMU noise parameters can be set roughly.
 
-* camera intrinsics,
-* camera extrinsics (poses relative to the IMU), 
-* knowledge about the IMU noise parameters,
-* and ACCURATE TIME SYNCHRONISATION OF ALL SENSORS.
-
-To perform a calibration yourself, we recommend the following:
-
-* Get Kalibr by following the instructions here 
-  https://github.com/ethz-asl/kalibr/wiki/installation . If you decide to build from 
-	source and you run ROS kinetic checkout pull request 3:
-
-    git fetch origin pull/3/head:request3
-    git checkout request3
-
-* Follow https://github.com/ethz-asl/kalibr/wiki/multiple-camera-calibration to 
-  calibrate intrinsic and extrinsic parameters of the cameras. If you receive an 
-  error message that the tool was unable to make an initial guess on focal 
-  length, make sure that your recorded dataset contains frames that have the 
-  whole calibration target in view.
-
-* Follow https://github.com/ethz-asl/kalibr/wiki/camera-imu-calibration to get 
-  estimates for the spatial parameters of the cameras with respect to the IMU.
-
-## Contribution guidelines
-
-* Contact s.leutenegger@imperial.ac.uk to request access to the bitbucket 
-  repository.
-
-* Programming guidelines: please follow 
-  https://github.com/ethz-asl/programming_guidelines/wiki/Cpp-Coding-Style-Guidelines .
-	
-* Writing tests: please write unit tests (gtest).
-
-* Code review: please create a pull request for all changes proposed. The pull 
-  request will be reviewed by an admin before merging.
 
 ## Static program analysis with linter
 The below instructions installs linter which requres python2 following the
@@ -423,9 +388,3 @@ bash
 cd swift_vio_ws/src/swift_vio
 init_linter_git_hooks
 ```
-
-## Support
-
-The developpers will be happy to assist you or to consider bug reports / feature 
-requests. But questions that can be answered reading this document will be 
-ignored. Please contact s.leutenegger@imperial.ac.uk.

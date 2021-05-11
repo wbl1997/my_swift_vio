@@ -36,7 +36,7 @@ else()
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mssse3")
 endif()
 
-list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/okvis/cmake")
+list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/thirdparty/okvis/cmake")
 find_package(Eigen REQUIRED)
 include_directories(${EIGEN_INCLUDE_DIR}) 
 
@@ -72,9 +72,6 @@ find_package(catkin REQUIRED
 
 find_package(vio_common REQUIRED)
 
-# generate dynamic reconfigure stuff
-generate_dynamic_reconfigure_options(cfg/Camera.cfg)
-
 catkin_package(
     DEPENDS
     CATKIN_DEPENDS
@@ -86,20 +83,8 @@ catkin_package(
 # doesn't exist yet. Create it at configure time!
 file(MAKE_DIRECTORY ${CATKIN_DEVEL_PREFIX}/include)
 
-# let's pull in the okvis plain cmake project
 set(BUILD_SHARED_LIBS OFF)
-add_subdirectory(okvis)
-
-# libvisensor
-find_package(VISensor)
-
-if(VISENSORDRIVER_FOUND)
-  add_definitions(-DHAVE_LIBVISENSOR)
-  message(STATUS "Found libvisensor in ROS interface.")
-  include_directories(${VISensorDriver_INCLUDE_DIR})
-else()
-  message(WARNING "libvisensor not found")
-endif()
+add_subdirectory(thirdparty/okvis)
 
 find_package(GTSAM)
 if(GTSAM_FOUND)
@@ -113,8 +98,8 @@ else()
   message(WARNING "GTSAM not found")
 endif()
 
-include_directories(include)
 include_directories(
+  include
   ${catkin_INCLUDE_DIRS}
   ${CMAKE_BINARY_DIR}/include
 )
@@ -126,7 +111,7 @@ else()
     set(UPDATE_DISCONNECTED_IF_AVAILABLE "UPDATE_DISCONNECTED 1")
 endif()
 
-include("${PROJECT_SOURCE_DIR}/okvis/cmake/DownloadProject/DownloadProject.cmake")
+include("${PROJECT_SOURCE_DIR}/thirdparty/okvis/cmake/DownloadProject/DownloadProject.cmake")
 download_project(PROJ                DBoW2
                  PREFIX ${CMAKE_CURRENT_BINARY_DIR}/DBoW2
                  GIT_REPOSITORY      https://github.com/dorian3d/DBoW2.git
@@ -173,8 +158,8 @@ else()
 endif()
 
 if(GTSAM_FOUND)
-  add_subdirectory(Kimera-RPGO)
-  include_directories(Kimera-RPGO)
+  add_subdirectory(thirdparty/Kimera-RPGO)
+  include_directories(thirdparty/Kimera-RPGO)
   list(APPEND LINK_LIBRARIES KimeraRPGO)
 endif()
 
@@ -251,9 +236,6 @@ add_library(${PROJECT_NAME} STATIC
 
 add_dependencies(${PROJECT_NAME} okvis_multisensor_processing)
 
-# make sure configure headers are built before any node using them
-add_dependencies(${PROJECT_NAME} ${PROJECT_NAME}_gencfg)
-
 list(APPEND LINK_LIBRARIES
     ${catkin_LIBRARIES}
     okvis_util
@@ -277,24 +259,19 @@ target_link_libraries(${PROJECT_NAME}
   ${LINK_LIBRARIES}
 )
 
-if(VISENSORDRIVER_FOUND)
-  target_link_libraries(${PROJECT_NAME} ${VISensorDriver_LIBRARY})
-endif()
-
 include_directories(
-  okvis/okvis_util/include
-  okvis/okvis_kinematics/include
-  okvis/okvis_time/include
-  okvis/okvis_cv/include
-  okvis/okvis_common/include
-  okvis/loop_closure/include
-  okvis/okvis_ceres/include
-  okvis/okvis_timing/include
-  okvis/okvis_matcher/include
-  okvis/okvis_frontend/include 
-  okvis/okvis_multisensor_processing/include
-
-  sophus
+  thirdparty/okvis/okvis_util/include
+  thirdparty/okvis/okvis_kinematics/include
+  thirdparty/okvis/okvis_time/include
+  thirdparty/okvis/okvis_cv/include
+  thirdparty/okvis/okvis_common/include
+  thirdparty/okvis/loop_closure/include
+  thirdparty/okvis/okvis_ceres/include
+  thirdparty/okvis/okvis_timing/include
+  thirdparty/okvis/okvis_matcher/include
+  thirdparty/okvis/okvis_frontend/include
+  thirdparty/okvis/okvis_multisensor_processing/include
+  thirdparty/sophus
   ${vio_common_INCLUDE_DIRS}
 )
 

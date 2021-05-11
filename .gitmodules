@@ -1,10 +1,10 @@
 [submodule "okvis"]
-	path = okvis
+	path = thirdparty/okvis
 	url = https://github.com/JzHuai0108/okvis.git
 [submodule "sophus"]
-	path = sophus
+	path = thirdparty/sophus
 	url = https://github.com/stevenlovegrove/Sophus.git
 [submodule "Kimera-RPGO"]
-	path = Kimera-RPGO
+	path = thirdparty/Kimera-RPGO
 	url = https://github.com/JzHuai0108/Kimera-RPGO.git
 	branch = master

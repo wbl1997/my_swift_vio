@@ -48,7 +48,6 @@
 #pragma GCC diagnostic ignored "-Wnon-virtual-dtor"
 #include <dynamic_reconfigure/server.h>
 #include <image_geometry/pinhole_camera_model.h>
-#include <swift_vio/CameraConfig.h>  // generated
 #include <ros/ros.h>
 #pragma GCC diagnostic pop
 #include <image_transport/image_transport.h>
