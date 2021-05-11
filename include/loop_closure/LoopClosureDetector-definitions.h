@@ -27,8 +27,7 @@
 #include <opencv2/core.hpp>
 #include <Eigen/Core>
 
-namespace VIO {
-
+namespace swift_vio {
 typedef cv::Mat OrbDescriptor;
 typedef std::vector<OrbDescriptor> OrbDescriptorVec;
 typedef uint64_t FrameId;
@@ -161,5 +160,4 @@ struct LcdDebugInfo {
   size_t pgo_lc_count_;
   size_t pgo_lc_inliers_;
 };  // struct LcdDebugInfo
-
-}  // namespace VIO
+}  // namespace swift_vio

@@ -2,8 +2,7 @@
 #include <opencv2/core/eigen.hpp>
 #include <okvis/triangulation/ProbabilisticStereoTriangulator.hpp>
 
-/// \brief okvis Main namespace of this package.
-namespace okvis {
+namespace swift_vio {
 template <class CAMERA_GEOMETRY_T>
 void loadParameters(const std::shared_ptr<okvis::MultiFrame> multiframe,
                     const okvis::Estimator& estimator,
@@ -177,4 +176,4 @@ int addConstraintToEstimator(
   }
   return 0;
 }
-}  // namespace okvis
+}  // namespace swift_vio

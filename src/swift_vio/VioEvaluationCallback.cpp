@@ -26,6 +26,5 @@ void VioEvaluationCallback::PrepareForEvaluation(
     //  intrinsics.tail<kDistortionDim>() = distortionIntrinsics;
     //  cameraGeometryBase_->setIntrinsics(intrinsics);
   }
-
 }
 } // namespace swift_vio

@@ -36,7 +36,7 @@
 #include <okvis/Measurements.hpp>
 #include "okvis/class_macros.hpp"
 
-namespace okvis {
+namespace swift_vio {
 /*
  * Class implementing the Imu Front End preintegration.
  * Construct using imu_params, and optionally an initial ImuBias.
@@ -132,5 +132,4 @@ public:
   ImuParams imu_params_;
   PimUniquePtr pim_ = nullptr;
 };
-
-} // End of okvis namespace.
+}  // namespace swift_vio

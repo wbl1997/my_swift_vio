@@ -12,7 +12,7 @@
 
 #ifdef HAVE_GTSAM
 
-namespace okvis {
+namespace swift_vio {
 /**
  * RiSlidingWindowSmoother builds upon gtsam FixedLagSmoother with right invariant errors.
  */
@@ -21,13 +21,13 @@ class RiSlidingWindowSmoother : public SlidingWindowSmoother {
   OKVIS_DEFINE_EXCEPTION(Exception, std::runtime_error)
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
-  RiSlidingWindowSmoother(const okvis::BackendParams& backendParams);
+  RiSlidingWindowSmoother(const BackendParams& backendParams);
 
   /**
    * @brief Constructor if a ceres map is already available.
    * @param mapPtr Shared pointer to ceres map.
    */
-  RiSlidingWindowSmoother(const okvis::BackendParams& backendParams,
+  RiSlidingWindowSmoother(const BackendParams& backendParams,
                         std::shared_ptr<okvis::ceres::Map> mapPtr);
 
   virtual ~RiSlidingWindowSmoother();
@@ -88,10 +88,10 @@ class RiSlidingWindowSmoother : public SlidingWindowSmoother {
   bool gtsamMarginalCovariance(Eigen::MatrixXd* cov) const final;
 
 };
-}  // namespace okvis
+}  // namespace swift_vio
 #else
-namespace okvis {
+namespace swift_vio {
   typedef SlidingWindowSmoother RiSlidingWindowSmoother;
-}  // namespace okvis
-#endif // # ifdef HAVE_GTSAM
+}  // namespace swift_vio
+#endif  // #ifdef HAVE_GTSAM
 #endif /* INCLUDE_GTSAM_RI_SLIDING_WINDOW_SMOOTHER_HPP_ */

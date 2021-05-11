@@ -39,20 +39,16 @@
 #ifndef INCLUDE_SWIFT_VIO_IMU_ODOMETRY_LEGACY_HPP_
 #define INCLUDE_SWIFT_VIO_IMU_ODOMETRY_LEGACY_HPP_
 
+#include <okvis/kinematics/operators.hpp>
 #include <swift_vio/imu/ImuErrorModel.h>
 
 #include <Eigen/Core>
-#include <vio/eigen_utils.h>  //only for rvec2quat
-#include <sophus/se3.hpp>     //only for first order propagation
+#include <sophus/se3.hpp>     // only for first order propagation
 
-/// \brief okvis Main namespace of this package.
-namespace okvis {
-/// \brief ceres Namespace for ceres-related functionality implemented in okvis.
-namespace ceres {
+namespace swift_vio {
 /// \brief ode Namespace for functionality related to ODE integration
 /// implemented in okvis.
 namespace ode {
-
 // s0 can be any local world frame
 // acc, m/s^2, estimated acc from imu in s frame with bias removed, gyro, rad/s,
 // estimated angular rate by imu with bias removed for better accuracy within
@@ -71,9 +67,9 @@ void strapdown_local_quat_bias(const Eigen::Matrix<Scalar, 3, 1>& rs0,
   Eigen::Matrix<Scalar, 3, 1> wie2s0 = gomegas0.template tail<3>();
   // Update attitude
   // method (1) second order integration
-  Eigen::Quaternion<Scalar> qe = vio::rvec2quat(wie2s0 * dt);
+  Eigen::Quaternion<Scalar> qe = okvis::kinematics::rvec2quat(wie2s0 * dt);
   (*qs0_2_s_new) = qs0_2_s * qe;
-  Eigen::Quaternion<Scalar> qb = vio::rvec2quat(-w * dt);
+  Eigen::Quaternion<Scalar> qb = okvis::kinematics::rvec2quat(-w * dt);
   (*qs0_2_s_new) = qb * (*qs0_2_s_new);
 
   //// method (2) Runge-Kutta 4th order integration, empirically, this sometimes
@@ -298,10 +294,7 @@ void predictStates(
   pred_T_skp1_to_w->translation() = r_new;
   (*pred_speed_kp1) = v_new;
 }
-
 }  // namespace ode
-
-}  // namespace ceres
-}  // namespace okvis
+}  // namespace swift_vio
 
 #endif // INCLUDE_SWIFT_VIO_IMU_ODOMETRY_LEGACY_HPP_

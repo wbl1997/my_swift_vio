@@ -21,7 +21,7 @@
 #include <okvis/ceres/PoseParameterBlock.hpp>
 #include <okvis/ceres/ReprojectionError.hpp>
 #include <okvis/ceres/SpeedAndBiasParameterBlock.hpp>
-#include <swift_vio/EuclideanParamBlockSized.hpp>
+
 #include <okvis/Estimator.hpp>
 #include <okvis/timing/Timer.hpp>
 
@@ -33,9 +33,7 @@
 #include <swift_vio/memory.h>
 #include <swift_vio/imu/ImuOdometry.h>
 
-/// \brief okvis Main namespace of this package.
-namespace okvis {
-
+namespace swift_vio {
 enum RetrieveObsSeqType {
     ENTIRE_TRACK=0,
     LATEST_TWO,
@@ -55,7 +53,7 @@ enum RetrieveObsSeqType {
  B: Body, defined by the IMU model, e.g., Imu_BG_BA, usually defined close to S.
  Its relation to the camera frame is modeled by the extrinsic model, e.g., Extrinsic_p_CB.
  */
-class HybridFilter : public Estimator, public BaseFilter {
+class HybridFilter : public okvis::Estimator, public BaseFilter {
  public:
   OKVIS_DEFINE_EXCEPTION(Exception, std::runtime_error)
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
@@ -138,7 +136,7 @@ class HybridFilter : public Estimator, public BaseFilter {
    * @return number of gathered valid observations
    */
   size_t gatherMapPointObservations(
-      const MapPoint &mp,
+      const okvis::MapPoint &mp,
       swift_vio::PointSharedData *pointDataPtr,
       std::vector<Eigen::Vector3d, Eigen::aligned_allocator<Eigen::Vector3d>>
           *obsDirections,
@@ -164,7 +162,7 @@ class HybridFilter : public Estimator, public BaseFilter {
       const Eigen::AlignedVector<okvis::kinematics::Transformation>& T_BCs,
       const std::vector<size_t>& camIndices) const;
 
-  bool isPureRotation(const MapPoint& mp) const;
+  bool isPureRotation(const okvis::MapPoint& mp) const;
 
   void propagatePoseAndVelocityForMapPoint(swift_vio::PointSharedData* pointDataPtr) const;
 
@@ -197,7 +195,7 @@ class HybridFilter : public Estimator, public BaseFilter {
    * @return true if triangulation successful
    */
   swift_vio::TriangulationStatus triangulateAMapPoint(
-      const MapPoint &mp,
+      const okvis::MapPoint &mp,
       std::vector<Eigen::Vector2d, Eigen::aligned_allocator<Eigen::Vector2d>>
           &obsInPixel,
       swift_vio::PointLandmark& pointLandmark,
@@ -248,7 +246,7 @@ class HybridFilter : public Estimator, public BaseFilter {
    * where k is the number of features in the state vector.
    * @return true if succeeded in computing the residual and Jacobians.
    */
-  bool slamFeatureJacobian(const MapPoint &mp,
+  bool slamFeatureJacobian(const okvis::MapPoint &mp,
                            Eigen::MatrixXd &H_x,
                            Eigen::Matrix<double, -1, 1> &r_i,
                            Eigen::MatrixXd &R_i,
@@ -274,7 +272,7 @@ class HybridFilter : public Estimator, public BaseFilter {
    * @return true if succeeded in computing the residual and Jacobians
    */
   virtual bool
-  featureJacobian(const MapPoint &mp,
+  featureJacobian(const okvis::MapPoint &mp,
                   swift_vio::PointLandmark *pointLandmark,
                   Eigen::MatrixXd &H_oi,
                   Eigen::Matrix<double, Eigen::Dynamic, 1> &r_oi,
@@ -348,13 +346,13 @@ class HybridFilter : public Estimator, public BaseFilter {
     size_t totalCamDim = statesMap_.rbegin()
                              ->second.sensors.at(SensorStates::Camera)
                              .back()
-                             .at(CameraSensorStates::TR)
+                             .at(okvis::Estimator::CameraSensorStates::TR)
                              .startIndexInCov +
                          1;
     size_t totalImuDim = statesMap_.rbegin()
                              ->second.sensors.at(SensorStates::Camera)
                              .at(0u)
-                             .at(CameraSensorStates::T_SCi)
+                             .at(okvis::Estimator::CameraSensorStates::T_SCi)
                              .startIndexInCov;
     return totalCamDim - totalImuDim;
   }
@@ -369,13 +367,13 @@ class HybridFilter : public Estimator, public BaseFilter {
     size_t totalInclusiveDim = statesMap_.rbegin()
                                    ->second.sensors.at(SensorStates::Camera)
                                    .at(camIdx)
-                                   .at(CameraSensorStates::TR)
+                                   .at(okvis::Estimator::CameraSensorStates::TR)
                                    .startIndexInCov +
                                1;
     size_t totalExclusiveDim = statesMap_.rbegin()
                                    ->second.sensors.at(SensorStates::Camera)
                                    .at(camIdx)
-                                   .at(CameraSensorStates::T_SCi)
+                                   .at(okvis::Estimator::CameraSensorStates::T_SCi)
                                    .startIndexInCov;
     return totalInclusiveDim - totalExclusiveDim;
   }
@@ -396,7 +394,7 @@ class HybridFilter : public Estimator, public BaseFilter {
   }
 
   inline size_t startIndexOfClonedStates() const {
-    size_t dim = okvis::ceres::ode::kNavErrorStateDim + imu_rig_.getImuParamsMinimalDim(0);
+    size_t dim = swift_vio::ode::kNavErrorStateDim + imu_rig_.getImuParamsMinimalDim(0);
     for (size_t j = 0; j < camera_rig_.numberCameras(); ++j) {
       dim += cameraParamsMinimalDimen(j);
     }
@@ -412,13 +410,13 @@ class HybridFilter : public Estimator, public BaseFilter {
     return statesMap_.rbegin()
                ->second.sensors.at(SensorStates::Camera)
                .back()
-               .at(CameraSensorStates::TR)
+               .at(okvis::Estimator::CameraSensorStates::TR)
                .startIndexInCov +
            1;
   }
 
   inline size_t startIndexOfCameraParams(size_t camIdx = 0u) const {
-    size_t dim = okvis::ceres::ode::kNavErrorStateDim + imu_rig_.getImuParamsMinimalDim(0);
+    size_t dim = swift_vio::ode::kNavErrorStateDim + imu_rig_.getImuParamsMinimalDim(0);
     for (size_t i = 0u; i < camIdx; ++i) {
       dim += cameraParamsMinimalDimen(i);
     }
@@ -433,7 +431,7 @@ class HybridFilter : public Estimator, public BaseFilter {
    */
   inline size_t startIndexOfCameraParamsFast(
       size_t camIdx,
-      CameraSensorStates camParamBlockName = CameraSensorStates::T_SCi) const {
+      CameraSensorStates camParamBlockName = okvis::Estimator::CameraSensorStates::T_SCi) const {
     return statesMap_.rbegin()
         ->second.sensors.at(SensorStates::Camera)
         .at(camIdx)
@@ -449,7 +447,7 @@ class HybridFilter : public Estimator, public BaseFilter {
    */
   inline size_t intraStartIndexOfCameraParams(
       size_t camIdx,
-      CameraSensorStates camParamBlockName = CameraSensorStates::T_SCi) const {
+      CameraSensorStates camParamBlockName = okvis::Estimator::CameraSensorStates::T_SCi) const {
     size_t totalInclusiveDim = statesMap_.rbegin()
                                    ->second.sensors.at(SensorStates::Camera)
                                    .at(camIdx)
@@ -458,7 +456,7 @@ class HybridFilter : public Estimator, public BaseFilter {
     size_t totalExclusiveDim = statesMap_.rbegin()
                                    ->second.sensors.at(SensorStates::Camera)
                                    .at(0u)
-                                   .at(CameraSensorStates::T_SCi)
+                                   .at(okvis::Estimator::CameraSensorStates::T_SCi)
                                    .startIndexInCov;
     return totalInclusiveDim - totalExclusiveDim;
   }
@@ -470,7 +468,7 @@ class HybridFilter : public Estimator, public BaseFilter {
    * @return
    */
   inline size_t navStateAndImuParamsMinimalDim(size_t imuIdx = 0u) {
-    return okvis::ceres::ode::kNavErrorStateDim +
+    return swift_vio::ode::kNavErrorStateDim +
            imu_rig_.getImuParamsMinimalDim(imuIdx);
   }
 
@@ -506,7 +504,7 @@ class HybridFilter : public Estimator, public BaseFilter {
   void removeAnchorlessLandmarks(const std::vector<uint64_t>& sortedRemovedStateIds);
 
   bool getOdometryConstraintsForKeyframe(
-      std::shared_ptr<okvis::LoopQueryKeyframeMessage> queryKeyframe) const final;
+      std::shared_ptr<LoopQueryKeyframeMessage> queryKeyframe) const final;
 
   // using latest state estimates set imu_rig_ and camera_rig_ which are then
   // used in computing Jacobians of all feature observations
@@ -524,7 +522,7 @@ class HybridFilter : public Estimator, public BaseFilter {
   uint64_t getMinValidStateId() const;
 
   void addImuAugmentedStates(const okvis::Time stateTime, int imu_id,
-                             SpecificSensorStatesContainer* imuInfo);
+                             okvis::Estimator::SpecificSensorStatesContainer* imuInfo);
 
   /**
    * @brief updateImuRig update imu_rig_ from states.
@@ -547,10 +545,10 @@ class HybridFilter : public Estimator, public BaseFilter {
 
   void usePreviousCameraParamBlocks(
       std::map<uint64_t, States>::const_reverse_iterator prevStateRevIter,
-      size_t cameraIndex, SpecificSensorStatesContainer* cameraInfos) const;
+      size_t cameraIndex, okvis::Estimator::SpecificSensorStatesContainer* cameraInfos) const;
 
   void initializeCameraParamBlocks(okvis::Time stateEpoch, size_t cameraIndex,
-                                   SpecificSensorStatesContainer *cameraInfos);
+                                   okvis::Estimator::SpecificSensorStatesContainer *cameraInfos);
 
   // epipolar measurement used by filters for computing Jacobians
   // https://en.cppreference.com/w/cpp/language/nested_types
@@ -636,7 +634,7 @@ class HybridFilter : public Estimator, public BaseFilter {
    * @return true if Jacobian is computed successfully
    */
   bool featureJacobianEpipolar(
-      const MapPoint &mp,
+      const okvis::MapPoint &mp,
       Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> *Hi,
       Eigen::Matrix<double, Eigen::Dynamic, 1> *ri,
       Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> *Ri,
@@ -705,6 +703,6 @@ void computeExtrinsicJacobians(
     std::vector<size_t>* involvedCameraIndices,
     size_t mainCameraIndex);
 
-}  // namespace okvis
+}  // namespace swift_vio
 #include <swift_vio/implementation/HybridFilter.hpp>
-#endif /* INCLUDE_OKVIS_HYBRID_FILTER_HPP_ */
+#endif  // INCLUDE_OKVIS_HYBRID_FILTER_HPP_

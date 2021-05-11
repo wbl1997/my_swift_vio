@@ -3,7 +3,7 @@
 
 #include <vector>
 
-namespace okvis {
+namespace swift_vio {
 class TwoViewPair {
  public:
   // for views less than 8, use the look up table
@@ -32,5 +32,5 @@ class TwoViewPair {
       int numFeatures,
       const TWO_VIEW_CONSTRAINT_SCHEME scheme = MAX_GAP_EVEN_CHANCE);
 };
-}  // namespace okvis
+}  // namespace swift_vio
 #endif  // INCLUDE_SWIFT_VIO_TWO_VIEW_PAIR_HPP_

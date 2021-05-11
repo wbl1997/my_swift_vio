@@ -15,8 +15,7 @@
 #include "loop_closure/LoopClosureDetectorParams.h"
 #include "io_wrap/YamlParser.h"
 
-namespace VIO {
-
+namespace swift_vio {
 LoopClosureDetectorParams::LoopClosureDetectorParams(
     LoopClosureMethodType lc_method_id,
     bool use_nss,
@@ -97,7 +96,7 @@ LoopClosureDetectorParams::LoopClosureDetectorParams(
 }
 
 bool LoopClosureDetectorParams::parseYAML(const std::string& filepath) {
-  okvis::YamlParser yaml_parser(filepath);
+  YamlParser yaml_parser(filepath);
 
   int lc_method_id;
   yaml_parser.getYamlParam("loop_closure_method", &lc_method_id);
@@ -211,4 +210,4 @@ void LoopClosureDetectorParams::print() const {
       << "pgo_rot_threshold_: " << pgo_rot_threshold_ << '\n'
       << "pgo_trans_threshold_: " << pgo_trans_threshold_;
 }
-}  // namespace VIO
+}  // namespace swift_vio

@@ -30,8 +30,7 @@
 #include "okvis/class_macros.hpp"
 #include "io_wrap/YamlParser.h"
 
-namespace okvis {
-
+namespace swift_vio {
 /** \struct Backend Output Params
  * \brief Params controlling what the backend outputs.
  */
@@ -128,6 +127,4 @@ class BackendParams : public PipelineParams {
   double noMotionRotationSigma_ = 1.0e-4;
   double constantVelSigma_ = 1.0e-2;
 };
-
-
-}  // namespace okvis
+}  // namespace swift_vio

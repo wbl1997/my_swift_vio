@@ -8,8 +8,7 @@
 #include <okvis/ceres/ParameterBlock.hpp>
 #include <okvis/timing/Timer.hpp>
 
-namespace okvis {
-
+namespace swift_vio {
 struct StatePointerAndEstimate {
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
   StatePointerAndEstimate(
@@ -72,6 +71,6 @@ protected:
   okvis::timing::Timer updateStatesTimer;
   okvis::timing::Timer updateCovarianceTimer;
 };
-} // namespace okvis
+} // namespace swift_vio
 
 #endif // BASEFILTER_H

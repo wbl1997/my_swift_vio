@@ -72,7 +72,7 @@ class PointLandmarkSimulationRSTest : public ::testing::Test {
     // project the landmark via RS model
     std::vector<std::vector<size_t>> frameLandmarkIndices;
     std::vector<std::vector<int>> keypointIndices;
-    PointLandmarkSimulationRS::projectLandmarksToNFrame(
+    simul::PointLandmarkSimulationRS::projectLandmarksToNFrame(
         homogeneousPoints, cst, centralRowEpoch, trueCameraSystem, mf,
         &frameLandmarkIndices, &keypointIndices, nullptr);
 

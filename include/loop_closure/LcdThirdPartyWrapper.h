@@ -52,7 +52,7 @@ POSSIBILITY OF SUCH DAMAGE.
 #include <okvis/class_macros.hpp>
 #include "loop_closure/LoopClosureDetectorParams.h"
 
-namespace VIO {
+namespace swift_vio {
 class LcdThirdPartyWrapper {
  public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
@@ -128,5 +128,4 @@ class LcdThirdPartyWrapper {
   MatchIsland latest_matched_island_;
   FrameId latest_query_id_;
 };  // class LcdThirdPartyWrapper
-
-}  // namespace VIO
+}  // namespace swift_vio

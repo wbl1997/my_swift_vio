@@ -3,6 +3,7 @@
 #include <Eigen/Core>
 #include "opencv2/imgproc.hpp"
 
+namespace swift_vio {
 PoseViewer::PoseViewer() {
   cv::namedWindow("OKVIS Top View");
   _image.create(imageSize, imageSize, CV_8UC3);
@@ -107,3 +108,4 @@ void PoseViewer::drawPath() {
     i++;
   }
 }
+}  // namespace swift_vio

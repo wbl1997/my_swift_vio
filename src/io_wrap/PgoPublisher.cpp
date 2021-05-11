@@ -1,7 +1,7 @@
 #include <iomanip>
 #include "io_wrap/PgoPublisher.hpp"
 
-namespace okvis {
+namespace swift_vio {
 PgoPublisher::PgoPublisher() {}
 
 PgoPublisher::~PgoPublisher() { csvStream_.close(); }
@@ -22,5 +22,4 @@ bool PgoPublisher::setCsvFile(const std::string& csvFile) {
   csvStream_ << "# timestamp tx ty tz qx qy qz qw\n";
   return csvStream_.good();
 }
-
-}  // namespace okvis
+}  // namespace swift_vio

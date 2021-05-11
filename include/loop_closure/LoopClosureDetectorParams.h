@@ -23,12 +23,11 @@
 
 #include "loop_closure/LoopClosureDetector-definitions.h"
 
-#include <okvis/LoopClosureParameters.hpp>
+#include <loop_closure/LoopClosureParameters.hpp>
 
 
-namespace VIO {
-
-class LoopClosureDetectorParams : public okvis::LoopClosureParameters {
+namespace swift_vio {
+class LoopClosureDetectorParams : public LoopClosureParameters {
  public:
   LoopClosureDetectorParams(
       LoopClosureMethodType lc_method_id = LoopClosureMethodType::OrbBoW,
@@ -175,5 +174,4 @@ class LoopClosureDetectorParams : public okvis::LoopClosureParameters {
   double pgo_trans_threshold_;
   //////////////////////////////////////////////////////////////////////////////
 };
-
-}  // namespace VIO
+}  // namespace swift_vio

@@ -1,6 +1,6 @@
 #include "swift_vio/TwoViewPair.hpp"
 
-namespace okvis {
+namespace swift_vio {
 const std::vector<std::vector<std::pair<int, int>>> TwoViewPair::pairs_lut{
     {},  // place holder
     {},  // place holder
@@ -76,4 +76,4 @@ std::vector<std::pair<int, int>> TwoViewPair::getFramePairs(
   }
   return framePairs;
 }
-}  // namespace okvis
+}  // namespace swift_vio

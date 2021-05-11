@@ -137,7 +137,7 @@ public:
   }
 
   void SetUp() {
-    testSetting = okvis::TestSetting(
+    testSetting = simul::TestSetting(
         true, noisyInitialSpeedAndBiases, false, true, true, noise_factor,
         noise_factor, algorithm, useEpipolarConstraint,
         cameraObservationModelId, landmarkModelId, cameraModelId,
@@ -161,10 +161,10 @@ public:
     if (!debugStream.is_open()) {
       debugStream.open(outputFile, std::ofstream::out);
       std::string headerLine;
-      okvis::StreamHelper::composeHeaderLine(
+      swift_vio::StreamHelper::composeHeaderLine(
           vioSystemBuilder.imuModelType(), {extrinsicModelName},
           {projOptModelName}, {vioSystemBuilder.distortionType()},
-          okvis::FULL_STATE_WITH_ALL_CALIBRATION, &headerLine);
+          swift_vio::FULL_STATE_WITH_ALL_CALIBRATION, &headerLine);
       debugStream << headerLine << std::endl;
     }
   }
@@ -202,7 +202,7 @@ public:
       okvis::Time currentKFTime = *iter;
       okvis::Time imuDataEndTime = currentKFTime + okvis::Duration(1);
       okvis::Time imuDataBeginTime = lastKFTime - okvis::Duration(1);
-      okvis::ImuMeasurementDeque imuSegment = okvis::getImuMeasurements(
+      okvis::ImuMeasurementDeque imuSegment = swift_vio::getImuMeasurements(
           imuDataBeginTime, imuDataEndTime, imuMeasurements, nullptr);
       bool asKeyframe = true;
       // add it in the window to create a new time instance
@@ -374,7 +374,7 @@ public:
   double readoutTime;
   int cameraObservationModelId = 0;
   int landmarkModelId = 0;
-  okvis::EstimatorAlgorithm algorithm = okvis::EstimatorAlgorithm::MSCKF;
+  swift_vio::EstimatorAlgorithm algorithm = swift_vio::EstimatorAlgorithm::MSCKF;
 
 private:
 
@@ -387,10 +387,10 @@ private:
   simul::CameraOrientation cameraOrientationId =
       simul::CameraOrientation::Forward;
   double landmarkRadius = 5;
-  okvis::TestSetting testSetting;
+  simul::TestSetting testSetting;
   simul::SimulatedTrajectoryType trajectoryType =
       simul::SimulatedTrajectoryType::Torus;
-  okvis::BackendParams backendParams;
+  swift_vio::BackendParams backendParams;
 
 
   std::ofstream debugStream; // record state history of a trial
@@ -400,7 +400,7 @@ private:
   okvis::ImuMeasurementDeque trueBiases;
   std::vector<okvis::kinematics::Transformation> ref_T_WS_list;
 
-  std::shared_ptr<okvis::SimulationFrontend> frontend;
+  std::shared_ptr<simul::SimulationFrontend> frontend;
   std::shared_ptr<const okvis::cameras::NCameraSystem> cameraSystem0;
   std::shared_ptr<const okvis::cameras::CameraBase> cameraGeometry0;
 };
@@ -458,7 +458,7 @@ TEST(EstimatorTest, OkvisCovariance) {
   std::string extrinsicModelName = "FIXED";
   std::string outputFile = FLAGS_log_dir + "/OKVIS_Torus_Fixed.txt";
   EstimatorTest test(projOptModelName, extrinsicModelName, outputFile, 0.0, 0.0);
-  test.algorithm = okvis::EstimatorAlgorithm::OKVIS;
+  test.algorithm = swift_vio::EstimatorAlgorithm::OKVIS;
   test.SetUp();
   test.Run(EstimatorCheck::NAVSTATE_COVARIANCE);
 }

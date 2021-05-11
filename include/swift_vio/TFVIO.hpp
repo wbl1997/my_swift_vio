@@ -22,8 +22,7 @@
 #include <okvis/ceres/ReprojectionError.hpp>
 #include <okvis/ceres/SpeedAndBiasParameterBlock.hpp>
 
-/// \brief okvis Main namespace of this package.
-namespace okvis {
+namespace swift_vio {
 //! TFVIO class investigates the effects of epipolar constraints on VIO filter.
 //! The best strategies for VIO filtering with epipolar constraints found by TFVIO have
 //! been integrated into MSCKF which has extra features like redundant frame marginalization.
@@ -72,7 +71,6 @@ private:
   // minimum of the ids of the states that have tracked features
   uint64_t minValidStateId_;
 };
+}  // namespace swift_vio
 
-}  // namespace okvis
-
-#endif /* INCLUDE_OKVIS_TFVIO_HPP_ */
+#endif  // INCLUDE_OKVIS_TFVIO_HPP_

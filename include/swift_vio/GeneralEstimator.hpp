@@ -32,9 +32,8 @@
 
 #include <swift_vio/CameraRig.hpp>
 
-/// \brief okvis Main namespace of this package.
-namespace okvis {
-class GeneralEstimator : public Estimator
+namespace swift_vio {
+class GeneralEstimator : public okvis::Estimator
 {
  public:
   OKVIS_DEFINE_EXCEPTION(Exception, std::runtime_error)
@@ -94,12 +93,12 @@ class GeneralEstimator : public Estimator
       ::ceres::ResidualBlockId residualBlockId, uint64_t landmarkId);
 };
 
-inline bool areTwoViewConstraints(const MapPoint& mp,
+inline bool areTwoViewConstraints(const okvis::MapPoint& mp,
                                   size_t numLandmarkResiduals) {
   return mp.observations.begin()->second == 0u &&
          numLandmarkResiduals == 0u;
 }
 
-}  // namespace okvis
+}  // namespace swift_vio
 
-#endif /* #ifndef INCLUDE_SWIFT_VIO_GENERAL_ESTIMATOR_HPP_ */
+#endif  // INCLUDE_SWIFT_VIO_GENERAL_ESTIMATOR_HPP_

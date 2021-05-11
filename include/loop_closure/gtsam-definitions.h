@@ -25,8 +25,7 @@
 #include <gtsam/nonlinear/NonlinearFactorGraph.h>
 #include <gtsam/nonlinear/Values.h>
 
-namespace VIO {
-
+namespace swift_vio {
 struct LoopClosureFactor {
   LoopClosureFactor(const FrameId& ref_key,
                     const FrameId& cur_key,
@@ -94,5 +93,4 @@ struct LcdOutput {
   gtsam::Values states_;
   gtsam::NonlinearFactorGraph nfg_;
 };
-
-}  // namespace VIO
+}  // namespace swift_vio

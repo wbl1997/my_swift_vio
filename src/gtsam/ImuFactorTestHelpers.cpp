@@ -6,7 +6,7 @@
 #include <gtsam/ImuFactorTestHelpers.h>
 #include <okvis/kinematics/operators.hpp>
 
-namespace gtsam {
+namespace swift_vio {
 Eigen::Matrix<double, 15, 15> dokvis_drightinvariant(
     const okvis::kinematics::Transformation& T_WB,
     const Eigen::Vector3d& v_WB) {
@@ -54,4 +54,4 @@ Eigen::Matrix<double, 15, 15> dforster_dokvis(const Eigen::Matrix3d& R_WB) {
   jacobian.block<3, 3>(12, 9).setIdentity();
   return jacobian;
 }
-}; // namespace gtsam
+}  // namespace swift_vio

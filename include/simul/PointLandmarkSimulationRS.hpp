@@ -7,6 +7,7 @@
 
 #include <simul/curves.h>
 
+namespace simul {
 class PointLandmarkSimulationRS
 {
  public:
@@ -35,5 +36,5 @@ class PointLandmarkSimulationRS
       std::vector<std::vector<int>>* keypointIndices,
       const double* imageNoiseMag);
 };
-
+}  // namespace simul
 #endif // INCLUDE_SWIFT_VIO_POINT_LANDMARK_SIMULATION_HPP

@@ -89,7 +89,7 @@ class CameraMeasurementJacobianTest {
     return imuMeasurements;
   }
 
-  okvis::InitialNavState initializeNavState() {
+  swift_vio::InitialNavState initializeNavState() {
     Eigen::Vector3d p_WS = Eigen::Vector3d(radius, 0, 0);
     Eigen::Vector3d v_WS = Eigen::Vector3d(0, angular_rate * radius, 0);
     Eigen::Matrix3d R_WS;
@@ -98,7 +98,7 @@ class CameraMeasurementJacobianTest {
     R_WS << 1, 0, 0, 0, 1, 0, 0, 0, 1;
     Eigen::Quaterniond q_WS = Eigen::Quaterniond(R_WS);
 
-    okvis::InitialNavState pvstd;
+    swift_vio::InitialNavState pvstd;
     pvstd.initWithExternalSource = true;
     pvstd.p_WS = p_WS;
     pvstd.q_WS = Eigen::Quaterniond(q_WS);
@@ -217,7 +217,7 @@ void CameraMeasurementJacobianTest::initialize() {
     if (k != 0) {
       lastKFTime = estimator_.currentFrameTimestamp();
     }
-    okvis::ImuMeasurementDeque imuSegment = okvis::getImuMeasurements(
+    okvis::ImuMeasurementDeque imuSegment = swift_vio::getImuMeasurements(
         lastKFTime, currentKFTime, imuMeasurements, nullptr);
 
     std::shared_ptr<okvis::MultiFrame> mf =

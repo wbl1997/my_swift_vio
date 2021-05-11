@@ -24,7 +24,7 @@ TEST(BetweenFactor, JacobianToCustomRetract) {
   for (int i = 0; i < 6; ++i) {
     Eigen::Matrix<double, 6, 1> delta = Eigen::Matrix<double, 6, 1>::Zero();
     delta[i] = h;
-    gtsam::Pose3 Tzp = VIO::GtsamWrap::retract(Tz, delta);
+    gtsam::Pose3 Tzp = swift_vio::GtsamWrap::retract(Tz, delta);
     gtsam::BetweenFactor<gtsam::Pose3> bfp(0, 1, Tzp, noiseOdom);
     Eigen::VectorXd residualp = bfp.evaluateError(Tx, Ty);
     numericJ.col(i) = (residualp - residual) / h;
@@ -42,7 +42,7 @@ TEST(BetweenFactor, JacobianToCustomRetract) {
 
   // Test the Jacobians in a bundle.
   Eigen::Matrix<double, 6, 6> J6;
-  VIO::GtsamWrap::toMeasurementJacobianBetweenFactor(Tz, &J6);
+  swift_vio::GtsamWrap::toMeasurementJacobianBetweenFactor(Tz, &J6);
   EXPECT_LT((numericJ - J6).lpNorm<Eigen::Infinity>(), eps);
 }
 
@@ -69,14 +69,14 @@ TEST(BetweenFactor, JacobianToCustomRetractRandomObs) {
   for (int i = 0; i < 6; ++i) {
     Eigen::Matrix<double, 6, 1> delta = Eigen::Matrix<double, 6, 1>::Zero();
     delta[i] = h;
-    gtsam::Pose3 Tzp = VIO::GtsamWrap::retract(Tz, delta);
+    gtsam::Pose3 Tzp = swift_vio::GtsamWrap::retract(Tz, delta);
     gtsam::BetweenFactor<gtsam::Pose3> bfp(0, 1, Tzp, noiseOdom);
     Eigen::VectorXd residualp = bfp.evaluateError(Tx, Ty);
     numericJ.col(i) = (residualp - residual) / h;
   }
 
   Eigen::Matrix<double, 6, 6> analJ;
-  VIO::GtsamWrap::toMeasurementJacobianBetweenFactor(Tz, Tx, Ty, &analJ);
+  swift_vio::GtsamWrap::toMeasurementJacobianBetweenFactor(Tz, Tx, Ty, &analJ);
 //  Eigen::Matrix<double, 6, 6> diff = numericJ - analJ;
 //  EXPECT_LT((diff.topRightCorner<3, 3>()).lpNorm<Eigen::Infinity>(), eps)
 //      << "numericJ.topRightCorner<3, 3>()\n"
@@ -98,7 +98,7 @@ TEST(BetweenFactor, JacobianToCustomRetractRandomObs) {
 //      << analJ.bottomRightCorner<3, 3>();
 
   // analytic jacobian
-  VIO::BetweenFactorPose3Wrap bfWrap(Tz, Tx, Ty);
+  swift_vio::BetweenFactorPose3Wrap bfWrap(Tz, Tx, Ty);
   Eigen::Matrix<double, 6, 6, Eigen::RowMajor> autoJ;
   Eigen::Matrix<double, 6, 1> autoResidual;
   bfWrap.toMeasurmentJacobian(&autoJ, &autoResidual);
@@ -147,7 +147,7 @@ TEST(RobustNoiseModel, sqrtInfoR) {
   NonlinearFactorGraph graphWithPrior;
 
   {
-    SharedNoiseModel priorModel = VIO::createRobustNoiseModelSqrtR(sqrtInfoR);
+    SharedNoiseModel priorModel = swift_vio::createRobustNoiseModelSqrtR(sqrtInfoR);
 
     graphWithPrior.add(PriorFactor<Pose3>(firstKey, Pose3(), priorModel));
 
@@ -165,7 +165,7 @@ TEST(RobustNoiseModel, sqrtInfoR) {
         ,0,0,0,0,0.1,0
         ,0,0,0,0,0,0.1;
 
-    SharedNoiseModel noiseModel = VIO::createRobustNoiseModelSqrtR(sqrtInfoR);
+    SharedNoiseModel noiseModel = swift_vio::createRobustNoiseModelSqrtR(sqrtInfoR);
     NonlinearFactorGraph nfg;
     nfg.add(BetweenFactor<Pose3>(firstKey, secondKey, Pose3(), noiseModel));
 
@@ -216,6 +216,6 @@ TEST(GtsamUtil, covariancebvx2xvb) {
   cov_bvx.block<3, 15>(6, 0) << cov_vb, cov_vv, cov_vx;
   cov_bvx.block<6, 15>(9, 0) << cov_xb, cov_xv, cov_xx;
 
-  gtsam::Matrix cov_actual_xvb = VIO::Covariance_bvx2xvb(cov_bvx);
+  gtsam::Matrix cov_actual_xvb = swift_vio::Covariance_bvx2xvb(cov_bvx);
   EXPECT_LE((expected_cov_xvb - cov_actual_xvb).lpNorm<Eigen::Infinity>(), 1e-8);
 }

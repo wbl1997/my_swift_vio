@@ -59,9 +59,8 @@ namespace gtsam {
   using PinholeCameraCal3_S2 = gtsam::PinholeCamera<gtsam::Cal3_S2>;
 }
 
-/// \brief okvis Main namespace of this package.
-namespace okvis {
-void setIsam2Params(const okvis::BackendParams& vio_params,
+namespace swift_vio {
+void setIsam2Params(const BackendParams& vio_params,
                     gtsam::ISAM2Params* isam_param) {
   CHECK_NOTNULL(isam_param);
 
@@ -158,7 +157,7 @@ void setFactorsParams(
 }
 
 void SlidingWindowSmoother::setupSmoother(
-    const okvis::BackendParams& vioParams) {
+    const BackendParams& vioParams) {
 #ifdef INCREMENTAL_SMOOTHER
   gtsam::ISAM2Params params;
   setIsam2Params(vioParams, &params);
@@ -174,7 +173,7 @@ void SlidingWindowSmoother::setupSmoother(
 }
 
 SlidingWindowSmoother::SlidingWindowSmoother(
-    const okvis::BackendParams& vioParams,
+    const BackendParams& vioParams,
     std::shared_ptr<okvis::ceres::Map> mapPtr)
     : Estimator(mapPtr),
       backendParams_(vioParams),
@@ -193,7 +192,7 @@ SlidingWindowSmoother::SlidingWindowSmoother(
                    &constant_velocity_prior_noise_);
 }
 
-SlidingWindowSmoother::SlidingWindowSmoother(const okvis::BackendParams& vioParams)
+SlidingWindowSmoother::SlidingWindowSmoother(const BackendParams& vioParams)
     : Estimator(),
       addLandmarkFactorsTimer("3.1 addLandmarkFactors", true),
       isam2UpdateTimer("3.2 isam2Update", true),
@@ -212,8 +211,8 @@ void SlidingWindowSmoother::addInitialPriorFactors() {
   Eigen::Matrix3d B_Rot_W = T_WB.C().transpose();
 
   Eigen::Matrix<double, 6, 6> pose_prior_covariance = Eigen::Matrix<double, 6, 6>::Zero();
-  pose_prior_covariance.diagonal().head<3>() = pvstd_.std_q_WS.cwiseAbs2();
-  pose_prior_covariance.diagonal().tail<3>() = pvstd_.std_p_WS.cwiseAbs2();
+  pose_prior_covariance.diagonal().head<3>() = initialNavState_.std_q_WS.cwiseAbs2();
+  pose_prior_covariance.diagonal().tail<3>() = initialNavState_.std_p_WS.cwiseAbs2();
 
   // Rotate initial uncertainty into local frame, where the uncertainty is
   // specified.
@@ -225,13 +224,13 @@ void SlidingWindowSmoother::addInitialPriorFactors() {
       gtsam::noiseModel::Gaussian::Covariance(pose_prior_covariance);
   new_imu_prior_and_other_factors_.push_back(
       boost::make_shared<gtsam::PriorFactor<gtsam::Pose3>>(
-          gtsam::Symbol('x', frameId), VIO::GtsamWrap::toPose3(T_WB), noise_init_pose));
+          gtsam::Symbol('x', frameId), GtsamWrap::toPose3(T_WB), noise_init_pose));
 
   Eigen::Matrix<double, 9, 1> vel_bias;
   getSpeedAndBias(frameId, 0u, vel_bias);
   // Add initial velocity priors.
   gtsam::SharedNoiseModel noise_init_vel_prior =
-      gtsam::noiseModel::Diagonal::Sigmas(pvstd_.std_v_WS);
+      gtsam::noiseModel::Diagonal::Sigmas(initialNavState_.std_v_WS);
   Eigen::Vector3d vel = vel_bias.head<3>();
   new_imu_prior_and_other_factors_.push_back(
       boost::make_shared<gtsam::PriorFactor<gtsam::Vector3>>(
@@ -258,7 +257,7 @@ void SlidingWindowSmoother::addImuValues() {
   Eigen::Matrix<double, 9, 1> vel_bias;
   getSpeedAndBias(cur_id, 0u, vel_bias);
 
-  new_values_.insert(gtsam::Symbol('x', cur_id), VIO::GtsamWrap::toPose3(T_WB));
+  new_values_.insert(gtsam::Symbol('x', cur_id), GtsamWrap::toPose3(T_WB));
   Eigen::Vector3d vel = vel_bias.head<3>();
   new_values_.insert(gtsam::Symbol('v', cur_id), vel);
   Eigen::Vector3d bg = vel_bias.segment<3>(3);
@@ -346,10 +345,10 @@ void SlidingWindowSmoother::addCameraExtrinsicFactor() {
   for (size_t i = 0; i < extrinsicsEstimationParametersVec_.size(); ++i) {
     if (penultimateElementIter->second.sensors.at(SensorStates::Camera)
             .at(i)
-            .at(CameraSensorStates::T_SCi)
+            .at(okvis::Estimator::CameraSensorStates::T_SCi)
             .id != lastElementIter->second.sensors.at(SensorStates::Camera)
                        .at(i)
-                       .at(CameraSensorStates::T_SCi)
+                       .at(okvis::Estimator::CameraSensorStates::T_SCi)
                        .id) {
       // i.e. they are different estimated variables, so link them with a
       // temporal error term
@@ -375,12 +374,12 @@ void SlidingWindowSmoother::addCameraExtrinsicFactor() {
               gtsam::Symbol('C', penultimateElementIter->second.sensors
                                      .at(SensorStates::Camera)
                                      .at(i)
-                                     .at(CameraSensorStates::T_SCi)
+                                     .at(okvis::Estimator::CameraSensorStates::T_SCi)
                                      .id),
               gtsam::Symbol(
                   'C', lastElementIter->second.sensors.at(SensorStates::Camera)
                            .at(i)
-                           .at(CameraSensorStates::T_SCi)
+                           .at(okvis::Estimator::CameraSensorStates::T_SCi)
                            .id),
               from_id_Pose_to_id, betweenNoise_));
     }
@@ -397,7 +396,7 @@ void SlidingWindowSmoother::addCameraSystem(const okvis::cameras::NCameraSystem&
                   "tangential distortion!");
   cal0_.reset(new gtsam::Cal3DS2(intrinsics[0], intrinsics[1], 0, intrinsics[2], intrinsics[3],
       intrinsics[4], intrinsics[5], intrinsics[6], intrinsics[7]));
-  body_P_cam0_ = VIO::GtsamWrap::toPose3(camera_rig_.getCameraExtrinsic(0u));
+  body_P_cam0_ = GtsamWrap::toPose3(camera_rig_.getCameraExtrinsic(0u));
 }
 
 bool SlidingWindowSmoother::addStates(
@@ -408,21 +407,21 @@ bool SlidingWindowSmoother::addStates(
   inertialMeasForStates_.push_back(imuMeasurements);
   okvis::kinematics::Transformation T_WS;
   Eigen::Matrix<double, 9, 1> speedAndBias;
-  Time newStateTime = multiFrame->timestamp();
+  okvis::Time newStateTime = multiFrame->timestamp();
   if (statesMap_.empty()) {
     // in case this is the first frame ever, let's initialize the pose:
-    if (pvstd_.initWithExternalSource)
-      T_WS = okvis::kinematics::Transformation(pvstd_.p_WS, pvstd_.q_WS);
+    if (initialNavState_.initWithExternalSource)
+      T_WS = okvis::kinematics::Transformation(initialNavState_.p_WS, initialNavState_.q_WS);
     else {
       bool success0 = initPoseFromImu(imuMeasurements, T_WS);
       OKVIS_ASSERT_TRUE_DBG(
           Exception, success0,
           "pose could not be initialized from imu measurements.");
       if (!success0) return false;
-      pvstd_.updatePose(T_WS, newStateTime);
+      initialNavState_.updatePose(T_WS, newStateTime);
     }
     speedAndBias.setZero();
-    speedAndBias.head<3>() = pvstd_.v_WS;
+    speedAndBias.head<3>() = initialNavState_.v_WS;
     speedAndBias.segment<3>(3) = imuParametersVec_.at(0).g0;
     speedAndBias.tail<3>() = imuParametersVec_.at(0).a0;
   } else {
@@ -436,15 +435,15 @@ bool SlidingWindowSmoother::addStates(
     OKVIS_ASSERT_TRUE_DBG(
         Exception, mapPtr_->parameterBlockExists(T_WS_id),
         "this is an okvis bug. previous pose does not exist.");
-    T_WS = std::static_pointer_cast<ceres::PoseParameterBlock>(
+    T_WS = std::static_pointer_cast<okvis::ceres::PoseParameterBlock>(
                mapPtr_->parameterBlockPtr(T_WS_id))
                ->estimate();
-    speedAndBias = std::static_pointer_cast<ceres::SpeedAndBiasParameterBlock>(
+    speedAndBias = std::static_pointer_cast<okvis::ceres::SpeedAndBiasParameterBlock>(
                        mapPtr_->parameterBlockPtr(speedAndBias_id))
                        ->estimate();
 
     // propagate pose and speedAndBias
-    int numUsedImuMeasurements = ceres::ImuError::propagation(
+    int numUsedImuMeasurements = okvis::ceres::ImuError::propagation(
         imuMeasurements, imuParametersVec_.at(0), T_WS, speedAndBias,
         statesMap_.rbegin()->second.timestamp, newStateTime);
     OKVIS_ASSERT_TRUE_DBG(Exception, numUsedImuMeasurements > 1,
@@ -472,11 +471,11 @@ bool SlidingWindowSmoother::addStates(
 
   if (statesMap_.empty()) {
     referencePoseId_ = states.id;  // set this as reference pose
-    if (!mapPtr_->addParameterBlock(poseParameterBlock, ceres::Map::Pose6d)) {
+    if (!mapPtr_->addParameterBlock(poseParameterBlock, okvis::ceres::Map::Pose6d)) {
       return false;
     }
   } else {
-    if (!mapPtr_->addParameterBlock(poseParameterBlock, ceres::Map::Pose6d)) {
+    if (!mapPtr_->addParameterBlock(poseParameterBlock, okvis::ceres::Map::Pose6d)) {
       return false;
     }
   }
@@ -493,31 +492,31 @@ bool SlidingWindowSmoother::addStates(
   // initialize new sensor states
   // cameras:
   for (size_t i = 0; i < extrinsicsEstimationParametersVec_.size(); ++i) {
-    SpecificSensorStatesContainer cameraInfos(2);
-    cameraInfos.at(CameraSensorStates::T_SCi).exists = true;
-    cameraInfos.at(CameraSensorStates::Intrinsics).exists = false;
+    okvis::Estimator::SpecificSensorStatesContainer cameraInfos(2);
+    cameraInfos.at(okvis::Estimator::CameraSensorStates::T_SCi).exists = true;
+    cameraInfos.at(okvis::Estimator::CameraSensorStates::Intrinsics).exists = false;
     if (((extrinsicsEstimationParametersVec_.at(i)
               .sigma_c_relative_translation < 1e-12) ||
          (extrinsicsEstimationParametersVec_.at(i)
               .sigma_c_relative_orientation < 1e-12)) &&
         (statesMap_.size() > 1)) {
       // use the same block...
-      cameraInfos.at(CameraSensorStates::T_SCi).id =
+      cameraInfos.at(okvis::Estimator::CameraSensorStates::T_SCi).id =
           lastElementIterator->second.sensors.at(SensorStates::Camera)
               .at(i)
-              .at(CameraSensorStates::T_SCi)
+              .at(okvis::Estimator::CameraSensorStates::T_SCi)
               .id;
     } else {
       const okvis::kinematics::Transformation T_SC = *multiFrame->T_SC(i);
-      uint64_t id = IdProvider::instance().newId();
+      uint64_t id = okvis::IdProvider::instance().newId();
       std::shared_ptr<okvis::ceres::PoseParameterBlock>
           extrinsicsParameterBlockPtr(new okvis::ceres::PoseParameterBlock(
               T_SC, id, newStateTime));
       if (!mapPtr_->addParameterBlock(extrinsicsParameterBlockPtr,
-                                      ceres::Map::Pose6d)) {
+                                      okvis::ceres::Map::Pose6d)) {
         return false;
       }
-      cameraInfos.at(CameraSensorStates::T_SCi).id = id;
+      cameraInfos.at(okvis::Estimator::CameraSensorStates::T_SCi).id = id;
     }
     // update the states info
     statesMap_.rbegin()
@@ -528,9 +527,9 @@ bool SlidingWindowSmoother::addStates(
 
   // IMU states are automatically propagated.
   for (size_t i = 0; i < imuParametersVec_.size(); ++i) {
-    SpecificSensorStatesContainer imuInfo(2);
+    okvis::Estimator::SpecificSensorStatesContainer imuInfo(2);
     imuInfo.at(ImuSensorStates::SpeedAndBias).exists = true;
-    uint64_t id = IdProvider::instance().newId();
+    uint64_t id = okvis::IdProvider::instance().newId();
     std::shared_ptr<okvis::ceres::SpeedAndBiasParameterBlock>
         speedAndBiasParameterBlock(new okvis::ceres::SpeedAndBiasParameterBlock(
             speedAndBias, id, newStateTime));
@@ -578,7 +577,7 @@ uint64_t SlidingWindowSmoother::getMinValidStateId() const {
 }
 
 // Get a copy of all the landmarks as a PointMap.
-size_t SlidingWindowSmoother::getLandmarks(MapPointVector& landmarks) const {
+size_t SlidingWindowSmoother::getLandmarks(okvis::MapPointVector& landmarks) const {
   if (backendParams_.backendModality_ == BackendModality::STRUCTURELESS) {
     std::lock_guard<std::mutex> l(Estimator::statesMutex_);
     LmkIdToLmkTypeMap lmk_id_to_lmk_type_map;
@@ -676,9 +675,9 @@ bool SlidingWindowSmoother::applyMarginalizationStrategy(
   }
 
   // remove feature tracks that do not overlap the sliding window.
-  for (PointMap::iterator pit = landmarksMap_.begin();
+  for (okvis::PointMap::iterator pit = landmarksMap_.begin();
        pit != landmarksMap_.end();) {
-    const MapPoint& mapPoint = pit->second;
+    const okvis::MapPoint& mapPoint = pit->second;
     // Remove a landmark whose last observation is out of the horizon.
     uint64_t lastFrameId = mapPoint.observations.rbegin()->first.frameId;
     if (lastFrameId < minValidStateId) {
@@ -714,15 +713,15 @@ bool SlidingWindowSmoother::applyMarginalizationStrategy(
       if (iter->first < minValidStateId) {
         if (iter->second.sensors.at(SensorStates::Camera)
                 .at(i)
-                .at(CameraSensorStates::T_SCi)
+                .at(okvis::Estimator::CameraSensorStates::T_SCi)
                 .id != nextIter->second.sensors.at(SensorStates::Camera)
                            .at(i)
-                           .at(CameraSensorStates::T_SCi)
+                           .at(okvis::Estimator::CameraSensorStates::T_SCi)
                            .id) {
           mapPtr_->removeParameterBlock(
               it->second.sensors.at(SensorStates::Camera)
                   .at(i)
-                  .at(CameraSensorStates::T_SCi)
+                  .at(okvis::Estimator::CameraSensorStates::T_SCi)
                   .id);
           // The associated residual will be removed by ceres solver.
         }  // else do nothing
@@ -752,7 +751,7 @@ bool SlidingWindowSmoother::addLandmarkToGraph(uint64_t lmkId, const Eigen::Vect
 
   uint64_t minValidStateId = statesMap_.begin()->first;
   okvis::MapPoint& mp = landmarksMap_.at(lmkId);
-  IsObservedInFrame lastImageId(0u, 0u);
+  okvis::IsObservedInFrame lastImageId(0u, 0u);
   for (std::map<okvis::KeypointIdentifier, uint64_t>::const_iterator obsIter =
            mp.observations.begin();
        obsIter != mp.observations.end(); ++obsIter) {
@@ -790,7 +789,7 @@ bool SlidingWindowSmoother::addLandmarkToGraph(uint64_t lmkId, const Eigen::Vect
 
     new_reprojection_factors_.add(factor);
     lastImageId =
-        IsObservedInFrame(obsIter->first.frameId, obsIter->first.cameraIndex);
+        okvis::IsObservedInFrame(obsIter->first.frameId, obsIter->first.cameraIndex);
   }
   mp.status.inState = true;
   return true;
@@ -846,7 +845,7 @@ void SlidingWindowSmoother::addLandmarkSmartFactorToGraph(const LandmarkId& lmkI
   gtsam::SmartProjectionPoseFactor<gtsam::Cal3DS2>::shared_ptr new_factor =
       boost::make_shared<gtsam::SmartProjectionPoseFactor<gtsam::Cal3DS2>>(
           smart_noise_, cal0_, body_P_cam0_, smart_factors_params_);
-  IsObservedInFrame lastImageId(0u, 0u);
+  okvis::IsObservedInFrame lastImageId(0u, 0u);
   for (std::map<okvis::KeypointIdentifier, uint64_t>::const_iterator obsIter =
            mp.observations.begin();
        obsIter != mp.observations.end(); ++obsIter) {
@@ -868,7 +867,7 @@ void SlidingWindowSmoother::addLandmarkSmartFactorToGraph(const LandmarkId& lmkI
 
     new_factor->add(measurement, gtsam::Symbol('x', obsIter->first.frameId));
     lastImageId =
-        IsObservedInFrame(obsIter->first.frameId, obsIter->first.cameraIndex);
+        okvis::IsObservedInFrame(obsIter->first.frameId, obsIter->first.cameraIndex);
   }
   mp.status.inState = true;
 
@@ -1021,10 +1020,10 @@ void SlidingWindowSmoother::updateStates() {
     gtsam::Pose3 W_T_B =
         estimates.at<gtsam::Pose3>(gtsam::Symbol('x', stateId));
 
-    std::shared_ptr<ceres::PoseParameterBlock> poseParamBlockPtr =
-        std::static_pointer_cast<ceres::PoseParameterBlock>(
+    std::shared_ptr<okvis::ceres::PoseParameterBlock> poseParamBlockPtr =
+        std::static_pointer_cast<okvis::ceres::PoseParameterBlock>(
             mapPtr_->parameterBlockPtr(stateId));
-    kinematics::Transformation T_WB = VIO::GtsamWrap::toTransform(W_T_B);
+    okvis::kinematics::Transformation T_WB = GtsamWrap::toTransform(W_T_B);
     poseParamBlockPtr->setEstimate(T_WB);
 
     // update imu sensor states
@@ -1033,10 +1032,10 @@ void SlidingWindowSmoother::updateStates() {
                         .at(imuIdx)
                         .at(ImuSensorStates::SpeedAndBias)
                         .id;
-    std::shared_ptr<ceres::SpeedAndBiasParameterBlock> sbParamBlockPtr =
-        std::static_pointer_cast<ceres::SpeedAndBiasParameterBlock>(
+    std::shared_ptr<okvis::ceres::SpeedAndBiasParameterBlock> sbParamBlockPtr =
+        std::static_pointer_cast<okvis::ceres::SpeedAndBiasParameterBlock>(
             mapPtr_->parameterBlockPtr(SBId));
-    SpeedAndBiases sb = sbParamBlockPtr->estimate();
+    okvis::SpeedAndBiases sb = sbParamBlockPtr->estimate();
 
     auto vval = estimates.find(gtsam::Symbol('v', stateId));
     gtsam::Vector3 W_v_B =
@@ -1255,7 +1254,7 @@ bool SlidingWindowSmoother::updateSmoother(gtsam::FixedLagSmoother::Result* resu
 }
 
 bool SlidingWindowSmoother::triangulateSafe(uint64_t lmkId, Eigen::Vector4d* hpW) const {
-  const MapPoint& mp = landmarksMap_.at(lmkId);
+  const okvis::MapPoint& mp = landmarksMap_.at(lmkId);
   uint64_t minValidStateId = statesMap_.begin()->first;
 
   gtsam::Cal3_S2 cal(1, 1, 0, 0, 0);
@@ -1280,7 +1279,7 @@ bool SlidingWindowSmoother::triangulateSafe(uint64_t lmkId, Eigen::Vector4d* hpW
 
     // use the latest estimates for camera intrinsic parameters
     Eigen::Vector3d backProjectionDirection;
-    std::shared_ptr<const cameras::CameraBase> cameraGeometry =
+    std::shared_ptr<const okvis::cameras::CameraBase> cameraGeometry =
         camera_rig_.getCameraGeometry(itObs->first.cameraIndex);
     bool validDirection =
         cameraGeometry->backProject(measurement, &backProjectionDirection);
@@ -1289,7 +1288,7 @@ bool SlidingWindowSmoother::triangulateSafe(uint64_t lmkId, Eigen::Vector4d* hpW
     }
     okvis::kinematics::Transformation T_WB;
     get_T_WS(poseId, T_WB);
-    gtsam::Pose3 W_T_B = VIO::GtsamWrap::toPose3(T_WB);
+    gtsam::Pose3 W_T_B = GtsamWrap::toPose3(T_WB);
     gtsam::PinholeCameraCal3_S2 camera(W_T_B.compose(body_P_cam0_), cal);
 
     cameras.push_back(camera);
@@ -1309,7 +1308,7 @@ bool SlidingWindowSmoother::triangulateSafe(uint64_t lmkId, Eigen::Vector4d* hpW
 bool SlidingWindowSmoother::triangulateWithDisparityCheck(
     uint64_t lmkId, Eigen::Matrix<double, 4, 1>* hpW,
     double focalLength, double raySigmaScalar) const {
-  const MapPoint& mp = landmarksMap_.at(lmkId);
+  const okvis::MapPoint& mp = landmarksMap_.at(lmkId);
   Eigen::AlignedVector<Eigen::Vector3d> obsDirections;
   Eigen::AlignedVector<okvis::kinematics::Transformation> T_CWs;
   std::vector<double> imageNoiseStd;
@@ -1847,7 +1846,7 @@ void SlidingWindowSmoother::cleanCheiralityLmk(
 // Returns if the key in feature tracks could be removed or not.
 bool SlidingWindowSmoother::deleteLmkFromFeatureTracks(uint64_t lmkId) {
   auto pit = landmarksMap_.find(lmkId);
-  const MapPoint& mapPoint = pit->second;
+  const okvis::MapPoint& mapPoint = pit->second;
   VLOG(2) << "Deleting feature track for lmk with id: " << lmkId;
   ++mTrackLengthAccumulator[mapPoint.observations.size() >=
                                     mTrackLengthAccumulator.size()
@@ -1860,7 +1859,7 @@ bool SlidingWindowSmoother::deleteLmkFromFeatureTracks(uint64_t lmkId) {
       mapPtr_->removeResidualBlock(
           reinterpret_cast<::ceres::ResidualBlockId>(it->second));
     }
-    const KeypointIdentifier& kpi = it->first;
+    const okvis::KeypointIdentifier& kpi = it->first;
     auto mfp = multiFramePtrMap_.find(kpi.frameId);
     OKVIS_ASSERT_TRUE(Exception, mfp != multiFramePtrMap_.end(), "frame id not found in frame map!");
     mfp->second->setLandmarkId(kpi.cameraIndex, kpi.keypointIndex, 0);
@@ -1981,7 +1980,7 @@ void findSlotsOfFactorsWithKey(
 bool SlidingWindowSmoother::print(std::ostream& stream) const {
   printNavStateAndBiases(stream, statesMap_.rbegin()->first);
   Eigen::Matrix<double, Eigen::Dynamic, 1> variances = covariance_.diagonal();
-  stream << " " << variances.cwiseSqrt().transpose().format(kSpaceInitFmt);
+  stream << " " << variances.cwiseSqrt().transpose().format(okvis::kSpaceInitFmt);
   return true;
 }
 
@@ -2200,5 +2199,5 @@ PointsWithIdMap SlidingWindowSmoother::getMapLmkIdsTo3dPointsInTimeHorizon(
   return points_with_id;
 }
 
-}  // namespace okvis
+}  // namespace swift_vio
 

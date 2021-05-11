@@ -1,5 +1,6 @@
 #include "io_wrap/CameraPoseVisualization.h"
 
+namespace swift_vio {
 const Eigen::Vector3d CameraPoseVisualization::imlt = Eigen::Vector3d(-1.0, -0.5, 1.0);
 const Eigen::Vector3d CameraPoseVisualization::imrt = Eigen::Vector3d( 1.0, -0.5, 1.0);
 const Eigen::Vector3d CameraPoseVisualization::imlb = Eigen::Vector3d(-1.0,  0.5, 1.0);
@@ -196,3 +197,4 @@ void CameraPoseVisualization::publish_by( ros::Publisher &pub, const std_msgs::H
 
 	pub.publish(markerArray_msg);
 }
+}  // namespace swift_vio

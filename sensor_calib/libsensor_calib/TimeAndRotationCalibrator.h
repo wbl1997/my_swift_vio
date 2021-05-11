@@ -6,8 +6,7 @@
 #include "swift_vio/memory.h"
 #include "okvis/ImuMeasurements.hpp"
 
-namespace sensor_calib {
-
+namespace swift_vio {
 template <class Element>
 int removeObsoleteData(Eigen::AlignedDeque<okvis::Measurement<Element>> *q,
                        okvis::Time eraseUntil) {
@@ -156,5 +155,4 @@ private:
   double calibratedTimeOffset_; // timestamp by imu clock = timestamp by target
                                 // sensor clock + time offset.
 };
-
-} // namespace sensor_calib
+} // namespace swift_vio

@@ -5,6 +5,7 @@
 #include <Eigen/StdVector>
 #include <vector>
 
+namespace swift_vio {
 class FilterHelper {
 public:
   /**
@@ -52,5 +53,5 @@ public:
    */
   static const double chi2_95percentile[];
 };
-
+}  // namespace swift_vio
 #endif // INCLUDE_SWIFT_VIO_FILTER_HELPER_HPP_

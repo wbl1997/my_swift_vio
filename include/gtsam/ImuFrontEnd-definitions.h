@@ -25,9 +25,7 @@
 
 #include "okvis/Time.hpp"
 
-namespace okvis {
-
-// Inertial containers.
+namespace swift_vio {
 using ImuStamp = okvis::Time;
 
 // First 3 elements correspond to acceleration data [m/s^2]
@@ -78,5 +76,4 @@ safeCastToPreintegratedCombinedImuMeasurements(
     const gtsam::PreintegrationType& pim) {
   return dynamic_cast<const gtsam::PreintegratedCombinedMeasurements&>(pim);
 }
-
-}  // namespace okvis
+}  // namespace swift_vio

@@ -24,11 +24,11 @@ void RiPreintegratedImuMeasurements::redoPreintegration(
   Eigen::Matrix<double, 6, 1> bgba;
   bgba.head<3>() = bias_i.gyroscope();
   bgba.tail<3>() = bias_i.accelerometer();
-  ImuErrorModel<double> iem(bgba);
+  swift_vio::ImuErrorModel<double> iem(bgba);
   covariance_.setZero();
   jacobian_.setIdentity();
 
-  okvis::ImuOdometry::propagationRightInvariantError(
+  swift_vio::ImuOdometry::propagationRightInvariantError(
       imuMeasurements_, imuParams_, T_WB, v_WB, iem, ti_, tj_, &covariance_,
       &jacobian_);
 
@@ -123,13 +123,13 @@ gtsam::Vector RiImuFactor::evaluateError(
 gtsam::Vector RiImuFactor::evaluateErrorCheck(
     const RiExtendedPose3& state_i, const RiExtendedPose3& state_j,
     const imuBias::ConstantBias& bias_i) const {
-  okvis::ImuFrontEnd::PimPtr combinedPim;
-  okvis::ImuParams imuParamsKimera;
+  swift_vio::ImuFrontEnd::PimPtr combinedPim;
+  swift_vio::ImuParams imuParamsKimera;
   imuParamsKimera.set(pim_.imuParameters());
   imuParamsKimera.imu_preintegration_type_ =
-      okvis::ImuPreintegrationType::kPreintegratedCombinedMeasurements;
+      swift_vio::ImuPreintegrationType::kPreintegratedCombinedMeasurements;
 
-  okvis::ImuFrontEnd imuIntegrator(imuParamsKimera);
+  swift_vio::ImuFrontEnd imuIntegrator(imuParamsKimera);
   Eigen::Matrix<double, 9, 1> speedAndBiasi;
   speedAndBiasi.segment<3>(3) = bias_i.gyroscope();
   speedAndBiasi.tail<3>() = bias_i.accelerometer();

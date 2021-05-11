@@ -14,8 +14,7 @@
 #include "swift_vio/memory.h"
 #include <okvis/kinematics/Transformation.hpp>
 
-namespace VIO {
-
+namespace swift_vio {
 // given two gtsam::Pose3 computes the relative rotation and translation errors:
 // rotError,tranError
 std::pair<double, double> computeRotationAndTranslationErrors(
@@ -353,7 +352,6 @@ public:
     return true;
   }
 };
-
-} // namespace VIO
+}  // namespace swift_vio
 
 #endif // INCLUDE_LOOP_CLOSURE_GTSAM_WRAP_HPP_

@@ -18,8 +18,8 @@ public:
   }
   virtual ~VioTestSystemBuilder() {}
 
-  void createVioSystem(const okvis::TestSetting& testSetting,
-                       const okvis::BackendParams& backendParams,
+  void createVioSystem(const TestSetting& testSetting,
+                       const swift_vio::BackendParams& backendParams,
                        SimulatedTrajectoryType trajectoryId,
                        std::string projOptModelName, std::string extrinsicModelName,
                        double td, double tr,
@@ -30,7 +30,7 @@ public:
     return estimator;
   }
 
-  std::shared_ptr<okvis::SimulationFrontend> mutableFrontend() {
+  std::shared_ptr<SimulationFrontend> mutableFrontend() {
     return frontend;
   }
 
@@ -66,15 +66,15 @@ public:
     return trueCameraSystem_;
   }
 
-  const okvis::InitialNavState& initialNavState() const {
+  const swift_vio::InitialNavState& initialNavState() const {
     return initialNavState_;
   }
 
 private:
   std::shared_ptr<okvis::Estimator> estimator;
   std::shared_ptr<::ceres::EvaluationCallback> evaluationCallback_;
-  std::shared_ptr<okvis::SimulationFrontend> frontend;
-  std::shared_ptr<simul::CircularSinusoidalTrajectory> circularSinusoidalTrajectory;
+  std::shared_ptr<SimulationFrontend> frontend;
+  std::shared_ptr<CircularSinusoidalTrajectory> circularSinusoidalTrajectory;
   std::string distortionType_;
   std::string imuModelType_;
   std::vector<okvis::Time> times_;
@@ -82,7 +82,7 @@ private:
   std::vector<okvis::kinematics::Transformation> ref_T_WS_list_;
   okvis::ImuMeasurementDeque imuMeasurements_;
   std::shared_ptr<okvis::cameras::NCameraSystem> trueCameraSystem_;
-  okvis::InitialNavState initialNavState_;
+  swift_vio::InitialNavState initialNavState_;
 };
 
 } // namespace simul

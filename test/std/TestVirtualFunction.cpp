@@ -13,14 +13,14 @@
 
 using namespace std;
 
-class Trump
+class MyPose
 {
 public:
-    Trump(cv::Mat initValue, int i=0):myse3(initValue.clone()), id(i)
+    MyPose(cv::Mat initValue, int i=0):myse3(initValue.clone()), id(i)
     {
-        cout<<"Trump() "<<i<<endl;
+        cout<<"MyPose() "<<i<<endl;
     }
-    Trump(const Trump & rhs): myse3(rhs.myse3), id(rhs.id){cout<<"Trump(const Trump) "<<id<<endl;}
+    MyPose(const MyPose & rhs): myse3(rhs.myse3), id(rhs.id){cout<<"MyPose(const MyPose) "<<id<<endl;}
     Mat myse3;
     int id;
 };
@@ -42,9 +42,9 @@ public:
         cout<<"Frame:a:"<<a<<endl;
     }
     virtual bool isKeyFrame(){return false;}
-    std::vector<Trump> vTrump;
-    std::vector<Trump>& GetTrumps(){
-        return vTrump;
+    std::vector<MyPose> vMyPose;
+    std::vector<MyPose>& GetMyPoses(){
+        return vMyPose;
     }
 };
 class KeyFrame:public Frame
@@ -71,15 +71,15 @@ void KeyFrame::change(int b)
 void TestVirtualFunc()
 {
     Frame a(100);
-    a.vTrump.push_back(Trump(cv::Mat(), 1));
-    a.vTrump.push_back(Trump(cv::Mat(), 2));
-    a.vTrump.push_back(Trump(cv::Mat(), 3));
+    a.vMyPose.push_back(MyPose(cv::Mat(), 1));
+    a.vMyPose.push_back(MyPose(cv::Mat(), 2));
+    a.vMyPose.push_back(MyPose(cv::Mat(), 3));
 
-    std::vector<Trump>& me=a.GetTrumps();
+    std::vector<MyPose>& me=a.GetMyPoses();
     cout<<me[1].id<<endl;
     me[1].id=100;
     cout<< me[1].id<<endl;
-    cout<<a.vTrump[1].id<<endl;
+    cout<<a.vMyPose[1].id<<endl;
     vector<std::shared_ptr<Frame> > vtr;
     std::shared_ptr<Frame> pF(new Frame(100));
     std::shared_ptr<KeyFrame> pKF(new KeyFrame(200));

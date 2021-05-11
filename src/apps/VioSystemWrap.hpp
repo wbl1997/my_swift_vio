@@ -7,7 +7,7 @@
 #include <okvis/Parameters.hpp>
 #include <okvis/ThreadedKFVio.hpp>
 
-namespace okvis {
+namespace swift_vio {
 class VioSystemWrap {
  public:
   /**
@@ -19,12 +19,12 @@ class VioSystemWrap {
    * @param pgoPublisher
    * @return
    */
-  static void registerCallbacks(const std::string& output_dir,
-                                       const okvis::VioParameters& parameters,
-                                       okvis::ThreadedKFVio* vioSystem,
-                                       okvis::StreamPublisher* publisher,
-                                       okvis::PgoPublisher* pgoPublisher);
+   static void registerCallbacks(const std::string &output_dir,
+                                 const okvis::VioParameters &parameters,
+                                 okvis::ThreadedKFVio *vioSystem,
+                                 StreamPublisher *publisher,
+                                 PgoPublisher *pgoPublisher);
 };
-}  // namespace okvis
+}  // namespace swift_vio
 
 #endif  // APPS_VIO_SYSTEM_WRAP_HPP

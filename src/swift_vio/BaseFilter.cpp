@@ -4,7 +4,7 @@
 
 #include <Eigen/Dense>
 
-namespace okvis {
+namespace swift_vio {
 BaseFilter::BaseFilter()
     : numResiduals_(0),
       computeKalmanGainTimer("3.1.2 computeKalmanGain", true),
@@ -95,4 +95,4 @@ void BaseFilter::updateEkf(int variableStartIndex, int variableDim) {
   updateCovarianceTimer.stop();
 }
 
-} // namespace okvis
+} // namespace swift_vio

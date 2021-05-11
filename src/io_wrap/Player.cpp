@@ -14,9 +14,7 @@
 
 #define THRESHOLD_DATA_DELAY_WARNING 0.1  // in seconds
 
-/// \brief okvis Main namespace of this package.
-namespace okvis {
-
+namespace swift_vio {
 Player::~Player() {}
 
 Player::Player(okvis::VioInterface *vioInterfacePtr,
@@ -162,4 +160,4 @@ void Player::RunBlocking() {
   mbFinished.store(true);
 }
 
-}  // namespace okvis
+}  // namespace swift_vio

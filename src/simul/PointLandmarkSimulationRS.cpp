@@ -9,6 +9,7 @@
 #include <swift_vio/MultipleTransformPointJacobian.hpp>
 #include <swift_vio/TransformMultiplyJacobian.hpp>
 
+namespace simul {
 void PointLandmarkSimulationRS::projectLandmarksToNFrame(
     const std::vector<Eigen::Vector4d,
                       Eigen::aligned_allocator<Eigen::Vector4d>>&
@@ -59,7 +60,7 @@ void PointLandmarkSimulationRS::projectLandmarksToNFrame(
             // compute Jacobians required by Newton Raphson method.
             Eigen::AlignedVector<okvis::kinematics::Transformation> transformList{*cameraSystemRef->T_SC(i), T_WBt};
             std::vector<int> exponentList{-1, -1};
-            okvis::MultipleTransformPointJacobian mtpj(transformList, exponentList, homogeneousPoints[j]);
+            swift_vio::MultipleTransformPointJacobian mtpj(transformList, exponentList, homogeneousPoints[j]);
             Eigen::Matrix<double, 4, 6> dpC_dT_WB = mtpj.dp_dT(0);
             okvis::kinematics::Transformation T_identity;
             Eigen::Vector3d v_WB = simulatedTrajectory->computeGlobalLinearVelocity(featureTime);
@@ -104,3 +105,4 @@ void PointLandmarkSimulationRS::projectLandmarksToNFrame(
     keypointIndices->emplace_back(frameKeypointIndices);
   }
 }
+}  // namespace simul

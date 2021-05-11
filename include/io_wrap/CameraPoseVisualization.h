@@ -7,6 +7,7 @@
 #include <Eigen/Dense>
 #include <Eigen/Geometry>
 
+namespace swift_vio {
 class CameraPoseVisualization {
 public:
 	std::string m_marker_ns;
@@ -40,3 +41,4 @@ private:
 	static const Eigen::Vector3d lt1 ;
 	static const Eigen::Vector3d lt2 ;
 };
+}  // namespace swift_vio

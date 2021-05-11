@@ -1,7 +1,6 @@
 #include "swift_vio/StatAccumulator.h"
 
-namespace okvis {
-
+namespace swift_vio {
 void StatAccumulator::refreshBuffer(int expectedNumEntries) {
   stat.clear();
   stat.reserve(expectedNumEntries);
@@ -41,5 +40,4 @@ void StatAccumulator::dump(const std::string statFile,
     stream << it->timeStamp << " " << it->measurement.transpose() << std::endl;
   stream.close();
 }
-
-} // namespace okvis
+} // namespace swift_vio

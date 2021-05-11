@@ -3,10 +3,9 @@
 #include <swift_vio/FeatureTriangulation.hpp>
 #include <swift_vio/ParallaxAnglePoint.hpp>
 #include <swift_vio/PointLandmarkModels.hpp>
-#include <okvis/FrameTypedefs.hpp>
+#include <swift_vio/FrameTypedefs.hpp>
 
 namespace swift_vio {
-
 /**
  * @brief decideAnchors
  * @param mp
@@ -17,7 +16,7 @@ namespace swift_vio {
  */
 void decideAnchors(const std::vector<std::pair<uint64_t, size_t>>& frameIds,
                    const std::vector<uint64_t>& orderedCulledFrameIds,
-                   int landmarkModelId, std::vector<okvis::AnchorFrameIdentifier>* anchorIds) {
+                   int landmarkModelId, std::vector<AnchorFrameIdentifier>* anchorIds) {
   std::vector<uint64_t> anchorFrameIds;
   anchorFrameIds.reserve(2);
   uint64_t anchorId;
@@ -48,7 +47,7 @@ void decideAnchors(const std::vector<std::pair<uint64_t, size_t>>& frameIds,
 }
 
 void decideAnchors(const std::vector<std::pair<uint64_t, size_t>>& frameIds,
-                   int landmarkModelId, std::vector<okvis::AnchorFrameIdentifier>* anchorIds) {
+                   int landmarkModelId, std::vector<AnchorFrameIdentifier>* anchorIds) {
   switch (landmarkModelId) {
     case swift_vio::ParallaxAngleParameterization::kModelId:
       // TODO(jhuai): is there an efficient way to find the ray pair of max
@@ -109,7 +108,7 @@ TriangulationStatus PointLandmark::initialize(
       for (auto iter = T_WSs.begin(); iter != T_WSs.end(); ++iter, ++joel) {
         cam_states[joel] = *iter * T_BCs[cameraIndices[joel]];
       }
-      LWF::ParallaxAnglePoint pap;
+      swift_vio::ParallaxAnglePoint pap;
       TriangulationStatus status;
       status.triangulationOk =
           pap.initializePosition(obsDirections, cam_states, anchorSeqIds);

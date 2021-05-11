@@ -46,8 +46,8 @@ DEFINE_string(vocabulary_path,
               "vocabulary/ORBvoc.yml",
               "Path to BoW vocabulary file for LoopClosureDetector module.");
 
-namespace okvis {
-bool setInputParameters(okvis::InputData *input) {
+namespace swift_vio {
+bool setInputParameters(InputData *input) {
   input->videoFile = FLAGS_video_file;
   input->imageFolder = FLAGS_image_folder;
   input->imuFile = FLAGS_imu_file;
@@ -56,4 +56,4 @@ bool setInputParameters(okvis::InputData *input) {
   input->finishIndex = FLAGS_finish_index;
   return true;
 }
-} // namespace okvis
+} // namespace swift_vio

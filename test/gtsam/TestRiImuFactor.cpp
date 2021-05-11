@@ -149,7 +149,7 @@ TEST_F(RiImuFactorTest, predict) {
   gtsam::RiExtendedPose3 extendedPosej = ripim.predict(extendedPosei_);
 
   okvis::ImuFrontEnd::PimPtr combinedPim;
-  okvis::ImuParams imuParamsKimera;
+  swift_vio::ImuParams imuParamsKimera;
   imuParamsKimera.set(riFactor_.pim().imuParameters());
   imuParamsKimera.imu_preintegration_type_ =
       okvis::ImuPreintegrationType::kPreintegratedCombinedMeasurements;

@@ -7,8 +7,7 @@
 DEFINE_string(datafile_separator, ",",
               "the separator used for a ASCII output file");
 
-namespace okvis {
-
+namespace swift_vio {
 void StreamHelper::composeHeaderLine(const std::string &imu_model,
                                      const std::vector<std::string> &cam_extrinsic_opt_rep,
                                      const std::vector<std::string> &cam_proj_opt_rep,
@@ -73,7 +72,7 @@ void StreamHelper::composeHeaderLine(const std::string& imu_model,
     ProjectionOptToParamsInfo(cam_proj_opt_mode[j], FLAGS_datafile_separator,
                               &cam_proj_intrinsic_format);
     std::string cam_distortion_format;
-    okvis::cameras::DistortionNameToParamsInfo(cam_distortion_rep[j],
+    swift_vio::cameras::DistortionNameToParamsInfo(cam_distortion_rep[j],
                                                FLAGS_datafile_separator,
                                                &cam_distortion_format);
     if (result_option == FULL_STATE_WITH_ALL_CALIBRATION) {
@@ -110,4 +109,4 @@ std::string removeTrailingSlash(const std::string &path) {
   }
   return subpath;
 }
-}  // namespace okvis
+}  // namespace swift_vio

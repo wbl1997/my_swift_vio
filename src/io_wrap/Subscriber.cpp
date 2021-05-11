@@ -45,9 +45,7 @@
 
 #define THRESHOLD_DATA_DELAY_WARNING 0.1  // in seconds
 
-/// \brief okvis Main namespace of this package.
-namespace okvis {
-
+namespace swift_vio {
 Subscriber::~Subscriber() {
   if (imgTransport_ != 0) delete imgTransport_;
 }
@@ -458,5 +456,4 @@ void Subscriber::configCallback(swift_vio::CameraConfig& config,
   }
 }
 #endif
-
-}  // namespace okvis
+}  // namespace swift_vio

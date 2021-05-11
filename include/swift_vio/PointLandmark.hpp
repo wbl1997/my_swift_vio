@@ -5,7 +5,6 @@
 #include <okvis/FrameTypedefs.hpp>
 
 namespace swift_vio {
-
 struct TriangulationStatus {
   bool triangulationOk; // True if the landmark is in front of every camera.
   bool chi2Small;
@@ -30,10 +29,10 @@ enum class MeasurementJacobianStatus {
 
 void decideAnchors(const std::vector<std::pair<uint64_t, size_t>>& frameIdentifiers,
                    const std::vector<uint64_t>& orderedCulledFrameIds,
-                   int landmarkModelId, std::vector<okvis::AnchorFrameIdentifier>* anchorIds);
+                   int landmarkModelId, std::vector<AnchorFrameIdentifier>* anchorIds);
 
 void decideAnchors(const std::vector<std::pair<uint64_t, size_t>>& frameIdentifiers,
-                   int landmarkModelId, std::vector<okvis::AnchorFrameIdentifier>* anchorIds);
+                   int landmarkModelId, std::vector<AnchorFrameIdentifier>* anchorIds);
 
 inline int eraseBadObservations(const std::vector<std::pair<uint64_t, int>>& dudIds,
                                 std::vector<uint64_t>* candidateFrameIds) {

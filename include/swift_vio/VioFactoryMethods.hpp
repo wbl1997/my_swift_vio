@@ -5,20 +5,20 @@
 
 #include <okvis/Estimator.hpp>
 
-#include <okvis/LoopClosureMethod.hpp>
-#include <okvis/LoopClosureParameters.hpp>
+#include <loop_closure/LoopClosureMethod.hpp>
+#include <loop_closure/LoopClosureParameters.hpp>
 #include <gtsam/VioBackEndParams.h>
 
 #include <loop_closure/LoopClosureDetectorParams.h>
 
 namespace swift_vio {
 std::shared_ptr<okvis::Frontend> createFrontend(
-    int numCameras, const okvis::FrontendOptions& frontendOptions,
-    okvis::EstimatorAlgorithm algorithm);
+    int numCameras, const FrontendOptions& frontendOptions,
+    EstimatorAlgorithm algorithm);
 
 std::shared_ptr<okvis::Estimator> createBackend(
-    okvis::EstimatorAlgorithm algorithm,
-    const okvis::BackendParams& backendParams,
+    EstimatorAlgorithm algorithm,
+    const BackendParams& backendParams,
     std::shared_ptr<okvis::ceres::Map> mapPtr);
 
 /**
@@ -26,8 +26,8 @@ std::shared_ptr<okvis::Estimator> createBackend(
  * @param lcParams
  * @return
  */
-std::shared_ptr<okvis::LoopClosureMethod> createLoopClosureMethod(
-    std::shared_ptr<VIO::LoopClosureDetectorParams> lcParams);
+std::shared_ptr<LoopClosureMethod> createLoopClosureMethod(
+    std::shared_ptr<LoopClosureDetectorParams> lcParams);
 
 }  // namespace swift_vio
 #endif // INCLUDE_SWIFT_VIO_VIOFACTORY_METHODS_HPP_

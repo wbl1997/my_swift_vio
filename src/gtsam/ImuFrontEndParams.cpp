@@ -21,7 +21,7 @@
 //#include "kimera-vio/utils/UtilsOpenCV.h"
 #include "io_wrap/YamlParser.h"
 
-namespace okvis {
+namespace swift_vio {
 ImuParams::ImuParams() : PipelineParams("IMU params") {
 }
 
@@ -116,5 +116,4 @@ bool ImuParams::equals(const PipelineParams& obj) const {
       n_gravity_ == rhs.n_gravity_;
   // clang-format on
 }
-
-}  // namespace okvis
+}  // namespace swift_vio

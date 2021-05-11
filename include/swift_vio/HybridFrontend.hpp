@@ -8,22 +8,18 @@
 #include <okvis/assert_macros.hpp>
 #include <okvis/timing/Timer.hpp>
 
-
-
-#include <feature_tracker/feature_tracker.h>
+#include <feature_tracker/FeatureTracker.h>
 
 #include <boost/accumulators/accumulators.hpp>
 #include <boost/accumulators/statistics/density.hpp>
 #include <boost/accumulators/statistics/stats.hpp>
 
-/// \brief okvis Main namespace of this package.
-namespace okvis {
-
+namespace swift_vio {
 /**
  * @brief A frontend that uses BRISK descriptor based matching or
  * KLT feature tracking.
  */
-class HybridFrontend : public Frontend {
+class HybridFrontend : public okvis::Frontend {
  public:
   OKVIS_DEFINE_EXCEPTION(Exception, std::runtime_error)
 
@@ -37,7 +33,7 @@ class HybridFrontend : public Frontend {
    * @brief Constructor.
    * @param numCameras Number of cameras in the sensor configuration.
    */
-  HybridFrontend(size_t numCameras, const okvis::FrontendOptions& frontendOptions);
+  HybridFrontend(size_t numCameras, const FrontendOptions& frontendOptions);
   virtual ~HybridFrontend() {}
 
   ///@{
@@ -139,6 +135,5 @@ class HybridFrontend : public Frontend {
                               bool removeOutliers, bool* asKeyframe);
 };
 
-}  // namespace okvis
-
+}  // namespace swift_vio
 #endif  // INCLUDE_OKVIS_HYBRID_FRONTEND_HPP_

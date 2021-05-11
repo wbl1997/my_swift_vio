@@ -19,8 +19,7 @@
 #include "gtsam/ImuFrontEnd.h"
 #include "gtsam/ImuFrontEndParams.h"
 
-namespace okvis {
-
+namespace swift_vio {
 /* -------------------------------------------------------------------------- */
 TEST(ImuFrontEnd, ImuFrontEndInitialization) {
   // Check that IMU frontend instantiation works.
@@ -65,5 +64,4 @@ TEST(ImuFrontEnd, UpdateBias) {
                                            okvis::Time(2.0), resultPim);
   EXPECT_TRUE(resultPim->biasHat().equals(imu_bias));
 }
-
-}  // namespace okvis
+}  // namespace swift_vio

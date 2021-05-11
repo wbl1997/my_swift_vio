@@ -120,15 +120,15 @@ TEST(RiMultipleTransformPointJacobian, random) {
   state_WBa.setRandom();
   Eigen::Matrix<double, 4, 1> hpCa;
   hpCa.setRandom();
-  okvis::MultipleTransformPointJacobian mtpj;
+  swift_vio::MultipleTransformPointJacobian mtpj;
 
   Eigen::AlignedVector<okvis::kinematics::Transformation> transforms{
       toOkvisTransform(state_BC), toOkvisTransform(state_WBj),
       toOkvisTransform(state_WBa), toOkvisTransform(state_BC)};
   std::vector<int> exponents{-1, -1, 1, 1};
-  std::shared_ptr<okvis::TransformPointJacobian> tpj(
+  std::shared_ptr<swift_vio::TransformPointJacobian> tpj(
       new gtsam::RiTransformPointJacobian());
-  std::shared_ptr<okvis::InverseTransformPointJacobian> itpj(
+  std::shared_ptr<swift_vio::InverseTransformPointJacobian> itpj(
       new gtsam::RiInverseTransformPointJacobian());
 
   mtpj.initialize(transforms, exponents, hpCa, tpj, itpj);
@@ -146,15 +146,15 @@ TEST(RiMultipleTransformPointJacobian, random) {
                  const gtsam::RiExtendedPose3& state_WBj,
                  const gtsam::RiExtendedPose3& state_WBa,
                  const Eigen::Matrix<double, 4, 1>& hpCa) {
-        okvis::MultipleTransformPointJacobian mtpj;
+        swift_vio::MultipleTransformPointJacobian mtpj;
 
         Eigen::AlignedVector<okvis::kinematics::Transformation> transforms{
             toOkvisTransform(state_BC), toOkvisTransform(state_WBj),
             toOkvisTransform(state_WBa), toOkvisTransform(state_BC)};
         std::vector<int> exponents{-1, -1, 1, 1};
-        std::shared_ptr<okvis::TransformPointJacobian> tpj(
+        std::shared_ptr<swift_vio::TransformPointJacobian> tpj(
             new gtsam::RiTransformPointJacobian());
-        std::shared_ptr<okvis::InverseTransformPointJacobian> itpj(
+        std::shared_ptr<swift_vio::InverseTransformPointJacobian> itpj(
             new gtsam::RiInverseTransformPointJacobian());
         mtpj.initialize(transforms, exponents, hpCa, tpj, itpj);
         return mtpj.evaluate();

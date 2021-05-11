@@ -51,8 +51,7 @@ POSSIBILITY OF SUCH DAMAGE.
 
 #include "loop_closure/LcdThirdPartyWrapper.h"
 
-namespace VIO {
-
+namespace swift_vio {
 /* ------------------------------------------------------------------------ */
 LcdThirdPartyWrapper::LcdThirdPartyWrapper(
     std::shared_ptr<const LoopClosureDetectorParams> params)
@@ -194,5 +193,4 @@ double LcdThirdPartyWrapper::computeIslandScore(const DBoW2::QueryResults& q,
 
   return score_sum;
 }
-
-}  // namespace VIO
+}  // namespace swift_vio

@@ -9,8 +9,7 @@
 
 #include <okvis/kinematics/Transformation.hpp>
 
-namespace gtsam {
-
+namespace swift_vio {
 /**
  * @brief dokvis_drightinvariant Jacobian of the okvis error vector relative to
  * the right invariant error vector for a nav state. The okvis error vector is
@@ -62,7 +61,5 @@ inline Eigen::Matrix<double, 15, 15> dforster_dokvis(
     const Eigen::Quaterniond& q_WB) {
   return dforster_dokvis(q_WB.toRotationMatrix());
 }
-
-}; // namespace gtsam
-
+}; // namespace swift_vio
 #endif // IMUFACTORTESTHELPERS_H

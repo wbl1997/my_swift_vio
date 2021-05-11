@@ -14,14 +14,13 @@
 #include <okvis/timing/Timer.hpp>
 #include <okvis/triangulation/ProbabilisticStereoTriangulator.hpp>
 
-#include <feature_tracker/feature_tracker.h>
+#include <feature_tracker/FeatureTracker.h>
 
 #include <simul/CameraSystemCreator.hpp>
 #include <simul/curves.h>
 
 /// \brief okvis Main namespace of this package.
-namespace okvis {
-
+namespace simul {
 enum class LandmarkGridType {
   FourWalls = 0,
   FourWallsFloorCeiling,
@@ -41,7 +40,7 @@ class SimulationFrontend {
    * @param numCameras Number of cameras in the sensor configuration.
    */
   SimulationFrontend(size_t numCameras, bool addImageNoise, int maxTrackLength,
-                     VisualConstraints constraintScheme,
+                     okvis::VisualConstraints constraintScheme,
                      LandmarkGridType gridType,
                      double landmarkRadius,
                      std::string pointFile);
@@ -99,7 +98,7 @@ class SimulationFrontend {
   const size_t numCameras_;  ///< Number of cameras in the configuration.
   bool addImageNoise_; ///< Add noise to image observations
   int maxTrackLength_; ///< Cap feature track length
-  const VisualConstraints constraintScheme_;
+  const okvis::VisualConstraints constraintScheme_;
   static const bool singleTwoViewConstraint_ = false;
   std::shared_ptr<okvis::MultiFrame> previousKeyframe_;
   okvis::kinematics::Transformation previousKeyframePose_;
@@ -118,8 +117,8 @@ class SimulationFrontend {
 
 
   struct LandmarkKeypointMatch {
-    KeypointIdentifier currentKeypoint;
-    KeypointIdentifier previousKeypoint;
+    okvis::KeypointIdentifier currentKeypoint;
+    okvis::KeypointIdentifier previousKeypoint;
     uint64_t landmarkId; // unique identifier
     size_t landmarkIdInVector; // index in the scene grid
   };
@@ -197,7 +196,7 @@ struct TestSetting {
   //  factor in generating noise.
   double sim_ga_bias_noise_factor;
 
-  okvis::EstimatorAlgorithm estimator_algorithm;
+  swift_vio::EstimatorAlgorithm estimator_algorithm;
   bool useEpipolarConstraint;
   int cameraObservationModelId;
   int landmarkModelId;
@@ -210,8 +209,8 @@ struct TestSetting {
               bool _noisyInitialSensorParams = false, bool _addImageNoise = true,
               bool _useImageObservs = true, double _sim_ga_noise_factor = 1.0,
               double _sim_ga_bias_noise_factor = 1.0,
-              okvis::EstimatorAlgorithm _estimator_algorithm =
-                  okvis::EstimatorAlgorithm::MSCKF,
+              swift_vio::EstimatorAlgorithm _estimator_algorithm =
+                  swift_vio::EstimatorAlgorithm::MSCKF,
               bool _useEpipolarConstraint = false,
               int _cameraObservationModelId = 0, int _landmarkModelId = 0,
               simul::SimCameraModelType _cameraModelId =
@@ -244,7 +243,7 @@ struct TestSetting {
        << " useImageObservs " << useImageObservs << "\nsim_ga_noise_factor "
        << sim_ga_noise_factor << " sim_ga_bias_noise_factor "
        << sim_ga_bias_noise_factor << "\nestimator_algorithm "
-       << okvis::EstimatorAlgorithmIdToName(estimator_algorithm)
+       << swift_vio::EstimatorAlgorithmIdToName(estimator_algorithm)
        << " use epipolar constraint? " << useEpipolarConstraint
        << "\ncamera observation model id " << cameraObservationModelId
        << " landmark model id " << landmarkModelId
@@ -255,7 +254,6 @@ struct TestSetting {
     return ss.str();
   }
 };
-
-}  // namespace okvis
+}  // namespace simul
 
 #endif  // INCLUDE_OKVIS_SIMULATION_FRONTEND_HPP_

@@ -11,7 +11,6 @@
 #include <deque>
 #include <memory>
 
-//#include <boost/shared_ptr.hpp>
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wnon-virtual-dtor"
 #include <dynamic_reconfigure/server.h>
@@ -35,11 +34,10 @@
 #include <okvis/assert_macros.hpp>
 #include <okvis/kinematics/Transformation.hpp>
 
-#include "vio/FrameGrabber.h"  //for reading images
-#include "vio/ImuGrabber.h"    //for reading IMU data
-/// \brief okvis Main namespace of this package.
-namespace okvis {
+#include "vio/FrameGrabber.h"  // for reading images
+#include "vio/ImuGrabber.h"    // for reading IMU data
 
+namespace swift_vio {
 /**
  * @brief This class handles all the buffering of incoming data.
  */
@@ -92,7 +90,6 @@ class Player {
   Player(const Player& rhs);
   Player& operator=(const Player&) = delete;
 };
-
-}  // namespace okvis
+}  // namespace swift_vio
 
 #endif /* INCLUDE_SWIFT_VIO_PLAYER_HPP_ */

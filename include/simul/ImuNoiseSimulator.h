@@ -13,7 +13,6 @@
 #include <vector>
 
 namespace simul {
-
 /**
  * @brief initImuNoiseParams
  * @param imuParameters

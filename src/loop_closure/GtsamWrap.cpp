@@ -1,7 +1,7 @@
 #include "loop_closure/GtsamWrap.hpp"
 #include "okvis/kinematics/sophus_operators.hpp"
 
-namespace VIO {
+namespace swift_vio {
 std::pair<double, double> computeRotationAndTranslationErrors(
     const gtsam::Pose3& expectedPose, const gtsam::Pose3& actualPose,
     const bool upToScale) {
@@ -112,5 +112,4 @@ gtsam::Matrix Covariance_bvx2xvb(const gtsam::Matrix& COV_bvx) {
 
   return cov_xvb;
 }
-
-} // namespace VIO
+} // namespace swift_vio

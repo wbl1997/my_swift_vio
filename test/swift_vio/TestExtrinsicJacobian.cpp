@@ -24,11 +24,11 @@ class ExtrinsicJacobianTest : public ::testing::Test {
       deltaExtrinsic.setZero();
       deltaExtrinsic[j] = h_;
       okvis::kinematics::Transformation T_XC = T_BC_list_[0];
-      okvis::ExtrinsicModelOplus(camExtrinsicModelId, deltaExtrinsic.data(),
+      swift_vio::ExtrinsicModelOplus(camExtrinsicModelId, deltaExtrinsic.data(),
                                  &T_XC);
       Eigen::Matrix<double, 6, 1> delta;
       delta.setZero();
-      okvis::Extrinsic_p_BC_q_BC::ominus(T_BC_list_[0].parameters().data(),
+      swift_vio::Extrinsic_p_BC_q_BC::ominus(T_BC_list_[0].parameters().data(),
                                   T_XC.parameters().data(), delta.data());
       dT_BC_dExtrinsic->col(j) = delta / h_;
     }
@@ -39,7 +39,7 @@ class ExtrinsicJacobianTest : public ::testing::Test {
       Eigen::Matrix<double, 6, 6>* dT_BC_dSecondExt,
       Eigen::Matrix<double, 6, 6>* dT_BC_dMainExt) {
     okvis::kinematics::Transformation T_XC;
-    if (camExtrinsicModelId == okvis::Extrinsic_p_C0C_q_C0C::kModelId) {
+    if (camExtrinsicModelId == swift_vio::Extrinsic_p_C0C_q_C0C::kModelId) {
       T_XC = T_BC_list_[0].inverse() * T_BC_list_[1];
     } else {
       T_XC = T_BC_list_[1];
@@ -50,16 +50,16 @@ class ExtrinsicJacobianTest : public ::testing::Test {
       deltaExtrinsic.setZero();
       deltaExtrinsic[j] = h_;
       okvis::kinematics::Transformation T_XC_plus = T_XC;
-      okvis::ExtrinsicModelOplus(camExtrinsicModelId, deltaExtrinsic.data(),
+      swift_vio::ExtrinsicModelOplus(camExtrinsicModelId, deltaExtrinsic.data(),
                                  &T_XC_plus);
       okvis::kinematics::Transformation T_BC_plus;
-      if (camExtrinsicModelId == okvis::Extrinsic_p_C0C_q_C0C::kModelId) {
+      if (camExtrinsicModelId == swift_vio::Extrinsic_p_C0C_q_C0C::kModelId) {
         T_BC_plus = T_BC_list_[0] * T_XC_plus;
       } else {
         T_BC_plus = T_XC_plus;
       }
       Eigen::Matrix<double, 6, 1> delta;
-      okvis::Extrinsic_p_BC_q_BC::ominus(T_BC_list_[1].parameters().data(),
+      swift_vio::Extrinsic_p_BC_q_BC::ominus(T_BC_list_[1].parameters().data(),
                                          T_BC_plus.parameters().data(),
                                          delta.data());
       dT_BC_dSecondExt->col(j) = delta / h_;
@@ -69,17 +69,17 @@ class ExtrinsicJacobianTest : public ::testing::Test {
       deltaExtrinsic.setZero();
       deltaExtrinsic[j] = h_;
       okvis::kinematics::Transformation T_XC_plus = T_BC_list_[0];
-      okvis::ExtrinsicModelOplus(mainCamExtrinsicModelId, deltaExtrinsic.data(),
+      swift_vio::ExtrinsicModelOplus(mainCamExtrinsicModelId, deltaExtrinsic.data(),
                                  &T_XC_plus);
       okvis::kinematics::Transformation T_BC_plus;
-      if (camExtrinsicModelId == okvis::Extrinsic_p_C0C_q_C0C::kModelId) {
+      if (camExtrinsicModelId == swift_vio::Extrinsic_p_C0C_q_C0C::kModelId) {
         T_BC_plus = T_XC_plus * T_XC;
       } else {
         T_BC_plus = T_BC_list_[1];
       }
       Eigen::Matrix<double, 6, 1> delta;
       delta.setZero();
-      okvis::Extrinsic_p_BC_q_BC::ominus(T_BC_list_[1].parameters().data(),
+      swift_vio::Extrinsic_p_BC_q_BC::ominus(T_BC_list_[1].parameters().data(),
                                   T_BC_plus.parameters().data(), delta.data());
       dT_BC_dMainExt->col(j) = delta / h_;
     }
@@ -89,7 +89,7 @@ class ExtrinsicJacobianTest : public ::testing::Test {
     {
       std::vector<size_t> involvedCameraIndices{0u};
       Eigen::AlignedVector<Eigen::MatrixXd> dT_BCi_dExtrinsics;
-      okvis::computeExtrinsicJacobians(
+      swift_vio::computeExtrinsicJacobians(
           T_BC_list_[0], T_BC_list_[0], mainCamExtModelId, mainCamExtModelId,
           &dT_BCi_dExtrinsics, &involvedCameraIndices, kMainCameraIndex);
 
@@ -109,11 +109,11 @@ class ExtrinsicJacobianTest : public ::testing::Test {
     {
       std::vector<size_t> involvedCameraIndices{1u};
       Eigen::AlignedVector<Eigen::MatrixXd> dT_BCi_dExtrinsics;
-      okvis::computeExtrinsicJacobians(
+      swift_vio::computeExtrinsicJacobians(
           T_BC_list_[1], T_BC_list_[0], secondCamExtModelId, mainCamExtModelId,
           &dT_BCi_dExtrinsics, &involvedCameraIndices, kMainCameraIndex);
 
-      if (secondCamExtModelId == okvis::Extrinsic_p_C0C_q_C0C::kModelId) {
+      if (secondCamExtModelId == swift_vio::Extrinsic_p_C0C_q_C0C::kModelId) {
         EXPECT_EQ(involvedCameraIndices.size(), 2u);
         EXPECT_EQ(involvedCameraIndices[0], 1u);
         EXPECT_EQ(involvedCameraIndices[1], 0u);
@@ -155,25 +155,25 @@ class ExtrinsicJacobianTest : public ::testing::Test {
 };
 
 TEST_F(ExtrinsicJacobianTest, P_CB_T_BC) {
-  checkJacobian(okvis::Extrinsic_p_CB::kModelId,
-                okvis::Extrinsic_p_BC_q_BC::kModelId,
-                okvis::Extrinsic_p_CB::kNumParams);
+  checkJacobian(swift_vio::Extrinsic_p_CB::kModelId,
+                swift_vio::Extrinsic_p_BC_q_BC::kModelId,
+                swift_vio::Extrinsic_p_CB::kNumParams);
 }
 
 TEST_F(ExtrinsicJacobianTest, P_CB_T_C0C) {
-  checkJacobian(okvis::Extrinsic_p_CB::kModelId,
-                okvis::Extrinsic_p_C0C_q_C0C::kModelId,
-                okvis::Extrinsic_p_CB::kNumParams);
+  checkJacobian(swift_vio::Extrinsic_p_CB::kModelId,
+                swift_vio::Extrinsic_p_C0C_q_C0C::kModelId,
+                swift_vio::Extrinsic_p_CB::kNumParams);
 }
 
 TEST_F(ExtrinsicJacobianTest, T_BC_T_BC) {
-  checkJacobian(okvis::Extrinsic_p_BC_q_BC::kModelId,
-                okvis::Extrinsic_p_BC_q_BC::kModelId,
-                okvis::Extrinsic_p_BC_q_BC::kNumParams);
+  checkJacobian(swift_vio::Extrinsic_p_BC_q_BC::kModelId,
+                swift_vio::Extrinsic_p_BC_q_BC::kModelId,
+                swift_vio::Extrinsic_p_BC_q_BC::kNumParams);
 }
 
 TEST_F(ExtrinsicJacobianTest, T_BC_T_C0C) {
-  checkJacobian(okvis::Extrinsic_p_BC_q_BC::kModelId,
-                okvis::Extrinsic_p_C0C_q_C0C::kModelId,
-                okvis::Extrinsic_p_BC_q_BC::kNumParams);
+  checkJacobian(swift_vio::Extrinsic_p_BC_q_BC::kModelId,
+                swift_vio::Extrinsic_p_C0C_q_C0C::kModelId,
+                swift_vio::Extrinsic_p_BC_q_BC::kNumParams);
 }

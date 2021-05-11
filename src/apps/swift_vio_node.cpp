@@ -55,16 +55,16 @@ int main(int argc, char **argv) {
     return 1;
   }
 
-  okvis::RosParametersReader vio_parameters_reader(configFilename);
+  swift_vio::RosParametersReader vio_parameters_reader(configFilename);
   okvis::VioParameters parameters;
   vio_parameters_reader.getParameters(parameters);
-  okvis::setInputParameters(&parameters.input);
+  swift_vio::setInputParameters(&parameters.input);
 
-  okvis::Publisher publisher(nh);
+  swift_vio::Publisher publisher(nh);
   publisher.setParameters(parameters);
-  okvis::PgoPublisher pgoPublisher;
+  swift_vio::PgoPublisher pgoPublisher;
 
-  okvis::BackendParams backendParams;
+  swift_vio::BackendParams backendParams;
   backendParams.parseYAML(configFilename);
   std::shared_ptr<okvis::ceres::Map> mapPtr(new okvis::ceres::Map());
   std::shared_ptr<okvis::Estimator> estimator =
@@ -74,8 +74,8 @@ int main(int argc, char **argv) {
       parameters.nCameraSystem.numCameras(),
       parameters.frontendOptions,
       parameters.optimization.algorithm);
-  std::shared_ptr<VIO::LoopClosureDetectorParams> lcParams(
-        new VIO::LoopClosureDetectorParams());
+  std::shared_ptr<swift_vio::LoopClosureDetectorParams> lcParams(
+        new swift_vio::LoopClosureDetectorParams());
   if (lcdConfigFilename.empty()) {
     LOG(WARNING) << "Default parameters for loop closure will be used as no "
                     "configuration filename is provided!";
@@ -83,28 +83,28 @@ int main(int argc, char **argv) {
     lcParams->parseYAML(lcdConfigFilename);
   }
   if (!frontend->isDescriptorBasedMatching()) {
-    lcParams->loop_closure_method_ = VIO::LoopClosureMethodType::Mock;
+    lcParams->loop_closure_method_ = swift_vio::LoopClosureMethodType::Mock;
     LOG(WARNING)
         << "Loop closure module requires descriptors for keypoints to perform "
            "matching. But the KLT frontend does not extract descriptors. "
            "Descriptors can be extracted for KLT points in creating loop query "
            "keyframes but this is not done yet.";
   }
-  std::shared_ptr<okvis::LoopClosureMethod> loopClosureMethod =
+  std::shared_ptr<swift_vio::LoopClosureMethod> loopClosureMethod =
       swift_vio::createLoopClosureMethod(lcParams);
   okvis::ThreadedKFVio okvis_estimator(parameters, estimator, frontend,
                                        loopClosureMethod);
 
 
-  okvis::VioSystemWrap::registerCallbacks(
+  swift_vio::VioSystemWrap::registerCallbacks(
       FLAGS_output_dir, parameters, &okvis_estimator, &publisher,
       &pgoPublisher);
 
   // player to grab messages directly from files on a hard drive.
-  std::shared_ptr<okvis::Player> pPlayer;
+  std::shared_ptr<swift_vio::Player> pPlayer;
   std::shared_ptr<std::thread> ptPlayer;
   if (FLAGS_load_input_option == 0) {
-    okvis::Subscriber subscriber(nh, &okvis_estimator,
+    swift_vio::Subscriber subscriber(nh, &okvis_estimator,
                                  vio_parameters_reader);
     ros::Rate rate(20);
     while (ros::ok()) {
@@ -113,8 +113,8 @@ int main(int argc, char **argv) {
       rate.sleep();
     }
   } else {
-    pPlayer.reset(new okvis::Player(&okvis_estimator, parameters));
-    ptPlayer.reset(new std::thread(&okvis::Player::Run, std::ref(*pPlayer)));
+    pPlayer.reset(new swift_vio::Player(&okvis_estimator, parameters));
+    ptPlayer.reset(new std::thread(&swift_vio::Player::Run, std::ref(*pPlayer)));
 
     ros::Rate rate(20);
     while (!pPlayer->mbFinished) {
@@ -127,7 +127,7 @@ int main(int argc, char **argv) {
   }
 
   std::string filename =
-      okvis::removeTrailingSlash(FLAGS_output_dir) + "/feature_statistics.txt";
+      swift_vio::removeTrailingSlash(FLAGS_output_dir) + "/feature_statistics.txt";
   okvis_estimator.saveStatistics(filename);
   return 0;
 }

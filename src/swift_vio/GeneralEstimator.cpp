@@ -4,9 +4,10 @@
  * @author Jianzhu Huai
  */
 
-#include <swift_vio/EuclideanParamBlock.hpp>
+#include <swift_vio/ceres/EuclideanParamBlock.hpp>
 #include <swift_vio/GeneralEstimator.hpp>
-#include <swift_vio/CameraTimeParamBlock.hpp>
+#include <swift_vio/ceres/CameraTimeParamBlock.hpp>
+#include <swift_vio/VectorOperations.hpp>
 
 #include <okvis/cameras/PinholeCamera.hpp>
 #include <okvis/ceres/PoseParameterBlock.hpp>
@@ -18,19 +19,17 @@
 #include <okvis/MultiFrame.hpp>
 #include <okvis/assert_macros.hpp>
 
-/// \brief okvis Main namespace of this package.
-namespace okvis {
-
+namespace swift_vio {
 // Constructor if a ceres map is already available.
 GeneralEstimator::GeneralEstimator(
     std::shared_ptr<okvis::ceres::Map> mapPtr)
-    : Estimator(mapPtr)
+    : okvis::Estimator(mapPtr)
 {
 }
 
 // The default constructor.
 GeneralEstimator::GeneralEstimator()
-    : Estimator()
+    : okvis::Estimator()
 {
 }
 
@@ -60,18 +59,18 @@ bool GeneralEstimator::addStates(
     tdEstimate.fromSec(camera_rig_.getImageDelay(camIdx));
     correctedStateTime = multiFrame->timestamp() + tdEstimate;
 
-    if (pvstd_.initWithExternalSource) {
-      T_WS = okvis::kinematics::Transformation(pvstd_.p_WS, pvstd_.q_WS);
+    if (initialNavState_.initWithExternalSource) {
+      T_WS = okvis::kinematics::Transformation(initialNavState_.p_WS, initialNavState_.q_WS);
     } else {
       bool success0 = initPoseFromImu(imuMeasurements, T_WS);
       OKVIS_ASSERT_TRUE_DBG(
           Exception, success0,
           "pose could not be initialized from imu measurements.");
       if (!success0) return false;
-      pvstd_.updatePose(T_WS, correctedStateTime);
+      initialNavState_.updatePose(T_WS, correctedStateTime);
     }
     speedAndBias.setZero();
-    speedAndBias.head<3>() = pvstd_.v_WS;
+    speedAndBias.head<3>() = initialNavState_.v_WS;
     speedAndBias.segment<3>(3) = imuParametersVec_.at(0).g0;
     speedAndBias.tail<3>() = imuParametersVec_.at(0).a0;
   } else {
@@ -85,26 +84,26 @@ bool GeneralEstimator::addStates(
     OKVIS_ASSERT_TRUE_DBG(
         Exception, mapPtr_->parameterBlockExists(T_WS_id),
         "this is an okvis bug. previous pose does not exist.");
-    T_WS = std::static_pointer_cast<ceres::PoseParameterBlock>(
+    T_WS = std::static_pointer_cast<okvis::ceres::PoseParameterBlock>(
         mapPtr_->parameterBlockPtr(T_WS_id))->estimate();
 
     speedAndBias =
-        std::static_pointer_cast<ceres::SpeedAndBiasParameterBlock>(
+        std::static_pointer_cast<okvis::ceres::SpeedAndBiasParameterBlock>(
             mapPtr_->parameterBlockPtr(speedAndBias_id))->estimate();
 
     uint64_t td_id = statesMap_.rbegin()
                          ->second.sensors.at(SensorStates::Camera)
                          .at(0)
-                         .at(CameraSensorStates::TD)
+                         .at(okvis::Estimator::CameraSensorStates::TD)
                          .id;  // one camera assumption
     tdEstimate =
-        okvis::Duration(std::static_pointer_cast<ceres::CameraTimeParamBlock>(
+        okvis::Duration(std::static_pointer_cast<okvis::ceres::CameraTimeParamBlock>(
                             mapPtr_->parameterBlockPtr(td_id))
                             ->estimate());
     correctedStateTime = multiFrame->timestamp() + tdEstimate;
 
     // propagate pose and speedAndBias
-    int numUsedImuMeasurements = ceres::ImuError::propagation(
+    int numUsedImuMeasurements = okvis::ceres::ImuError::propagation(
         imuMeasurements, imuParametersVec_.at(0), T_WS, speedAndBias,
         statesMap_.rbegin()->second.timestamp, correctedStateTime);
     OKVIS_ASSERT_TRUE_DBG(Exception, numUsedImuMeasurements > 1,
@@ -138,7 +137,7 @@ bool GeneralEstimator::addStates(
   if(statesMap_.empty()) {
     referencePoseId_ = states.id; // set this as reference pose
   }
-  mapPtr_->addParameterBlock(poseParameterBlock,ceres::Map::Pose6d);
+  mapPtr_->addParameterBlock(poseParameterBlock, okvis::ceres::Map::Pose6d);
 
   // add to buffer
   statesMap_.insert(std::pair<uint64_t, States>(states.id, states));
@@ -151,55 +150,55 @@ bool GeneralEstimator::addStates(
   // initialize new sensor states
   // cameras:
   for (size_t i = 0; i < extrinsicsEstimationParametersVec_.size(); ++i) {
-    SpecificSensorStatesContainer cameraInfos(5);
-    cameraInfos.at(CameraSensorStates::T_SCi).exists=true;
-    cameraInfos.at(CameraSensorStates::Intrinsics).exists = true;
-    cameraInfos.at(CameraSensorStates::Distortion).exists = true;
-    cameraInfos.at(CameraSensorStates::TD).exists = true;
-    cameraInfos.at(CameraSensorStates::TR).exists = true;
+    okvis::Estimator::SpecificSensorStatesContainer cameraInfos(5);
+    cameraInfos.at(okvis::Estimator::CameraSensorStates::T_SCi).exists=true;
+    cameraInfos.at(okvis::Estimator::CameraSensorStates::Intrinsics).exists = true;
+    cameraInfos.at(okvis::Estimator::CameraSensorStates::Distortion).exists = true;
+    cameraInfos.at(okvis::Estimator::CameraSensorStates::TD).exists = true;
+    cameraInfos.at(okvis::Estimator::CameraSensorStates::TR).exists = true;
     if(statesMap_.size() > 1) {
       // use the same block...
-      cameraInfos.at(CameraSensorStates::T_SCi).id =
-          lastElementIterator->second.sensors.at(SensorStates::Camera).at(i).at(CameraSensorStates::T_SCi).id;
-      cameraInfos.at(CameraSensorStates::Intrinsics).exists =
+      cameraInfos.at(okvis::Estimator::CameraSensorStates::T_SCi).id =
+          lastElementIterator->second.sensors.at(SensorStates::Camera).at(i).at(okvis::Estimator::CameraSensorStates::T_SCi).id;
+      cameraInfos.at(okvis::Estimator::CameraSensorStates::Intrinsics).exists =
           lastElementIterator->second.sensors.at(SensorStates::Camera)
               .at(i)
-              .at(CameraSensorStates::Intrinsics)
+              .at(okvis::Estimator::CameraSensorStates::Intrinsics)
               .exists;
-      cameraInfos.at(CameraSensorStates::Intrinsics).id =
+      cameraInfos.at(okvis::Estimator::CameraSensorStates::Intrinsics).id =
           lastElementIterator->second.sensors.at(SensorStates::Camera)
               .at(i)
-              .at(CameraSensorStates::Intrinsics)
+              .at(okvis::Estimator::CameraSensorStates::Intrinsics)
               .id;
-      cameraInfos.at(CameraSensorStates::Distortion).id =
+      cameraInfos.at(okvis::Estimator::CameraSensorStates::Distortion).id =
           lastElementIterator->second.sensors.at(SensorStates::Camera)
               .at(i)
-              .at(CameraSensorStates::Distortion)
+              .at(okvis::Estimator::CameraSensorStates::Distortion)
               .id;
-      cameraInfos.at(CameraSensorStates::TD).id =
+      cameraInfos.at(okvis::Estimator::CameraSensorStates::TD).id =
           lastElementIterator->second.sensors.at(SensorStates::Camera)
               .at(i)
-              .at(CameraSensorStates::TD)
+              .at(okvis::Estimator::CameraSensorStates::TD)
               .id;
-      cameraInfos.at(CameraSensorStates::TR).id =
+      cameraInfos.at(okvis::Estimator::CameraSensorStates::TR).id =
           lastElementIterator->second.sensors.at(SensorStates::Camera)
               .at(i)
-              .at(CameraSensorStates::TR)
+              .at(okvis::Estimator::CameraSensorStates::TR)
               .id;
     } else {
       const okvis::kinematics::Transformation T_SC = camera_rig_.getCameraExtrinsic(i);
-      uint64_t id = IdProvider::instance().newId();
+      uint64_t id = okvis::IdProvider::instance().newId();
       std::shared_ptr<okvis::ceres::PoseParameterBlock> extrinsicsParameterBlockPtr(
           new okvis::ceres::PoseParameterBlock(T_SC, id,
                                                correctedStateTime));
-      if(!mapPtr_->addParameterBlock(extrinsicsParameterBlockPtr,ceres::Map::Pose6d)){
+      if(!mapPtr_->addParameterBlock(extrinsicsParameterBlockPtr,okvis::ceres::Map::Pose6d)){
         return false;
       }
-      cameraInfos.at(CameraSensorStates::T_SCi).id = id;
+      cameraInfos.at(okvis::Estimator::CameraSensorStates::T_SCi).id = id;
 
       Eigen::VectorXd allIntrinsics;
       camera_rig_.getCameraGeometry(i)->getIntrinsics(allIntrinsics);
-      id = IdProvider::instance().newId();
+      id = okvis::IdProvider::instance().newId();
       if (!fixCameraIntrinsicParams_[i]) {
         int projOptModelId = camera_rig_.getProjectionOptMode(i);
         const int minProjectionDim = camera_rig_.getMinimalProjectionDimen(i);
@@ -210,43 +209,43 @@ bool GeneralEstimator::addStates(
             projIntrinsicParamBlockPtr(new okvis::ceres::EuclideanParamBlock(
                 optProjIntrinsics, id, correctedStateTime, minProjectionDim));
         mapPtr_->addParameterBlock(projIntrinsicParamBlockPtr,
-                                   ceres::Map::Parameterization::Trivial);
-        cameraInfos.at(CameraSensorStates::Intrinsics).id = id;
+                                   okvis::ceres::Map::Parameterization::Trivial);
+        cameraInfos.at(okvis::Estimator::CameraSensorStates::Intrinsics).id = id;
       } else {
         Eigen::VectorXd optProjIntrinsics = allIntrinsics.head<4>();
         std::shared_ptr<okvis::ceres::EuclideanParamBlock>
             projIntrinsicParamBlockPtr(new okvis::ceres::EuclideanParamBlock(
                 optProjIntrinsics, id, correctedStateTime, 4));
         mapPtr_->addParameterBlock(projIntrinsicParamBlockPtr, 
-            ceres::Map::Parameterization::Trivial);
-        cameraInfos.at(CameraSensorStates::Intrinsics).id = id;
+            okvis::ceres::Map::Parameterization::Trivial);
+        cameraInfos.at(okvis::Estimator::CameraSensorStates::Intrinsics).id = id;
         mapPtr_->setParameterBlockConstant(id);
       }
-      id = IdProvider::instance().newId();
+      id = okvis::IdProvider::instance().newId();
       const int distortionDim = camera_rig_.getDistortionDimen(i);
       std::shared_ptr<okvis::ceres::EuclideanParamBlock>
           distortionParamBlockPtr(new okvis::ceres::EuclideanParamBlock(
               allIntrinsics.tail(distortionDim), id, correctedStateTime,
               distortionDim));
       mapPtr_->addParameterBlock(distortionParamBlockPtr,
-                                 ceres::Map::Parameterization::Trivial);
-      cameraInfos.at(CameraSensorStates::Distortion).id = id;
+                                 okvis::ceres::Map::Parameterization::Trivial);
+      cameraInfos.at(okvis::Estimator::CameraSensorStates::Distortion).id = id;
 
-      id = IdProvider::instance().newId();
+      id = okvis::IdProvider::instance().newId();
       std::shared_ptr<okvis::ceres::CameraTimeParamBlock> tdParamBlockPtr(
           new okvis::ceres::CameraTimeParamBlock(camera_rig_.getImageDelay(i),
                                                  id, correctedStateTime));
       mapPtr_->addParameterBlock(tdParamBlockPtr,
-                                 ceres::Map::Parameterization::Trivial);
-      cameraInfos.at(CameraSensorStates::TD).id = id;
+                                 okvis::ceres::Map::Parameterization::Trivial);
+      cameraInfos.at(okvis::Estimator::CameraSensorStates::TD).id = id;
 
-      id = IdProvider::instance().newId();
+      id = okvis::IdProvider::instance().newId();
       std::shared_ptr<okvis::ceres::CameraTimeParamBlock> trParamBlockPtr(
           new okvis::ceres::CameraTimeParamBlock(camera_rig_.getReadoutTime(i),
                                                  id, correctedStateTime));
       mapPtr_->addParameterBlock(trParamBlockPtr,
-                                 ceres::Map::Parameterization::Trivial);
-      cameraInfos.at(CameraSensorStates::TR).id = id;
+                                 okvis::ceres::Map::Parameterization::Trivial);
+      cameraInfos.at(okvis::Estimator::CameraSensorStates::TR).id = id;
     }
     // update the states info
     statesMap_.rbegin()->second.sensors.at(SensorStates::Camera).push_back(cameraInfos);
@@ -255,9 +254,9 @@ bool GeneralEstimator::addStates(
 
   // IMU states are automatically propagated.
   for (size_t i=0; i<imuParametersVec_.size(); ++i){
-    SpecificSensorStatesContainer imuInfo(2);
+    okvis::Estimator::SpecificSensorStatesContainer imuInfo(2);
     imuInfo.at(ImuSensorStates::SpeedAndBias).exists = true;
-    uint64_t id = IdProvider::instance().newId();
+    uint64_t id = okvis::IdProvider::instance().newId();
     std::shared_ptr<okvis::ceres::SpeedAndBiasParameterBlock>
         speedAndBiasParameterBlock(new okvis::ceres::SpeedAndBiasParameterBlock(
             speedAndBias, id, correctedStateTime));
@@ -274,8 +273,8 @@ bool GeneralEstimator::addStates(
   if (statesMap_.size() == 1) {
     // let's add a prior
     Eigen::Matrix<double, 6, 6> information;
-    pvstd_.toInformation(&information);
-    std::shared_ptr<ceres::PoseError > poseError(new ceres::PoseError(T_WS, information));
+    initialNavState_.toInformation(&information);
+    std::shared_ptr<okvis::ceres::PoseError > poseError(new okvis::ceres::PoseError(T_WS, information));
     /*auto id2= */ mapPtr_->addResidualBlock(poseError,NULL,poseParameterBlock);
     //mapPtr_->isJacobianCorrect(id2,1.0e-6);
 
@@ -287,43 +286,43 @@ bool GeneralEstimator::addStates(
       double rotationVariance = rotationStdev*rotationStdev;
       if(translationVariance>1.0e-16 && rotationVariance>1.0e-16){
         const okvis::kinematics::Transformation T_SC = camera_rig_.getCameraExtrinsic(i);
-        std::shared_ptr<ceres::PoseError > cameraPoseError(
-              new ceres::PoseError(T_SC, translationVariance, rotationVariance));
+        std::shared_ptr<okvis::ceres::PoseError > cameraPoseError(
+              new okvis::ceres::PoseError(T_SC, translationVariance, rotationVariance));
         // add to map
         mapPtr_->addResidualBlock(
             cameraPoseError,
             NULL,
             mapPtr_->parameterBlockPtr(
-                states.sensors.at(SensorStates::Camera).at(i).at(CameraSensorStates::T_SCi).id));
+                states.sensors.at(SensorStates::Camera).at(i).at(okvis::Estimator::CameraSensorStates::T_SCi).id));
         //mapPtr_->isJacobianCorrect(id,1.0e-6);
       }
       else {
         mapPtr_->setParameterBlockConstant(
-            states.sensors.at(SensorStates::Camera).at(i).at(CameraSensorStates::T_SCi).id);
+            states.sensors.at(SensorStates::Camera).at(i).at(okvis::Estimator::CameraSensorStates::T_SCi).id);
       }
 
       // TODO(jhuai): relax the cmaera characteristic parameter blocks
       if (states.sensors.at(SensorStates::Camera)
               .at(i)
-              .at(CameraSensorStates::Intrinsics)
+              .at(okvis::Estimator::CameraSensorStates::Intrinsics)
               .exists) {
         mapPtr_->setParameterBlockConstant(
             states.sensors.at(SensorStates::Camera)
                 .at(i)
-                .at(CameraSensorStates::Intrinsics)
+                .at(okvis::Estimator::CameraSensorStates::Intrinsics)
                 .id);
       }
       mapPtr_->setParameterBlockConstant(states.sensors.at(SensorStates::Camera)
                                              .at(i)
-                                             .at(CameraSensorStates::Distortion)
+                                             .at(okvis::Estimator::CameraSensorStates::Distortion)
                                              .id);
       mapPtr_->setParameterBlockConstant(states.sensors.at(SensorStates::Camera)
                                              .at(i)
-                                             .at(CameraSensorStates::TD)
+                                             .at(okvis::Estimator::CameraSensorStates::TD)
                                              .id);
       mapPtr_->setParameterBlockConstant(states.sensors.at(SensorStates::Camera)
                                              .at(i)
-                                             .at(CameraSensorStates::TR)
+                                             .at(okvis::Estimator::CameraSensorStates::TR)
                                              .id);
     }
     for (size_t i = 0; i < imuParametersVec_.size(); ++i) {
@@ -331,8 +330,8 @@ bool GeneralEstimator::addStates(
       // get these from parameter file
       const double sigma_bg = imuParametersVec_.at(0).sigma_bg;
       const double sigma_ba = imuParametersVec_.at(0).sigma_ba;
-      std::shared_ptr<ceres::SpeedAndBiasError > speedAndBiasError(
-            new ceres::SpeedAndBiasError(
+      std::shared_ptr<okvis::ceres::SpeedAndBiasError > speedAndBiasError(
+            new okvis::ceres::SpeedAndBiasError(
                 speedAndBias, 1.0, sigma_bg*sigma_bg, sigma_ba*sigma_ba));
       // add to map
       mapPtr_->addResidualBlock(
@@ -345,8 +344,8 @@ bool GeneralEstimator::addStates(
   } else {
     // add IMU error terms
     for (size_t i = 0; i < imuParametersVec_.size(); ++i) {
-      std::shared_ptr<ceres::ImuError> imuError(
-          new ceres::ImuError(imuMeasurements, imuParametersVec_.at(i),
+      std::shared_ptr<okvis::ceres::ImuError> imuError(
+          new okvis::ceres::ImuError(imuMeasurements, imuParametersVec_.at(i),
                               lastElementIterator->second.timestamp,
                               states.timestamp));
       /*::ceres::ResidualBlockId id = */mapPtr_->addResidualBlock(
@@ -367,8 +366,8 @@ bool GeneralEstimator::addStates(
 
     // add relative sensor state errors
     for (size_t i = 0; i < extrinsicsEstimationParametersVec_.size(); ++i) {
-      if(lastElementIterator->second.sensors.at(SensorStates::Camera).at(i).at(CameraSensorStates::T_SCi).id !=
-          states.sensors.at(SensorStates::Camera).at(i).at(CameraSensorStates::T_SCi).id){
+      if(lastElementIterator->second.sensors.at(SensorStates::Camera).at(i).at(okvis::Estimator::CameraSensorStates::T_SCi).id !=
+          states.sensors.at(SensorStates::Camera).at(i).at(okvis::Estimator::CameraSensorStates::T_SCi).id){
         // i.e. they are different estimated variables, so link them with a temporal error term
         double dt = (states.timestamp - lastElementIterator->second.timestamp)
             .toSec();
@@ -378,18 +377,18 @@ bool GeneralEstimator::addStates(
         double rotationSigmaC = extrinsicsEstimationParametersVec_.at(i)
             .sigma_c_relative_orientation;
         double rotationVariance = rotationSigmaC * rotationSigmaC * dt;
-        std::shared_ptr<ceres::RelativePoseError> relativeExtrinsicsError(
-            new ceres::RelativePoseError(translationVariance,
+        std::shared_ptr<okvis::ceres::RelativePoseError> relativeExtrinsicsError(
+            new okvis::ceres::RelativePoseError(translationVariance,
                                          rotationVariance));
         mapPtr_->addResidualBlock(
             relativeExtrinsicsError,
             NULL,
             mapPtr_->parameterBlockPtr(
                 lastElementIterator->second.sensors.at(SensorStates::Camera).at(
-                    i).at(CameraSensorStates::T_SCi).id),
+                    i).at(okvis::Estimator::CameraSensorStates::T_SCi).id),
             mapPtr_->parameterBlockPtr(
                 states.sensors.at(SensorStates::Camera).at(i).at(
-                    CameraSensorStates::T_SCi).id));
+                    okvis::Estimator::CameraSensorStates::T_SCi).id));
         //mapPtr_->isJacobianCorrect(id,1.0e-6);
       }
     }
@@ -432,7 +431,7 @@ bool GeneralEstimator::applyMarginalizationStrategy(
 
   if (!marginalizationErrorPtr_) {
     marginalizationErrorPtr_.reset(
-        new ceres::MarginalizationError(*mapPtr_.get()));
+        new okvis::ceres::MarginalizationError(*mapPtr_.get()));
   }
 
   // distinguish if we marginalize everything or everything but pose
@@ -474,11 +473,11 @@ bool GeneralEstimator::applyMarginalizationStrategy(
       it->second.global[i].exists = false; // remember we removed
       paremeterBlocksToBeMarginalized.push_back(it->second.global[i].id);
       keepParameterBlocks.push_back(false);
-      ceres::Map::ResidualBlockCollection residuals = mapPtr_->residuals(
+      okvis::ceres::Map::ResidualBlockCollection residuals = mapPtr_->residuals(
           it->second.global[i].id);
       for (size_t r = 0; r < residuals.size(); ++r) {
-        std::shared_ptr<ceres::ReprojectionErrorBase> reprojectionError =
-            std::dynamic_pointer_cast<ceres::ReprojectionErrorBase>(
+        std::shared_ptr<okvis::ceres::ReprojectionErrorBase> reprojectionError =
+            std::dynamic_pointer_cast<okvis::ceres::ReprojectionErrorBase>(
             residuals[r].errorInterfacePtr);
         if(!reprojectionError){   // we make sure no reprojection errors are yet included.
           marginalizationErrorPtr_->addResidualBlock(residuals[r].residualBlockId);
@@ -489,7 +488,7 @@ bool GeneralEstimator::applyMarginalizationStrategy(
     for (size_t i = 0; i < it->second.sensors.size(); ++i) {
       for (size_t j = 0; j < it->second.sensors[i].size(); ++j) {
         for (size_t k = 0; k < it->second.sensors[i][j].size(); ++k) {
-          if (i == SensorStates::Camera && k == CameraSensorStates::T_SCi) {
+          if (i == SensorStates::Camera && k == okvis::Estimator::CameraSensorStates::T_SCi) {
             continue; // we do not remove the extrinsics pose here.
           }
           if (!it->second.sensors[i][j][k].exists) {
@@ -509,11 +508,11 @@ bool GeneralEstimator::applyMarginalizationStrategy(
           it->second.sensors[i][j][k].exists = false; // remember we removed
           paremeterBlocksToBeMarginalized.push_back(it->second.sensors[i][j][k].id);
           keepParameterBlocks.push_back(false);
-          ceres::Map::ResidualBlockCollection residuals = mapPtr_->residuals(
+          okvis::ceres::Map::ResidualBlockCollection residuals = mapPtr_->residuals(
               it->second.sensors[i][j][k].id);
           for (size_t r = 0; r < residuals.size(); ++r) {
-            std::shared_ptr<ceres::ReprojectionErrorBase> reprojectionError =
-                std::dynamic_pointer_cast<ceres::ReprojectionErrorBase>(
+            std::shared_ptr<okvis::ceres::ReprojectionErrorBase> reprojectionError =
+                std::dynamic_pointer_cast<okvis::ceres::ReprojectionErrorBase>(
                 residuals[r].errorInterfacePtr);
             if(!reprojectionError){   // we make sure no reprojection errors are yet included.
               marginalizationErrorPtr_->addResidualBlock(residuals[r].residualBlockId);
@@ -541,18 +540,18 @@ bool GeneralEstimator::applyMarginalizationStrategy(
     }
 
     // add remaing error terms
-    ceres::Map::ResidualBlockCollection residuals = mapPtr_->residuals(
+    okvis::ceres::Map::ResidualBlockCollection residuals = mapPtr_->residuals(
         it->second.global[GlobalStates::T_WS].id);
 
     for (size_t r = 0; r < residuals.size(); ++r) {
-      if(std::dynamic_pointer_cast<ceres::PoseError>(
+      if(std::dynamic_pointer_cast<okvis::ceres::PoseError>(
            residuals[r].errorInterfacePtr)){ // avoids linearising initial pose error
 				mapPtr_->removeResidualBlock(residuals[r].residualBlockId);
 				reDoFixation = true;
         continue;
       }
-      std::shared_ptr<ceres::ReprojectionErrorBase> reprojectionError =
-          std::dynamic_pointer_cast<ceres::ReprojectionErrorBase>(
+      std::shared_ptr<okvis::ceres::ReprojectionErrorBase> reprojectionError =
+          std::dynamic_pointer_cast<okvis::ceres::ReprojectionErrorBase>(
           residuals[r].errorInterfacePtr);
       if(!reprojectionError){   // we make sure no reprojection errors are yet included.
         marginalizationErrorPtr_->addResidualBlock(residuals[r].residualBlockId);
@@ -566,7 +565,7 @@ bool GeneralEstimator::applyMarginalizationStrategy(
     // add remaining error terms of the sensor states.
     size_t i = SensorStates::Camera;
     for (size_t j = 0; j < it->second.sensors[i].size(); ++j) {
-      size_t k = CameraSensorStates::T_SCi;
+      size_t k = okvis::Estimator::CameraSensorStates::T_SCi;
       if (!it->second.sensors[i][j][k].exists) {
         continue;
       }
@@ -584,11 +583,11 @@ bool GeneralEstimator::applyMarginalizationStrategy(
       it->second.sensors[i][j][k].exists = false; // remember we removed
       paremeterBlocksToBeMarginalized.push_back(it->second.sensors[i][j][k].id);
       keepParameterBlocks.push_back(false);
-      ceres::Map::ResidualBlockCollection residuals = mapPtr_->residuals(
+      okvis::ceres::Map::ResidualBlockCollection residuals = mapPtr_->residuals(
           it->second.sensors[i][j][k].id);
       for (size_t r = 0; r < residuals.size(); ++r) {
-        std::shared_ptr<ceres::ReprojectionErrorBase> reprojectionError =
-            std::dynamic_pointer_cast<ceres::ReprojectionErrorBase>(
+        std::shared_ptr<okvis::ceres::ReprojectionErrorBase> reprojectionError =
+            std::dynamic_pointer_cast<okvis::ceres::ReprojectionErrorBase>(
             residuals[r].errorInterfacePtr);
         if(!reprojectionError){   // we make sure no reprojection errors are yet included.
           marginalizationErrorPtr_->addResidualBlock(residuals[r].residualBlockId);
@@ -601,10 +600,10 @@ bool GeneralEstimator::applyMarginalizationStrategy(
     uint64_t currentKfId = allLinearizedFrames.at(0);
 
     {
-      for(PointMap::iterator pit = landmarksMap_.begin();
+      for(okvis::PointMap::iterator pit = landmarksMap_.begin();
           pit != landmarksMap_.end(); ){
 
-        ceres::Map::ResidualBlockCollection residuals = mapPtr_->residuals(pit->first);
+        okvis::ceres::Map::ResidualBlockCollection residuals = mapPtr_->residuals(pit->first);
 
         bool twoViewTerms = areTwoViewConstraints(pit->second, residuals.size());
         if (twoViewTerms) { // we will handle these terms in the next code block
@@ -621,8 +620,8 @@ bool GeneralEstimator::applyMarginalizationStrategy(
         std::map<uint64_t,bool> visibleInFrame;
         size_t obsCount = 0;
         for (size_t r = 0; r < residuals.size(); ++r) {
-          std::shared_ptr<ceres::ReprojectionErrorBase> reprojectionError =
-              std::dynamic_pointer_cast<ceres::ReprojectionErrorBase>(
+          std::shared_ptr<okvis::ceres::ReprojectionErrorBase> reprojectionError =
+              std::dynamic_pointer_cast<okvis::ceres::ReprojectionErrorBase>(
                   residuals[r].errorInterfacePtr);
           if (reprojectionError) {
             uint64_t poseId = mapPtr_->parameters(residuals[r].residualBlockId).at(0).first;
@@ -659,8 +658,8 @@ bool GeneralEstimator::applyMarginalizationStrategy(
 
         // so, we need to consider it.
         for (size_t r = 0; r < residuals.size(); ++r) {
-          std::shared_ptr<ceres::ReprojectionErrorBase> reprojectionError =
-              std::dynamic_pointer_cast<ceres::ReprojectionErrorBase>(
+          std::shared_ptr<okvis::ceres::ReprojectionErrorBase> reprojectionError =
+              std::dynamic_pointer_cast<okvis::ceres::ReprojectionErrorBase>(
                   residuals[r].errorInterfacePtr);
           if (reprojectionError) {
             uint64_t poseId = mapPtr_->parameters(residuals[r].residualBlockId).at(0).first;
@@ -740,7 +739,7 @@ bool GeneralEstimator::applyMarginalizationStrategy(
 
       // for every landmark, remove its observations in removeFrames,
       // This is needed because some obs are added without associated residuals
-      for (PointMap::iterator pit = landmarksMap_.begin();
+      for (okvis::PointMap::iterator pit = landmarksMap_.begin();
            pit != landmarksMap_.end();) {
         for (auto obsIter = pit->second.observations.begin();
              obsIter != pit->second.observations.end();) {
@@ -802,12 +801,12 @@ bool GeneralEstimator::applyMarginalizationStrategy(
 	
 	if(reDoFixation){
 	  // finally fix the first pose properly
-		//mapPtr_->resetParameterization(statesMap_.begin()->first, ceres::Map::Pose3d);
+		//mapPtr_->resetParameterization(statesMap_.begin()->first, okvis::ceres::Map::Pose3d);
 		okvis::kinematics::Transformation T_WS_0;
 		get_T_WS(statesMap_.begin()->first, T_WS_0);
 		Eigen::Matrix<double, 6, 6> information;
-		pvstd_.toInformation(&information);
-	  std::shared_ptr<ceres::PoseError > poseError(new ceres::PoseError(T_WS_0, information));
+		initialNavState_.toInformation(&information);
+		std::shared_ptr<okvis::ceres::PoseError > poseError(new okvis::ceres::PoseError(T_WS_0, information));
 	  mapPtr_->addResidualBlock(poseError,NULL,mapPtr_->parameterBlockPtr(statesMap_.begin()->first));
 	}
 
@@ -884,7 +883,7 @@ void GeneralEstimator::optimize(size_t numIter, size_t /*numThreads*/,
 okvis::KeypointIdentifier GeneralEstimator::removeObservationOfLandmark(
     ::ceres::ResidualBlockId residualBlockId, uint64_t landmarkId) {
   // remove in landmarksMap
-  MapPoint& mapPoint = landmarksMap_.at(landmarkId);
+  okvis::MapPoint& mapPoint = landmarksMap_.at(landmarkId);
   okvis::KeypointIdentifier kpi;
   for (std::map<okvis::KeypointIdentifier, uint64_t>::iterator it =
            mapPoint.observations.begin();
@@ -899,4 +898,4 @@ okvis::KeypointIdentifier GeneralEstimator::removeObservationOfLandmark(
   }
   return kpi;
 }
-}  // namespace okvis
+}  // namespace swift_vio

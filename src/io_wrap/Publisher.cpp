@@ -60,10 +60,7 @@
 
 DECLARE_string(datafile_separator);
 
-/// \brief okvis Main namespace of this package.
-namespace okvis {
-
-// Default constructor.
+namespace swift_vio {
 Publisher::Publisher()
     : nh_(nullptr),
       ctr2_(0), cameraPoseVisual_(0, 1, 0, 1)
@@ -255,10 +252,10 @@ void Publisher::setPose(const okvis::kinematics::Transformation& T_WS)
 {
 
   okvis::kinematics::Transformation T;
-  if (parameters_.publishing.trackedBodyFrame == FrameName::S) {
+  if (parameters_.publishing.trackedBodyFrame == okvis::FrameName::S) {
     poseMsg_.child_frame_id = "sensor";
     T = parameters_.publishing.T_Wc_W * T_WS;
-  } else if (parameters_.publishing.trackedBodyFrame == FrameName::B) {
+  } else if (parameters_.publishing.trackedBodyFrame == okvis::FrameName::B) {
     poseMsg_.child_frame_id = "body";
     T = parameters_.publishing.T_Wc_W * T_WS * parameters_.imu.T_BS.inverse();
   } else {
@@ -287,9 +284,9 @@ void Publisher::setPose(const okvis::kinematics::Transformation& T_WS)
   poseMsg_.transform.translation.z = r[2];
 
   // also do the mesh
-  /*if (parameters_.publishing.trackedBodyFrame == FrameName::S) {
+  /*if (parameters_.publishing.trackedBodyFrame == okvis::FrameName::S) {
     meshMsg_.child_frame_id = "sensor";
-  } else if (parameters_.publishing.trackedBodyFrame == FrameName::B) {
+  } else if (parameters_.publishing.trackedBodyFrame == okvis::FrameName::B) {
     meshMsg_.child_frame_id = "body";
   } else {
     meshMsg_.child_frame_id = "body";
@@ -355,12 +352,12 @@ void Publisher::setOdometry(const okvis::kinematics::Transformation& T_WS,
   Eigen::Vector3d t_W_ofFrame;  // lever arm in W-system
   Eigen::Vector3d v_W_ofFrame;  // velocity in W-system. v_S_in_W or v_B_in_W
 
-  if (parameters_.publishing.trackedBodyFrame == FrameName::S) {
+  if (parameters_.publishing.trackedBodyFrame == okvis::FrameName::S) {
     odometryMsg_.header.frame_id = "world";
     T = parameters_.publishing.T_Wc_W * T_WS;
     t_W_ofFrame.setZero(); // r_SS_in_W
     v_W_ofFrame = parameters_.publishing.T_Wc_W.C()*speedAndBiases.head<3>();  // world-centric speedAndBiases.head<3>()
-  } else if (parameters_.publishing.trackedBodyFrame == FrameName::B) {
+  } else if (parameters_.publishing.trackedBodyFrame == okvis::FrameName::B) {
     odometryMsg_.header.frame_id = "world";
     T = parameters_.publishing.T_Wc_W * T_WS * parameters_.imu.T_BS.inverse();
     t_W_ofFrame = (parameters_.publishing.T_Wc_W * T_WS * parameters_.imu.T_BS.inverse()).r() - (parameters_.publishing.T_Wc_W * T_WS).r();  // r_BS_in_W
@@ -389,15 +386,15 @@ void Publisher::setOdometry(const okvis::kinematics::Transformation& T_WS,
 
   Eigen::Matrix3d C_v;
   Eigen::Matrix3d C_omega;
-  if (parameters_.publishing.velocitiesFrame == FrameName::S) {
+  if (parameters_.publishing.velocitiesFrame == okvis::FrameName::S) {
     C_v = (parameters_.publishing.T_Wc_W * T_WS).inverse().C();
     C_omega.setIdentity();
     odometryMsg_.child_frame_id = "sensor";
-  } else if (parameters_.publishing.velocitiesFrame == FrameName::B) {
+  } else if (parameters_.publishing.velocitiesFrame == okvis::FrameName::B) {
     C_v = (parameters_.imu.T_BS * T_WS.inverse()).C() * parameters_.publishing.T_Wc_W.inverse().C();
     C_omega = parameters_.imu.T_BS.C();
     odometryMsg_.child_frame_id = "body";
-  } else if (parameters_.publishing.velocitiesFrame == FrameName::Wc) {
+  } else if (parameters_.publishing.velocitiesFrame == okvis::FrameName::Wc) {
     C_v.setIdentity();
     C_omega = parameters_.publishing.T_Wc_W.C() * T_WS.C();
     odometryMsg_.child_frame_id = "world";
@@ -427,10 +424,10 @@ void Publisher::setOdometry(const okvis::kinematics::Transformation& T_WS,
 void Publisher::setFrustum(const okvis::kinematics::Transformation& T_WB,
                   const okvis::kinematics::Transformation& T_BC) {
   okvis::kinematics::Transformation T; // the pose to be published. T_WS or T_WB depending on 'trackedBodyFrame'
-  if (parameters_.publishing.trackedBodyFrame == FrameName::S) {
+  if (parameters_.publishing.trackedBodyFrame == okvis::FrameName::S) {
     odometryMsg_.header.frame_id = "world";
     T = parameters_.publishing.T_Wc_W * T_WB;
-  } else if (parameters_.publishing.trackedBodyFrame == FrameName::B) {
+  } else if (parameters_.publishing.trackedBodyFrame == okvis::FrameName::B) {
     odometryMsg_.header.frame_id = "world";
     T = parameters_.publishing.T_Wc_W * T_WB * parameters_.imu.T_BS.inverse();
   } else {
@@ -955,9 +952,9 @@ void Publisher::setPath(const okvis::kinematics::Transformation &T_WS)
   okvis::kinematics::Transformation T = parameters_.publishing.T_Wc_W*T_WS;
 
   // put the path into the origin of the selected tracked frame
-  if (parameters_.publishing.trackedBodyFrame == FrameName::S) {
+  if (parameters_.publishing.trackedBodyFrame == okvis::FrameName::S) {
     // nothing
-  } else if (parameters_.publishing.trackedBodyFrame == FrameName::B) {
+  } else if (parameters_.publishing.trackedBodyFrame == okvis::FrameName::B) {
     T = T * parameters_.imu.T_BS.inverse();
   } else {
     LOG(ERROR) <<
@@ -1014,5 +1011,4 @@ void Publisher::publishPath()
 {
   pubPath_.publish(path_);
 }
-
-}  // namespace okvis
+}  // namespace swift_vio

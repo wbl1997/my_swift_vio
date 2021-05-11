@@ -3,19 +3,19 @@
 #include <io_wrap/CommonGflags.hpp>
 #include <io_wrap/StreamHelper.hpp>
 
-namespace okvis {
+namespace swift_vio {
 void VioSystemWrap::registerCallbacks(
     const std::string& output_dir, const okvis::VioParameters& parameters,
-    okvis::ThreadedKFVio* vioSystem, okvis::StreamPublisher* publisher,
-    okvis::PgoPublisher* pgoPublisher) {
-  std::string path = okvis::removeTrailingSlash(output_dir);
+    okvis::ThreadedKFVio* vioSystem, StreamPublisher* publisher,
+    PgoPublisher* pgoPublisher) {
+  std::string path = removeTrailingSlash(output_dir);
 
   vioSystem->setFullStateCallback(
-      std::bind(&okvis::StreamPublisher::publishFullStateAsCallback, publisher,
+      std::bind(&StreamPublisher::publishFullStateAsCallback, publisher,
                 std::placeholders::_1, std::placeholders::_2,
                 std::placeholders::_3, std::placeholders::_4));
   vioSystem->setLandmarksCallback(std::bind(
-      &okvis::StreamPublisher::publishLandmarksAsCallback, publisher,
+      &StreamPublisher::publishLandmarksAsCallback, publisher,
       std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
 
   std::string stateFilename = path + "/swift_vio.csv";
@@ -32,22 +32,22 @@ void VioSystemWrap::registerCallbacks(
         parameters.nCameraSystem.cameraGeometry(camIdx)->distortionType();
   }
 
-  okvis::StreamHelper::composeHeaderLine(
+  StreamHelper::composeHeaderLine(
       parameters.imu.model_type, extrinsicParamRepList, projectionParamRepList,
-      distortionParamRepList, okvis::FULL_STATE_WITH_ALL_CALIBRATION,
+      distortionParamRepList, swift_vio::FULL_STATE_WITH_ALL_CALIBRATION,
       &headerLine);
   publisher->setCsvFile(stateFilename, headerLine);
   if (FLAGS_dump_output_option == 2) {
     // save estimates of evolving states, and camera extrinsics
     vioSystem->setFullStateCallbackWithExtrinsics(std::bind(
-        &okvis::StreamPublisher::csvSaveFullStateWithExtrinsicsAsCallback, publisher,
+        &StreamPublisher::csvSaveFullStateWithExtrinsicsAsCallback, publisher,
         std::placeholders::_1, std::placeholders::_2, std::placeholders::_3,
         std::placeholders::_4, std::placeholders::_5, std::placeholders::_6));
   } else if (FLAGS_dump_output_option == 3 || FLAGS_dump_output_option == 4) {
     // save estimates of evolving states, camera extrinsics,
     // and all other calibration parameters
     vioSystem->setFullStateCallbackWithAllCalibration(std::bind(
-        &okvis::StreamPublisher::csvSaveFullStateWithAllCalibrationAsCallback,
+        &StreamPublisher::csvSaveFullStateWithAllCalibrationAsCallback,
         publisher, std::placeholders::_1, std::placeholders::_2,
         std::placeholders::_3, std::placeholders::_4, std::placeholders::_5,
         std::placeholders::_6, std::placeholders::_7, std::placeholders::_8,
@@ -65,12 +65,12 @@ void VioSystemWrap::registerCallbacks(
     }
   }
   vioSystem->setStateCallback(
-      std::bind(&okvis::StreamPublisher::publishStateAsCallback, publisher,
+      std::bind(&StreamPublisher::publishStateAsCallback, publisher,
                 std::placeholders::_1, std::placeholders::_2));
 
   pgoPublisher->setCsvFile(path + "/online_pgo.csv");
   vioSystem->appendPgoStateCallback(
-      std::bind(&okvis::PgoPublisher::csvSaveStateAsCallback, pgoPublisher,
+      std::bind(&PgoPublisher::csvSaveStateAsCallback, pgoPublisher,
                 std::placeholders::_1, std::placeholders::_2));
 }
-}  // namespace okvis
+}  // namespace swift_vio

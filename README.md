@@ -13,10 +13,9 @@ The underlying data structures are largely borrowed from OKVIS.
 ## Build dependencies
 
 This is a catkin package that wraps the pure CMake project.
-
 You will need to install the following dependencies,
 
-* ROS (currently supported: hydro, jade, kinetic, and melodic). 
+* ROS (currently supported: kinetic, and melodic). 
 Read the ROS installation [instructions](http://wiki.ros.org/melodic/Installation/Ubuntu).
 
 * google-glog + gflags,
@@ -39,7 +38,7 @@ sudo apt-get install python-catkin-tools
 
 * gtest (**No operation required**)
 
-ros melodic will install the source files for the following three packages by default: googletest libgtest-dev google-mock.
+The ros melodic desktop distro will install the source files for the three packages by default: googletest libgtest-dev google-mock.
 The googletest package includes source for both googletest and googlemock.
 *You do not need to cmake and install gtest libraries to /usr/lib.*.
 
@@ -57,74 +56,14 @@ cd swift_vio_ws/src
 git clone --recursive https://jzhuai@bitbucket.org/jzhuai/swift_vio.git
 ```
 
-* gtsam (optional)
-Its installation refers to [Kimera-VIO](https://github.com/MIT-SPARK/Kimera-VIO/blob/master/docs/kimera_vio_install.md).
-
-```
-sudo apt-get install libtbb-dev
-cd $HOME/Documents/slam_src
-git clone https://github.com/borglab/gtsam.git --recursive
-cd gtsam
-git checkout 6c85850147751d45cf9c595f1a7e623d239305fc
-# 342f30d148fae84c92ff71705c9e50e0a3683bda(previously tested commit)
-mkdir build
-cd build
-
-*EIGEN_INCLUDE_DIR is needed for ubuntu 16 to preempt the incompatible system-wide Eigen.*
-*$HOME/Documents/slam_devel is more error prone than /usr/local as it may cause
- difficulty in debugging this program in QtCreator.*
-cmake -DCMAKE_INSTALL_PREFIX=$HOME/Documents/slam_devel -DCMAKE_BUILD_TYPE=Release \
-  -DGTSAM_TANGENT_PREINTEGRATION=OFF -DGTSAM_POSE3_EXPMAP=ON -DGTSAM_ROT3_EXPMAP=ON \
-  -DGTSAM_USE_SYSTEM_EIGEN=ON ..
-# -DEIGEN3_INCLUDE_DIR=$HOME/slam_devel/include/eigen3 -DEIGEN_INCLUDE_DIR=$HOME/slam_devel/include/eigen3
-
-make -j $(nproc) check # (optional, runs unit tests)
-make -j $(nproc) install
-```
-
-If you get an error while loading shared libraries libmetis.so at run or test time, 
-you may need to add the lib path for gtsam to LD_LIBRARY_PATH as below inside the 
-incumbent terminal or the Run Environment in QtCreator. QtCreator debugger may have
-trouble understanding the symbol "$HOME", so it is preferred to replace it with its actual path.
-```
-export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$HOME/Documents/slam_devel/lib
-```
-Even LD_LIBRARY_PATH is properly set in Run Environment in QtCreator, 
-QtCreator debugger may still fail to load libmetis.so. In that case, you may 
-need to install gtsam to /usr/local, i.e., -DCMAKE_INSTALL_PREFIX=/usr/local.
-
-## Build the project
-
-```
-cd swift_vio_ws/
-if [[ "x$(nproc)" = "x1" ]] ; then export USE_PROC=1 ;
-else export USE_PROC=$(($(nproc)/2)) ; 
-fi
-
-export ROS_VERSION=melodic # kinetic
-catkin init
-catkin config --merge-devel # Necessary for catkin_tools >= 0.4.
-catkin config --extend /opt/ros/$ROS_VERSION
-catkin config --cmake-args -DUSE_ROS=ON -DBUILD_TESTS=ON \
- -DGTSAM_DIR=$HOME/Documents/slam_devel/lib/cmake/GTSAM
-# -DEIGEN3_INCLUDE_DIR=$HOME/slam_devel/include/eigen3 -DEIGEN_INCLUDE_DIR=$HOME/slam_devel/include/eigen3
-
-
-catkin build vio_common swift_vio -DUSE_ROS=ON -DBUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Release -j$USE_PROC
-# -DCMAKE_PREFIX_PATH=/opt/ros/$ROS_VERSION
-# -DDO_TIMING=ON
-# -DUSE_SANITIZER=Address
-
-```
-### 1. Why is EIGEN_INCLUDE_DIR passed as a build argument?
-Setting EIGEN_INCLUDE_DIR is necessary for Ubuntu 16.04 because
-the system wide Eigen library (usually 3.2) does not 
-meet the requirements of the ceres solver depended by this package.
-Therefore, the eigen library 3.3.4 should be downloaded from 
+* supplant Eigen on Ubuntu 16
+The system wide Eigen library in Ubuntu 18 is OK for swift_vio.
+However, in Ubuntu 16, the system wide Eigen library (usually of version 3.2) does not 
+meet the requirements of ceres solver used by swift_vio.
+Therefore, a newer Eigen library (newer than 3.3.4) should be downloaded from 
 [here](https://github.com/eigenteam/eigen-git-mirror/releases)
-and installed in a local directory with the below commands.
-In a low bandwidth environment, wget is significantly slower than 
-downloading from the webpage with the browser.
+and installed in a local directory say $HOME/slam_devel by the below commands.
+
 ```
 mkdir -p $HOME/slam_src
 cd $HOME/slam_src
@@ -138,7 +77,52 @@ cmake .. -DCMAKE_INSTALL_PREFIX="$HOME/slam_devel"
 make install
 ```
 
-### 2. Why is CMAKE_PREFIX_PATH passed as a build argument?
+* gtsam (optional)
+
+```
+sudo apt-get install libtbb-dev
+cd $HOME/Documents/slam_src
+git clone https://github.com/borglab/gtsam.git --recursive
+cd gtsam
+git checkout 6c85850147751d45cf9c595f1a7e623d239305fc
+# 342f30d148fae84c92ff71705c9e50e0a3683bda(previously tested commit)
+mkdir build
+cd build
+
+# In Ubuntu 16, to circumvent the incompatible system-wide Eigen, passing the local Eigen by EIGEN_INCLUDE_DIR is needed.
+# GTSAM can be installed locally, e.g., at $HOME/slam_devel, but 
+# /usr/local is recommended as it has no issue when debugging swift_vio in QtCreator.
+
+cmake -DCMAKE_INSTALL_PREFIX=/usr/local -DCMAKE_BUILD_TYPE=Release \
+  -DGTSAM_TANGENT_PREINTEGRATION=OFF -DGTSAM_POSE3_EXPMAP=ON -DGTSAM_ROT3_EXPMAP=ON \
+  -DGTSAM_USE_SYSTEM_EIGEN=ON ..
+# -DEIGEN3_INCLUDE_DIR=$HOME/slam_devel/include/eigen3 -DEIGEN_INCLUDE_DIR=$HOME/slam_devel/include/eigen3 # in Ubuntu 16
+
+make -j $(nproc) check # (optional, runs unit tests)
+make -j $(nproc) install
+```
+
+## Build the project
+
+```
+cd swift_vio_ws/
+
+export ROS_VERSION=melodic # kinetic
+catkin init
+catkin config --merge-devel # Necessary for catkin_tools >= 0.4.
+catkin config --extend /opt/ros/$ROS_VERSION
+catkin config --cmake-args -DUSE_ROS=ON -DBUILD_TESTS=ON \
+ -DGTSAM_DIR=/usr/local/lib/cmake/GTSAM
+# -DEIGEN3_INCLUDE_DIR=$HOME/slam_devel/include/eigen3 -DEIGEN_INCLUDE_DIR=$HOME/slam_devel/include/eigen3 # in Ubuntu 16
+
+catkin build vio_common swift_vio -DUSE_ROS=ON -DBUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Release -j4
+# -DCMAKE_PREFIX_PATH=/opt/ros/$ROS_VERSION
+# -DDO_TIMING=ON
+# -DUSE_SANITIZER=Address
+
+```
+
+### 1. CMAKE_PREFIX_PATH
 After opening and building the project with QtCreator (see Section Debug the Project with QtCreator),
 the following warning and associated errors may come up when the project is built again by catkin in a terminal.
 
@@ -148,7 +132,7 @@ used last time this workspace was built."
 
 To suppress these errors, CMAKE_PREFIX_PATH needs to be specified.
 
-### 3. CATKIN_ENABLE_TESTING
+### 2. CATKIN_ENABLE_TESTING
 BUILD_TESTS=ON tells the program to build tests which depends on gmock and gtest. 
 If the program is built outside a catkin environment, then we will automatically download and build gmock and gtest.
 Otherwise, if the program is built by catkin, the ros stack provides gmock and gtest. 
@@ -157,10 +141,10 @@ Additional build of gmock and gtest will cause the error
 To tell if we are in catkin, CATKIN_ENABLE_TESTING=ON can be used. 
 But since this the default value in catkin, we do not need to specify it.
 
-### 4. DO_TIMING
+### 3. DO_TIMING
 Add this cmake flag to enable timing statistics.
 
-### 5. Error "ceres-solver/include/ceres/jet.h:887:8: error: ‘ScalarBinaryOpTraits’ is not a class template".
+### 4. Error "ceres-solver/include/ceres/jet.h:887:8: error: ‘ScalarBinaryOpTraits’ is not a class template".
 This error arises when the system wide Eigen, e.g., on Ubuntu 16, is incompatible with ceres solver 14.0 
 which requires Eigen version >= 3.3.
 You need to pass EIGEN_INCLUDE_DIR and EIGEN3_INCLUDE_DIR to this package and also eschew PCL 
@@ -169,11 +153,13 @@ In the end, the workspace should be clear of traces of system wide Eigen. That i
 no /usr/include/eigen3 should appear when searching in the workspace.
 
 ## Build and run tests
+
 * To build all tests
 ```
 catkin build swift_vio --catkin-make-args run_tests # or
 catkin build --make-args tests -- swift_vio
 ```
+
 * To run all tests,
 ```
 catkin build swift_vio --catkin-make-args run_tests # or
@@ -188,24 +174,24 @@ rosrun swift_vio swift_vio_test --gtest_filter="*Eigen*"
 * To test RPGO,
 ```
 cd swift_vio_ws/build/swift_vio/Kimera-RPGO
-export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$HOME/Documents/slam_devel/lib
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib
 make check
 ```
 
 * To run integration tests,
-You will need to download [rpg_trajectory_evaluation](https://github.com/uzh-rpg/rpg_trajectory_evaluation.git) which is the evaluation engine.
-And install its dependencies,
+Download the evaluation workhorse [rpg_trajectory_evaluation](https://github.com/uzh-rpg/rpg_trajectory_evaluation.git), 
+and install its dependencies,
 ```
 pip2 install --upgrade pyyaml
 pip2 install numpy matplotlib colorama ruamel.yaml
 ```
-Because python scripts under evaluation/ directory also deaults to use python3, 
+Because python scripts under evaluation/ directory defaults to use python3, 
 you also need to install the python3 counterparts,
 ```
 pip3 install numpy matplotlib colorama pyyaml ruamel.yaml
 ```
 
-For tests, you will need to download the EuRoC dataset and optionally the UZH-FPV dataset.
+For tests, download the EuRoC dataset and optionally the UZH-FPV dataset.
 ```
 swift_vio/evaluation/smoke_test.py tests the program with one data session from EuRoC dataset.
 swift_vio/evaluation/main_evaluation.py tests the program with multiple data session from EuRoC and UZH-FPV dataset.
@@ -215,30 +201,14 @@ swift_vio/evaluation/main_evaluation.py tests the program with multiple data ses
 
 Follow the below steps exactly, otherwise mysterious errors like missing generate_config file arise.
 
-### 1. Build swift_vio with catkin
-
-Build the project with instructions in Section Build the project. 
-You may need to clean build and devel dirs under the workspace with
-
-```
-catkin clean -y
-```
+### 1. Build swift_vio as described earlier.
 
 ### 2. Open swift_vio with QtCreator
 
-Open QtCreator, assuming swift_vio_ws is the workspace dir,
+Open QtCreator by
 
 ```
-source /opt/ros/melodic/setup.bash # or .zsh depending on the terminal shell
-/opt/Qt/Tools/QtCreator/bin/qtcreator
-```
-
-if you encounter the error in starting qtcreator 
-"qt.qpa.plugin: Could not load the Qt platform plugin "xcb" in "" even though it was found.",
-open another terminal, try the below alternative approach.
-
-```
-source /opt/ros/kinetic/setup.zsh
+source /opt/ros/melodic/setup.bash # or .zsh
 /opt/Qt/Tools/QtCreator/bin/qtcreator
 ```
 
@@ -254,6 +224,14 @@ To enable building test targets inside QtCreator, you may need to turn on
 "CATKIN_ENABLE_TESTING" in the CMake section of Building Settings and 
 select the *_test target in a newly added Build Step from the Build Steps section.
 The default target "all" may not emcompass building some test targets.
+
+To solve the error about loading shared libraries libmetis.so, 
+add the lib path of gtsam to LD_LIBRARY_PATH as below inside the terminal or 
+the Run Environment in QtCreator (Projects > Build and Run > Run > Run Environment).
+
+```
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib
+```
 
 ## Example running cases
 

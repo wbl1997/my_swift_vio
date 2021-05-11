@@ -11,6 +11,7 @@ using ceres::Problem;
 using ceres::Solve;
 using ceres::Solver;
 
+namespace swift_vio {
 Eigen::Vector4d triangulateHomogeneousDLT(
     const std::vector<Eigen::Vector3d,
                       Eigen::aligned_allocator<Eigen::Vector3d>>& vV3Xn,
@@ -348,3 +349,4 @@ void triangulate_refineJ(
   ceres::Solve(options, &problem, &summary);
   //    std::cout << summary.FullReport() << "\n";
 }
+}  // namespace swift_vio

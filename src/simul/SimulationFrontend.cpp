@@ -22,13 +22,10 @@
 
 #include <simul/PointLandmarkSimulationRS.hpp>
 
-/// \brief okvis Main namespace of this package.
-namespace okvis {
+namespace simul {
 
 const double SimulationFrontend::imageNoiseMag_ = 1.0;
-
 const double SimulationFrontend::fourthRoot2_ = 1.1892071150;
-
 const double SimulationFrontend::kRangeThreshold = 20;
 
 void saveLandmarkGrid(
@@ -185,7 +182,7 @@ void initCameraNoiseParams(
 SimulationFrontend::SimulationFrontend(
     size_t numCameras, bool addImageNoise,
     int maxTrackLength,
-    VisualConstraints constraintScheme,
+    okvis::VisualConstraints constraintScheme,
     LandmarkGridType gridType,
     double landmarkRadius,
     std::string pointFile)
@@ -402,20 +399,20 @@ int SimulationFrontend::addMatchToEstimator(
                                   landmarkMatch.currentKeypoint.keypointIndex,
                                   lmIdPrevious);
         switch (constraintScheme_) {
-          case OnlyReprojectionErrors:
+          case okvis::OnlyReprojectionErrors:
             estimator.addObservation<CAMERA_GEOMETRY_T>(
                 lmIdPrevious, currFrames->id(),
                 landmarkMatch.currentKeypoint.cameraIndex,
                 landmarkMatch.currentKeypoint.keypointIndex);
             break;
-          case OnlyTwoViewConstraints:
+          case okvis::OnlyTwoViewConstraints:
             estimator.addEpipolarConstraint<CAMERA_GEOMETRY_T>(
                 lmIdPrevious, currFrames->id(),
                 landmarkMatch.currentKeypoint.cameraIndex,
                 landmarkMatch.currentKeypoint.keypointIndex,
                 singleTwoViewConstraint_);
             break;
-          case TwoViewAndReprojection:
+          case okvis::TwoViewAndReprojection:
             break;
         }
         ++trackedFeatures;
@@ -479,7 +476,7 @@ int SimulationFrontend::addMatchToEstimator(
         estimator.setLandmarkInitialized(landmarkMatch.landmarkId,
                                          canBeInitialized);
         switch (constraintScheme_) {
-          case OnlyReprojectionErrors:
+          case okvis::OnlyReprojectionErrors:
             estimator.addObservation<CAMERA_GEOMETRY_T>(
                 landmarkMatch.landmarkId, IdA.frameId, IdA.cameraIndex,
                 IdA.keypointIndex);
@@ -487,7 +484,7 @@ int SimulationFrontend::addMatchToEstimator(
                 landmarkMatch.landmarkId, IdB.frameId, IdB.cameraIndex,
                 IdB.keypointIndex);
             break;
-          case OnlyTwoViewConstraints:
+          case okvis::OnlyTwoViewConstraints:
             if (estimator.numObservations(landmarkMatch.landmarkId) + 1 <
                 estimator.minTrackLength()) {
               estimator.addObservation<CAMERA_GEOMETRY_T>(
@@ -502,7 +499,7 @@ int SimulationFrontend::addMatchToEstimator(
                 landmarkMatch.landmarkId, IdB.frameId, IdB.cameraIndex,
                 IdB.keypointIndex, singleTwoViewConstraint_);
             break;
-          case TwoViewAndReprojection:
+          case okvis::TwoViewAndReprojection:
             break;
         }
         trackedFeatures += 2;
@@ -529,9 +526,9 @@ int SimulationFrontend::matchToFrame(
       if (previousLm2Kp[lm] != -1 && currentLm2Kp[lm] != -1) {
         LandmarkKeypointMatch lmKpMatch;
         lmKpMatch.previousKeypoint =
-            KeypointIdentifier(prevFrameId, im, previousLm2Kp[lm]);
+            okvis::KeypointIdentifier(prevFrameId, im, previousLm2Kp[lm]);
         lmKpMatch.currentKeypoint =
-            KeypointIdentifier(currFrameId, im, currentLm2Kp[lm]);
+            okvis::KeypointIdentifier(currFrameId, im, currentLm2Kp[lm]);
         lmKpMatch.landmarkId = lmIds_[lm];
         lmKpMatch.landmarkIdInVector = lm;
         landmarkMatches->push_back(lmKpMatch);
@@ -541,4 +538,4 @@ int SimulationFrontend::matchToFrame(
   }
   return numMatches;
 }
-}  // namespace okvis
+}  // namespace simul

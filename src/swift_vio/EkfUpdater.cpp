@@ -13,7 +13,7 @@
 DEFINE_double(max_inc_tol, 2,
               "the tolerance of the lpNorm of an EKF state update");
 
-namespace okvis {
+namespace swift_vio {
 PreconditionedEkfUpdater::PreconditionedEkfUpdater(const Eigen::MatrixXd &cov,
                                                    int obsVarStartIndex,
                                                    int variableDim)
@@ -222,4 +222,4 @@ void DefaultEkfUpdater::updateCovariance(
               << KScaled_.allFinite() << "\n";
   }
 }
-}  // namespace okvis
+}  // namespace swift_vio

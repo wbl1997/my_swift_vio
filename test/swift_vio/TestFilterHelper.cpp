@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 #include <swift_vio/FilterHelper.hpp>
-#include <swift_vio/RemoveFromVector.hpp>
+#include <swift_vio/VectorOperations.hpp>
 #include <simul/SimulationNView.h>
 
 #include <random>

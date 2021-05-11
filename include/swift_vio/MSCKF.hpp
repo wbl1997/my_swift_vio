@@ -22,9 +22,7 @@
 #include <okvis/ceres/ReprojectionError.hpp>
 #include <okvis/ceres/SpeedAndBiasParameterBlock.hpp>
 
-/// \brief okvis Main namespace of this package.
-namespace okvis {
-
+namespace swift_vio {
 /**
  * @brief The MSCKF class implement the MSCKF with first estimate Jacobian technique.
  * It does not include landmarks in the state vector but supports iterative EKF.
@@ -119,7 +117,7 @@ class MSCKF : public HybridFilter {
       Eigen::VectorXd *residual) const;
 
   bool
-  featureJacobian(const MapPoint &mp, swift_vio::PointLandmark *pointLandmark,
+  featureJacobian(const okvis::MapPoint &mp, swift_vio::PointLandmark *pointLandmark,
                   Eigen::MatrixXd &H_oi,
                   Eigen::Matrix<double, Eigen::Dynamic, 1> &r_oi,
                   Eigen::MatrixXd &R_oi,
@@ -127,7 +125,7 @@ class MSCKF : public HybridFilter {
                   std::vector<uint64_t> *involved_frame_ids = nullptr) const override;
 
   bool featureJacobianGeneric(
-      const MapPoint &mp, swift_vio::PointLandmark *pointLandmark,
+      const okvis::MapPoint &mp, swift_vio::PointLandmark *pointLandmark,
       Eigen::MatrixXd &H_oi,
       Eigen::Matrix<double, Eigen::Dynamic, 1> &r_oi, Eigen::MatrixXd &R_oi,
       Eigen::Matrix<double, Eigen::Dynamic, 3> *pH_fi = nullptr,
@@ -138,8 +136,6 @@ class MSCKF : public HybridFilter {
       Eigen::MatrixXd *R_q) final;
 
 };
+}  // namespace swift_vio
 
-
-}  // namespace okvis
-
-#endif /* INCLUDE_SWIFT_VIO_MSCKF_HPP_ */
+#endif  // INCLUDE_SWIFT_VIO_MSCKF_HPP_

@@ -66,7 +66,7 @@ void ImuOdometryGtsam(const Eigen::Vector3d& p_WS_W0,
   okvis::ImuFrontEnd::PimPtr combinedPim;
 
   okvis::timing::Timer gtsamTimer("gtsam", false);
-  okvis::ImuParams imuParamsKimera;
+  swift_vio::ImuParams imuParamsKimera;
   imuParamsKimera.set(imuParams);
   imuParamsKimera.imu_preintegration_type_ =
       okvis::ImuPreintegrationType::kPreintegratedCombinedMeasurements;

@@ -14,7 +14,6 @@
 #include <vector>
 
 namespace simul {
-
 typedef std::vector<okvis::ImuMeasurement,
                     Eigen::aligned_allocator<okvis::ImuMeasurement>>
     ImuMeasurementVector;

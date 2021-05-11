@@ -9,6 +9,7 @@
 #include <opencv2/core.hpp>
 #include <opencv2/highgui.hpp>
 
+namespace swift_vio {
 class PoseViewer {
  public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
@@ -44,5 +45,6 @@ class PoseViewer {
   std::atomic_bool drawing_;
   std::atomic_bool showing_;
 };
+}  // namespace swift_vio
 
 #endif

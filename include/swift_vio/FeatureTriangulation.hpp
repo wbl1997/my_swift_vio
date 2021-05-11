@@ -27,7 +27,6 @@
 #include <okvis/triangulation/stereo_triangulation.hpp>
 
 namespace swift_vio {
-
 namespace {
 template <class T>
 const T clamp(const T& v, const T& lo, const T& hi) {

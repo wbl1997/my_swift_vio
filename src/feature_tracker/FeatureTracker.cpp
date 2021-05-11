@@ -5,7 +5,7 @@
  * All rights reserved.
  */
 
-#include <feature_tracker/feature_tracker.h>
+#include <feature_tracker/FeatureTracker.h>
 
 #include <random>
 // #include <random_numbers/random_numbers.h>

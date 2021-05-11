@@ -3,12 +3,12 @@
 
 #include <ceres/ceres.h>
 
-#include <swift_vio/CameraTimeParamBlock.hpp>
-#include <swift_vio/EuclideanParamBlock.hpp>
-#include <swift_vio/EuclideanParamBlockSized.hpp>
+#include <swift_vio/ceres/CameraTimeParamBlock.hpp>
+#include <swift_vio/ceres/EuclideanParamBlock.hpp>
+#include <swift_vio/ceres/EuclideanParamBlockSized.hpp>
 #include <swift_vio/ExtrinsicModels.hpp>
 #include <swift_vio/ProjParamOptModels.hpp>
-#include <swift_vio/RsReprojectionError.hpp>
+#include <swift_vio/ceres/RsReprojectionError.hpp>
 
 #include <okvis/FrameTypedefs.hpp>
 #include <okvis/Time.hpp>
@@ -83,7 +83,7 @@ void setupPoseOptProblem(bool perturbPose, bool rollingShutter,
       DistortedPinholeCameraGeometry;
   const int distortionDim =
       DistortedPinholeCameraGeometry::distortion_t::NumDistortionIntrinsics;
-  const int projIntrinsicDim = okvis::ProjectionOptFXY_CXY::kNumParams;
+  const int projIntrinsicDim = swift_vio::ProjectionOptFXY_CXY::kNumParams;
   std::shared_ptr<DistortedPinholeCameraGeometry> cameraGeometry =
       std::static_pointer_cast<DistortedPinholeCameraGeometry>(
           DistortedPinholeCameraGeometry::createTestObject());
@@ -98,11 +98,11 @@ void setupPoseOptProblem(bool perturbPose, bool rollingShutter,
   std::string projOptModelName = "FXY_CXY";
   std::string extrinsicOptModelName = "P_BC_Q_BC";
 
-  int projOptModelId = okvis::ProjectionOptNameToId(projOptModelName);
+  int projOptModelId = swift_vio::ProjectionOptNameToId(projOptModelName);
 
   Eigen::VectorXd projIntrinsics;
-  okvis::ProjectionOptGlobalToLocal(projOptModelId, intrinsicParams,
-                                    &projIntrinsics);
+  swift_vio::ProjectionOptGlobalToLocal(projOptModelId, intrinsicParams,
+                                        &projIntrinsics);
 
   Eigen::VectorXd distortion = intrinsicParams.tail(distortionDim);
   okvis::ceres::EuclideanParamBlock projectionParamBlock(
@@ -192,8 +192,8 @@ void setupPoseOptProblem(bool perturbPose, bool rollingShutter,
           new okvis::ImuMeasurementDeque(imuMeasDeque));
     ::ceres::CostFunction* cost_function(
         new okvis::ceres::RsReprojectionError<DistortedPinholeCameraGeometry,
-                                              okvis::ProjectionOptFXY_CXY,
-                                              okvis::Extrinsic_p_BC_q_BC>(
+                                              swift_vio::ProjectionOptFXY_CXY,
+                                              swift_vio::Extrinsic_p_BC_q_BC>(
             cameraGeometry, kp, covariance, imuMeasDequePtr,
             std::shared_ptr<const Eigen::Matrix<double, 6, 1>>(),
             stateEpoch, tdAtCreation, gravity));
@@ -295,11 +295,11 @@ void setupPoseOptProblem(bool perturbPose, bool rollingShutter,
         duv_td_minimal.data(),         duv_sb_minimal.data()};
 
     okvis::ceres::RsReprojectionError<DistortedPinholeCameraGeometry,
-                                      okvis::ProjectionOptFXY_CXY,
-                                      okvis::Extrinsic_p_BC_q_BC>* costFuncPtr =
+                                      swift_vio::ProjectionOptFXY_CXY,
+                                      swift_vio::Extrinsic_p_BC_q_BC>* costFuncPtr =
         static_cast<okvis::ceres::RsReprojectionError<
-            DistortedPinholeCameraGeometry, okvis::ProjectionOptFXY_CXY,
-            okvis::Extrinsic_p_BC_q_BC>*>(cost_function);
+            DistortedPinholeCameraGeometry, swift_vio::ProjectionOptFXY_CXY,
+            swift_vio::Extrinsic_p_BC_q_BC>*>(cost_function);
 
     costFuncPtr->EvaluateWithMinimalJacobians(parameters, residuals.data(),
                                               jacobians, jacobiansMinimal);

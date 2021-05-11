@@ -68,14 +68,12 @@ namespace visensor_msgs = visensor_node;
 #include <visensor/visensor_api.hpp>
 #endif
 
-/// \brief okvis Main namespace of this package.
-namespace okvis {
-
+namespace swift_vio {
 /**
  * @brief This class extends the VioParametersReader class in order to use ROS
  * services and topics.
  */
-class RosParametersReader : public VioParametersReader {
+class RosParametersReader : public okvis::VioParametersReader {
  public:
   OKVIS_DEFINE_EXCEPTION(Exception, std::runtime_error)
 
@@ -103,8 +101,8 @@ class RosParametersReader : public VioParametersReader {
    * @return True if reading of the calibration was successful.
    */
   virtual bool getCameraCalibration(
-      std::vector<CameraCalibration,
-                  Eigen::aligned_allocator<CameraCalibration>>& calibrations,
+      std::vector<okvis::VioParametersReader::CameraCalibration,
+                  Eigen::aligned_allocator<okvis::VioParametersReader::CameraCalibration>>& calibrations,
       cv::FileStorage& configurationFile);
 
   /**
@@ -114,8 +112,8 @@ class RosParametersReader : public VioParametersReader {
    * @return True if successful.
    */
   bool getCalibrationViaRosService(
-      std::vector<CameraCalibration,
-                  Eigen::aligned_allocator<CameraCalibration>>& calibrations)
+      std::vector<okvis::VioParametersReader::CameraCalibration,
+                  Eigen::aligned_allocator<okvis::VioParametersReader::CameraCalibration>>& calibrations)
       const;
 
   /**
@@ -125,11 +123,10 @@ class RosParametersReader : public VioParametersReader {
    * @return True if successful.
    */
   bool getCalibrationViaRosTopic(
-      std::vector<CameraCalibration,
-                  Eigen::aligned_allocator<CameraCalibration>>& calibrations)
+      std::vector<okvis::VioParametersReader::CameraCalibration,
+                  Eigen::aligned_allocator<okvis::VioParametersReader::CameraCalibration>>& calibrations)
       const;
 };
-
-}  // namespace okvis
+}  // namespace swift_vio
 
 #endif /* INCLUDE_OKVIS_ROSPARAMETERSREADER_HPP_ */

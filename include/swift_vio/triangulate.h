@@ -5,6 +5,7 @@
 #include <sophus/se3.hpp>
 #include <vector>
 
+namespace swift_vio {
 /**
  * @brief direct linear triangulation method see Hartley and Zisserman 2003,
  * implemented with Eigen and Sophus, however this function does not take care
@@ -148,5 +149,5 @@ inline typename Derived::Scalar norm_max(const Eigen::MatrixBase<Derived>& v) {
 }
 
 const double EPS = 1e-8;
-
+}  // namespace swift_vio
 #endif

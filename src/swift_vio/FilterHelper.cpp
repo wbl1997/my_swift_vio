@@ -8,7 +8,7 @@ DEFINE_bool(
     use_mahalanobis, true,
     "use malalanobis gating test in optimize or a simple projection distance"
     " threshold in computing jacobians. true by default");
-
+namespace swift_vio {
 void FilterHelper::stackJacobianAndResidual(
     const std::vector<Eigen::MatrixXd,
                       Eigen::aligned_allocator<Eigen::MatrixXd>> &vH_o,
@@ -210,4 +210,4 @@ bool FilterHelper::gatingTest(const Eigen::MatrixXd &H,
     return true;
   }
 }
-
+}  // namespace swift_vio

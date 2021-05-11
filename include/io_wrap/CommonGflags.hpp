@@ -28,8 +28,8 @@ DECLARE_string(imu_topic);
 
 DECLARE_string(vocabulary_path);
 
-namespace okvis {
+namespace swift_vio {
 
-bool setInputParameters(okvis::InputData *input);
+bool setInputParameters(InputData *input);
 
-} // namespace okvis
+}  // namespace swift_vio

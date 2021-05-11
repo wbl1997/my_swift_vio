@@ -113,7 +113,7 @@ class RobustSolverTest {
     Eigen::Matrix<double, 6, 6> sqrtInfoR;
     sqrtInfoR = diagonalSigmas_.asDiagonal();
     gtsam::SharedNoiseModel priorNoiseModel =
-        VIO::createRobustNoiseModelSqrtR(sqrtInfoR);
+        swift_vio::createRobustNoiseModelSqrtR(sqrtInfoR);
 
     priorFactorGraph.add(
         gtsam::PriorFactor<gtsam::Pose3>(init_key_a, prior_pose, priorNoiseModel));
@@ -126,7 +126,7 @@ class RobustSolverTest {
     int tailPoseIndex = visitedCornerIndices_.size() - 1;
     okvis::kinematics::Transformation T_HeadTail =
         T_WB_list_[0].inverse() * T_WB_list_[tailPoseIndex];
-    gtsam::Pose3 Head_T_Tail = VIO::GtsamWrap::toPose3(T_HeadTail);
+    gtsam::Pose3 Head_T_Tail = swift_vio::GtsamWrap::toPose3(T_HeadTail);
 
     gtsam::Key head_pose_key = gtsam::Symbol('a', 0);
     gtsam::Key tail_pose_key = gtsam::Symbol('a', tailPoseIndex);
@@ -156,11 +156,11 @@ class RobustSolverTest {
         gtsam::Key key_prev = gtsam::Symbol('a', i - 1);
         gtsam::Key key_new = gtsam::Symbol('a', i);
 
-        odom_val.insert(key_new, VIO::GtsamWrap::toPose3(T_WNew));
+        odom_val.insert(key_new, swift_vio::GtsamWrap::toPose3(T_WNew));
 
         Eigen::Matrix<double, 6, 6> bfSqrtInfoR;
         bfSqrtInfoR = diagonalSigmas_.asDiagonal();
-        gtsam::SharedNoiseModel bfNoiseModel = VIO::createRobustNoiseModelSqrtR(bfSqrtInfoR);
+        gtsam::SharedNoiseModel bfNoiseModel = swift_vio::createRobustNoiseModelSqrtR(bfSqrtInfoR);
         odom_factor.add(gtsam::BetweenFactor<gtsam::Pose3>(key_prev, key_new,
                                                            odom, bfNoiseModel));
         bool runOpt = pgo->update(odom_factor, odom_val);
@@ -209,7 +209,7 @@ class RobustSolverTest {
     gtsam::Pose3 estimatedHead_T_Tail =
         estimatedHeadPose.inverse() * estimatedTailPose;
 
-    std::pair<double, double> error = VIO::computeRotationAndTranslationErrors(
+    std::pair<double, double> error = swift_vio::computeRotationAndTranslationErrors(
         estimatedHead_T_Tail, Head_T_Tail, true);
     LOG(INFO) << "Initial error " << error.first << " " << error.second;
 //    EXPECT_GT(error.second, 2 * kTranslationStd);
@@ -257,7 +257,7 @@ class RobustSolverTest {
     estimatedHead_T_Tail = estimatedHeadPose.inverse() * estimatedTailPose;
 
     std::pair<double, double> finalError =
-        VIO::computeRotationAndTranslationErrors(estimatedHead_T_Tail,
+        swift_vio::computeRotationAndTranslationErrors(estimatedHead_T_Tail,
                                                  Head_T_Tail, true);
     LOG(INFO) << "Final error " << finalError.first << " " << finalError.second;
     EXPECT_LT(finalError.second, error.second);

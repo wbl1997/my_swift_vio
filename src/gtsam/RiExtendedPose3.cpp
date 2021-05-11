@@ -18,7 +18,6 @@
 using namespace std;
 
 namespace gtsam {
-
 namespace geometry {
 
 Eigen::Matrix3d SO3Jr_eigen(const Eigen::Vector3d& omega) {

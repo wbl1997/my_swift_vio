@@ -5,7 +5,7 @@
 #include <okvis/Time.hpp>
 #include <okvis/kinematics/Transformation.hpp>
 
-namespace okvis {
+namespace swift_vio {
 class PgoPublisher {
  public:
   PgoPublisher();
@@ -25,6 +25,6 @@ class PgoPublisher {
  private:
   std::ofstream csvStream_;
 };
-}  // namespace okvis
+}  // namespace swift_vio
 
 #endif  // INCLUDE_IOWRAP_PGO_PUBLISHER_HPP

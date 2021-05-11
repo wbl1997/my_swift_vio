@@ -6,19 +6,19 @@
 #include <swift_vio/memory.h>
 #include <swift_vio/CameraRig.hpp>
 
-#include <swift_vio/CameraTimeParamBlock.hpp>
-#include <swift_vio/ChordalDistance.hpp>
-#include <swift_vio/EuclideanParamBlock.hpp>
-#include <swift_vio/EuclideanParamBlockSized.hpp>
+#include <swift_vio/ceres/CameraTimeParamBlock.hpp>
+#include <swift_vio/ceres/ChordalDistance.hpp>
+#include <swift_vio/ceres/EuclideanParamBlock.hpp>
+#include <swift_vio/ceres/EuclideanParamBlockSized.hpp>
 #include <swift_vio/ExtrinsicModels.hpp>
+#include <swift_vio/FrameTypedefs.hpp>
 #include <swift_vio/ParallaxAnglePoint.hpp>
 #include <swift_vio/PointLandmark.hpp>
 #include <swift_vio/PointLandmarkModels.hpp>
 #include <swift_vio/ProjParamOptModels.hpp>
-#include <swift_vio/ReprojectionErrorWithPap.hpp>
+#include <swift_vio/ceres/ReprojectionErrorWithPap.hpp>
 #include <swift_vio/imu/BoundedImuDeque.hpp>
 
-#include <okvis/FrameTypedefs.hpp>
 #include <okvis/Time.hpp>
 #include <okvis/assert_macros.hpp>
 #include <okvis/cameras/EquidistantDistortion.hpp>
@@ -43,7 +43,7 @@ class CameraObservationOptions {
       : perturbPose(false),
         rollingShutter(false),
         noisyKeypoint(false),
-        cameraObservationModelId(okvis::cameras::kChordalDistanceId),
+        cameraObservationModelId(swift_vio::cameras::kChordalDistanceId),
         projOptModelName("FXY_CXY"),
         extrinsicOptModelName("P_BC_Q_BC") {}
 
@@ -60,7 +60,7 @@ typedef okvis::cameras::PinholeCamera<okvis::cameras::EquidistantDistortion>
     DistortedPinholeCameraGeometry;
 const int kDistortionDim =
     DistortedPinholeCameraGeometry::distortion_t::NumDistortionIntrinsics;
-const int kProjIntrinsicDim = okvis::ProjectionOptFXY_CXY::kNumParams;
+const int kProjIntrinsicDim = swift_vio::ProjectionOptFXY_CXY::kNumParams;
 const int kExtrinsicMinimalDim = 3;
 Eigen::Matrix2d covariance = Eigen::Matrix2d::Identity() / 0.36;
 Eigen::Matrix2d squareRootInformation = Eigen::Matrix2d::Identity() * 0.6;
@@ -80,9 +80,9 @@ class CameraObservationJacobianTest {
     problemOptions.cost_function_ownership =
         ::ceres::Ownership::DO_NOT_TAKE_OWNERSHIP;
     problem_.reset(new ::ceres::Problem(problemOptions));
-    int extrinsicModelId = okvis::ExtrinsicModelNameToId(coo_.extrinsicOptModelName);
+    int extrinsicModelId = swift_vio::ExtrinsicModelNameToId(coo_.extrinsicOptModelName);
     if (extrinsicModelId == 1) {
-      extrinsicLocalParameterization_.reset(new okvis::Extrinsic_p_CB());
+      extrinsicLocalParameterization_.reset(new swift_vio::Extrinsic_p_CB());
     } else {
       extrinsicLocalParameterization_.reset(
           new okvis::ceres::PoseLocalParameterization());
@@ -327,7 +327,7 @@ void CameraObservationJacobianTest::addImuInfo(
     okvis::Duration halfSide(0.5);
     std::shared_ptr<okvis::ImuMeasurementDeque> window(
         new okvis::ImuMeasurementDeque());
-    *window = okvis::getImuMeasurements(
+    *window = swift_vio::getImuMeasurements(
         centerTime - halfSide, centerTime + halfSide, entireImuList, nullptr);
     imuWindowList_.push_back(window);
   }
@@ -575,7 +575,7 @@ public:
  bool computeReprojectionWithPapResidual(
      Eigen::Vector2d* residual,
      Eigen::Matrix<double, 2, 3, Eigen::RowMajor>* de_dPap) const {
-   LWF::ParallaxAnglePoint pap;
+   swift_vio::ParallaxAnglePoint pap;
    pap.set(parameters_[3]);
    Eigen::Matrix<double, 3, 1> t_BC_B(parameters_[4][0], parameters_[4][1],
                                       parameters_[4][2]);
@@ -650,7 +650,7 @@ public:
      EXPECT_LT((mimicResidual - refResidual_).lpNorm<Eigen::Infinity>(), 1e-8);
    }
 
-   LWF::ParallaxAnglePoint refPap;
+   swift_vio::ParallaxAnglePoint refPap;
    refPap.set(pointLandmark_->data());
    for (int j = 0; j < 3; ++j) {
        delta.setZero();
@@ -682,7 +682,7 @@ public:
      delta.setZero();
      delta[j] = h;
      std::pair<Eigen::Vector3d, Eigen::Quaterniond> T_BC(ref_T_BC.r(), ref_T_BC.q());
-     okvis::Extrinsic_p_CB::oplus(delta.data(), &T_BC);
+     swift_vio::Extrinsic_p_CB::oplus(delta.data(), &T_BC);
 
      extrinsicBlock_->setEstimate(okvis::kinematics::Transformation(T_BC.first, T_BC.second));
 
@@ -695,7 +695,7 @@ public:
      extrinsicBlock_->setEstimate(ref_T_BC);
    }
    Eigen::Matrix<double, 3, 7, Eigen::RowMajor> jLift;
-   okvis::Extrinsic_p_CB::liftJacobian(ref_T_BC.parameters().data(), jLift.data());
+   swift_vio::Extrinsic_p_CB::liftJacobian(ref_T_BC.parameters().data(), jLift.data());
    *de_dExtrinsic = (*de_dExtrinsic_minimal) * jLift;
  }
 
@@ -1191,7 +1191,7 @@ void setupPoseOptProblem(bool perturbPose, bool rollingShutter,
 
     jacTest.propagatePoseAndVelocityForMapPoint(pointDataPtr);
 
-    std::vector<okvis::AnchorFrameIdentifier> anchorIds{{frameIds[0], 0, 0}, {frameIds[1], 0, 1}};
+    std::vector<swift_vio::AnchorFrameIdentifier> anchorIds{{frameIds[0], 0, 0}, {frameIds[1], 0, 1}};
     pointDataPtr->setAnchors(anchorIds);
 
     bool useFirstEstimate = true;
@@ -1203,28 +1203,28 @@ void setupPoseOptProblem(bool perturbPose, bool rollingShutter,
       std::shared_ptr<::ceres::CostFunction> costFunctionPtr;
       std::shared_ptr<okvis::ceres::ErrorInterface> errorInterface;
       switch (cameraObservationModelId) {
-        case okvis::cameras::kChordalDistanceId: {
+        case swift_vio::cameras::kChordalDistanceId: {
           std::shared_ptr<okvis::ceres::ChordalDistance<DistortedPinholeCameraGeometry,
-                                        okvis::ProjectionOptFXY_CXY,
-                                        okvis::Extrinsic_p_CB>>
+                                        swift_vio::ProjectionOptFXY_CXY,
+                                        swift_vio::Extrinsic_p_CB>>
               localCostFunctionPtr(
                   new okvis::ceres::ChordalDistance<
                       DistortedPinholeCameraGeometry,
-                      okvis::ProjectionOptFXY_CXY, okvis::Extrinsic_p_CB>(
+                      swift_vio::ProjectionOptFXY_CXY, swift_vio::Extrinsic_p_CB>(
                       cameraGeometry, pointObservationList[i][observationIndex],
                       covariance, observationIndex, pointDataPtr, R_WCnmf));
           costFunctionPtr = std::static_pointer_cast<::ceres::CostFunction>(localCostFunctionPtr);
           errorInterface = std::static_pointer_cast<okvis::ceres::ErrorInterface>(localCostFunctionPtr);
           break;
         }
-        case okvis::cameras::kReprojectionErrorWithPapId: {
+        case swift_vio::cameras::kReprojectionErrorWithPapId: {
           std::shared_ptr<okvis::ceres::ReprojectionErrorWithPap<DistortedPinholeCameraGeometry,
-                                                 okvis::ProjectionOptFXY_CXY,
-                                                 okvis::Extrinsic_p_CB>>
+                                                 swift_vio::ProjectionOptFXY_CXY,
+                                                 swift_vio::Extrinsic_p_CB>>
               localCostFunctionPtr(
                   new okvis::ceres::ReprojectionErrorWithPap<
                       DistortedPinholeCameraGeometry,
-                      okvis::ProjectionOptFXY_CXY, okvis::Extrinsic_p_CB>(
+                      swift_vio::ProjectionOptFXY_CXY, swift_vio::Extrinsic_p_CB>(
                       cameraGeometry, pointObservationList[i][observationIndex],
                       covariance, observationIndex, pointDataPtr));
           costFunctionPtr = std::static_pointer_cast<::ceres::CostFunction>(localCostFunctionPtr);

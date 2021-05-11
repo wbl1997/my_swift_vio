@@ -30,7 +30,7 @@
 #include "gtsam/VioBackEndParams.h"
 #include "gtsam/ImuFrontEnd.h"
 
-namespace okvis {
+namespace swift_vio {
 #ifdef INCREMENTAL_SMOOTHER
 typedef gtsam::IncrementalFixedLagSmoother Smoother;
 #else
@@ -89,20 +89,20 @@ class DebugVioInfo {
 /**
  * SlidingWindowSmoother builds upon gtsam FixedLagSmoother.
  */
-class SlidingWindowSmoother : public Estimator {
+class SlidingWindowSmoother : public okvis::Estimator {
  public:
   OKVIS_DEFINE_EXCEPTION(Exception, std::runtime_error)
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
-  SlidingWindowSmoother(const okvis::BackendParams& backendParams);
+  SlidingWindowSmoother(const BackendParams& backendParams);
 
-  void setupSmoother(const okvis::BackendParams& backendParams);
+  void setupSmoother(const BackendParams& backendParams);
 
   /**
    * @brief Constructor if a ceres map is already available.
    * @param mapPtr Shared pointer to ceres map.
    */
-  SlidingWindowSmoother(const okvis::BackendParams& backendParams,
+  SlidingWindowSmoother(const BackendParams& backendParams,
                         std::shared_ptr<okvis::ceres::Map> mapPtr);
 
   virtual ~SlidingWindowSmoother();
@@ -321,11 +321,11 @@ class SlidingWindowSmoother : public Estimator {
                                      double focalLength, double raySigmaScalar) const;
 
  protected:
-  okvis::BackendParams backendParams_;
-  okvis::ImuParams imuParams_;
+  BackendParams backendParams_;
+  ImuParams imuParams_;
 
   // IMU frontend integrates IMU measurements into factors.
-  std::unique_ptr<okvis::ImuFrontEnd> imuFrontend_;
+  std::unique_ptr<ImuFrontEnd> imuFrontend_;
 
   // Vision params.
   gtsam::SmartProjectionParams smart_factors_params_;
@@ -415,24 +415,23 @@ void findSlotsOfFactorsWithKey(
     const gtsam::NonlinearFactorGraph& graph,
     std::vector<size_t>* slots_of_factors_with_key);
 
-}  // namespace okvis
+}  // namespace swift_vio
 #else
-namespace okvis {
+namespace swift_vio {
 class SlidingWindowSmoother : public Estimator {
  public:
   OKVIS_DEFINE_EXCEPTION(Exception, std::runtime_error)
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
-  SlidingWindowSmoother(const okvis::BackendParams& backendParams) : Estimator() {}
+  SlidingWindowSmoother(const BackendParams& backendParams) : Estimator() {}
 
   /**
    * @brief Constructor if a ceres map is already available.
    * @param mapPtr Shared pointer to ceres map.
    */
-  SlidingWindowSmoother(const okvis::BackendParams& backendParams,
+  SlidingWindowSmoother(const BackendParams& backendParams,
                         std::shared_ptr<okvis::ceres::Map> mapPtr) : Estimator(mapPtr) {}
 }
-}  // namespace okvis
-#endif // # ifdef HAVE_GTSAM
-
+}  // namespace swift_vio
+#endif // #ifdef HAVE_GTSAM
 #endif /* INCLUDE_GTSAM_SLIDING_WINDOW_SMOOTHER_HPP_ */

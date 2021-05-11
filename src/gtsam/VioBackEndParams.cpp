@@ -14,8 +14,7 @@
 
 #include "gtsam/VioBackEndParams.h"
 
-namespace okvis {
-
+namespace swift_vio {
 BackendParams::BackendParams() : PipelineParams("Backend Parameters") {
   // Trivial sanity checks.
   CHECK_GE(numOptimize_, 0);
@@ -131,5 +130,4 @@ void BackendParams::printVioBackEndParams() const {
             << "lowerBoundLambda_: " << lowerBoundLambda_ << '\n'
             << "upperBoundLambda_: " << upperBoundLambda_;
 }
-
-}  // namespace okvis
+}  // namespace swift_vio

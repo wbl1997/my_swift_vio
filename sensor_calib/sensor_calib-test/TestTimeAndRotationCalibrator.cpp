@@ -12,9 +12,9 @@
 
 using namespace testing;
 
-namespace sensor_calib::tests {
+namespace swift_vio::tests {
 void testTimeAndRotationCalibrator(bool orientationSensor) {
-  sensor_calib::TimeAndRotationCalibrator imuCamCalibrator;
+  swift_vio::TimeAndRotationCalibrator imuCamCalibrator;
   int rate = 200;
   int durationInSecs = 20;
   int checkPointInSecs[] = {5, 14, 16, 18};
@@ -138,4 +138,4 @@ TEST(TimeAndRotationCalibrator, computeCovariance) {
   EXPECT_GT(numUsedObservations, observationDuration * rate - 1);
 }
 
-} // namespace sensor_calib::tests
+} // namespace swift_vio::tests

@@ -26,8 +26,7 @@
 
 #include "okvis/class_macros.hpp"
 
-namespace okvis {
-
+namespace swift_vio {
 class YamlParser {
  public:
   POINTER_TYPEDEFS(YamlParser);
@@ -97,5 +96,4 @@ class YamlParser {
   cv::FileStorage fs_;
   std::string filepath_;
 };
-
-}  // namespace okvis
+}  // namespace swift_vio

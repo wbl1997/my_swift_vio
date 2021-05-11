@@ -48,8 +48,7 @@ TEST(GtsamWrap, StackedProjectionFactorDynamic) {
   }
   LOG(INFO) << " [ OK ] ";
 
-  VIO::StackedProjectionFactorDynamic relativePoseProblem(pointList, rayList,
-                                                          T_SC);
+  swift_vio::StackedProjectionFactorDynamic relativePoseProblem(pointList, rayList, T_SC);
   LOG(INFO) << "computing residual and jacobian";
   Eigen::Matrix<double, -1, 1> residuals(pointList.size() * 2, 1);
   Eigen::Matrix<double, -1, 6> jacobian(pointList.size() * 2, 6);
@@ -58,8 +57,8 @@ TEST(GtsamWrap, StackedProjectionFactorDynamic) {
   LOG(INFO) << "run the tiny solver";
   EXPECT_GT(residuals.squaredNorm() / 2.0, 1e-1);
   Eigen::Matrix<double, 7, 1> estimated_T_WS_coeffs = T_WS_init.coeffs();
-  VIO::GtsamPose3Parameterization localParameterization;
-  swift_vio::ceres::TinySolver<VIO::StackedProjectionFactorDynamic> solver(
+  swift_vio::GtsamPose3Parameterization localParameterization;
+  swift_vio::ceres::TinySolver<swift_vio::StackedProjectionFactorDynamic> solver(
       &localParameterization);
   solver.Solve(relativePoseProblem, &estimated_T_WS_coeffs);
   okvis::kinematics::Transformation estimated_T_WS;

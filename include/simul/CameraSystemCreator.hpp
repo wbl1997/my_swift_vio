@@ -14,7 +14,6 @@
 #include <okvis/Parameters.hpp>
 
 namespace simul {
-
 // Sideways orientation is geometrically favorable for motion estimation.
 enum class CameraOrientation {
   Forward = 0,

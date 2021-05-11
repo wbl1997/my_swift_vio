@@ -21,8 +21,8 @@ DEFINE_bool(zero_imu_intrinsic_param_noise, true,
 
 namespace simul {
 void VioTestSystemBuilder::createVioSystem(
-    const okvis::TestSetting& testSetting,
-    const okvis::BackendParams& backendParams,
+    const TestSetting& testSetting,
+    const swift_vio::BackendParams& backendParams,
     SimulatedTrajectoryType trajectoryType,
     std::string projOptModelName,
     std::string extrinsicModelName,
@@ -138,10 +138,10 @@ void VioTestSystemBuilder::createVioSystem(
   distortionType_ = cameraSystem2->cameraGeometry(0)->distortionType();
 
   estimator = swift_vio::createBackend(testSetting.estimator_algorithm,
-                                   backendParams, mapPtr);
+                                       backendParams, mapPtr);
 
   okvis::VisualConstraints constraintScheme(okvis::OnlyReprojectionErrors);
-  if (testSetting.estimator_algorithm == okvis::EstimatorAlgorithm::General) {
+  if (testSetting.estimator_algorithm == swift_vio::EstimatorAlgorithm::General) {
     constraintScheme = okvis::OnlyTwoViewConstraints;
   }
   okvis::Optimization optimOptions;
@@ -149,12 +149,12 @@ void VioTestSystemBuilder::createVioSystem(
   optimOptions.cameraObservationModelId = testSetting.cameraObservationModelId;
   estimator->setOptimizationOptions(optimOptions);
 
-  okvis::PointLandmarkOptions plOptions;
+  swift_vio::PointLandmarkOptions plOptions;
   plOptions.minTrackLengthForSlam = 5;
   plOptions.landmarkModelId = testSetting.landmarkModelId;
   estimator->setPointLandmarkOptions(plOptions);
 
-  frontend.reset(new okvis::SimulationFrontend(trueCameraSystem_->numCameras(),
+  frontend.reset(new SimulationFrontend(trueCameraSystem_->numCameras(),
                                                testSetting.addImageNoise, 60,
                                                constraintScheme,
                                                testSetting.gridType,

@@ -1,7 +1,7 @@
 #include <iostream>
 #include "gtest/gtest.h"
 
-#include <swift_vio/EuclideanParamError.hpp>
+#include <swift_vio/ceres/EuclideanParamError.hpp>
 
 TEST(EuclideanParamError, Jacobian) {
   const int kVarDim = 4;

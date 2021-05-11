@@ -21,5 +21,4 @@ void MotionAndStructureStats::finishUpdatingSceneDepth() {
     double filteredInvDepth = 0.5 / medianSceneDepth_ + 0.5 * invDepth;
     medianSceneDepth_ = 1.0 / filteredInvDepth;
 }
-
 } // namespace swift_vio

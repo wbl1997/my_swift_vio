@@ -4,7 +4,7 @@
 #include <Eigen/Core>
 #include <okvis/assert_macros.hpp>
 
-namespace okvis {
+namespace swift_vio {
 class DefaultEkfUpdater {
  public:
   OKVIS_DEFINE_EXCEPTION(Exception, std::runtime_error)
@@ -61,5 +61,5 @@ class PreconditionedEkfUpdater : public DefaultEkfUpdater {
 
   void updateCovariance(Eigen::MatrixXd *cov_ptr) const final;
 };
-}  // namespace okvis
+}  // namespace swift_vio
 #endif  // OKVIS_PRECONDITIONED_EKF_UPDATER_H

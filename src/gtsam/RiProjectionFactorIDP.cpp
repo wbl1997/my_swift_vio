@@ -59,11 +59,11 @@ gtsam::Vector RiProjectionFactorIDP::evaluateError(
   transformList[2] = okvis::kinematics::Transformation(
       state_a.position(), state_a.rotation().toQuaternion());
 
-  std::shared_ptr<okvis::TransformPointJacobian> transformPointObject(
+  std::shared_ptr<swift_vio::TransformPointJacobian> transformPointObject(
       new gtsam::RiTransformPointJacobian());
-  std::shared_ptr<okvis::InverseTransformPointJacobian>
+  std::shared_ptr<swift_vio::InverseTransformPointJacobian>
       inverseTransformPointObject(new gtsam::RiInverseTransformPointJacobian());
-  okvis::MultipleTransformPointJacobian mtpj(transformList, exponentList_,
+  swift_vio::MultipleTransformPointJacobian mtpj(transformList, exponentList_,
                                              ab1rho, transformPointObject,
                                              inverseTransformPointObject);
 

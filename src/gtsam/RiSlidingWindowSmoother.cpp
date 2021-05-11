@@ -33,14 +33,14 @@ DEFINE_double(rifls_huber_threshold, -1,
               "projection factor with this huber threshold (say 2.447) will be "
               "used. However, it will be much slower.");
 
-namespace okvis {
+namespace swift_vio {
 RiSlidingWindowSmoother::RiSlidingWindowSmoother(
-    const okvis::BackendParams& vioParams,
+    const BackendParams& vioParams,
     std::shared_ptr<okvis::ceres::Map> mapPtr)
     : SlidingWindowSmoother(vioParams, mapPtr) {}
 
 RiSlidingWindowSmoother::RiSlidingWindowSmoother(
-    const okvis::BackendParams& vioParams)
+    const BackendParams& vioParams)
     : SlidingWindowSmoother(vioParams) {}
 
 RiSlidingWindowSmoother::~RiSlidingWindowSmoother() {}
@@ -55,9 +55,9 @@ void RiSlidingWindowSmoother::addInitialPriorFactors() {
 
   Eigen::Matrix<double, 9, 9> state_prior_covariance =
       Eigen::Matrix<double, 9, 9>::Zero();
-  state_prior_covariance.diagonal().head<3>() = pvstd_.std_q_WS.cwiseAbs2();
-  state_prior_covariance.diagonal().segment<3>(3) = pvstd_.std_v_WS.cwiseAbs2();
-  state_prior_covariance.diagonal().tail(3) = pvstd_.std_p_WS.cwiseAbs2();
+  state_prior_covariance.diagonal().head<3>() = initialNavState_.std_q_WS.cwiseAbs2();
+  state_prior_covariance.diagonal().segment<3>(3) = initialNavState_.std_v_WS.cwiseAbs2();
+  state_prior_covariance.diagonal().tail(3) = initialNavState_.std_p_WS.cwiseAbs2();
 
   // Add RVP prior.
   // Lock Jacobian for the prior factor is unneeded.
@@ -171,7 +171,7 @@ bool RiSlidingWindowSmoother::addLandmarkToGraph(
 
   uint64_t minValidStateId = statesMap_.begin()->first;
   okvis::MapPoint& mp = landmarksMap_.at(lmkId);
-  IsObservedInFrame lastImageId(0u, 0u);
+  okvis::IsObservedInFrame lastImageId(0u, 0u);
   for (auto obsIter = mp.observations.rbegin();
        obsIter != mp.observations.rend(); ++obsIter) {
     uint64_t observingFrameId = obsIter->first.frameId;
@@ -237,7 +237,7 @@ bool RiSlidingWindowSmoother::addLandmarkToGraph(
       new_reprojection_factors_.add(factor);
     }
     lastImageId =
-        IsObservedInFrame(obsIter->first.frameId, obsIter->first.cameraIndex);
+        okvis::IsObservedInFrame(obsIter->first.frameId, obsIter->first.cameraIndex);
   }
   mp.status.inState = true;
   return true;
@@ -307,7 +307,7 @@ void RiSlidingWindowSmoother::addLandmarkSmartFactorToGraph(const LandmarkId& lm
           smart_noise_, body_P_cam0_, cal0_, camera_rig_.getCameraGeometry(0),
           smart_factors_params_);
 
-  IsObservedInFrame lastImageId(0u, 0u);
+  okvis::IsObservedInFrame lastImageId(0u, 0u);
   for (std::map<okvis::KeypointIdentifier, uint64_t>::const_iterator obsIter =
            mp.observations.begin();
        obsIter != mp.observations.end(); ++obsIter) {
@@ -329,7 +329,7 @@ void RiSlidingWindowSmoother::addLandmarkSmartFactorToGraph(const LandmarkId& lm
 
     new_factor->add(measurement, gtsam::Symbol('x', obsIter->first.frameId));
     lastImageId =
-        IsObservedInFrame(obsIter->first.frameId, obsIter->first.cameraIndex);
+        okvis::IsObservedInFrame(obsIter->first.frameId, obsIter->first.cameraIndex);
   }
   mp.status.inState = true;
   new_factor->setAnchorIndex(new_factor->keys().size() - 1);
@@ -404,10 +404,10 @@ void RiSlidingWindowSmoother::updateStates() {
     gtsam::RiExtendedPose3 rvp =
         estimates.at<gtsam::RiExtendedPose3>(gtsam::Symbol('x', stateId));
 
-    std::shared_ptr<ceres::PoseParameterBlock> poseParamBlockPtr =
-        std::static_pointer_cast<ceres::PoseParameterBlock>(
+    std::shared_ptr<okvis::ceres::PoseParameterBlock> poseParamBlockPtr =
+        std::static_pointer_cast<okvis::ceres::PoseParameterBlock>(
             mapPtr_->parameterBlockPtr(stateId));
-    kinematics::Transformation T_WB(rvp.position(),
+    okvis::kinematics::Transformation T_WB(rvp.position(),
                                     rvp.rotation().toQuaternion());
     poseParamBlockPtr->setEstimate(T_WB);
 
@@ -417,10 +417,10 @@ void RiSlidingWindowSmoother::updateStates() {
                         .at(imuIdx)
                         .at(ImuSensorStates::SpeedAndBias)
                         .id;
-    std::shared_ptr<ceres::SpeedAndBiasParameterBlock> sbParamBlockPtr =
-        std::static_pointer_cast<ceres::SpeedAndBiasParameterBlock>(
+    std::shared_ptr<okvis::ceres::SpeedAndBiasParameterBlock> sbParamBlockPtr =
+        std::static_pointer_cast<okvis::ceres::SpeedAndBiasParameterBlock>(
             mapPtr_->parameterBlockPtr(SBId));
-    SpeedAndBiases sb = sbParamBlockPtr->estimate();
+    okvis::SpeedAndBiases sb = sbParamBlockPtr->estimate();
     sb.head<3>() = rvp.velocity();
 
     gtsam::imuBias::ConstantBias imuBias =
@@ -470,7 +470,7 @@ bool RiSlidingWindowSmoother::gtsamMarginalCovariance(
 
   *cov = Eigen::Matrix<double, 15, 15>::Identity();
   Eigen::Matrix<double, 15, 15> dokvis_drierror =
-      gtsam::dokvis_drightinvariant(T_WB, speedAndBgBa.head<3>());
+      swift_vio::dokvis_drightinvariant(T_WB, speedAndBgBa.head<3>());
   Eigen::MatrixXd rvpMargCov =
       marginals.marginalCovariance(gtsam::Symbol('x', stateId));
   cov->topLeftCorner<9, 9>() =
@@ -482,4 +482,4 @@ bool RiSlidingWindowSmoother::gtsamMarginalCovariance(
       dokvis_drierror.bottomRightCorner<6, 6>().transpose();
   return true;
 }
-}  // namespace okvis
+}  // namespace swift_vio

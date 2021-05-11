@@ -42,9 +42,7 @@
 
 #include <io_wrap/RosParametersReader.hpp>
 
-/// \brief okvis Main namespace of this package.
-namespace okvis {
-
+namespace swift_vio {
 // The default constructor.
 RosParametersReader::RosParametersReader() : VioParametersReader() {}
 
@@ -57,13 +55,13 @@ RosParametersReader::RosParametersReader(const std::string& filename) {
 
 // Get the camera calibration.
 bool RosParametersReader::getCameraCalibration(
-    std::vector<CameraCalibration, Eigen::aligned_allocator<CameraCalibration>>&
+    std::vector<okvis::VioParametersReader::CameraCalibration, Eigen::aligned_allocator<okvis::VioParametersReader::CameraCalibration>>&
         calibrations,
     cv::FileStorage& configurationFile) {
   bool success =
       getCalibrationViaConfig(calibrations, configurationFile["cameras"]);
   bool monocularInput = false;
-  bool parseOk = parseBoolean(configurationFile["monocular_input"], monocularInput);
+  bool parseOk = okvis::parseBoolean(configurationFile["monocular_input"], monocularInput);
   if (parseOk && monocularInput) {
     calibrations.resize(1);
   }
@@ -103,7 +101,7 @@ bool RosParametersReader::getCameraCalibration(
 // Get the camera calibration via the ROS service advertised by the visensor
 // node.
 bool RosParametersReader::getCalibrationViaRosService(
-    std::vector<CameraCalibration, Eigen::aligned_allocator<CameraCalibration>>&
+    std::vector<okvis::VioParametersReader::CameraCalibration, Eigen::aligned_allocator<okvis::VioParametersReader::CameraCalibration>>&
         calibrations) const {
 #ifdef HAVE_VISENSOR
   calibrations.clear();
@@ -127,7 +125,7 @@ bool RosParametersReader::getCalibrationViaRosService(
           return false;
         } else {
           calibrations.push_back(
-              okvis::VioParametersReader::CameraCalibration());
+              okvis::VioParametersReader::okvis::VioParametersReader::CameraCalibration());
 #ifdef USE_VISENSORNODE_V1_1  // TODO: remove this as soon as the public
                               // visensor_node gets updated!
           geometry_msgs::Pose& T_IC = srv.response.calibration[i].T_IC;
@@ -173,7 +171,7 @@ bool RosParametersReader::getCalibrationViaRosService(
 
 // Get the camera calibration via the ROS topic /calibrationX.
 bool RosParametersReader::getCalibrationViaRosTopic(
-    std::vector<CameraCalibration, Eigen::aligned_allocator<CameraCalibration>>&
+    std::vector<okvis::VioParametersReader::CameraCalibration, Eigen::aligned_allocator<okvis::VioParametersReader::CameraCalibration>>&
         calibrations) const {
 #ifdef HAVE_VISENSOR
   calibrations.clear();
@@ -240,5 +238,4 @@ bool RosParametersReader::getCalibrationViaRosTopic(
   return false;
 #endif  // HAVE_VISENSOR
 }
-
-}  // namespace okvis
+}  // namespace swift_vio

@@ -46,11 +46,11 @@ private:
 };
 
 TEST_F(BackwardIntegrationTest, BackwardRK) {
-  ImuErrorModel<double> iem(sb.tail<6>(), cpc.get_vTgTsTa());
-  okvis::ImuOdometry::propagation_RungeKutta(
+  swift_vio::ImuErrorModel<double> iem(sb.tail<6>(), cpc.get_vTgTsTa());
+  swift_vio::ImuOdometry::propagation_RungeKutta(
       cpc.get_imu_measurements(), cpc.get_imu_params(), T_WB, sb,
       iem, cpc.get_meas_begin_time(), cpc.get_meas_end_time());
-  okvis::ImuOdometry::propagationBackward_RungeKutta(
+  swift_vio::ImuOdometry::propagationBackward_RungeKutta(
       cpc.get_imu_measurements(), imuParams, T_WB, sb,
       iem, cpc.get_meas_end_time(), cpc.get_meas_begin_time());
   p_WS_W = T_WB.r();
@@ -75,8 +75,8 @@ TEST_F(BackwardIntegrationTest, StepwiseBackwardRK) {
   for (auto iter = imuMeasurements.begin(); iter != imuMeasurements.end();
        ++iter) {
     if (iter == imuMeasurements.begin()) continue;
-    ImuErrorModel<double> iem(sb.tail<6>(), cpc.get_vTgTsTa());
-    okvis::ceres::ode::integrateOneStep_RungeKutta(
+    swift_vio::ImuErrorModel<double> iem(sb.tail<6>(), cpc.get_vTgTsTa());
+    swift_vio::ode::integrateOneStep_RungeKutta(
         iterLast->measurement.gyroscopes, iterLast->measurement.accelerometers,
         iter->measurement.gyroscopes, iter->measurement.accelerometers,
         cpc.get_g(), cpc.get_sigma_g_c(), cpc.get_sigma_a_c(),
@@ -93,8 +93,8 @@ TEST_F(BackwardIntegrationTest, StepwiseBackwardRK) {
   for (auto iterR = imuMeasurements.rbegin(); iterR != imuMeasurements.rend();
        ++iterR) {
     if (iterR == imuMeasurements.rbegin()) continue;
-    ImuErrorModel<double> iem(sb.tail<6>(), cpc.get_vTgTsTa());
-    okvis::ceres::ode::integrateOneStepBackward_RungeKutta(
+    swift_vio::ImuErrorModel<double> iem(sb.tail<6>(), cpc.get_vTgTsTa());
+    swift_vio::ode::integrateOneStepBackward_RungeKutta(
         iterR->measurement.gyroscopes, iterR->measurement.accelerometers,
         iterRLast->measurement.gyroscopes,
         iterRLast->measurement.accelerometers, cpc.get_g(), cpc.get_sigma_g_c(),
@@ -117,8 +117,8 @@ TEST_F(BackwardIntegrationTest, StepwiseBackwardRK) {
 
 TEST_F(BackwardIntegrationTest, BackwardEuler) {
   Eigen::Vector3d tempV_WS = sb.head<3>();
-  ImuErrorModel<double> iem(sb.tail<6>(), cpc.get_vTgTsTa());
-  okvis::ImuOdometry::propagation(cpc.get_imu_measurements(), cpc.get_imu_params(),
+  swift_vio::ImuErrorModel<double> iem(sb.tail<6>(), cpc.get_vTgTsTa());
+  swift_vio::ImuOdometry::propagation(cpc.get_imu_measurements(), cpc.get_imu_params(),
                            T_WB, tempV_WS, iem, cpc.get_meas_begin_time(),
                            cpc.get_meas_end_time());
 
@@ -126,7 +126,7 @@ TEST_F(BackwardIntegrationTest, BackwardEuler) {
   sb.head<3>() = tempV_WS;
   print_p_q_sb(T_WB.r(), T_WB.q(), sb);
 
-  okvis::ImuOdometry::propagationBackward(
+  swift_vio::ImuOdometry::propagationBackward(
       cpc.get_imu_measurements(), imuParams, T_WB, tempV_WS, iem,
       cpc.get_meas_end_time(), cpc.get_meas_begin_time());
   p_WS_W = T_WB.r();
@@ -174,10 +174,10 @@ void IMUOdometryTrapezoidRule(
   int numUsedImuMeasurements = 0;
 
   Eigen::Vector3d v_WS = sb.head<3>();
-  ImuErrorModel<double> imuModel(sb.tail<6>(), vTgTsTa);
+  swift_vio::ImuErrorModel<double> imuModel(sb.tail<6>(), vTgTsTa);
   Eigen::Matrix<double, 6, 1> linearizationPoint;
   linearizationPoint << T_WS.r(), v_WS;
-  numUsedImuMeasurements = okvis::ImuOdometry::propagation(
+  numUsedImuMeasurements = swift_vio::ImuOdometry::propagation(
       imuMeasurements, imuParams, T_WS, v_WS, imuModel,
       imuMeasurements.begin()->timeStamp, imuMeasurements.rbegin()->timeStamp,
       covariance, jacobian,
@@ -272,8 +272,8 @@ TEST(ImuOdometry, IMUCovariancePropagation) {
   for (auto iter = imuMeasurements.begin(); iter != imuMeasurements.end();
        ++iter) {
     if (iter == imuMeasurements.begin()) continue;
-    ImuErrorModel<double> iem(sb.tail<6>(), cpc.get_vTgTsTa());
-    okvis::ceres::ode::integrateOneStep_RungeKutta(
+    swift_vio::ImuErrorModel<double> iem(sb.tail<6>(), cpc.get_vTgTsTa());
+    swift_vio::ode::integrateOneStep_RungeKutta(
         iterLast->measurement.gyroscopes, iterLast->measurement.accelerometers,
         iter->measurement.gyroscopes, iter->measurement.accelerometers,
         cpc.get_g(), cpc.get_sigma_g_c(), cpc.get_sigma_a_c(),
@@ -386,7 +386,7 @@ TEST(ImuOdometry, IMUCovariancePropagation) {
   Sophus::SE3d T_WS1_se3;
   Eigen::Matrix<double, 3, 1> v_WS1_Euler;
   okvis::timing::Timer simpleTimer("simple", false);
-  okvis::ceres::ode::predictStates(T_WS0_se3, sb, time_pair, measurements,
+  swift_vio::ode::predictStates(T_WS0_se3, sb, time_pair, measurements,
                                    gwomegaw, q_n_aw_babw, &T_WS1_se3,
                                    &v_WS1_Euler, &covEuler, cpc.get_vTgTsTa());
   timeElapsed = simpleTimer.stop();
@@ -492,9 +492,9 @@ TEST(ImuFactor, dokvis_dri) {
   T_WB.setRandom();
   Eigen::Vector3d v_WB;
   v_WB.setRandom();
-  Eigen::Matrix<double, 15, 15> permutator = gtsam::dokvis_drightinvariant(T_WB, v_WB);
+  Eigen::Matrix<double, 15, 15> permutator = swift_vio::dokvis_drightinvariant(T_WB, v_WB);
   Eigen::Matrix<double, 15, 15> permutator_inv =
-      gtsam::drightinvariant_dokvis(T_WB, v_WB);
+      swift_vio::drightinvariant_dokvis(T_WB, v_WB);
   EXPECT_LT(((permutator * permutator_inv) -
              Eigen::Matrix<double, 15, 15>::Identity())
                 .lpNorm<Eigen::Infinity>(),
@@ -504,9 +504,9 @@ TEST(ImuFactor, dokvis_dri) {
 TEST(ImuFactor, dokvis_dforster) {
   okvis::kinematics::Transformation T_WB;
   T_WB.setRandom();
-  Eigen::Matrix<double, 15, 15> permutator = gtsam::dokvis_dforster(T_WB.C());
+  Eigen::Matrix<double, 15, 15> permutator = swift_vio::dokvis_dforster(T_WB.C());
   Eigen::Matrix<double, 15, 15> permutator_inv =
-      gtsam::dforster_dokvis(T_WB.C());
+      swift_vio::dforster_dokvis(T_WB.C());
   EXPECT_LT(((permutator * permutator_inv) -
              Eigen::Matrix<double, 15, 15>::Identity())
                 .lpNorm<Eigen::Infinity>(),
@@ -578,10 +578,10 @@ void propagateRiCovarianceFromZero(
   Eigen::Matrix<double, 9, 1> speedAndBias_ri = cpc.get_sb0();
   speedAndBias_ri.head<3>() = initialVelocity;
   Eigen::Vector3d v_WS_ri = initialVelocity;
-  ImuErrorModel<double> iem(speedAndBias_ri.tail<6>());
+  swift_vio::ImuErrorModel<double> iem(speedAndBias_ri.tail<6>());
 
   okvis::timing::Timer riTimer("right invariant error", false);
-  numUsedImuMeasurements = okvis::ImuOdometry::propagationRightInvariantError(
+  numUsedImuMeasurements = swift_vio::ImuOdometry::propagationRightInvariantError(
       cpc.get_imu_measurements(), cpc.get_imu_params(), T_WS_ri, v_WS_ri, iem,
       cpc.get_meas_begin_time(), cpc.get_meas_end_time(), &covariance_ri,
       &jacobian_ri);
@@ -597,9 +597,9 @@ void propagateRiCovarianceFromZero(
   EXPECT_LT((speedAndBiasOkvis - speedAndBias_ri).tail<6>().norm(), 1e-6);
 
   Eigen::Matrix<double, 15, 15> permutator_j =
-      gtsam::dokvis_drightinvariant(T_WS_ri, v_WS_ri);
+      swift_vio::dokvis_drightinvariant(T_WS_ri, v_WS_ri);
 
-  Eigen::Matrix<double, 15, 15> permutator_i_inv = gtsam::drightinvariant_dokvis(
+  Eigen::Matrix<double, 15, 15> permutator_i_inv = swift_vio::drightinvariant_dokvis(
       okvis::kinematics::Transformation(initialPosition, cpc.get_q_WS0()),
       initialVelocity);
 
@@ -652,7 +652,6 @@ TEST(ImuOdometry, RiCovariancePropagationWithLargeV) {
 }
 
 TEST(ImuOdometry, InitPoseFromImu) {
-  using namespace okvis;
   Eigen::Vector3d acc_B(2, -1, 3);
   Eigen::Vector3d e_acc = acc_B.normalized();
 

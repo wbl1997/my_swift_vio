@@ -21,10 +21,7 @@
 #include "gtsam/ImuFrontEnd-definitions.h"
 //#include "kimera-vio/utils/UtilsNumerical.h"
 
-
-
-namespace okvis {
-
+namespace swift_vio {
 ImuFrontEnd::ImuFrontEnd(const ImuParams& imu_params)
     : imu_params_(imu_params) {
   CHECK_GT(imu_params.acc_noise_, 0.0);
@@ -76,7 +73,7 @@ int ImuFrontEnd::preintegrateImuMeasurements(
   imuMeasurements.resize(imu_timestamps.size());
   for (size_t i = 0u; i < imu_timestamps.size(); ++i) {
     imuMeasurements.emplace_back(okvis::ImuMeasurement(
-        imu_timestamps[i], ImuSensorReadings(accGyrSeq.block<3, 1>(3, i),
+        imu_timestamps[i], okvis::ImuSensorReadings(accGyrSeq.block<3, 1>(3, i),
                                              accGyrSeq.block<3, 1>(0, i))));
   }
   okvis::SpeedAndBias speedAndBias = okvis::SpeedAndBias::Zero();
@@ -288,4 +285,4 @@ ImuFrontEnd::generateRegularImuParams(const ImuParams& imu_params) {
   return regular_imu_params;
 }
 
-}  // namespace okvis
+}  // namespace swift_vio

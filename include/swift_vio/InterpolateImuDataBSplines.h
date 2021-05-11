@@ -14,6 +14,7 @@
 #include <vector>
 #include <iostream>
 
+namespace swift_vio {
 /**
  *@brief interpolate IMU data by cumulative SE3 B-splines given control poses
  *and their uniform timestamps
@@ -164,5 +165,6 @@ void InterpolateIMUData(
     samples[i].tail(3) = dotDdotTs[0].col(3).head(3);    //$v_s^w$
   }
 }
+}  // namespace simul
 
 #endif // INTERPOLATEIMUDATABSPLINES_H

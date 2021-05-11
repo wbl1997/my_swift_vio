@@ -2,9 +2,9 @@
 
 #include <Eigen/StdVector>
 
-#include <swift_vio/CameraTimeParamBlock.hpp>
-#include <swift_vio/EpipolarFactor.hpp>
-#include <swift_vio/EuclideanParamBlock.hpp>
+#include <swift_vio/ceres/CameraTimeParamBlock.hpp>
+#include <swift_vio/ceres/EpipolarFactor.hpp>
+#include <swift_vio/ceres/EuclideanParamBlock.hpp>
 #include <swift_vio/ExtrinsicModels.hpp>
 
 #include <okvis/cameras/EquidistantDistortion.hpp>
@@ -121,7 +121,7 @@ TEST(EpipolarFactor, Jacobians) {
   for (int j = 0; j < numValidPoint; ++j) {
     const int distortionDim =
         DistortedPinholeCameraGeometry::distortion_t::NumDistortionIntrinsics;
-    const int projIntrinsicDim = okvis::ProjectionOptFXY_CXY::kNumParams;
+    const int projIntrinsicDim = swift_vio::ProjectionOptFXY_CXY::kNumParams;
     const Eigen::Matrix2d covariance = Eigen::Matrix2d::Identity() / 0.36;
     const double tdAtCreation = 0.0;
 
@@ -153,8 +153,8 @@ TEST(EpipolarFactor, Jacobians) {
 
     ::ceres::CostFunction* epiFactor =
         new okvis::ceres::EpipolarFactor<DistortedPinholeCameraGeometry,
-                                         okvis::Extrinsic_p_BC_q_BC,
-                                         okvis::ProjectionOptFXY_CXY>(
+                                         swift_vio::Extrinsic_p_BC_q_BC,
+                                         swift_vio::ProjectionOptFXY_CXY>(
             cameraGeometryArg, j + 100, measurement12, covariance12,
             imuMeasCanopy, twoTimes, tdAtCreation2, sb2, imuParameters.g);
 
@@ -223,11 +223,11 @@ TEST(EpipolarFactor, Jacobians) {
                                   de_dtd.data()};
 
     okvis::ceres::EpipolarFactor<DistortedPinholeCameraGeometry,
-                                 okvis::Extrinsic_p_BC_q_BC,
-                                 okvis::ProjectionOptFXY_CXY>* costFuncPtr =
+                                 swift_vio::Extrinsic_p_BC_q_BC,
+                                 swift_vio::ProjectionOptFXY_CXY>* costFuncPtr =
         static_cast<okvis::ceres::EpipolarFactor<DistortedPinholeCameraGeometry,
-                                                 okvis::Extrinsic_p_BC_q_BC,
-                                                 okvis::ProjectionOptFXY_CXY>*>(
+                                                 swift_vio::Extrinsic_p_BC_q_BC,
+                                                 swift_vio::ProjectionOptFXY_CXY>*>(
             epiFactor);
     costFuncPtr->EvaluateWithMinimalJacobians(parameters, &residual, jacobians,
                                               jacobiansMinimal);

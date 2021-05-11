@@ -21,8 +21,7 @@
 #include "gtsam/ImuFrontEnd-definitions.h"
 #include "okvis/class_macros.hpp"
 
-namespace okvis {
-
+namespace swift_vio {
 struct ImuParams : public PipelineParams {
  public:
   POINTER_TYPEDEFS(ImuParams);
@@ -56,5 +55,4 @@ protected:
   Eigen::Matrix<double, 6, 1> biasAccOmegaInit_ = Eigen::Matrix<double, 6, 1>::Zero();
   gtsam::Vector3 n_gravity_ = gtsam::Vector3(0, 0, -9.81);
 };
-
-}  // namespace okvis
+}  // namespace swift_vio

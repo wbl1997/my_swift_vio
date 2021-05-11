@@ -40,11 +40,11 @@
 #define DISTORTION_MODEL_CHAIN_CASE(ImuModel, ExtrinsicModel, CameraGeometry)  \
   switch (projOptModelId) {                                                    \
     PROJECTION_INTRINSIC_MODEL_CHAIN_CASE(                                     \
-        ImuModel, ExtrinsicModel, CameraGeometry, ProjectionOptFXY_CXY)        \
+        ImuModel, ExtrinsicModel, CameraGeometry, swift_vio::ProjectionOptFXY_CXY)        \
     PROJECTION_INTRINSIC_MODEL_CHAIN_CASE(ImuModel, ExtrinsicModel,            \
-                                          CameraGeometry, ProjectionOptFX_CXY) \
+                                          CameraGeometry, swift_vio::ProjectionOptFX_CXY) \
     PROJECTION_INTRINSIC_MODEL_CHAIN_CASE(ImuModel, ExtrinsicModel,            \
-                                          CameraGeometry, ProjectionOptFX)     \
+                                          CameraGeometry, swift_vio::ProjectionOptFX)     \
     default:                                                                   \
       MODEL_DOES_NOT_APPLY_EXCEPTION                                           \
       break;                                                                   \
@@ -86,8 +86,8 @@
 #define IMU_MODEL_CHAIN_CASE(ImuModel)                          \
   case ImuModel::kModelId:                                      \
     switch (extrinsicModelId) {                                 \
-      EXTRINSIC_MODEL_CHAIN_CASE(ImuModel, Extrinsic_p_CB)      \
-      EXTRINSIC_MODEL_CHAIN_CASE(ImuModel, Extrinsic_p_BC_q_BC) \
+      EXTRINSIC_MODEL_CHAIN_CASE(ImuModel, swift_vio::Extrinsic_p_CB)      \
+      EXTRINSIC_MODEL_CHAIN_CASE(ImuModel, swift_vio::Extrinsic_p_BC_q_BC) \
       default:                                                  \
         MODEL_DOES_NOT_APPLY_EXCEPTION                          \
         break;                                                  \

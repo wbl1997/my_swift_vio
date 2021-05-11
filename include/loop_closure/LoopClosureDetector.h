@@ -29,10 +29,10 @@
 #include "loop_closure/LcdThirdPartyWrapper.h"
 #include "loop_closure/LoopClosureDetector-definitions.h"
 #include "loop_closure/LoopClosureDetectorParams.h"
-#include <okvis/KeyframeForLoopDetection.hpp>
+#include <loop_closure/KeyframeForLoopDetection.hpp>
 
-#include <okvis/LoopFrameAndMatches.hpp>
-#include <okvis/LoopClosureMethod.hpp>
+#include <loop_closure/LoopFrameAndMatches.hpp>
+#include <loop_closure/LoopClosureMethod.hpp>
 
 #ifdef HAVE_GTSAM
 #include "loop_closure/gtsam-definitions.h"
@@ -42,7 +42,7 @@ namespace KimeraRPGO {
 class RobustSolver;
 }
 
-namespace VIO {
+namespace swift_vio {
 // Add compatibility for c++11's lack of make_unique.
 template <typename T, typename... Args>
 std::unique_ptr<T> make_unique(Args&&... args) {
@@ -58,7 +58,7 @@ struct LoopKeyframeMetadata {
 };
 
 /* ------------------------------------------------------------------------ */
-class LoopClosureDetector : public okvis::LoopClosureMethod {
+class LoopClosureDetector : public LoopClosureMethod {
  public:
   POINTER_TYPEDEFS(LoopClosureDetector);
   DELETE_COPY_CONSTRUCTORS(LoopClosureDetector);
@@ -74,9 +74,9 @@ class LoopClosureDetector : public okvis::LoopClosureMethod {
   /* ------------------------------------------------------------------------ */
   virtual ~LoopClosureDetector();
 
-  virtual std::shared_ptr<okvis::KeyframeInDatabase> initializeKeyframeInDatabase(
+  virtual std::shared_ptr<KeyframeInDatabase> initializeKeyframeInDatabase(
       size_t dbowId,
-      const okvis::LoopQueryKeyframeMessage& queryKeyframe) const final;
+      const LoopQueryKeyframeMessage& queryKeyframe) const final;
 
   /**
    * @brief addConstraintsAndOptimize PGO is only performed when loop occurs.
@@ -87,14 +87,14 @@ class LoopClosureDetector : public okvis::LoopClosureMethod {
    * @return true which is not used yet.
    */
   virtual bool addConstraintsAndOptimize(
-      const okvis::KeyframeInDatabase& queryKeyframeInDB,
-      std::shared_ptr<const okvis::LoopFrameAndMatches> loopFrameAndMatches,
-      okvis::PgoResult& pgoResult) final;
+      const KeyframeInDatabase& queryKeyframeInDB,
+      std::shared_ptr<const LoopFrameAndMatches> loopFrameAndMatches,
+      PgoResult& pgoResult) final;
 
   inline std::shared_ptr<const OrbDatabase> getBoWDatabase() const { return db_BoW_; }
 
   void detectAndDescribe(
-      const okvis::LoopQueryKeyframeMessage& query_keyframe,
+      const LoopQueryKeyframeMessage& query_keyframe,
       OrbDescriptorVec* descriptors_vec);
 
   /* ------------------------------------------------------------------------ */
@@ -108,9 +108,9 @@ class LoopClosureDetector : public okvis::LoopClosureMethod {
    *  false otherwise.
    */
   virtual bool detectLoop(
-      std::shared_ptr<const okvis::LoopQueryKeyframeMessage> queryKeyframe,
-      std::shared_ptr<okvis::KeyframeInDatabase>& queryKeyframeInDB,
-      std::shared_ptr<okvis::LoopFrameAndMatches>& loopFrameAndMatches) final;
+      std::shared_ptr<const LoopQueryKeyframeMessage> queryKeyframe,
+      std::shared_ptr<KeyframeInDatabase>& queryKeyframeInDB,
+      std::shared_ptr<LoopFrameAndMatches>& loopFrameAndMatches) final;
 
   /* ------------------------------------------------------------------------ */
   /** @brief Verify that the geometry between two frames is close enough to be
@@ -122,15 +122,15 @@ class LoopClosureDetector : public okvis::LoopClosureMethod {
    * @return True if the verification check passes, false otherwise.
    */
   bool geometricVerificationCheck(
-      const okvis::LoopQueryKeyframeMessage& queryKeyframe,
+      const LoopQueryKeyframeMessage& queryKeyframe,
       const FrameId query_id, const FrameId match_id,
-      std::shared_ptr<okvis::LoopFrameAndMatches>* loopFrameAndMatches);
+      std::shared_ptr<LoopFrameAndMatches>* loopFrameAndMatches);
 
   /**
    * @brief create matched keypoints which will be used by VIO estimator for relocalisation.
    * @param[in, out] loopFrameAndMatches the loop frame and its matches message
    */
-  void createMatchedKeypoints(okvis::LoopFrameAndMatches* loopFrameAndMatches) const;
+  void createMatchedKeypoints(LoopFrameAndMatches* loopFrameAndMatches) const;
 
   /* ------------------------------------------------------------------------ */
   /** @brief Returns the values of the PGO, which is the full trajectory of the
@@ -163,7 +163,7 @@ class LoopClosureDetector : public okvis::LoopClosureMethod {
    * in RPGO for odometry factors.
    * @param[in]
    */
-  void addOdometryFactors(const okvis::KeyframeInDatabase& keyframeInDB);
+  void addOdometryFactors(const KeyframeInDatabase& keyframeInDB);
 
   void initializePGO(); ///< for test only.
 
@@ -220,10 +220,10 @@ class LoopClosureDetector : public okvis::LoopClosureMethod {
  private:
   using DMatchVec = std::vector<cv::DMatch>;
 };  // class LoopClosureDetector
-}  // namespace VIO
+}  // namespace swift_vio
 #else // create a dummy loop closure method when gtsam is not available.
-namespace VIO {
-class LoopClosureDetector : public okvis::LoopClosureMethod {
+namespace swift_vio {
+class LoopClosureDetector : public LoopClosureMethod {
  public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
@@ -231,5 +231,5 @@ class LoopClosureDetector : public okvis::LoopClosureMethod {
 
   virtual ~LoopClosureDetector() {}
 };
-} // namespace VIO
+}  // namespace swift_vio
 #endif

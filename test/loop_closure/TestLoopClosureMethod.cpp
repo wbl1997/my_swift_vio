@@ -20,7 +20,7 @@
 
 #include <swift_vio/memory.h>
 
-#include <swift_vio/RemoveFromVector.hpp>
+#include <swift_vio/VectorOperations.hpp>
 #include <swift_vio/VioFactoryMethods.hpp>
 #include <swift_vio/TwoViewGeometry.hpp>
 
@@ -33,7 +33,7 @@ DEFINE_string(test_data_path, "test/data", "Path to data for unit tests.");
 
 DECLARE_string(vocabulary_path);
 
-namespace VIO {
+namespace swift_vio {
 using CAMERA_GEOMETRY_T = okvis::cameras::PinholeCamera<
   okvis::cameras::RadialTangentialDistortion>;
 
@@ -50,9 +50,9 @@ class LCDFixture :public ::testing::Test {
                             std::string("/ForLoopClosureDetector")),
         equalize_image_(false), epipolarThreshold_(3.0f),
         cameraSystem_(new okvis::cameras::NCameraSystem),
-        frontend_(new okvis::Frontend(2, okvis::FrontendOptions())),
+        frontend_(new okvis::Frontend(2, swift_vio::FrontendOptions())),
         cut_matches_lowe_(true),
-        lcd_params_(new VIO::LoopClosureDetectorParams()),
+        lcd_params_(new swift_vio::LoopClosureDetectorParams()),
         ref1_to_cur1_pose_(),
         ref2_to_cur2_pose_(),
         id_ref1_(0),
@@ -209,15 +209,15 @@ class LCDFixture :public ::testing::Test {
     return triangulatedLandmarks;
   }
 
-  std::shared_ptr<okvis::LoopQueryKeyframeMessage>
+  std::shared_ptr<LoopQueryKeyframeMessage>
   createLoopQueryKeyframeMessage(
       std::shared_ptr<okvis::MultiFrame> nframe,
       const std::vector<size_t>& neighborKeyframeIds =
           std::vector<size_t>(), bool uniform_weight = true) const {
     uint64_t keyframeId = nframe->id();
     okvis::kinematics::Transformation T_WBr = GtsamWrap::toTransform(T_WB_list_[keyframeId]);
-    std::shared_ptr<okvis::LoopQueryKeyframeMessage> queryKeyframe(
-        new okvis::LoopQueryKeyframeMessage(nframe->id(), nframe->timestamp(),
+    std::shared_ptr<LoopQueryKeyframeMessage> queryKeyframe(
+        new LoopQueryKeyframeMessage(nframe->id(), nframe->timestamp(),
                                             T_WBr, nframe));
     if (uniform_weight) {
       queryKeyframe->setZeroCovariance();
@@ -228,8 +228,8 @@ class LCDFixture :public ::testing::Test {
       std::shared_ptr<okvis::MultiFrame> neighborFrame = stereo_frames_[neighborKeyframeId];
       okvis::kinematics::Transformation T_WBn = GtsamWrap::toTransform(T_WB_list_[neighborKeyframeId]);
       okvis::kinematics::Transformation T_BnBr = T_WBn.inverse() * T_WBr;
-      std::shared_ptr<okvis::NeighborConstraintMessage> neighborMessage(
-          new okvis::NeighborConstraintMessage(
+      std::shared_ptr<swift_vio::NeighborConstraintMessage> neighborMessage(
+          new swift_vio::NeighborConstraintMessage(
               neighborFrame->id(), neighborFrame->timestamp(), T_BnBr, T_WBn));
       if (uniform_weight) {
         neighborMessage->core_.squareRootInfo_.setIdentity();
@@ -402,10 +402,10 @@ class LCDFixture :public ::testing::Test {
   const FrameId id_ref2_;
   const FrameId id_cur2_;
 
-  const VIO::Timestamp timestamp_ref1_;
-  const VIO::Timestamp timestamp_cur1_;
-  const VIO::Timestamp timestamp_ref2_;
-  const VIO::Timestamp timestamp_cur2_;
+  const swift_vio::Timestamp timestamp_ref1_;
+  const swift_vio::Timestamp timestamp_cur1_;
+  const swift_vio::Timestamp timestamp_ref2_;
+  const swift_vio::Timestamp timestamp_cur2_;
   const int pauseMillisec = 2000;
   const size_t totalKeyframes = 4u;
   const double sqrtInfoAliasFactor = 5.0;
@@ -420,15 +420,15 @@ TEST_F(LCDFixture, detectLoop) {
   std::pair<double, double> error;
 
   /* Test the detectLoop method against two images without closure */
-  std::shared_ptr<okvis::LoopFrameAndMatches> output_0;
-  std::shared_ptr<okvis::KeyframeInDatabase> queryKeyframeInDatabase;
+  std::shared_ptr<swift_vio::LoopFrameAndMatches> output_0;
+  std::shared_ptr<swift_vio::KeyframeInDatabase> queryKeyframeInDatabase;
 
   lcd_detector_->detectLoop(
       createLoopQueryKeyframeMessage(stereo_frames_[2]),
       queryKeyframeInDatabase, output_0);
   EXPECT_EQ(output_0.get(), nullptr);
 
-  std::shared_ptr<okvis::LoopFrameAndMatches> output_1;
+  std::shared_ptr<swift_vio::LoopFrameAndMatches> output_1;
   lcd_detector_->detectLoop(
       createLoopQueryKeyframeMessage(stereo_frames_[0]),
       queryKeyframeInDatabase, output_1);
@@ -436,7 +436,7 @@ TEST_F(LCDFixture, detectLoop) {
   EXPECT_EQ(output_1.get(), nullptr);
 
   /* Test the detectLoop method against two images that are identical */
-  std::shared_ptr<okvis::LoopFrameAndMatches> output_2;
+  std::shared_ptr<swift_vio::LoopFrameAndMatches> output_2;
   lcd_detector_->detectLoop(
       createLoopQueryKeyframeMessage(stereo_frames_[0]),
       queryKeyframeInDatabase, output_2);
@@ -445,7 +445,7 @@ TEST_F(LCDFixture, detectLoop) {
   EXPECT_EQ(output_2->id_, 0u);
   EXPECT_EQ(output_2->queryKeyframeId_, 0u);
   error = computeRotationAndTranslationErrors(
-      gtsam::Pose3(), VIO::GtsamWrap::toPose3(output_2->T_BlBq_), true);
+      gtsam::Pose3(), swift_vio::GtsamWrap::toPose3(output_2->T_BlBq_), true);
   EXPECT_LT(error.first, rot_tol);
   EXPECT_LT(error.second, tran_tol);
   EXPECT_LT((output_2->relativePoseSqrtInfo().diagonal() -
@@ -454,7 +454,7 @@ TEST_F(LCDFixture, detectLoop) {
             1e-7);
 
   /* Test the detectLoop method against two unidentical, similar images */
-  std::shared_ptr<okvis::LoopFrameAndMatches> output_3;
+  std::shared_ptr<swift_vio::LoopFrameAndMatches> output_3;
   lcd_detector_->detectLoop(
       createLoopQueryKeyframeMessage(stereo_frames_[1]),
       queryKeyframeInDatabase, output_3);
@@ -464,7 +464,7 @@ TEST_F(LCDFixture, detectLoop) {
     EXPECT_EQ(output_3->id_, 0u);
     EXPECT_EQ(output_3->queryKeyframeId_, 1u);
     error = computeRotationAndTranslationErrors(
-        ref1_to_cur1_pose_, VIO::GtsamWrap::toPose3(output_3->T_BlBq_), true);
+        ref1_to_cur1_pose_, swift_vio::GtsamWrap::toPose3(output_3->T_BlBq_), true);
     LOG(INFO) << "Loop frame relative pose estimation error " << error.first
               << " " << error.second;
     EXPECT_LT(error.first, rot_tol);
@@ -497,9 +497,9 @@ TEST_F(LCDFixture, spinOnce) {
       {2, 0},
       {1, 2}};  // frame index of neighboring keyframes for each query keyframe.
                 // note the most adjacent neighbor is at the front.
-  std::shared_ptr<okvis::LoopQueryKeyframeMessage>
+  std::shared_ptr<LoopQueryKeyframeMessage>
       kfs[totalKeyframes];  // query keyframes fed to the loop closure module.
-  std::shared_ptr<okvis::LoopFrameAndMatches>
+  std::shared_ptr<LoopFrameAndMatches>
       outputs[totalKeyframes];  // outputs for each query keyframe.
 
   size_t j = 0u;
@@ -508,11 +508,11 @@ TEST_F(LCDFixture, spinOnce) {
   for (auto i : processOrder) {
     kfs[j] = createLoopQueryKeyframeMessage(stereo_frames_[i],
     neighborKeyframeIds[j], false);
-    std::shared_ptr<okvis::KeyframeInDatabase> queryKeyframeInDatabase;
+    std::shared_ptr<swift_vio::KeyframeInDatabase> queryKeyframeInDatabase;
     LOG(INFO) << "Detect loop for keyframe " << i << " order " << j;
     lcd_detector_->detectLoop(kfs[j], queryKeyframeInDatabase, outputs[j]);
     EXPECT_FALSE(lcd_detector_->isUniformWeight());
-    okvis::PgoResult pgoResult;
+    PgoResult pgoResult;
     LOG(INFO) << "Add constraints for keyframe " << i;
     lcd_detector_->addConstraintsAndOptimize(*queryKeyframeInDatabase, outputs[j], pgoResult);
     EXPECT_EQ(lcd_detector_->getPGOTrajectory().size(), j + 1);
@@ -535,7 +535,7 @@ TEST_F(LCDFixture, spinOnce) {
     EXPECT_EQ(outputs[outputIndex]->queryKeyframeStamp_, timestamp_cur1_);
 
     std::pair<double, double> error = computeRotationAndTranslationErrors(
-        ref1_to_cur1_pose_, VIO::GtsamWrap::toPose3(outputs[outputIndex]->T_BlBq_), true);
+        ref1_to_cur1_pose_, swift_vio::GtsamWrap::toPose3(outputs[outputIndex]->T_BlBq_), true);
     LOG(INFO) << "Loop frame relative pose ref1_to_cur1_pose_ PnP error "
               << error.first << " " << error.second;
 
@@ -553,7 +553,7 @@ TEST_F(LCDFixture, spinOnce) {
     EXPECT_EQ(outputs[outputIndex]->queryKeyframeStamp_, timestamp_cur2_);
 
     std::pair<double, double> error = computeRotationAndTranslationErrors(
-        ref2_to_cur2_pose_, VIO::GtsamWrap::toPose3(outputs[outputIndex]->T_BlBq_), true);
+        ref2_to_cur2_pose_, swift_vio::GtsamWrap::toPose3(outputs[outputIndex]->T_BlBq_), true);
     LOG(INFO) << "Loop frame relative pose ref1_to_cur1_pose_ PnP error "
               << error.first << " " << error.second;
     EXPECT_GT((outputs[outputIndex]->relativePoseSqrtInfo().diagonal() -
@@ -578,4 +578,4 @@ TEST_F(LCDFixture, spinOnce) {
   }
 }
 
-}  // namespace VIO
+}  // namespace swift_vio

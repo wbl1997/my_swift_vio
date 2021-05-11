@@ -44,8 +44,6 @@
 #include <fstream>
 #include <memory>
 
-
-
 #include <geometry_msgs/PoseStamped.h>
 #include <sensor_msgs/PointCloud2.h>
 #include <visualization_msgs/Marker.h>
@@ -72,9 +70,7 @@
 #include <io_wrap/StreamHelper.hpp>
 #include <io_wrap/CameraPoseVisualization.h>
 
-/// \brief okvis Main namespace of this package.
-namespace okvis {
-
+namespace swift_vio {
 /**
  * @brief This class publishes to files.
  */
@@ -479,10 +475,6 @@ class Publisher : public StreamPublisher
   uint32_t ctr2_; ///< The counter for the amount of transferred points. Used for the seq parameter in the header.
 
   CameraPoseVisualization cameraPoseVisual_; ///< List of camera frustums.
-
-
 };
-
-}
-
+}  // namespace swift_vio
 #endif /* INCLUDE_OKVIS_PUBLISHER_HPP_ */

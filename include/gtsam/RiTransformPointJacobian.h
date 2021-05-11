@@ -12,15 +12,15 @@
 #include <swift_vio/TransformPointJacobian.hpp>
 
 namespace gtsam {
-class RiTransformPointJacobian : public okvis::TransformPointJacobian {
+class RiTransformPointJacobian : public swift_vio::TransformPointJacobian {
  public:
-  RiTransformPointJacobian() : okvis::TransformPointJacobian() {}
+  RiTransformPointJacobian() : swift_vio::TransformPointJacobian() {}
 
   virtual ~RiTransformPointJacobian() {}
 
   RiTransformPointJacobian(const okvis::kinematics::Transformation& T_AB,
                            const Eigen::Vector4d& hpB)
-      : okvis::TransformPointJacobian(T_AB, hpB) {}
+      : swift_vio::TransformPointJacobian(T_AB, hpB) {}
 
   /**
    * @brief dhpA_dT_AB \xi = [\phi, \delta t]
@@ -38,15 +38,15 @@ class RiTransformPointJacobian : public okvis::TransformPointJacobian {
 };
 
 class RiInverseTransformPointJacobian
-    : public okvis::InverseTransformPointJacobian {
+    : public swift_vio::InverseTransformPointJacobian {
  public:
-  RiInverseTransformPointJacobian() : okvis::InverseTransformPointJacobian() {}
+  RiInverseTransformPointJacobian() : swift_vio::InverseTransformPointJacobian() {}
 
   virtual ~RiInverseTransformPointJacobian() {}
 
   RiInverseTransformPointJacobian(const okvis::kinematics::Transformation& T_AB,
                                   const Eigen::Vector4d& hpA)
-      : okvis::InverseTransformPointJacobian(T_AB, hpA) {}
+      : swift_vio::InverseTransformPointJacobian(T_AB, hpA) {}
 
   void dhpB_dT_AB(Eigen::Matrix<double, 4, 6>* j) const override {
     j->topLeftCorner<3, 3>().noalias() =

@@ -6,9 +6,9 @@
 #include <okvis/IdProvider.hpp>
 #include <okvis/MultiFrame.hpp>
 
-#include <swift_vio/CameraTimeParamBlock.hpp>
+#include <swift_vio/ceres/CameraTimeParamBlock.hpp>
 #include <swift_vio/EpipolarJacobian.hpp>
-#include <swift_vio/EuclideanParamBlock.hpp>
+#include <swift_vio/ceres/EuclideanParamBlock.hpp>
 #include <swift_vio/FilterHelper.hpp>
 
 #include <swift_vio/PointLandmarkModels.hpp>
@@ -26,9 +26,7 @@ DEFINE_int32(
     "the receding tail observation of a landmark to "
     "form one two-view constraint in one filter update step");
 
-/// \brief okvis Main namespace of this package.
-namespace okvis {
-
+namespace swift_vio {
 TFVIO::TFVIO(std::shared_ptr<okvis::ceres::Map> mapPtr)
     : HybridFilter(mapPtr),
       minValidStateId_(0u) {}
@@ -52,9 +50,9 @@ bool TFVIO::applyMarginalizationStrategy(
   }
 
   // remove features tracked no more
-  for (PointMap::iterator pit = landmarksMap_.begin();
+  for (okvis::PointMap::iterator pit = landmarksMap_.begin();
        pit != landmarksMap_.end();) {
-    const MapPoint& mapPoint = pit->second;
+    const okvis::MapPoint& mapPoint = pit->second;
     if (mapPoint.shouldRemove(pointLandmarkOptions_.maxHibernationFrames)) {
       ++mTrackLengthAccumulator[mapPoint.observations.size()];
       for (std::map<okvis::KeypointIdentifier, uint64_t>::const_iterator it =
@@ -64,7 +62,7 @@ bool TFVIO::applyMarginalizationStrategy(
           mapPtr_->removeResidualBlock(
               reinterpret_cast<::ceres::ResidualBlockId>(it->second));
         }
-        const KeypointIdentifier& kpi = it->first;
+        const okvis::KeypointIdentifier& kpi = it->first;
         auto mfp = multiFramePtrMap_.find(kpi.frameId);
         OKVIS_ASSERT_TRUE(Exception, mfp != multiFramePtrMap_.end(), "frame id not found in frame map!");
         mfp->second->setLandmarkId(kpi.cameraIndex, kpi.keypointIndex, 0);
@@ -250,4 +248,4 @@ void TFVIO::optimize(size_t /*numIter*/, size_t /*numThreads*/, bool verbose) {
     LOG(INFO) << mapPtr_->summary.FullReport();
   }
 }
-}  // namespace okvis
+}  // namespace swift_vio

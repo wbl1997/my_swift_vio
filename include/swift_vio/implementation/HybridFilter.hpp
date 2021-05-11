@@ -6,16 +6,16 @@
  */
 #include <glog/logging.h>
 
-#include <swift_vio/ChordalDistance.hpp>
-#include <swift_vio/EpipolarFactor.hpp>
+#include <swift_vio/ceres/ChordalDistance.hpp>
+#include <swift_vio/ceres/EpipolarFactor.hpp>
+
 #include <swift_vio/PointLandmark.hpp>
 #include <swift_vio/PointLandmarkModels.hpp>
 #include <swift_vio/ProjParamOptModels.hpp>
-#include <swift_vio/RsReprojectionError.hpp>
-#include <swift_vio/ReprojectionErrorWithPap.hpp>
+#include <swift_vio/ceres/RsReprojectionError.hpp>
+#include <swift_vio/ceres/ReprojectionErrorWithPap.hpp>
 
-/// \brief okvis Main namespace of this package.
-namespace okvis {
+namespace swift_vio {
 template <class CameraGeometry, class ProjectionIntrinsicModel,
           class ExtrinsicModel, class PointLandmarkModel, class ImuModel>
 swift_vio::MeasurementJacobianStatus
@@ -70,7 +70,7 @@ HybridFilter::computeCameraObservationJacobians(
       std::static_pointer_cast<const CameraGeometry>(baseCameraGeometry);
 
   switch (optimizationOptions_.cameraObservationModelId) {
-    case okvis::cameras::kReprojectionErrorId: {
+    case swift_vio::cameras::kReprojectionErrorId: {
       typedef okvis::ceres::RsReprojectionError<
           CameraGeometry, ProjectionIntrinsicModel, ExtrinsicModel,
           PointLandmarkModel, ImuModel>
@@ -162,7 +162,7 @@ HybridFilter::computeCameraObservationJacobians(
       *residual = -(*residual);
       break;
     }
-    case okvis::cameras::kChordalDistanceId: {
+    case swift_vio::cameras::kChordalDistanceId: {
       typedef okvis::ceres::ChordalDistance<
           CameraGeometry, ProjectionIntrinsicModel, ExtrinsicModel,
           swift_vio::ParallaxAngleParameterization, ImuModel>
@@ -265,7 +265,7 @@ HybridFilter::computeCameraObservationJacobians(
                                     de_dSpeedAndBias_minimal[2].data()};
       bool evaluateOk = observationError->EvaluateWithMinimalJacobians(
           parameters, residual->data(), jacobians, jacobiansMinimal);
-      const std::vector<okvis::AnchorFrameIdentifier>& anchorIds = pointDataPtr->anchorIds();
+      const std::vector<AnchorFrameIdentifier>& anchorIds = pointDataPtr->anchorIds();
       if (evaluateOk) {
         status = swift_vio::MeasurementJacobianStatus::Successful;
       } else {
@@ -315,7 +315,7 @@ HybridFilter::computeCameraObservationJacobians(
       *residual = -(*residual);
       break;
     }
-    case okvis::cameras::kReprojectionErrorWithPapId: {
+    case swift_vio::cameras::kReprojectionErrorWithPapId: {
         typedef okvis::ceres::ReprojectionErrorWithPap<
             CameraGeometry, ProjectionIntrinsicModel, ExtrinsicModel,
             swift_vio::ParallaxAngleParameterization, ImuModel>
@@ -417,7 +417,7 @@ HybridFilter::computeCameraObservationJacobians(
                                       de_dSpeedAndBias_minimal[2].data()};
         bool evaluateOk = observationError->EvaluateWithMinimalJacobians(
             parameters, residual->data(), jacobians, jacobiansMinimal);
-        const std::vector<okvis::AnchorFrameIdentifier>& anchorIds = pointDataPtr->anchorIds();
+        const std::vector<AnchorFrameIdentifier>& anchorIds = pointDataPtr->anchorIds();
         if (evaluateOk) {
           status = swift_vio::MeasurementJacobianStatus::Successful;
         } else {
@@ -467,7 +467,7 @@ HybridFilter::computeCameraObservationJacobians(
         *residual = -(*residual);
         break;
       }
-    case okvis::cameras::kTangentDistanceId:
+    case swift_vio::cameras::kTangentDistanceId:
       break;
     default:
       MODEL_DOES_NOT_EXIST_EXCEPTION
@@ -475,4 +475,4 @@ HybridFilter::computeCameraObservationJacobians(
   }
   return status;
 }
-}  // namespace okvis
+}  // namespace swift_vio

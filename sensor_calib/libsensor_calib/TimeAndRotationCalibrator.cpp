@@ -2,8 +2,7 @@
 #include "swift_vio/imu/SimpleImuOdometry.hpp"
 #include "okvis/kinematics/sophus_operators.hpp"
 
-namespace sensor_calib {
-
+namespace swift_vio {
 bool cmp(okvis::Measurement<Eigen::Vector3d> lhs,
          okvis::Measurement<Eigen::Vector3d> rhs) {
   return lhs.timeStamp < rhs.timeStamp;
@@ -363,5 +362,4 @@ okvis::Time TimeAndRotationCalibrator::correlationStartTime() const {
                   uniformAngularRates_.back().timeStamp) -
          okvis::Duration(observationDuration_ + enumerationRangeSecs_);
 }
-
-} // namespace sensor_calib
+} // namespace swift_vio

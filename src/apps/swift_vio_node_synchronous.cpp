@@ -163,24 +163,24 @@ int main(int argc, char **argv) {
     return 1;
   }
 
-  okvis::RosParametersReader vio_parameters_reader(configFilename);
+  swift_vio::RosParametersReader vio_parameters_reader(configFilename);
   okvis::VioParameters parameters;
   vio_parameters_reader.getParameters(parameters);
-  okvis::setInputParameters(&parameters.input);
+  swift_vio::setInputParameters(&parameters.input);
 
   // Caution: Objects including shared_ptrs are destroyed in reverse order of construction,
   // and an object shared by shared_ptr will be destroyed when no shared_ptr shares its ownership.
   // Publisher is created before ThreadedKFVio as it depends on publisher in publisherLoop().
-  std::shared_ptr<okvis::StreamPublisher> publisher;
+  std::shared_ptr<swift_vio::StreamPublisher> publisher;
   if (FLAGS_publish_via_ros) {
-    publisher.reset(new okvis::Publisher(*nh));
+    publisher.reset(new swift_vio::Publisher(*nh));
   } else {
-    publisher.reset(new okvis::StreamPublisher());
+    publisher.reset(new swift_vio::StreamPublisher());
   }
   publisher->setParameters(parameters);
-  okvis::PgoPublisher pgoPublisher;
+  swift_vio::PgoPublisher pgoPublisher;
 
-  okvis::BackendParams backendParams;
+  swift_vio::BackendParams backendParams;
   backendParams.parseYAML(configFilename);
   std::shared_ptr<okvis::ceres::Map> mapPtr(new okvis::ceres::Map());
   std::shared_ptr<okvis::Estimator> estimator = swift_vio::createBackend(
@@ -189,8 +189,8 @@ int main(int argc, char **argv) {
       parameters.nCameraSystem.numCameras(),
       parameters.frontendOptions,
       parameters.optimization.algorithm);
-  std::shared_ptr<VIO::LoopClosureDetectorParams> lcParams(
-        new VIO::LoopClosureDetectorParams());
+  std::shared_ptr<swift_vio::LoopClosureDetectorParams> lcParams(
+        new swift_vio::LoopClosureDetectorParams());
   if (lcdConfigFilename.empty()) {
     LOG(WARNING) << "Default parameters for loop closure will be used as no "
                     "configuration filename is provided!";
@@ -198,18 +198,18 @@ int main(int argc, char **argv) {
     lcParams->parseYAML(lcdConfigFilename);
   }
   if (!frontend->isDescriptorBasedMatching()) {
-    lcParams->loop_closure_method_ = VIO::LoopClosureMethodType::Mock;
+    lcParams->loop_closure_method_ = swift_vio::LoopClosureMethodType::Mock;
     LOG(WARNING)
         << "Loop closure module requires descriptors for keypoints to perform "
            "matching. But the KLT frontend does not extract descriptors. "
            "Descriptors can be extracted for KLT points in creating loop query "
            "keyframes but this is not done yet.";
   }
-  std::shared_ptr<okvis::LoopClosureMethod> loopClosureMethod =
+  std::shared_ptr<swift_vio::LoopClosureMethod> loopClosureMethod =
       swift_vio::createLoopClosureMethod(lcParams);
   okvis::ThreadedKFVio okvis_estimator(parameters, estimator, frontend,
                                        loopClosureMethod);
-  okvis::VioSystemWrap::registerCallbacks(
+  swift_vio::VioSystemWrap::registerCallbacks(
       FLAGS_output_dir, parameters, &okvis_estimator, publisher.get(),
       &pgoPublisher);
 
@@ -217,9 +217,9 @@ int main(int argc, char **argv) {
 
   if (FLAGS_bagname.empty()) {
     // player to grab messages directly from files on a hard drive
-    okvis::Player player(&okvis_estimator, parameters);
+    swift_vio::Player player(&okvis_estimator, parameters);
     player.RunBlocking();
-    std::string filename = okvis::removeTrailingSlash(FLAGS_output_dir) +
+    std::string filename = swift_vio::removeTrailingSlash(FLAGS_output_dir) +
                            "/feature_statistics.txt";
     okvis_estimator.saveStatistics(filename);
     return 0;
@@ -231,7 +231,7 @@ int main(int argc, char **argv) {
   // open the bag
   rosbag::Bag bag(FLAGS_bagname, rosbag::bagmode::Read);
   std::vector<std::string> camera_topics =
-      okvis::parseCommaSeparatedTopics(FLAGS_camera_topics);
+      swift_vio::parseCommaSeparatedTopics(FLAGS_camera_topics);
   // views on topics. the slash is needs to be correct, it's ridiculous...
   std::string imu_topic = FLAGS_imu_topic;
   rosbag::View view_imu(bag, rosbag::TopicQuery(imu_topic));
@@ -289,7 +289,7 @@ int main(int argc, char **argv) {
     for (size_t i = 0; i < numCameras; ++i) {
       sensor_msgs::ImageConstPtr msg1 =
           view_cam_iterators[i]->instantiate<sensor_msgs::Image>();
-      cv::Mat filtered = okvis::convertImageMsgToMat(msg1);
+      cv::Mat filtered = swift_vio::convertImageMsgToMat(msg1);
       t = okvis::Time(msg1->header.stamp.sec, msg1->header.stamp.nsec);
       if (start == okvis::Time(0.0)) {
         start = t;

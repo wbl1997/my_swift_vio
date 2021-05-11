@@ -183,7 +183,7 @@ add_definitions(-fPIC -march=native -Wextra -Winit-self -Woverloaded-virtual
                 -Wnon-virtual-dtor -Wsign-promo -Wno-long-long -std=c++0x)
 
 LIST(APPEND SOURCEFILES
-    src/feature_tracker/feature_tracker.cpp
+    src/feature_tracker/FeatureTracker.cpp
 
     src/gtsam/VioBackEndParams.cpp
     src/gtsam/ImuFactorTestHelpers.cpp

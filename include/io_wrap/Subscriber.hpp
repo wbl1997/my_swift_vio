@@ -71,9 +71,7 @@
 #include <okvis/cameras/NCameraSystem.hpp>
 #include <okvis/kinematics/Transformation.hpp>
 
-/// \brief okvis Main namespace of this package.
-namespace okvis {
-
+namespace swift_vio {
 /**
  * @brief This class handles all the buffering of incoming data.
  */
@@ -169,6 +167,6 @@ class Subscriber {
 };
 
 cv::Mat convertImageMsgToMat(const sensor_msgs::ImageConstPtr& msg);
-}  // namespace okvis
+}  // namespace swift_vio
 
 #endif /* INCLUDE_OKVIS_SUBSCRIBER_HPP_ */

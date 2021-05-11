@@ -33,13 +33,12 @@
 
 #include <opengv/sac/Ransac.hpp>
 
+using namespace okvis;
 
-/// \brief okvis Main namespace of this package.
-namespace okvis {
-
+namespace swift_vio {
 // Constructor.
 HybridFrontend::HybridFrontend(size_t numCameras, const FrontendOptions& frontendOptions)
-    : Frontend(numCameras, frontendOptions) {
+    : okvis::Frontend(numCameras, frontendOptions) {
 
 }
 
@@ -534,7 +533,7 @@ int HybridFrontend::checkMotionByRansac2d2d(okvis::Estimator& estimator,
       if (rotation_only_inliers > 10) {
         rotation_only_success = true;
       }
-      rmt = ROTATION_ONLY;
+      rmt = okvis::ROTATION_ONLY;
       totalInlierNumber += rotation_only_inliers;
       for (size_t k = 0; k < rotation_only_ransac.inliers_.size(); ++k) {
         inliers.at(rotation_only_ransac.inliers_.at(k)) = true;
@@ -543,7 +542,7 @@ int HybridFrontend::checkMotionByRansac2d2d(okvis::Estimator& estimator,
       if (translation_only_inliers > 10) {
         translation_only_success = true;
       }
-      rmt = RELATIVE_POSE;
+      rmt = okvis::RELATIVE_POSE;
       totalInlierNumber += translation_only_inliers;
       for (size_t k = 0; k < translation_only_ransac.inliers_.size(); ++k) {
         inliers.at(translation_only_ransac.inliers_.at(k)) = true;
@@ -578,7 +577,7 @@ int HybridFrontend::checkMotionByRansac2d2d(okvis::Estimator& estimator,
     }
   }
 
-  if (totalInlierNumber <= 15 || rmt == UNCERTAIN_MOTION) {
+  if (totalInlierNumber <= 15 || rmt == okvis::UNCERTAIN_MOTION) {
     *asKeyframe = true;
   }
   if (isInitialized_) {
@@ -610,5 +609,4 @@ void HybridFrontend::setLandmarkTriangulationParameters(double triangulationTran
   swift_vio::Feature::optimization_config.max_depth =
       triangulationMaxDepth;
 }
-
-}  // namespace okvis
+}  // namespace swift_vio

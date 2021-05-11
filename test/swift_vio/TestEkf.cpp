@@ -15,7 +15,7 @@
 #include <okvis/kinematics/Transformation.hpp>
 #include <okvis/kinematics/sophus_operators.hpp>
 
-namespace okvis {
+namespace swift_vio {
 class SimPoseFilter : public BaseFilter {
 public:
   SimPoseFilter()
@@ -54,7 +54,7 @@ public:
         continue;
       }
       r_q->segment<2>(2 * validObservations) = observations[j] - imagePoint;
-      okvis::MultipleTransformPointJacobian mtpj(transformList, {-1},
+      swift_vio::MultipleTransformPointJacobian mtpj(transformList, {-1},
                                                  observedCorners[j]);
       T_H->block<2, 6>(2 * validObservations, 0) = dz_dpCtj * mtpj.dp_dT(0u);
       (*R_q)(validObservations * 2, validObservations * 2) =
@@ -125,7 +125,7 @@ public:
   Eigen::AlignedVector<Eigen::Vector2d> observations;
   Eigen::AlignedVector<Eigen::Vector2d> observationStddev;
 };
-} // namespace okvis
+} // namespace swift_vio
 
 class BaseFilterTest : public ::testing::Test {
 public:

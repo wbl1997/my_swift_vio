@@ -4,7 +4,7 @@
 #include <swift_vio/memory.h>
 #include <okvis/Measurements.hpp>
 
-namespace okvis {
+namespace swift_vio {
 class StatAccumulator {
 public:
   StatAccumulator() : numSucceededRuns(0) {}
@@ -32,7 +32,6 @@ private:
   Eigen::AlignedVector<okvis::Measurement<Eigen::VectorXd>> stat, cumulativeStat;
   int numSucceededRuns;
 };
-}  // namespace okvis
-
+}  // namespace swift_vio
 
 #endif // STATACCUMULATOR_H

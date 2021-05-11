@@ -12,7 +12,7 @@
 #include <okvis/MultiFrame.hpp>
 
 
-#include <swift_vio/EuclideanParamBlock.hpp>
+#include <swift_vio/ceres/EuclideanParamBlock.hpp>
 #include <swift_vio/FeatureTriangulation.hpp>
 #include <swift_vio/FilterHelper.hpp>
 
@@ -32,9 +32,7 @@ DEFINE_bool(use_IEKF, false,
             "use iterated EKF in optimization, empirically IEKF cost at"
             "least twice as much time as EKF");
 
-/// \brief okvis Main namespace of this package.
-namespace okvis {
-
+namespace swift_vio {
 MSCKF::MSCKF(std::shared_ptr<okvis::ceres::Map> mapPtr)
     : HybridFilter(mapPtr) {}
 
@@ -96,7 +94,7 @@ bool MSCKF::measurementJacobianAIDPMono(
   double kpN = pointDataPtr->normalizedRow(observationIndex);
   const double featureTime = pointDataPtr->normalizedFeatureTime(observationIndex);
 
-  kinematics::Transformation T_WBtj = pointDataPtr->T_WBtij(observationIndex);
+  okvis::kinematics::Transformation T_WBtj = pointDataPtr->T_WBtij(observationIndex);
 
   okvis::kinematics::Transformation T_WBta;
   if (pointLandmarkOptions_.anchorAtObservationTime) {
@@ -111,10 +109,10 @@ bool MSCKF::measurementJacobianAIDPMono(
 
   std::shared_ptr<const okvis::cameras::CameraBase> cameraGeometry =
       camera_rig_.getCameraGeometry(camIdx);
-  cameras::CameraBase::ProjectionStatus status = cameraGeometry->project(
+  okvis::cameras::CameraBase::ProjectionStatus status = cameraGeometry->project(
       rhoxpCtj, &imagePoint, &dz_drhoxpCtj, &intrinsicsJacobian);
   *residual = obs - imagePoint;
-  if (status != cameras::CameraBase::ProjectionStatus::Successful) {
+  if (status != okvis::cameras::CameraBase::ProjectionStatus::Successful) {
     return false;
   } else if (!FLAGS_use_mahalanobis) {
     // some heuristics to defend outliers is used, e.g., ignore correspondences
@@ -126,7 +124,7 @@ bool MSCKF::measurementJacobianAIDPMono(
   }
 
   double rho = ab1rho[3];
-  kinematics::Transformation lP_T_WBtj = pointDataPtr->T_WBtij_ForJacobian(observationIndex);
+  okvis::kinematics::Transformation lP_T_WBtj = pointDataPtr->T_WBtij_ForJacobian(observationIndex);
   Eigen::Vector3d omega_Btj = pointDataPtr->omega_Btij(observationIndex);
   Eigen::Vector3d lP_v_WBtj = pointDataPtr->v_WBtij_ForJacobian(observationIndex);
   okvis::kinematics::Transformation T_BcA = lP_T_WBtj.inverse() * T_WCta;
@@ -228,16 +226,16 @@ bool MSCKF::measurementJacobianHPPMono(
   double featureTime = pointDataPtr->normalizedFeatureTime(observationIndex);
   double kpN = pointDataPtr->normalizedRow(observationIndex);
 
-  kinematics::Transformation T_WB = pointDataPtr->T_WBtij(observationIndex);
+  okvis::kinematics::Transformation T_WB = pointDataPtr->T_WBtij(observationIndex);
   Eigen::Vector3d omega_Btij = pointDataPtr->omega_Btij(observationIndex);
 
-  kinematics::Transformation T_CW = (T_WB * T_SC0).inverse();
+  okvis::kinematics::Transformation T_CW = (T_WB * T_SC0).inverse();
   Eigen::Vector4d hp_C = T_CW * v4Xhomog;
   Eigen::Vector3d pfiinC = hp_C.head<3>();
-  cameras::CameraBase::ProjectionStatus status = tempCameraGeometry->project(
+  okvis::cameras::CameraBase::ProjectionStatus status = tempCameraGeometry->project(
       pfiinC, &imagePoint, &dz_dpCtij, &intrinsicsJacobian);
   *residual = obs - imagePoint;
-  if (status != cameras::CameraBase::ProjectionStatus::Successful) {
+  if (status != okvis::cameras::CameraBase::ProjectionStatus::Successful) {
     return false;
   } else if (!FLAGS_use_mahalanobis) {
     if (std::fabs((*residual)[0]) > FLAGS_max_proj_tolerance ||
@@ -246,7 +244,7 @@ bool MSCKF::measurementJacobianHPPMono(
     }
   }
 
-  kinematics::Transformation lP_T_WB =
+  okvis::kinematics::Transformation lP_T_WB =
       pointDataPtr->T_WBtij_ForJacobian(observationIndex);
   Eigen::Vector3d lP_v_WBtij =
       pointDataPtr->v_WBtij_ForJacobian(observationIndex);
@@ -288,7 +286,7 @@ bool MSCKF::measurementJacobianHPPMono(
 }
 
 bool MSCKF::featureJacobianGeneric(
-    const MapPoint &mp, swift_vio::PointLandmark *pointLandmark, Eigen::MatrixXd &H_oi,
+    const okvis::MapPoint &mp, swift_vio::PointLandmark *pointLandmark, Eigen::MatrixXd &H_oi,
     Eigen::Matrix<double, Eigen::Dynamic, 1> &r_oi, Eigen::MatrixXd &R_oi,
     Eigen::Matrix<double, Eigen::Dynamic, 3> * /*pH_fi*/,
     std::vector<uint64_t> *orderedCulledFrameIds) const {
@@ -300,7 +298,7 @@ bool MSCKF::featureJacobianGeneric(
   // in which the marginalized observations should never occur.
   int featureVariableDimen = minimalDimOfAllCameraParams() +
                              kClonedStateMinimalDimen * (statesMap_.size() - 1);
-  int residualBlockDim = okvis::cameras::CameraObservationModelResidualDim(
+  int residualBlockDim = cameras::CameraObservationModelResidualDim(
         optimizationOptions_.cameraObservationModelId);
   // all observations for this feature point
   std::vector<Eigen::Vector2d, Eigen::aligned_allocator<Eigen::Vector2d>>
@@ -400,7 +398,7 @@ bool MSCKF::featureJacobianGeneric(
     Ri.block(sagax, sagax, residualBlockDim, residualBlockDim).setIdentity();
   }
 
-  if (optimizationOptions_.cameraObservationModelId != okvis::cameras::kEpipolarFactorId) {
+  if (optimizationOptions_.cameraObservationModelId != cameras::kEpipolarFactorId) {
     int columnRankHf = status.raysParallel ? 2 : 3;
     // (rDim * n) x ((rDim * n)-columnRankHf), n==numValidObs
     Eigen::MatrixXd nullQ =
@@ -455,14 +453,14 @@ swift_vio::MeasurementJacobianStatus MSCKF::measurementJacobianGeneric(
 }
 
 bool MSCKF::featureJacobian(
-    const MapPoint &mp, swift_vio::PointLandmark *pointLandmark,
+    const okvis::MapPoint &mp, swift_vio::PointLandmark *pointLandmark,
     Eigen::MatrixXd &H_oi, Eigen::Matrix<double, Eigen::Dynamic, 1> &r_oi,
     Eigen::MatrixXd &R_oi, Eigen::Matrix<double, Eigen::Dynamic, 3> *pH_fi,
     std::vector<uint64_t> *orderedCulledFrameIds) const {
   if (pointLandmarkOptions_.landmarkModelId ==
           swift_vio::ParallaxAngleParameterization::kModelId ||
       optimizationOptions_.cameraObservationModelId !=
-          okvis::cameras::kReprojectionErrorId) {
+          swift_vio::cameras::kReprojectionErrorId) {
     return featureJacobianGeneric(mp, pointLandmark, H_oi, r_oi, R_oi, pH_fi,
                                   orderedCulledFrameIds);
   } else {
@@ -637,5 +635,4 @@ void MSCKF::optimize(size_t /*numIter*/, size_t /*numThreads*/, bool verbose) {
     LOG(INFO) << mapPtr_->summary.FullReport();
   }
 }
-
-}  // namespace okvis
+}  // namespace swift_vio
