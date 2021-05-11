@@ -16,7 +16,7 @@ class CameraMeasurementJacobianTest {
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
   CameraMeasurementJacobianTest(
       okvis::cameras::NCameraSystem::DistortionType distortionId,
-      const okvis::PointLandmarkOptions plOptions)
+      const swift_vio::PointLandmarkOptions plOptions)
       : distortionId_(distortionId),
         pointLandmarkOptions_(plOptions),
         estimator_(std::shared_ptr<okvis::ceres::Map>(new okvis::ceres::Map)),
@@ -123,9 +123,9 @@ class CameraMeasurementJacobianTest {
   }
 
   okvis::cameras::NCameraSystem::DistortionType distortionId_;
-  okvis::PointLandmarkOptions pointLandmarkOptions_;
+  swift_vio::PointLandmarkOptions pointLandmarkOptions_;
 
-  okvis::MSCKF estimator_;
+  swift_vio::MSCKF estimator_;
   okvis::Time t0_; // start time.
 
   okvis::ImuParameters imuParameters_;
@@ -364,7 +364,7 @@ void CameraMeasurementJacobianTest::computeAndCheckJacobians() const {
 }
 
 TEST(CameraMeasurementJacobianTest, RadialTangential_AIDP) {
-  okvis::PointLandmarkOptions plOptions;
+  swift_vio::PointLandmarkOptions plOptions;
   plOptions.landmarkModelId = swift_vio::InverseDepthParameterization::kModelId;
   plOptions.anchorAtObservationTime = true;
   CameraMeasurementJacobianTest cmjt(
@@ -374,7 +374,7 @@ TEST(CameraMeasurementJacobianTest, RadialTangential_AIDP) {
 }
 
 TEST(CameraMeasurementJacobianTest, FOV_AIDP) {
-  okvis::PointLandmarkOptions plOptions;
+  swift_vio::PointLandmarkOptions plOptions;
   plOptions.landmarkModelId = swift_vio::InverseDepthParameterization::kModelId;
   plOptions.anchorAtObservationTime = true;
   CameraMeasurementJacobianTest cmjt(
@@ -384,7 +384,7 @@ TEST(CameraMeasurementJacobianTest, FOV_AIDP) {
 }
 
 TEST(CameraMeasurementJacobianTest, RadialTangential_AIDP_onesided) {
-  okvis::PointLandmarkOptions plOptions;
+  swift_vio::PointLandmarkOptions plOptions;
   plOptions.landmarkModelId = swift_vio::InverseDepthParameterization::kModelId;
   plOptions.anchorAtObservationTime = false;
   CameraMeasurementJacobianTest cmjt(
@@ -394,7 +394,7 @@ TEST(CameraMeasurementJacobianTest, RadialTangential_AIDP_onesided) {
 }
 
 TEST(CameraMeasurementJacobianTest, FOV_AIDP_onesided) {
-  okvis::PointLandmarkOptions plOptions;
+  swift_vio::PointLandmarkOptions plOptions;
   plOptions.landmarkModelId = swift_vio::InverseDepthParameterization::kModelId;
   plOptions.anchorAtObservationTime = false;
   CameraMeasurementJacobianTest cmjt(
@@ -404,7 +404,7 @@ TEST(CameraMeasurementJacobianTest, FOV_AIDP_onesided) {
 }
 
 TEST(CameraMeasurementJacobianTest, RadialTangential_HPP) {
-  okvis::PointLandmarkOptions plOptions;
+  swift_vio::PointLandmarkOptions plOptions;
   plOptions.landmarkModelId = swift_vio::HomogeneousPointParameterization::kModelId;
   plOptions.anchorAtObservationTime = false;
   CameraMeasurementJacobianTest cmjt(
@@ -414,7 +414,7 @@ TEST(CameraMeasurementJacobianTest, RadialTangential_HPP) {
 }
 
 TEST(CameraMeasurementJacobianTest, FOV_HPP) {
-  okvis::PointLandmarkOptions plOptions;
+  swift_vio::PointLandmarkOptions plOptions;
   plOptions.landmarkModelId = swift_vio::HomogeneousPointParameterization::kModelId;
   plOptions.anchorAtObservationTime = false;
   CameraMeasurementJacobianTest cmjt(

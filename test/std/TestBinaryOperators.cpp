@@ -21,10 +21,4 @@ TEST(StandardC, Bool)
     bool a=true, b=false;
     ASSERT_EQ(a, 1);
     ASSERT_EQ(b, 0);
-
-    EXPECT_EQ(~a, 0xfffffffe);
-    EXPECT_EQ(~b, 0xffffffff);
-
-    ASSERT_TRUE(~a);
-    ASSERT_TRUE(~b);
 }

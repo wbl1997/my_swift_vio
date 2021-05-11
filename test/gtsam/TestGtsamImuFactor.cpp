@@ -63,15 +63,15 @@ void ImuOdometryGtsam(const Eigen::Vector3d& p_WS_W0,
       0, 0, -imuParams.g);  ///< Gravity vector in nav frame (namely, the global
                             ///< frame, as used in the client's VINS)
 
-  okvis::ImuFrontEnd::PimPtr combinedPim;
+  swift_vio::ImuFrontEnd::PimPtr combinedPim;
 
   okvis::timing::Timer gtsamTimer("gtsam", false);
   swift_vio::ImuParams imuParamsKimera;
   imuParamsKimera.set(imuParams);
   imuParamsKimera.imu_preintegration_type_ =
-      okvis::ImuPreintegrationType::kPreintegratedCombinedMeasurements;
+      swift_vio::ImuPreintegrationType::kPreintegratedCombinedMeasurements;
 
-  okvis::ImuFrontEnd imuIntegrator(imuParamsKimera);
+  swift_vio::ImuFrontEnd imuIntegrator(imuParamsKimera);
   imuIntegrator.preintegrateImuMeasurements(imuMeasurements, sb0, startEpoch,
                                             finishEpoch, combinedPim);
 
@@ -104,7 +104,7 @@ void ImuOdometryGtsam(const Eigen::Vector3d& p_WS_W0,
           .preintMeasCov();
 
   // jacobian of the OKVIS error \xi relative to gtsam error state at t_j.
-  Eigen::Matrix<double, 15, 15> dxi_deta_j = gtsam::dokvis_dforster(*q_WS1);
+  Eigen::Matrix<double, 15, 15> dxi_deta_j = swift_vio::dokvis_dforster(*q_WS1);
 
   gtsam::Pose3 pose_i(gtsam::Rot3(q_WS0), p_WS_W0);
   Eigen::Vector3d vel_i = sb0.head<3>();
@@ -129,7 +129,7 @@ void ImuOdometryGtsam(const Eigen::Vector3d& p_WS_W0,
       Eigen::Matrix<double, 6, 9>::Zero(),
       -Eigen::Matrix<double, 6, 6>::Identity(); // -1 because CombinedImuFactor computeError in bias as e_b = b_i - b_j.
 
-  Eigen::Matrix<double, 15, 15> dxi_deta_i = gtsam::dokvis_dforster(q_WS0);
+  Eigen::Matrix<double, 15, 15> dxi_deta_i = swift_vio::dokvis_dforster(q_WS0);
 
   sb1->head<3>() = v_WS1;
   sb1->tail<6>() = sb0.tail<6>();

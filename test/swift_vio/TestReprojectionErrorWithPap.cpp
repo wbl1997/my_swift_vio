@@ -254,9 +254,9 @@ uint64_t CameraObservationJacobianTest::addNavStatesAndExtrinsic(
 uint64_t CameraObservationJacobianTest::addCameraParameterBlocks(
     const Eigen::VectorXd& intrinsicParams, okvis::Time startEpoch,
     double timeOffset) {
-  int projOptModelId = okvis::ProjectionOptNameToId(coo_.projOptModelName);
+  int projOptModelId = swift_vio::ProjectionOptNameToId(coo_.projOptModelName);
   Eigen::VectorXd projIntrinsics;
-  okvis::ProjectionOptGlobalToLocal(projOptModelId, intrinsicParams,
+  swift_vio::ProjectionOptGlobalToLocal(projOptModelId, intrinsicParams,
                                     &projIntrinsics);
 
   Eigen::VectorXd distortion = intrinsicParams.tail(kDistortionDim);
@@ -843,7 +843,7 @@ void CameraObservationJacobianTest::verifyJacobians(
       speedAndBiasBlocks_[1]->parameters()};
 
 
-  const int krd = okvis::cameras::CameraObservationModelResidualDim(
+  const int krd = swift_vio::cameras::CameraObservationModelResidualDim(
       coo_.cameraObservationModelId);
   Eigen::VectorXd residuals(krd);
   Eigen::AlignedVector<Eigen::Matrix<double, -1, 7, Eigen::RowMajor>> de_deltaTWB(
@@ -1251,24 +1251,24 @@ void setupPoseOptProblem(bool perturbPose, bool rollingShutter,
 
 TEST(ReprojectionErrorWithPap, NoiseFree) {
   setupPoseOptProblem(false, false, false,
-                      okvis::cameras::kReprojectionErrorWithPapId);
+                      swift_vio::cameras::kReprojectionErrorWithPapId);
 }
 
 TEST(ChordalDistance, NoiseFree) {
-  setupPoseOptProblem(false, false, false, okvis::cameras::kChordalDistanceId);
+  setupPoseOptProblem(false, false, false, swift_vio::cameras::kChordalDistanceId);
 }
 
 TEST(ChordalDistanceRWC, NoiseFree) {
-  setupPoseOptProblem(false, false, false, okvis::cameras::kChordalDistanceId,
+  setupPoseOptProblem(false, false, false, swift_vio::cameras::kChordalDistanceId,
                       true);
 }
 
 TEST(ReprojectionErrorWithPap, Noisy) {
   setupPoseOptProblem(true, true, true,
-                      okvis::cameras::kReprojectionErrorWithPapId);
+                      swift_vio::cameras::kReprojectionErrorWithPapId);
 }
 
 TEST(ChordalDistance, Noisy) {
   setupPoseOptProblem(true, true, true,
-                      okvis::cameras::kChordalDistanceId);
+                      swift_vio::cameras::kChordalDistanceId);
 }

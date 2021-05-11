@@ -176,9 +176,9 @@ TEST(EpipolarFactor, Jacobians) {
       tr = 0.033;
     }
 
-    int projOptModelId = okvis::ProjectionOptNameToId(projOptModelName);
+    int projOptModelId = swift_vio::ProjectionOptNameToId(projOptModelName);
     Eigen::VectorXd projIntrinsics;
-    okvis::ProjectionOptGlobalToLocal(projOptModelId, intrinsicParams,
+    swift_vio::ProjectionOptGlobalToLocal(projOptModelId, intrinsicParams,
                                       &projIntrinsics);
 
     Eigen::VectorXd distortion = intrinsicParams.tail(distortionDim);

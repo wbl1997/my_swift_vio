@@ -88,23 +88,23 @@ TEST(Triangulate, AllMethods) {
     std::vector<Eigen::Vector3d,
            Eigen::aligned_allocator<Eigen::Matrix<double, 3, 1>>>
         res(num_methods);
-    Eigen::Vector4d v4Xhomog = triangulateHomogeneousDLT(obs, vse3CFromW);
+    Eigen::Vector4d v4Xhomog = swift_vio::triangulateHomogeneousDLT(obs, vse3CFromW);
     if (fabs(v4Xhomog[3]) < 1e-9)
       res[0] = Eigen::Vector3d(0, 0, -1000);
     else
       res[0] = v4Xhomog.head<3>() / v4Xhomog[3];
-    res[1] = triangulate2View_midpoint(vV2ImPlane, vse3CFromW);
-    res[2] = triangulate_midpoint(vV2ImPlane, vse3CFromW);
+    res[1] = swift_vio::triangulate2View_midpoint(vV2ImPlane, vse3CFromW);
+    res[2] = swift_vio::triangulate_midpoint(vV2ImPlane, vse3CFromW);
 
     for (int zinc = 3; zinc < num_methods; ++zinc) res[zinc] = res[1];
 
-    triangulate_refine_GN(obs, vse3CFromW, res[3], 5);
+    swift_vio::triangulate_refine_GN(obs, vse3CFromW, res[3], 5);
 
     // The following methods use ceres solver.
-    triangulate_refine(obs, vse3CFromW, res[4], 5);
-    triangulate_refine(obs, vse3CFromW, res[5], 5, 1);
-    triangulate_refineJ(obs, vse3CFromW, res[6], 5);
-    triangulate_refineJ(obs, vse3CFromW, res[7], 5, 1);
+    swift_vio::triangulate_refine(obs, vse3CFromW, res[4], 5);
+    swift_vio::triangulate_refine(obs, vse3CFromW, res[5], 5, 1);
+    swift_vio::triangulate_refineJ(obs, vse3CFromW, res[6], 5);
+    swift_vio::triangulate_refineJ(obs, vse3CFromW, res[7], 5, 1);
 
     for (int zinc = 0; zinc < num_methods; ++zinc) {
       Eigen::Vector3d point = snv.truePoint().head<3>();
@@ -117,7 +117,7 @@ TEST(Triangulate, AllMethods) {
             << std::endl;
   std::cout << "residual medians:";
   for (int zinc = 0; zinc < num_methods; ++zinc) {
-    double medianDev = CalcMHWScore(deviation[zinc]);
+    double medianDev = swift_vio::CalcMHWScore(deviation[zinc]);
     std::cout << medianDev << " ";
     ASSERT_LT(medianDev, 0.5);
   }

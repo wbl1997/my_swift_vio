@@ -115,9 +115,9 @@ TEST(FilterHelper, nullspaceWithRankCheck) {
 //  std::cout << "residuals:" << residual.transpose()
 //            << "\nHx\n" << Hx << "\nHf\n" << Hf << "\n";
 
-  Eigen::MatrixXd leftNullspace3 = FilterHelper::leftNullspaceWithRankCheck(Hf, 3);
+  Eigen::MatrixXd leftNullspace3 = swift_vio::FilterHelper::leftNullspaceWithRankCheck(Hf, 3);
   EXPECT_TRUE((leftNullspace3.transpose() * Hf).isMuchSmallerThan(1, 1e-8));
-  Eigen::MatrixXd leftNullspace2 = FilterHelper::leftNullspaceWithRankCheck(Hf, 2);
+  Eigen::MatrixXd leftNullspace2 = swift_vio::FilterHelper::leftNullspaceWithRankCheck(Hf, 2);
   EXPECT_TRUE((leftNullspace2.transpose() * Hf).isMuchSmallerThan(1, 1e-8));
 //  std::cout << "(3)Q2' * Hx\n" << leftNullspace3.transpose() * Hx << "\n";
 //  std::cout << "(2)Q2' * Hx\n" << leftNullspace2.transpose() * Hx << "\n";
@@ -126,7 +126,7 @@ TEST(FilterHelper, nullspaceWithRankCheck) {
   Eigen::Matrix<double, -1, -1> HxGivens = Hx;
   Eigen::Matrix<double, -1, -1> HfGivens = Hf;
   Eigen::Matrix<double, -1, 1> residualGivens = residual;
-  FilterHelper::multiplyLeftNullspaceWithGivens(&HfGivens, &HxGivens, &residualGivens, &R, 3);
+  swift_vio::FilterHelper::multiplyLeftNullspaceWithGivens(&HfGivens, &HxGivens, &residualGivens, &R, 3);
 
 //  std::cout << "Hf Givens\n" << HfGivens << "\nHx\n" << HxGivens << "\n";
 }

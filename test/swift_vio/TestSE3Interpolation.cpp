@@ -24,7 +24,7 @@ TEST(SE3Interpolation, CoarseInitialization) {
         Sophus::SE3d(Eigen::Quaterniond(1, 0, 0, 0),
                      Eigen::Vector3d(0.5 * aing * time * time, 0, 0)));
   }
-  InterpolateIMUData(q02n, times, outputFreq, samplePoses, samples, gw);
+  swift_vio::InterpolateIMUData(q02n, times, outputFreq, samplePoses, samples, gw);
 
   // check the results
   size_t removeEnds = (size_t)(interval * outputFreq);
@@ -49,7 +49,7 @@ TEST(SE3Interpolation, CoarseInitialization) {
     tbinw << radius * cos(theta), radius * sin(theta), 0;
     q02n.push_back(Sophus::SE3d(Rb2w, tbinw));
   }
-  InterpolateIMUData(q02n, times, outputFreq, samplePoses, samples, gw);
+  swift_vio::InterpolateIMUData(q02n, times, outputFreq, samplePoses, samples, gw);
 
   // check the results
   for (size_t jack = removeEnds; jack < samples.size() - removeEnds; ++jack) {

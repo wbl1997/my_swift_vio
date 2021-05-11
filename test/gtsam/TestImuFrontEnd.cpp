@@ -31,13 +31,13 @@ TEST(ImuFrontEnd, ImuFrontEndInitialization) {
   imu_params.n_gravity_ << 1.0, 1.0, 1.0;
   imu_params.imu_integration_sigma_ = 1.0;
   imu_params.imu_preintegration_type_ =
-      ImuPreintegrationType::kPreintegratedImuMeasurements;
+      swift_vio::ImuPreintegrationType::kPreintegratedImuMeasurements;
   Eigen::Vector3d bias_acc(1.0, 1.0, 1.0);
   Eigen::Vector3d bias_gyr(1.0, 1.0, 1.0);
   gtsam::imuBias::ConstantBias imu_bias(bias_acc, bias_gyr);
   ImuFrontEnd imu_frontend(imu_params);
   EXPECT_EQ(imu_frontend.getImuPreintegrationType(),
-            ImuPreintegrationType::kPreintegratedImuMeasurements);
+            swift_vio::ImuPreintegrationType::kPreintegratedImuMeasurements);
 }
 
 /* -------------------------------------------------------------------------- */

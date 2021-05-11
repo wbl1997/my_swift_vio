@@ -13,7 +13,7 @@ TEST(RelativeMotionJacobian, de_ddelta_BC) {
   T_GBj.setRandom();
   okvis::kinematics::Transformation T_GBk;
   T_GBk.setRandom();
-  okvis::RelativeMotionJacobian rmj(T_BC, T_GBj, T_GBk);
+  swift_vio::RelativeMotionJacobian rmj(T_BC, T_GBj, T_GBk);
   okvis::kinematics::Transformation T_CjCk = rmj.relativeMotionT();
   Eigen::Matrix3d dtheta_dtheta_BC;
   rmj.dtheta_dtheta_BC(&dtheta_dtheta_BC);
@@ -36,7 +36,7 @@ TEST(RelativeMotionJacobian, de_ddelta_BC) {
     delta(i) = eps;
     okvis::kinematics::Transformation T_BC_bar = T_BC;
     T_BC_bar.oplus(delta);
-    okvis::RelativeMotionJacobian rmj_bar(T_BC_bar, T_GBj, T_GBk);
+    swift_vio::RelativeMotionJacobian rmj_bar(T_BC_bar, T_GBj, T_GBk);
     okvis::kinematics::Transformation T_CjCk_bar = rmj_bar.relativeMotionT();
     Eigen::Matrix<double, 6, 1> delta = okvis::kinematics::ominus(T_CjCk_bar, T_CjCk) / eps;
     dp_ddelta_BC.col(i) = delta.head<3>();
@@ -60,7 +60,7 @@ TEST(RelativeMotionJacobian, de_ddelta_BC) {
       delta(i) = eps;
       okvis::kinematics::Transformation T_CB_bar = T_BC.inverse();
       T_CB_bar.oplus(delta);
-      okvis::RelativeMotionJacobian rmj_bar(T_CB_bar.inverse(), T_GBj, T_GBk);
+      swift_vio::RelativeMotionJacobian rmj_bar(T_CB_bar.inverse(), T_GBj, T_GBk);
       okvis::kinematics::Transformation T_CjCk_bar = rmj_bar.relativeMotionT();
       Eigen::Matrix<double, 6, 1> delta = okvis::kinematics::ominus(T_CjCk_bar, T_CjCk) / eps;
       dp_dt_CB.col(i) = delta.head<3>();
@@ -81,7 +81,7 @@ TEST(RelativeMotionJacobian, de_ddelta_GBj) {
   T_GBj.setRandom();
   okvis::kinematics::Transformation T_GBk;
   T_GBk.setRandom();
-  okvis::RelativeMotionJacobian rmj(T_BC, T_GBj, T_GBk);
+  swift_vio::RelativeMotionJacobian rmj(T_BC, T_GBj, T_GBk);
   okvis::kinematics::Transformation T_CjCk = rmj.relativeMotionT();
   Eigen::Matrix3d dtheta_dtheta_GBj;
   rmj.dtheta_dtheta_GBj(&dtheta_dtheta_GBj);
@@ -104,7 +104,7 @@ TEST(RelativeMotionJacobian, de_ddelta_GBj) {
     delta(i) = eps;
     okvis::kinematics::Transformation T_GBj_bar = T_GBj;
     T_GBj_bar.oplus(delta);
-    okvis::RelativeMotionJacobian rmj_bar(T_BC, T_GBj_bar, T_GBk);
+    swift_vio::RelativeMotionJacobian rmj_bar(T_BC, T_GBj_bar, T_GBk);
     okvis::kinematics::Transformation T_CjCk_bar = rmj_bar.relativeMotionT();
     Eigen::Matrix<double, 6, 1> delta = okvis::kinematics::ominus(T_CjCk_bar, T_CjCk) / eps;
     dp_ddelta_GBj.col(i) = delta.head<3>();
@@ -133,7 +133,7 @@ TEST(RelativeMotionJacobian, de_ddelta_GBk) {
   T_GBj.setRandom();
   okvis::kinematics::Transformation T_GBk;
   T_GBk.setRandom();
-  okvis::RelativeMotionJacobian rmj(T_BC, T_GBj, T_GBk);
+  swift_vio::RelativeMotionJacobian rmj(T_BC, T_GBj, T_GBk);
   okvis::kinematics::Transformation T_CjCk = rmj.relativeMotionT();
   Eigen::Matrix3d dtheta_dtheta_GBk;
   rmj.dtheta_dtheta_GBk(&dtheta_dtheta_GBk);
@@ -156,7 +156,7 @@ TEST(RelativeMotionJacobian, de_ddelta_GBk) {
     delta(i) = eps;
     okvis::kinematics::Transformation T_GBk_bar = T_GBk;
     T_GBk_bar.oplus(delta);
-    okvis::RelativeMotionJacobian rmj_bar(T_BC, T_GBj, T_GBk_bar);
+    swift_vio::RelativeMotionJacobian rmj_bar(T_BC, T_GBj, T_GBk_bar);
     okvis::kinematics::Transformation T_CjCk_bar = rmj_bar.relativeMotionT();
     Eigen::Matrix<double, 6, 1> delta = okvis::kinematics::ominus(T_CjCk_bar, T_CjCk) / eps;
     dp_ddelta_GBk.col(i) = delta.head<3>();

@@ -148,13 +148,13 @@ TEST_F(RiImuFactorTest, predict) {
   gtsam::RiPreintegratedImuMeasurements ripim = riFactor_.pim();
   gtsam::RiExtendedPose3 extendedPosej = ripim.predict(extendedPosei_);
 
-  okvis::ImuFrontEnd::PimPtr combinedPim;
+  swift_vio::ImuFrontEnd::PimPtr combinedPim;
   swift_vio::ImuParams imuParamsKimera;
   imuParamsKimera.set(riFactor_.pim().imuParameters());
   imuParamsKimera.imu_preintegration_type_ =
-      okvis::ImuPreintegrationType::kPreintegratedCombinedMeasurements;
+      swift_vio::ImuPreintegrationType::kPreintegratedCombinedMeasurements;
 
-  okvis::ImuFrontEnd imuIntegrator(imuParamsKimera);
+  swift_vio::ImuFrontEnd imuIntegrator(imuParamsKimera);
   Eigen::Matrix<double, 9, 1> sb0;
   sb0.head<3>() = extendedPosei_.velocity();
   sb0.segment<3>(3) = biasi_.gyroscope();

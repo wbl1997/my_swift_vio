@@ -45,7 +45,7 @@ void checkEqual(const okvis::ImuMeasurementDeque& a,
 
 TEST(BoundedImuDeque, PushBack) {
   okvis::ImuMeasurementDeque imu_meas_deque = createMeasDeque(0, 10);
-  okvis::BoundedImuDeque bid;
+  swift_vio::BoundedImuDeque bid;
   int res1 = bid.push_back(imu_meas_deque);
   int res2 = bid.push_back(imu_meas_deque);
   EXPECT_EQ(res1, 10);
@@ -58,7 +58,7 @@ TEST(BoundedImuDeque, PushBack) {
 
 TEST(BoundedImuDeque, PopFront) {
   okvis::ImuMeasurementDeque imu_meas_deque = createMeasDeque(0, 10);
-  okvis::BoundedImuDeque bid;
+  swift_vio::BoundedImuDeque bid;
   bid.push_back(imu_meas_deque);
   int res1 = bid.pop_front(okvis::Time(3.0));
   EXPECT_EQ(res1, 3);
@@ -72,7 +72,7 @@ TEST(BoundedImuDeque, PopFront) {
 
 TEST(BoundedImuDeque, Find) {
   okvis::ImuMeasurementDeque imu_meas_deque = createMeasDeque(0, 10);
-  okvis::BoundedImuDeque bid;
+  swift_vio::BoundedImuDeque bid;
   bid.push_back(imu_meas_deque);
   okvis::ImuMeasurementDeque imu_meas1 =
       bid.find(okvis::Time(2.0), okvis::Time(2.0));

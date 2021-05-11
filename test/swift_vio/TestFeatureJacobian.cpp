@@ -34,7 +34,7 @@ void computeNavErrors(
 }
 
 int examinLandmarkStackedJacobian(const okvis::MapPoint& mapPoint,
-                                   std::shared_ptr<okvis::MSCKF> estimator) {
+                                   std::shared_ptr<swift_vio::MSCKF> estimator) {
   swift_vio::PointLandmark pointLandmark;
   Eigen::MatrixXd H_oi[2];
   Eigen::Matrix<double, Eigen::Dynamic, 1> r_oi[2];
@@ -101,7 +101,7 @@ int examinLandmarkStackedJacobian(const okvis::MapPoint& mapPoint,
 }
 
 int examineLandmarkMeasurementJacobian(
-    const okvis::MapPoint& mapPoint, std::shared_ptr<okvis::MSCKF> estimator) {
+    const okvis::MapPoint& mapPoint, std::shared_ptr<swift_vio::MSCKF> estimator) {
   swift_vio::PointLandmark pointLandmark;
   Eigen::MatrixXd H_oi;
   Eigen::Matrix<double, Eigen::Dynamic, 1> r_oi;
@@ -141,7 +141,7 @@ public:
         true, noisyInitialSpeedAndBiases, false, true, true, noise_factor,
         noise_factor, algorithm, useEpipolarConstraint,
         cameraObservationModelId, landmarkModelId, cameraModelId,
-        cameraOrientationId, okvis::LandmarkGridType::FourWalls,
+        cameraOrientationId, simul::LandmarkGridType::FourWalls,
         landmarkRadius);
     vioSystemBuilder.createVioSystem(testSetting, backendParams, trajectoryType,
                                      projOptModelName, extrinsicModelName,
@@ -280,10 +280,10 @@ public:
    * Jacobian.
    */
   void examineJacobian(bool examineMeasurementJacobian) const {
-    std::shared_ptr<okvis::MSCKF> filter =
-        std::dynamic_pointer_cast<okvis::MSCKF>(estimator);
+    std::shared_ptr<swift_vio::MSCKF> filter =
+        std::dynamic_pointer_cast<swift_vio::MSCKF>(estimator);
     {
-      okvis::StatePointerAndEstimateList currentStates;
+      swift_vio::StatePointerAndEstimateList currentStates;
       filter->cloneFilterStates(&currentStates);
       Eigen::VectorXd deltaX;
       filter->boxminusFromInput(currentStates, &deltaX);

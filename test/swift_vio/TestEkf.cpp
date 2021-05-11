@@ -47,7 +47,7 @@ public:
       Eigen::Vector2d imagePoint;
       Eigen::Matrix<double, 2, 4> dz_dpCtj;
       Eigen::Vector4d pCtj = T_WC_est.inverse() * observedCorners[j];
-      cameras::CameraBase::ProjectionStatus status =
+      okvis::cameras::CameraBase::ProjectionStatus status =
           cameraSystem->cameraGeometry(0)->projectHomogeneous(pCtj, &imagePoint,
                                                               &dz_dpCtj);
       if (status != okvis::cameras::CameraBase::ProjectionStatus::Successful) {
@@ -81,11 +81,11 @@ public:
 
   void updateStates(
       const Eigen::Matrix<double, Eigen::Dynamic, 1> &deltaX) override {
-    kinematics::Transformation T_WC = poseParameterBlock->estimate();
+    okvis::kinematics::Transformation T_WC = poseParameterBlock->estimate();
     // In effect this amounts to PoseParameterBlock::plus().
     Eigen::Vector3d deltaAlpha = deltaX.segment<3>(3);
     Eigen::Quaterniond deltaq = okvis::kinematics::expAndTheta(deltaAlpha);
-    T_WC = kinematics::Transformation(T_WC.r() + deltaX.head<3>(),
+    T_WC = okvis::kinematics::Transformation(T_WC.r() + deltaX.head<3>(),
                                       deltaq * T_WC.q());
     poseParameterBlock->setEstimate(T_WC);
   }
@@ -209,7 +209,7 @@ protected:
     filter.setObservations(observedCorners, observations, observationStddev);
   }
 
-  okvis::SimPoseFilter filter;
+  swift_vio::SimPoseFilter filter;
 
   okvis::kinematics::Transformation T_WS_ref;
   int cols = 6;
