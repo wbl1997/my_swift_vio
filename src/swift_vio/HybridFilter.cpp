@@ -23,6 +23,7 @@
 
 #include <swift_vio/EkfUpdater.h>
 #include <swift_vio/FilterHelper.hpp>
+#include <swift_vio/IoUtil.hpp>
 #include <swift_vio/MultipleTransformPointJacobian.hpp>
 #include <swift_vio/imu/ImuOdometry.h>
 #include <swift_vio/PointLandmark.hpp>
@@ -3031,7 +3032,7 @@ bool HybridFilter::print(std::ostream& stream) const {
   const States stateInQuestion = statesMap_.rbegin()->second;
   Eigen::Matrix<double, Eigen::Dynamic, 1> extraParams;
   getImuAugmentedStatesEstimate(&extraParams);
-  stream << " " << extraParams.transpose().format(okvis::kSpaceInitFmt);
+  stream << " " << extraParams.transpose().format(kSpaceInitFmt);
 
   // camera extrinsic parameters.
   size_t numCameras = camera_rig_.numberCameras();
@@ -3051,13 +3052,13 @@ bool HybridFilter::print(std::ostream& stream) const {
   }
   Eigen::VectorXd cameraParams;
   getCameraCalibrationEstimate(&cameraParams);
-  stream << " " << cameraParams.transpose().format(okvis::kSpaceInitFmt);
+  stream << " " << cameraParams.transpose().format(kSpaceInitFmt);
 
   // stds
   const int stateDim = startIndexOfClonedStatesFast();
   Eigen::Matrix<double, Eigen::Dynamic, 1> variances =
       covariance_.topLeftCorner(stateDim, stateDim).diagonal();
-  stream << " " << variances.cwiseSqrt().transpose().format(okvis::kSpaceInitFmt);
+  stream << " " << variances.cwiseSqrt().transpose().format(kSpaceInitFmt);
   return true;
 }
 

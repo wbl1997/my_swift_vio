@@ -27,6 +27,7 @@
 
 #include <swift_vio/ceres/CameraTimeParamBlock.hpp>
 #include <swift_vio/ceres/EuclideanParamBlock.hpp>
+#include <swift_vio/IoUtil.hpp>
 #include <swift_vio/PointLandmarkModels.hpp>
 #include <swift_vio/ProjParamOptModels.hpp>
 #include <swift_vio/StatAccumulator.h>
@@ -171,8 +172,8 @@ void computeErrors(
   Eigen::Matrix<double, 3, 1> p_CB_est;
   okvis::kinematics::Transformation T_SC_est;
   estimator->getSensorStateEstimateAs<okvis::ceres::PoseParameterBlock>(
-      currFrameId, 0, okvis::HybridFilter::SensorStates::Camera,
-      okvis::HybridFilter::CameraSensorStates::T_SCi, T_SC_est);
+      currFrameId, 0, swift_vio::HybridFilter::SensorStates::Camera,
+      swift_vio::HybridFilter::CameraSensorStates::T_SCi, T_SC_est);
   p_CB_est = T_SC_est.inverse().r();
   squaredError->segment<3>(index) = p_CB_est.cwiseAbs2();
   index += 3;
@@ -186,11 +187,11 @@ void computeErrors(
     Eigen::Matrix<double, Eigen::Dynamic, 1> projectionIntrinsic;
     if (projOptModelDim > 0) {
       estimator->getSensorStateEstimateAs<okvis::ceres::EuclideanParamBlock>(
-          currFrameId, 0, okvis::HybridFilter::SensorStates::Camera,
-          okvis::HybridFilter::CameraSensorStates::Intrinsics,
+          currFrameId, 0, swift_vio::HybridFilter::SensorStates::Camera,
+          swift_vio::HybridFilter::CameraSensorStates::Intrinsics,
           projectionIntrinsic);
       Eigen::VectorXd local_opt_params;
-      okvis::ProjectionOptGlobalToLocal(projOptModelId, intrinsics_true,
+      swift_vio::ProjectionOptGlobalToLocal(projOptModelId, intrinsics_true,
                                         &local_opt_params);
 
       squaredError->segment(index, projOptModelDim) =
@@ -201,8 +202,8 @@ void computeErrors(
     Eigen::Matrix<double, Eigen::Dynamic, 1> cameraDistortion_est(
         nDistortionCoeffDim);
     estimator->getSensorStateEstimateAs<okvis::ceres::EuclideanParamBlock>(
-        currFrameId, 0, okvis::HybridFilter::SensorStates::Camera,
-        okvis::HybridFilter::CameraSensorStates::Distortion,
+        currFrameId, 0, swift_vio::HybridFilter::SensorStates::Camera,
+        swift_vio::HybridFilter::CameraSensorStates::Distortion,
         cameraDistortion_est);
     squaredError->segment(index, nDistortionCoeffDim) =
         (cameraDistortion_est - distIntrinsic_true).cwiseAbs2();
@@ -210,15 +211,15 @@ void computeErrors(
 
     double timeDelayEstimate(0.0), readoutTimeEstimate(0.0);
     estimator->getSensorStateEstimateAs<okvis::ceres::CameraTimeParamBlock>(
-        currFrameId, 0, okvis::HybridFilter::SensorStates::Camera,
-        okvis::HybridFilter::CameraSensorStates::TD, timeDelayEstimate);
+        currFrameId, 0, swift_vio::HybridFilter::SensorStates::Camera,
+        swift_vio::HybridFilter::CameraSensorStates::TD, timeDelayEstimate);
     double delta_td = refCameraGeometry->imageDelay() - timeDelayEstimate;
     (*squaredError)[index] = delta_td * delta_td;
     ++index;
 
     estimator->getSensorStateEstimateAs<okvis::ceres::CameraTimeParamBlock>(
-        currFrameId, 0, okvis::HybridFilter::SensorStates::Camera,
-        okvis::HybridFilter::CameraSensorStates::TR, readoutTimeEstimate);
+        currFrameId, 0, swift_vio::HybridFilter::SensorStates::Camera,
+        swift_vio::HybridFilter::CameraSensorStates::TR, readoutTimeEstimate);
     double deltaReadoutTime = refCameraGeometry->readoutTime() - readoutTimeEstimate;
     (*squaredError)[index] = deltaReadoutTime * deltaReadoutTime;
     ++index;
@@ -471,15 +472,15 @@ void testHybridFilterSinusoid(
               = cameraSystem0->T_SC(0);
 
           truthStream << *iter << " " << id << " " << std::setfill(' ')
-                      << T_WS.parameters().transpose().format(okvis::kSpaceInitFmt)
-                      << " " << v_WS_true.transpose().format(okvis::kSpaceInitFmt)
-                      << " " << trueBiasIter->measurement.gyroscopes.transpose().format(okvis::kSpaceInitFmt)
-                      << " " << trueBiasIter->measurement.accelerometers.transpose().format(okvis::kSpaceInitFmt)
+                      << T_WS.parameters().transpose().format(swift_vio::kSpaceInitFmt)
+                      << " " << v_WS_true.transpose().format(swift_vio::kSpaceInitFmt)
+                      << " " << trueBiasIter->measurement.gyroscopes.transpose().format(swift_vio::kSpaceInitFmt)
+                      << " " << trueBiasIter->measurement.accelerometers.transpose().format(swift_vio::kSpaceInitFmt)
                       << "1 0 0 0 1 0 0 0 1 "
                       << "0 0 0 0 0 0 0 0 0 "
                       << "1 0 0 0 1 0 0 0 1 "
-                      << T_SC_0->inverse().r().transpose().format(okvis::kSpaceInitFmt)
-                      << " " << allIntrinsics.transpose().format(okvis::kSpaceInitFmt)
+                      << T_SC_0->inverse().r().transpose().format(swift_vio::kSpaceInitFmt)
+                      << " " << allIntrinsics.transpose().format(swift_vio::kSpaceInitFmt)
                       << " " << cameraGeometry0->imageDelay()
                       << " " << cameraGeometry0->readoutTime() << std::endl;
         }
@@ -572,7 +573,7 @@ TEST(DeadreckoningM, TrajectoryLabel) {
       FLAGS_sim_imu_bias_noise_factor, swift_vio::EstimatorAlgorithm::MSCKF,
       useEpipolarConstraint, cameraObservationModelId, landmarkModelId,
       simul::SimCameraModelType::EUROC, simul::CameraOrientation::Forward,
-      okvis::LandmarkGridType::FourWalls, landmarkRadius);
+      simul::LandmarkGridType::FourWalls, landmarkRadius);
   testHybridFilterSinusoid(testSetting, FLAGS_log_dir, "DeadreckoningM",
                            FLAGS_sim_trajectory_label, FLAGS_num_runs);
 }
@@ -590,7 +591,7 @@ TEST(DeadreckoningO, TrajectoryLabel) {
       FLAGS_sim_imu_bias_noise_factor, swift_vio::EstimatorAlgorithm::OKVIS,
       useEpipolarConstraint, cameraObservationModelId, landmarkModelId,
       simul::SimCameraModelType::EUROC, simul::CameraOrientation::Forward,
-      okvis::LandmarkGridType::FourWalls, landmarkRadius);
+      simul::LandmarkGridType::FourWalls, landmarkRadius);
   testHybridFilterSinusoid(testSetting, FLAGS_log_dir, "DeadreckoningO",
                            FLAGS_sim_trajectory_label, FLAGS_num_runs);
 }
@@ -608,7 +609,7 @@ TEST(HybridFilter, TrajectoryLabel) {
       FLAGS_sim_imu_bias_noise_factor, swift_vio::EstimatorAlgorithm::HybridFilter,
       useEpipolarConstraint, cameraObservationModelId, landmarkModelId,
       simul::SimCameraModelType::EUROC, simul::CameraOrientation::Forward,
-      okvis::LandmarkGridType::FourWalls, landmarkRadius);
+      simul::LandmarkGridType::FourWalls, landmarkRadius);
   testHybridFilterSinusoid(testSetting, FLAGS_log_dir, "HybridFilter",
                            FLAGS_sim_trajectory_label, FLAGS_num_runs);
 }
@@ -626,7 +627,7 @@ TEST(MSCKF, TrajectoryLabel) {
       FLAGS_sim_imu_bias_noise_factor, swift_vio::EstimatorAlgorithm::MSCKF,
       useEpipolarConstraint, cameraObservationModelId, landmarkModelId,
       simul::SimCameraModelType::EUROC, simul::CameraOrientation::Forward,
-      okvis::LandmarkGridType::FourWalls, landmarkRadius);
+      simul::LandmarkGridType::FourWalls, landmarkRadius);
   testHybridFilterSinusoid(testSetting, FLAGS_log_dir, "MSCKF",
                            FLAGS_sim_trajectory_label, FLAGS_num_runs);
 }
@@ -644,7 +645,7 @@ TEST(MSCKF, HuaiThesis) {
       FLAGS_sim_imu_bias_noise_factor, swift_vio::EstimatorAlgorithm::MSCKF,
       useEpipolarConstraint, cameraObservationModelId, landmarkModelId,
       simul::SimCameraModelType::EUROC, simul::CameraOrientation::Forward,
-      okvis::LandmarkGridType::FourWallsFloorCeiling, landmarkRadius);
+      simul::LandmarkGridType::FourWallsFloorCeiling, landmarkRadius);
   testHybridFilterSinusoid(testSetting, FLAGS_log_dir, "MSCKF", "Ball",
                            FLAGS_num_runs);
 }
@@ -662,7 +663,7 @@ TEST(MSCKF, CircleFarPoints) {
       FLAGS_sim_imu_bias_noise_factor, swift_vio::EstimatorAlgorithm::MSCKF,
       useEpipolarConstraint, cameraObservationModelId, landmarkModelId,
       simul::SimCameraModelType::EUROC, simul::CameraOrientation::Forward,
-      okvis::LandmarkGridType::Cylinder, landmarkRadius);
+      simul::LandmarkGridType::Cylinder, landmarkRadius);
   testHybridFilterSinusoid(testSetting, FLAGS_log_dir, "MSCKF", "Circle",
                            FLAGS_num_runs);
 }
@@ -680,7 +681,7 @@ TEST(General, TrajectoryLabel) {
       FLAGS_sim_imu_bias_noise_factor, swift_vio::EstimatorAlgorithm::General,
       useEpipolarConstraint, cameraObservationModelId, landmarkModelId,
       simul::SimCameraModelType::EUROC, simul::CameraOrientation::Forward,
-      okvis::LandmarkGridType::FourWalls, landmarkRadius);
+      simul::LandmarkGridType::FourWalls, landmarkRadius);
   testHybridFilterSinusoid(testSetting, FLAGS_log_dir, "General",
                            FLAGS_sim_trajectory_label, FLAGS_num_runs);
 }
@@ -703,7 +704,7 @@ TEST(OKVIS, TrajectoryLabel) {
       FLAGS_sim_imu_bias_noise_factor, swift_vio::EstimatorAlgorithm::OKVIS,
       useEpipolarConstraint, cameraObservationModelId, landmarkModelId,
       simul::SimCameraModelType::EUROC, simul::CameraOrientation::Forward,
-      okvis::LandmarkGridType::FourWalls, landmarkRadius);
+      simul::LandmarkGridType::FourWalls, landmarkRadius);
   testHybridFilterSinusoid(testSetting, FLAGS_log_dir, "OKVIS",
                            FLAGS_sim_trajectory_label, FLAGS_num_runs);
 }
@@ -722,7 +723,7 @@ TEST(SlidingWindowSmoother, TrajectoryLabel) {
       swift_vio::EstimatorAlgorithm::SlidingWindowSmoother, useEpipolarConstraint,
       cameraObservationModelId, landmarkModelId,
       simul::SimCameraModelType::EUROC, simul::CameraOrientation::Forward,
-      okvis::LandmarkGridType::FourWalls, landmarkRadius);
+      simul::LandmarkGridType::FourWalls, landmarkRadius);
   testHybridFilterSinusoid(testSetting, FLAGS_log_dir, "SlidingWindowSmoother",
                            FLAGS_sim_trajectory_label, FLAGS_num_runs);
 }
@@ -741,9 +742,9 @@ TEST(RiSlidingWindowSmoother, TrajectoryLabel) {
       swift_vio::EstimatorAlgorithm::RiSlidingWindowSmoother, useEpipolarConstraint,
       cameraObservationModelId, landmarkModelId,
       simul::SimCameraModelType::EUROC, simul::CameraOrientation::Forward,
-      okvis::LandmarkGridType::FourWalls, landmarkRadius);
+      simul::LandmarkGridType::FourWalls, landmarkRadius);
   swift_vio::BackendParams backendParams;
-  backendParams.backendModality_ = okvis::BackendModality::STRUCTURELESS;
+  backendParams.backendModality_ = swift_vio::BackendModality::STRUCTURELESS;
   testHybridFilterSinusoid(testSetting, FLAGS_log_dir, "RiSlidingWindowSmoother",
                            FLAGS_sim_trajectory_label, FLAGS_num_runs, backendParams);
 }
@@ -761,7 +762,7 @@ TEST(TFVIO, TrajectoryLabel) {
       FLAGS_sim_imu_bias_noise_factor, swift_vio::EstimatorAlgorithm::TFVIO,
       useEpipolarConstraint, cameraObservationModelId, landmarkModelId,
       simul::SimCameraModelType::EUROC, simul::CameraOrientation::Forward,
-      okvis::LandmarkGridType::FourWalls, landmarkRadius);
+      simul::LandmarkGridType::FourWalls, landmarkRadius);
   testHybridFilterSinusoid(testSetting, FLAGS_log_dir, "TFVIO",
                            FLAGS_sim_trajectory_label, FLAGS_num_runs);
 }
@@ -779,7 +780,7 @@ TEST(MSCKFWithEuclidean, TrajectoryLabel) {
       FLAGS_sim_imu_bias_noise_factor, swift_vio::EstimatorAlgorithm::MSCKF,
       useEpipolarConstraint, cameraObservationModelId, landmarkModelId,
       simul::SimCameraModelType::EUROC, simul::CameraOrientation::Forward,
-      okvis::LandmarkGridType::FourWalls, landmarkRadius);
+      simul::LandmarkGridType::FourWalls, landmarkRadius);
   testHybridFilterSinusoid(testSetting, FLAGS_log_dir, "MSCKFWithEuclidean",
                            FLAGS_sim_trajectory_label, FLAGS_num_runs);
 }
@@ -797,7 +798,7 @@ TEST(MSCKFWithPAP, TrajectoryLabel) {
       FLAGS_sim_imu_bias_noise_factor, swift_vio::EstimatorAlgorithm::MSCKF,
       useEpipolarConstraint, cameraObservationModelId, landmarkModelId,
       simul::SimCameraModelType::EUROC, simul::CameraOrientation::Forward,
-      okvis::LandmarkGridType::FourWalls, landmarkRadius);
+      simul::LandmarkGridType::FourWalls, landmarkRadius);
   testHybridFilterSinusoid(testSetting, FLAGS_log_dir, "MSCKFWithPAP",
                            FLAGS_sim_trajectory_label, FLAGS_num_runs);
 }
@@ -815,7 +816,7 @@ TEST(MSCKFWithReprojectionErrorPAP, TrajectoryLabel) {
       FLAGS_sim_imu_bias_noise_factor, swift_vio::EstimatorAlgorithm::MSCKF,
       useEpipolarConstraint, cameraObservationModelId, landmarkModelId,
       simul::SimCameraModelType::EUROC, simul::CameraOrientation::Forward,
-      okvis::LandmarkGridType::FourWalls, landmarkRadius);
+      simul::LandmarkGridType::FourWalls, landmarkRadius);
   testHybridFilterSinusoid(testSetting, FLAGS_log_dir,
                            "MSCKFWithReprojectionErrorPAP",
                            FLAGS_sim_trajectory_label, FLAGS_num_runs);
@@ -834,7 +835,7 @@ TEST(MSCKFWithPAP, SquircleBackward) {
       FLAGS_sim_imu_bias_noise_factor, swift_vio::EstimatorAlgorithm::MSCKF,
       useEpipolarConstraint, cameraObservationModelId, landmarkModelId,
       simul::SimCameraModelType::EUROC, simul::CameraOrientation::Backward,
-      okvis::LandmarkGridType::FourWalls, landmarkRadius);
+      simul::LandmarkGridType::FourWalls, landmarkRadius);
   testHybridFilterSinusoid(testSetting, FLAGS_log_dir, "MSCKFWithPAP",
                            "Squircle", FLAGS_num_runs);
 }
@@ -852,7 +853,7 @@ TEST(MSCKFWithPAP, SquircleSideways) {
       FLAGS_sim_imu_bias_noise_factor, swift_vio::EstimatorAlgorithm::MSCKF,
       useEpipolarConstraint, cameraObservationModelId, landmarkModelId,
       simul::SimCameraModelType::EUROC, simul::CameraOrientation::Right,
-      okvis::LandmarkGridType::FourWalls, landmarkRadius);
+      simul::LandmarkGridType::FourWalls, landmarkRadius);
   testHybridFilterSinusoid(testSetting, FLAGS_log_dir, "MSCKFWithPAP",
                            "Squircle", FLAGS_num_runs);
 }
@@ -870,7 +871,7 @@ TEST(MSCKFWithEpipolarConstraint, TrajectoryLabel) {
       FLAGS_sim_imu_bias_noise_factor, swift_vio::EstimatorAlgorithm::MSCKF,
       useEpipolarConstraint, cameraObservationModelId, landmarkModelId,
       simul::SimCameraModelType::EUROC, simul::CameraOrientation::Forward,
-      okvis::LandmarkGridType::FourWalls, landmarkRadius);
+      simul::LandmarkGridType::FourWalls, landmarkRadius);
   testHybridFilterSinusoid(testSetting, FLAGS_log_dir,
                            "MSCKFWithEpipolarConstraint",
                            FLAGS_sim_trajectory_label, FLAGS_num_runs);
@@ -889,7 +890,7 @@ TEST(MSCKFWithEpipolarConstraint, CircleFarPoints) {
       FLAGS_sim_imu_bias_noise_factor, swift_vio::EstimatorAlgorithm::MSCKF,
       useEpipolarConstraint, cameraObservationModelId, landmarkModelId,
       simul::SimCameraModelType::EUROC, simul::CameraOrientation::Forward,
-      okvis::LandmarkGridType::Cylinder, landmarkRadius);
+      simul::LandmarkGridType::Cylinder, landmarkRadius);
   testHybridFilterSinusoid(testSetting, FLAGS_log_dir,
                            "MSCKFWithEpipolarConstraint", "Circle",
                            FLAGS_num_runs);

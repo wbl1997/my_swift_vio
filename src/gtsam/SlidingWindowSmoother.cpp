@@ -17,10 +17,11 @@
 
 #include <loop_closure/GtsamWrap.hpp>
 
-#include <swift_vio/FeatureTriangulation.hpp>
-
 #include <okvis/ceres/ImuError.hpp>
 #include <okvis/IdProvider.hpp>
+
+#include <swift_vio/IoUtil.hpp>
+#include <swift_vio/FeatureTriangulation.hpp>
 
 // In general, iSAM2 requires all variables are well constrained. For visual
 // inertial SLAM/odometry, we need to add priors for a pose, a velocity, and the 6D bias.
@@ -1980,7 +1981,7 @@ void findSlotsOfFactorsWithKey(
 bool SlidingWindowSmoother::print(std::ostream& stream) const {
   printNavStateAndBiases(stream, statesMap_.rbegin()->first);
   Eigen::Matrix<double, Eigen::Dynamic, 1> variances = covariance_.diagonal();
-  stream << " " << variances.cwiseSqrt().transpose().format(okvis::kSpaceInitFmt);
+  stream << " " << variances.cwiseSqrt().transpose().format(kSpaceInitFmt);
   return true;
 }
 
