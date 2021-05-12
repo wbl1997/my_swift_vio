@@ -42,7 +42,6 @@ HybridFrontend::HybridFrontend(size_t numCameras, const FrontendOptions& fronten
 
 }
 
-// Matching as well as initialization of landmarks and state.
 bool HybridFrontend::dataAssociationAndInitialization(
     okvis::Estimator& estimator,
     // TODO(sleutenegger): why is this not used here?

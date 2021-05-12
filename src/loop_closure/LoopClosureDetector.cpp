@@ -220,7 +220,6 @@ bool LoopClosureDetector::addConstraintsAndOptimize(
 }
 
 /* ------------------------------------------------------------------------ */
-// TODO(marcus): only add nodes if they're x dist away from previous node
 void LoopClosureDetector::addOdometryFactors(
     const KeyframeInDatabase& keyframeInDB) {
   const std::vector<std::shared_ptr<NeighborConstraintInDatabase>>&

@@ -3510,7 +3510,7 @@ bool HybridFilter::getOdometryConstraintsForKeyframe(
   int cov_T_WBr_start = kfCovIndexIter->second.global.at(GlobalStates::T_WS).startIndexInCov;
   queryKeyframe->setCovariance(covariance_.block<6, 6>(cov_T_WBr_start, cov_T_WBr_start));
   auto riter = statesMap_.rbegin();
-  for (++riter;  // skip the last frame which in this case should be a keyframe.
+  for (++riter;  // skip the last frame which is queryKeyframe.
        riter != statesMap_.rend() && j < poseGraphOptions_.maxOdometryConstraintForAKeyframe;
        ++riter) {
     if (riter->second.isKeyframe) {

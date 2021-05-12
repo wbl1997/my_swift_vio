@@ -15,7 +15,6 @@ std::shared_ptr<okvis::Frontend> createFrontend(
     EstimatorAlgorithm algorithm) {
   switch (algorithm) {
     case EstimatorAlgorithm::General:
-    case EstimatorAlgorithm::Consistent:
     case EstimatorAlgorithm::OKVIS:
       return std::shared_ptr<okvis::Frontend>(
           new okvis::Frontend(numCameras, frontendOptions));
@@ -39,10 +38,6 @@ std::shared_ptr<okvis::Estimator> createBackend(
     case EstimatorAlgorithm::General:
       return std::shared_ptr<okvis::Estimator>(
           new GeneralEstimator(mapPtr));
-
-    case EstimatorAlgorithm::Consistent:
-      return std::shared_ptr<okvis::Estimator>(
-          new okvis::Estimator(mapPtr));
 
     case EstimatorAlgorithm::SlidingWindowSmoother:
       return std::shared_ptr<okvis::Estimator>(
