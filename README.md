@@ -291,44 +291,37 @@ Remark: set sigma_{param} to zero to disable estimating "param" in filtering met
 2. Process a rosbag.
 
 ```
-export SWIFT_VIO_WS=$HOME/Documents/docker/swift_vio_ws
+# In terminal 1
+roscore
+
+# In terminal 2
+export SWIFT_VIO_WS=/path/to/swift_vio_ws
+rosrun rviz rviz -d $SWIFT_VIO_WS/src/swift_vio/config/rviz.rviz
+
+# In terminal 3
+export SWIFT_VIO_WS=/path/to/swift_vio_ws
+source $SWIFT_VIO_WS/devel/setup.bash
 rosrun swift_vio swift_vio_node $SWIFT_VIO_WS/src/swift_vio/config/config_fpga_p2_euroc.yaml \
- $SWIFT_VIO_WS/src/swift_vio/config/LcdParams.yaml \
  --vocabulary_path=$SWIFT_VIO_WS/src/swift_vio/vocabulary/ORBvoc.yml \
  --dump_output_option=0 --load_input_option=0 --output_dir=$HOME/Desktop/temp
 
+# In terminal 4
 rosbag play --pause --start=5.0 --rate=1.0 /media/$USER/Seagate/$USER/data/euroc/MH_01_easy.bag /cam0/image_raw:=/camera0 /imu0:=/imu
 
-rosrun rviz rviz -d $SWIFT_VIO_WS/src/swift_vio/config/rviz.rviz
 ```
-
-In this case, the program will exit once the Ctrl+C is entered in the terminal that runs the swift_vio_node.
-Note the program will not exit if Ctrl+C is entered in the terminal of roscore.
 
 3. Process the zip synchronously.
 
 ```
-export SWIFT_VIO_WS=$HOME/Documents/docker/swift_vio_ws
+export SWIFT_VIO_WS=/path/to/swift_vio_ws
 source $SWIFT_VIO_WS/devel/setup.bash
 rosrun swift_vio swift_vio_node_synchronous $SWIFT_VIO_WS/src/swift_vio/config/config_fpga_p2_euroc.yaml \
- $SWIFT_VIO_WS/src/swift_vio/config/LcdParams.yaml \
  --vocabulary_path=$SWIFT_VIO_WS/src/swift_vio/vocabulary/ORBvoc.yml \
  --bagname=/media/$USER/Seagate/$USER/data/euroc/MH_01_easy.bag --skip_first_seconds=0 --max_inc_tol=30.0 \
  --camera_topics="/cam0/image_raw,/cam1/image_raw" --imu_topic="/imu0" \
- --dump_output_option=3 --output_dir=$HOME/Desktop/temp --publish_via_ros=true
+ --dump_output_option=3 --output_dir=$HOME/Desktop/temp
 
 rosrun rviz rviz -d $SWIFT_VIO_WS/src/swift_vio/config/rviz.rviz
-```
-
-
-### Process the TUM VI dataset
-
-```
-$HOME/Documents/docker/swift_vio_ws/src/swift_vio/config/config_tum_vi_50_20_swift_vio.yaml \
- --output_dir=$HOME/Seagate/data/TUM-VI/postprocessed/ \
- --max_inc_tol=10.0 --dump_output_option=0 \
- --load_input_option=0
-
 ```
 
 ## Outputs and frames

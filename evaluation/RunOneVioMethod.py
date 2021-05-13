@@ -114,7 +114,7 @@ class RunOneVioMethod(object):
         if verbose_leak_sanitizer:
             export_lib_cmd += "export ASAN_OPTIONS=fast_unwind_on_malloc=0;"
 
-        cmd = "{} {} {} --output_dir={} --skip_first_seconds=0" \
+        cmd = "{} {} --lcd_params_yaml={} --output_dir={} --skip_first_seconds=0" \
               " --max_inc_tol=30.0 --dump_output_option=3" \
               " --bagname={} --vocabulary_path={} {} {}".format(
             self.get_sync_exe(), custom_vio_config, custom_lcd_config,

@@ -103,7 +103,6 @@ Answer: Disabling marginalization in OKVIS deadreckoning makes its result simila
 ## Vector access over the boundary when running command:
 /media/jhuai/Seagate/jhuai/temp/swift_vio_ws/devel/lib/swift_vio/swift_vio_node_synchronous
 /home/jhuai/Desktop/temp/swift_vio/vio/laptop/MSCKF_aidp/laptop_MSCKF_aidp_MH_01/config_fpga_p2_euroc.yaml
-/home/jhuai/Desktop/temp/swift_vio/vio/laptop/MSCKF_aidp/laptop_MSCKF_aidp_MH_01/LcdParams.yaml
 --output_dir=/home/jhuai/Desktop/temp/swift_vio/vio/laptop/MSCKF_aidp/laptop_MSCKF_aidp_MH_01/MSCKF4
 --skip_first_seconds=0 --max_inc_tol=10.0 --dump_output_option=3
 --bagname=/media/jhuai/OldWin8OS/jhuai/data/euroc/ijrr_euroc_mav_dataset/machine_hall/MH_01_easy/MH_01_easy.bag
@@ -136,7 +135,6 @@ To reproduce,
 ```
 /media/jhuai/Seagate/jhuai/temp/swift_vio_ws/devel/lib/swift_vio/swift_vio_node_synchronous 
 /home/jhuai/Desktop/temp/advio_noise0/vio/laptop/KSF_0.5_0.2/laptop_KSF_0.5_0.2_advio15/config_fpga_p2_euroc.yaml 
-/home/jhuai/Desktop/temp/advio_noise0/vio/laptop/KSF_0.5_0.2/laptop_KSF_0.5_0.2_advio15/LcdParams.yaml 
 --output_dir=/home/jhuai/Desktop/temp/advio_noise0/vio/laptop/KSF_0.5_0.2/laptop_KSF_0.5_0.2_advio15/MSCKF0 
 --skip_first_seconds=0 --max_inc_tol=30.0 --dump_output_option=3 
 --bagname=/media/jhuai/OldWin8OS/jhuai/data/advio/rosbag/iphone/advio-15.bag 
@@ -170,7 +168,6 @@ The same core dumped error (seg fault or aborted) occurred twice at about 34% of
 The command to reproduce the problem:
 /home/jhuai/Documents/docker/swift_vio_ws/devel/lib/swift_vio/swift_vio_node_synchronous /home/
 jhuai/Desktop/tumvi_calib0/vio/laptop/KSF_n_calibrated/laptop_KSF_n_calibrated_room3/config_fpga_p2_euroc.yaml
-/home/jhuai/Desktop/tumvi_calib0/vio/laptop/KSF_n_calibrated/laptop_KSF_n_calibrated_room3/LcdParams.yaml
 --output_dir=/home/jhuai/Desktop/tumvi_calib0/vio/laptop/KSF_n_calibrated/laptop_KSF_n_calibrated_room3/MSCKF
 --skip_first_seconds=0 --max_inc_tol=30.0 --dump_output_option=3 --bagname=/media/jhuai/viola/jhuai/data/TUM-
 VI/raw/room/dataset-room3_512_16.bag
@@ -180,7 +177,6 @@ VI/raw/room/dataset-room3_512_16.bag
 Or,
 /home/jhuai/Documents/docker/swift_vio_ws/devel/lib/swift_vio/swift_vio_node_synchronous /home/
 jhuai/Desktop/tumvi_calib0/vio/laptop/KSF_n_fix_TgTsTa/laptop_KSF_n_fix_TgTsTa_room3/config_fpga_p2_euroc.yaml
-/home/jhuai/Desktop/tumvi_calib0/vio/laptop/KSF_n_fix_TgTsTa/laptop_KSF_n_fix_TgTsTa_room3/LcdParams.yaml
 --output_dir=/home/jhuai/Desktop/tumvi_calib0/vio/laptop/KSF_n_fix_TgTsTa/laptop_KSF_n_fix_TgTsTa_room3/MSCKF0
 --skip_first_seconds=0 --max_inc_tol=30.0 --dump_output_option=3 --bagname=/media/jhuai/viola/jhuai/data/TUM-
 VI/raw/room/dataset-room3_512_16.bag

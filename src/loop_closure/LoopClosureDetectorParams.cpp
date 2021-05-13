@@ -152,7 +152,7 @@ bool LoopClosureDetectorParams::parseYAML(const std::string& filepath) {
       break;
     // TODO(marcus): add the rest of the options here
     default:
-      throw std::runtime_error("LCDparams parseYAML: wrong score_type_id");
+      throw std::runtime_error("LoopClosureDetectorParams parseYAML: wrong score_type_id");
       break;
   }
   yaml_parser.getYamlParam("patch_sze", &patch_sze_);

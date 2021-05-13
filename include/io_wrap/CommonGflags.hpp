@@ -28,6 +28,8 @@ DECLARE_string(imu_topic);
 
 DECLARE_string(vocabulary_path);
 
+DECLARE_string(lcd_params_yaml);
+
 namespace swift_vio {
 
 bool setInputParameters(InputData *input);

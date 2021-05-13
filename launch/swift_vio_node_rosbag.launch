@@ -7,7 +7,7 @@
   <arg name="load_input_option" default="0"/>
   <arg name="output_dir" default=""/>
   <arg name="config_filename" default="$(find swift_vio)/config/config_fpga_p2_euroc.yaml" />
-  <arg name="lcd_config_filename" default="$(find swift_vio)/config/LcdParams.yaml" />
+  <arg name="lcd_config_filename" default="$(find swift_vio)/config/lcd_params.yaml" />
   <arg name="start_into_bag" default="0"/>
   <arg name="image_noise_cov_multiplier" default="5.0"/>
   <arg name="play_rate" default="1.0"/>

@@ -46,6 +46,8 @@ DEFINE_string(vocabulary_path,
               "vocabulary/ORBvoc.yml",
               "Path to BoW vocabulary file for LoopClosureDetector module.");
 
+DEFINE_string(lcd_params_yaml, "", "e.g., config/lcd_params.yaml");
+
 namespace swift_vio {
 bool setInputParameters(InputData *input) {
   input->videoFile = FLAGS_video_file;

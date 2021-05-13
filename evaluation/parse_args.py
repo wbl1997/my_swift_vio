@@ -289,7 +289,7 @@ def parse_args():
         default="")
 
     lcd_config_default = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                                      '../config/LcdParams.yaml')
+                                      '../config/lcd_params.yaml')
     parser.add_argument('--lcd_config_yaml', type=str,
                         help="path to loop closure detector template config yaml. Its content "
                              "will NOT be modified in running the program.",

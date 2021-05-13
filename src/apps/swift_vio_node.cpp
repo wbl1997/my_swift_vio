@@ -43,15 +43,11 @@ int main(int argc, char **argv) {
   ros::NodeHandle nh(nodeName);
 
   std::string configFilename;
-  std::string lcdConfigFilename;
   if (argc >= 2) {
     configFilename = argv[1];
-    if (argc >= 3) {
-      lcdConfigFilename = argv[2];
-    }
   } else {
     LOG(ERROR) << "Usage:" << argv[0]
-               << " <config yml> <lcd config yml> [extra gflags]";
+               << " <config yml> [extra gflags]";
     return 1;
   }
 
@@ -76,6 +72,7 @@ int main(int argc, char **argv) {
       parameters.optimization.algorithm);
   std::shared_ptr<swift_vio::LoopClosureDetectorParams> lcParams(
         new swift_vio::LoopClosureDetectorParams());
+  std::string lcdConfigFilename = FLAGS_lcd_params_yaml;
   if (lcdConfigFilename.empty()) {
     LOG(WARNING) << "Default parameters for loop closure will be used as no "
                     "configuration filename is provided!";

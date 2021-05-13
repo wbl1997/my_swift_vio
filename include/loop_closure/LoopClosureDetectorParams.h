@@ -30,7 +30,7 @@ namespace swift_vio {
 class LoopClosureDetectorParams : public LoopClosureParameters {
  public:
   LoopClosureDetectorParams(
-      LoopClosureMethodType lc_method_id = LoopClosureMethodType::OrbBoW,
+      LoopClosureMethodType lc_method_id = LoopClosureMethodType::Mock,
       bool use_nss = true,
       float alpha = 0.1,
       int min_temporal_matches = 3,
