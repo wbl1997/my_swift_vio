@@ -112,11 +112,9 @@ bool HybridFrontend::dataAssociationAndInitialization(
     }
     matchToLastFrameTimer.stop();
     if (!isInitialized_) {
-      if (frontendOptions_.initializeWithoutEnoughParallax || !rotationOnly) {
+      if (!rotationOnly) {
         isInitialized_ = true;
-        LOG(INFO) << "Initialized: initializeWithoutEnoughParallax ? "
-                  << frontendOptions_.initializeWithoutEnoughParallax << " rotationOnly ? "
-                  << rotationOnly;
+        LOG(INFO) << "Initialized frontend with KLT.";
       }
     }
 
@@ -187,11 +185,9 @@ bool HybridFrontend::dataAssociationAndInitialization(
     }
     matchKeyframesTimer.stop();
     if (!isInitialized_) {
-      if (frontendOptions_.initializeWithoutEnoughParallax || !rotationOnly) {
+      if (!rotationOnly) {
         isInitialized_ = true;
-        LOG(INFO) << "Initialized: initializeWithoutEnoughParallax ? "
-                  << frontendOptions_.initializeWithoutEnoughParallax << " rotationOnly ? "
-                  << rotationOnly;
+        LOG(INFO) << "Initialized frontend.";
       }
     }
 
@@ -245,11 +241,9 @@ bool HybridFrontend::dataAssociationAndInitialization(
     matchToLastFrameTimer.stop();
     if (frontendOptions_.featureTrackingMethod != 0) {
       if (!isInitialized_) {
-        if (frontendOptions_.initializeWithoutEnoughParallax || !rotationOnly) {
+        if (!rotationOnly) {
           isInitialized_ = true;
-          LOG(INFO) << "Initialized: initializeWithoutEnoughParallax ? "
-                    << frontendOptions_.initializeWithoutEnoughParallax << " rotationOnly ? "
-                    << rotationOnly;
+          LOG(INFO) << "Initialized frontend.";
         }
       }
       if (num3dMatches <= requiredMatches) {
