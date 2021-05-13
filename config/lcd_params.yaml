@@ -1,6 +1,6 @@
 %YAML:1.0
 # LoopClosureDetector parameters:
-loop_closure_method: 0
+loop_closure_method: 1
 use_nss: 1
 alpha: 0.001
 min_temporal_matches: 1

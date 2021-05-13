@@ -41,6 +41,8 @@ class LoopClosureDetectorParams : public LoopClosureParameters {
       int max_intragroup_gap = 3,
       int max_distance_between_groups = 3,
       int max_distance_between_queries = 2,
+      double min_distance_between_queries = 0.1,
+      double min_angle_between_queries = 0.1,
 
       int min_correspondences = 12,
 
@@ -90,6 +92,8 @@ class LoopClosureDetectorParams : public LoopClosureParameters {
       max_intragroup_gap_== rhs.max_intragroup_gap_ &&
       max_distance_between_groups_== rhs.max_distance_between_groups_ &&
       max_distance_between_queries_== rhs.max_distance_between_queries_ &&
+      min_distance_between_queries_ == rhs.min_distance_between_queries_ &&
+      min_angle_between_queries_ == rhs.min_angle_between_queries_ &&
 
       min_correspondences_== rhs.min_correspondences_ &&
 
@@ -133,6 +137,8 @@ class LoopClosureDetectorParams : public LoopClosureParameters {
   int max_intragroup_gap_;     // Max separation btwn matches of the same group/island
   int max_distance_between_groups_;   // Max separation between groups
   int max_distance_between_queries_;  // Max separation between two queries
+  double min_distance_between_queries_;
+  double min_angle_between_queries_;
   //////////////////////////////////////////////////////////////////////////////
 
   /////////////////////// Geometrical Verification Params //////////////////////

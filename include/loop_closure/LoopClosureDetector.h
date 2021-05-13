@@ -199,6 +199,7 @@ class LoopClosureDetector : public LoopClosureMethod {
   // Store latest computed objects for temporal matching and nss scoring
   LcdThirdPartyWrapper::Ptr lcd_tp_wrapper_;
   DBoW2::BowVector latest_bowvec_;
+  okvis::kinematics::Transformation lastQueryPose_;
 
   // Robust PGO members
   std::unique_ptr<KimeraRPGO::RobustSolver> pgo_;

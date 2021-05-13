@@ -28,6 +28,8 @@ LoopClosureDetectorParams::LoopClosureDetectorParams(
     int max_intragroup_gap,
     int max_distance_between_groups,
     int max_distance_between_queries,
+    double min_distance_between_queries,
+    double min_angle_between_queries,
 
     int min_correspondences,
 
@@ -65,6 +67,8 @@ LoopClosureDetectorParams::LoopClosureDetectorParams(
       max_intragroup_gap_(max_intragroup_gap),
       max_distance_between_groups_(max_distance_between_groups),
       max_distance_between_queries_(max_distance_between_queries),
+      min_distance_between_queries_(min_distance_between_queries),
+      min_angle_between_queries_(min_angle_between_queries),
 
       min_correspondences_(min_correspondences),
 
@@ -122,6 +126,10 @@ bool LoopClosureDetectorParams::parseYAML(const std::string& filepath) {
                            &max_distance_between_groups_);
   yaml_parser.getYamlParam("max_distance_between_queries",
                            &max_distance_between_queries_);
+  yaml_parser.getYamlParam("min_distance_between_queries",
+                           &min_distance_between_queries_);
+  yaml_parser.getYamlParam("min_angle_between_queries",
+                           &min_angle_between_queries_);
 
   yaml_parser.getYamlParam("min_correspondences", &min_correspondences_);
 
@@ -182,6 +190,8 @@ void LoopClosureDetectorParams::print() const {
       << '\n'
       << "max_distance_between_queries_: " << max_distance_between_queries_
       << '\n'
+      << "min_distance_between_queries_: " << min_distance_between_queries_  << '\n'
+      << "min_angle_between_queries_: " << min_angle_between_queries_  << '\n'
 
       << "min_correspondences_: " << min_correspondences_ << '\n'
 

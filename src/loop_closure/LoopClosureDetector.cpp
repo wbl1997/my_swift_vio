@@ -362,10 +362,17 @@ bool LoopClosureDetector::detectLoop(
 
   // Query for BoW vector matches in database.
   DBoW2::QueryResults query_result;
+  // TODO(jhuai): is this effective in reducing loop closure labor while keeping positive loop closures?
+//  if (!okvis::kinematics::motionLessThan(lastQueryPose_.inverse() * queryKeyframeInDB->vio_T_WB_,
+//                                         lcd_params_->min_distance_between_queries_,
+//                                         lcd_params_->min_angle_between_queries_)) {
   db_BoW_->query(bow_vec,
                  query_result,
                  lcd_params_->max_db_results_,
                  max_possible_match_id);
+//  }
+
+  lastQueryPose_ = queryKeyframeInDB->vio_T_WB_;
 
   // Add current BoW vector to database.
   db_BoW_->add(bow_vec);
