@@ -190,7 +190,6 @@ LIST(APPEND SOURCEFILES
     src/swift_vio/EkfUpdater.cpp
     src/swift_vio/FeatureTriangulation.cpp
     src/swift_vio/FilterHelper.cpp
-    src/swift_vio/GeneralEstimator.cpp
     src/swift_vio/HybridFilter.cpp
     src/swift_vio/HybridFrontend.cpp
     src/swift_vio/MotionAndStructureStats.cpp

@@ -4,7 +4,6 @@
 
 #include <gtsam/SlidingWindowSmoother.hpp>
 
-#include <swift_vio/GeneralEstimator.hpp>
 #include <swift_vio/TFVIO.hpp>
 #include <swift_vio/VioEvaluationCallback.hpp>
 #include <swift_vio/VioFactoryMethods.hpp>
@@ -140,10 +139,6 @@ void VioTestSystemBuilder::createVioSystem(
   estimator = swift_vio::createBackend(testSetting.estimator_algorithm,
                                        backendParams, mapPtr);
 
-  okvis::VisualConstraints constraintScheme(okvis::OnlyReprojectionErrors);
-  if (testSetting.estimator_algorithm == swift_vio::EstimatorAlgorithm::General) {
-    constraintScheme = okvis::OnlyTwoViewConstraints;
-  }
   okvis::Optimization optimOptions;
   optimOptions.useEpipolarConstraint = testSetting.useEpipolarConstraint;
   optimOptions.cameraObservationModelId = testSetting.cameraObservationModelId;
@@ -156,7 +151,6 @@ void VioTestSystemBuilder::createVioSystem(
 
   frontend.reset(new SimulationFrontend(trueCameraSystem_->numCameras(),
                                                testSetting.addImageNoise, 60,
-                                               constraintScheme,
                                                testSetting.gridType,
                                                testSetting.landmarkRadius,
                                                pointFile));

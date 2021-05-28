@@ -1,6 +1,5 @@
 #include <swift_vio/VioFactoryMethods.hpp>
 
-#include <swift_vio/GeneralEstimator.hpp>
 #include <swift_vio/HybridFrontend.hpp>
 #include <swift_vio/MSCKF.hpp>
 #include <gtsam/RiSlidingWindowSmoother.hpp>
@@ -14,7 +13,6 @@ std::shared_ptr<okvis::Frontend> createFrontend(
     int numCameras, const FrontendOptions& frontendOptions,
     EstimatorAlgorithm algorithm) {
   switch (algorithm) {
-    case EstimatorAlgorithm::General:
     case EstimatorAlgorithm::OKVIS:
       return std::shared_ptr<okvis::Frontend>(
           new okvis::Frontend(numCameras, frontendOptions));
@@ -34,10 +32,6 @@ std::shared_ptr<okvis::Estimator> createBackend(
     // http://eigen.tuxfamily.org/bz/show_bug.cgi?id=1049
     case EstimatorAlgorithm::OKVIS:
       return std::shared_ptr<okvis::Estimator>(new okvis::Estimator(mapPtr));
-
-    case EstimatorAlgorithm::General:
-      return std::shared_ptr<okvis::Estimator>(
-          new GeneralEstimator(mapPtr));
 
     case EstimatorAlgorithm::SlidingWindowSmoother:
       return std::shared_ptr<okvis::Estimator>(

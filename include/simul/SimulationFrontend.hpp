@@ -19,12 +19,30 @@
 #include <simul/CameraSystemCreator.hpp>
 #include <simul/curves.h>
 
+#include <swift_vio/memory.h>
+
 /// \brief okvis Main namespace of this package.
 namespace simul {
 enum class LandmarkGridType {
   FourWalls = 0,
   FourWallsFloorCeiling,
   Cylinder,
+};
+
+struct AssociatedFrame {
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+  std::shared_ptr<okvis::MultiFrame> nframe_;
+  okvis::kinematics::Transformation pose_; // pose of the body frame at the nframe epoch.
+  // keypoint indices for m scene landmarks in nframes. Each component has m elements,
+  // -1 indicating no associted keypoint for a landmark.
+  std::vector<std::vector<int>> keypointIndices_;
+  bool isKeyframe_;
+
+  AssociatedFrame(std::shared_ptr<okvis::MultiFrame> nframe, const okvis::kinematics::Transformation& pose,
+                  const std::vector<std::vector<int>>& keypointIndices, bool isKeyframe) :
+    nframe_(nframe), pose_(pose), keypointIndices_(keypointIndices), isKeyframe_(isKeyframe) {
+
+  }
 };
 
 /**
@@ -40,7 +58,6 @@ class SimulationFrontend {
    * @param numCameras Number of cameras in the sensor configuration.
    */
   SimulationFrontend(size_t numCameras, bool addImageNoise, int maxTrackLength,
-                     okvis::VisualConstraints constraintScheme,
                      LandmarkGridType gridType,
                      double landmarkRadius,
                      std::string pointFile);
@@ -91,6 +108,10 @@ class SimulationFrontend {
   static const double fourthRoot2_; // sqrt(sqrt(2))
 
   static const double kRangeThreshold; // This value determines when far landmarks are used.
+  static const int kMaxMatchKeyframes;
+  static const int kMaxKeptFrames;
+  static const double kMinKeyframeDistance;
+  static const double kMinKeyframeAngle;
 
  private:
 
@@ -98,17 +119,10 @@ class SimulationFrontend {
   const size_t numCameras_;  ///< Number of cameras in the configuration.
   bool addImageNoise_; ///< Add noise to image observations
   int maxTrackLength_; ///< Cap feature track length
-  const okvis::VisualConstraints constraintScheme_;
   static const bool singleTwoViewConstraint_ = false;
-  std::shared_ptr<okvis::MultiFrame> previousKeyframe_;
+  Eigen::AlignedDeque<AssociatedFrame> nframeList_;
+
   okvis::kinematics::Transformation previousKeyframePose_;
-  // the keypoint index corresponding to each scene landmark in the previous keyframe
-  std::vector<std::vector<int>> previousKeyframeKeypointIndices_;
-  // feature tracking
-  std::shared_ptr<okvis::MultiFrame> previousFrame_;
-  okvis::kinematics::Transformation previousFramePose_;
-  // the keypoint index corresponding to each scene landmark in the previous frame
-  std::vector<std::vector<int>> previousFrameKeypointIndices_;
 
   // scene landmarks
   std::vector<Eigen::Vector4d, Eigen::aligned_allocator<Eigen::Vector4d>>

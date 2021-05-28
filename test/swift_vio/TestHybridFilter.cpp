@@ -86,7 +86,7 @@ void outputFeatureHistogram(const std::string& featureHistFile,
 }
 
 inline bool isFilteringMethod(swift_vio::EstimatorAlgorithm algorithmId) {
-  return algorithmId >= swift_vio::EstimatorAlgorithm::MSCKF;
+  return algorithmId >= swift_vio::EstimatorAlgorithm::HybridFilter;
 }
 
 /**
@@ -448,14 +448,16 @@ void testHybridFilterSinusoid(
           estimator->setKeyframe(mf->id(), asKeyframe);
         }
         frameFeatureTally(trackedFeatures);
-        size_t maxIterations = 10u;
-        size_t numThreads = 2u;
-        estimator->optimize(maxIterations, numThreads, false);
+
         okvis::Optimization sharedOptConfig;
         sharedOptConfig.getCovariance = true;
         sharedOptConfig.numKeyframes = 5;
         sharedOptConfig.numImuFrames = 3;
         estimator->setOptimizationOptions(sharedOptConfig);
+
+        size_t maxIterations = 10u;
+        size_t numThreads = 2u;
+        estimator->optimize(maxIterations, numThreads, false);
 
         okvis::MapPointVector removedLandmarks;
         estimator->applyMarginalizationStrategy(sharedOptConfig.numKeyframes,
@@ -666,24 +668,6 @@ TEST(MSCKF, CircleFarPoints) {
       simul::LandmarkGridType::Cylinder, landmarkRadius);
   testHybridFilterSinusoid(testSetting, FLAGS_log_dir, "MSCKF", "Circle",
                            FLAGS_num_runs);
-}
-
-TEST(General, TrajectoryLabel) {
-  bool addImageNoise = true;
-  bool useImageObservation = true;
-  bool useEpipolarConstraint = false;
-  int cameraObservationModelId = 0;
-  int landmarkModelId = 0;
-  double landmarkRadius = 5;
-  simul::TestSetting testSetting(
-      true, FLAGS_noisyInitialSpeedAndBiases, FLAGS_noisyInitialSensorParams,
-      addImageNoise, useImageObservation, FLAGS_sim_imu_noise_factor,
-      FLAGS_sim_imu_bias_noise_factor, swift_vio::EstimatorAlgorithm::General,
-      useEpipolarConstraint, cameraObservationModelId, landmarkModelId,
-      simul::SimCameraModelType::EUROC, simul::CameraOrientation::Forward,
-      simul::LandmarkGridType::FourWalls, landmarkRadius);
-  testHybridFilterSinusoid(testSetting, FLAGS_log_dir, "General",
-                           FLAGS_sim_trajectory_label, FLAGS_num_runs);
 }
 
 // It is also possible to test OKVIS with an infinity time horizon by

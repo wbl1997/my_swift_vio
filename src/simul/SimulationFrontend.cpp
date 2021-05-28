@@ -27,6 +27,10 @@ namespace simul {
 const double SimulationFrontend::imageNoiseMag_ = 1.0;
 const double SimulationFrontend::fourthRoot2_ = 1.1892071150;
 const double SimulationFrontend::kRangeThreshold = 20;
+const int SimulationFrontend::kMaxMatchKeyframes = 2;
+const int SimulationFrontend::kMaxKeptFrames = 20;
+const double SimulationFrontend::kMinKeyframeDistance = 0.4;
+const double SimulationFrontend::kMinKeyframeAngle = 10 * M_PI / 180;
 
 void saveLandmarkGrid(
     const std::vector<Eigen::Vector4d,
@@ -182,14 +186,12 @@ void initCameraNoiseParams(
 SimulationFrontend::SimulationFrontend(
     size_t numCameras, bool addImageNoise,
     int maxTrackLength,
-    okvis::VisualConstraints constraintScheme,
     LandmarkGridType gridType,
     double landmarkRadius,
     std::string pointFile)
     : isInitialized_(true), numCameras_(numCameras),
       addImageNoise_(addImageNoise),
-      maxTrackLength_(maxTrackLength),
-      constraintScheme_(constraintScheme) {
+      maxTrackLength_(maxTrackLength) {
   double halfz = 1.5;
   bool addFloorCeiling = false;
   switch (gridType) {
@@ -238,86 +240,92 @@ int SimulationFrontend::dataAssociationAndInitialization(
 
   int trackedFeatures = 0;
   if (estimator.numFrames() > 1) {
-    // TODO(jhuai): make it possible to match multiple earlier keyframes.
-    // find matches between the previous keyframe and current frame
-    // Matching to last Keyframe should not encounter zombie landmark
-    // ids for filters because they remove disappearing landmarks from
-    // landmarkMap_ as well as landmark Ids from multiframe.
+    // Find matches between a previous keyframe and current frame.
     std::vector<LandmarkKeypointMatch> landmarkKeyframeMatches;
-    matchToFrame(previousKeyframeKeypointIndices_, keypointIndices,
-                 previousKeyframe_->id(), framesInOut->id(),
-                 &landmarkKeyframeMatches);
-    switch (distortionType) {
-      case okvis::cameras::NCameraSystem::RadialTangential: {
-        trackedFeatures += addMatchToEstimator<okvis::cameras::PinholeCamera<
-            okvis::cameras::RadialTangentialDistortion>>(
-            estimator, previousKeyframe_, framesInOut, previousKeyframePose_,
-            T_WS_ref, landmarkKeyframeMatches);
-        break;
-      }
-      case okvis::cameras::NCameraSystem::Equidistant: {
-        trackedFeatures += addMatchToEstimator<okvis::cameras::PinholeCamera<
-            okvis::cameras::EquidistantDistortion>>(
-            estimator, previousKeyframe_, framesInOut, previousKeyframePose_,
-            T_WS_ref, landmarkKeyframeMatches);
-        break;
-      }
-      case okvis::cameras::NCameraSystem::RadialTangential8: {
-        trackedFeatures += addMatchToEstimator<okvis::cameras::PinholeCamera<
-            okvis::cameras::RadialTangentialDistortion8>>(
-            estimator, previousKeyframe_, framesInOut, previousKeyframePose_,
-            T_WS_ref, landmarkKeyframeMatches);
-        break;
-      }
-      case okvis::cameras::NCameraSystem::FOV: {
-        trackedFeatures += addMatchToEstimator<
-            okvis::cameras::PinholeCamera<okvis::cameras::FovDistortion>>(
-            estimator, previousKeyframe_, framesInOut, previousKeyframePose_,
-            T_WS_ref, landmarkKeyframeMatches);
-        break;
-      }
-      default:
-        OKVIS_THROW(Exception, "Unsupported distortion type.")
-        break;
-    }
-    // find matches between the previous frame and current frame
-    if (previousKeyframe_->id() != previousFrame_->id()) {
-      std::vector<LandmarkKeypointMatch> landmarkFrameMatches;
-      matchToFrame(previousFrameKeypointIndices_, keypointIndices,
-                   previousFrame_->id(), framesInOut->id(),
-                   &landmarkFrameMatches);
-      switch (distortionType) {
+    int numKeyframes = 0;
+    for (auto rit = nframeList_.rbegin(); rit != nframeList_.rend(); ++rit) {
+      if (rit->isKeyframe_) {
+        matchToFrame(rit->keypointIndices_, keypointIndices,
+                     rit->nframe_->id(), framesInOut->id(),
+                     &landmarkKeyframeMatches);
+        switch (distortionType) {
         case okvis::cameras::NCameraSystem::RadialTangential: {
           trackedFeatures += addMatchToEstimator<okvis::cameras::PinholeCamera<
               okvis::cameras::RadialTangentialDistortion>>(
-              estimator, previousFrame_, framesInOut, previousFramePose_,
-              T_WS_ref, landmarkFrameMatches);
+              estimator, rit->nframe_, framesInOut, rit->pose_,
+              T_WS_ref, landmarkKeyframeMatches);
           break;
         }
         case okvis::cameras::NCameraSystem::Equidistant: {
           trackedFeatures += addMatchToEstimator<okvis::cameras::PinholeCamera<
               okvis::cameras::EquidistantDistortion>>(
-              estimator, previousFrame_, framesInOut, previousFramePose_,
-              T_WS_ref, landmarkFrameMatches);
+              estimator, rit->nframe_, framesInOut, rit->pose_,
+              T_WS_ref, landmarkKeyframeMatches);
           break;
         }
         case okvis::cameras::NCameraSystem::RadialTangential8: {
           trackedFeatures += addMatchToEstimator<okvis::cameras::PinholeCamera<
               okvis::cameras::RadialTangentialDistortion8>>(
-              estimator, previousFrame_, framesInOut, previousFramePose_,
-              T_WS_ref, landmarkFrameMatches);
+              estimator, rit->nframe_, framesInOut, rit->pose_,
+              T_WS_ref, landmarkKeyframeMatches);
           break;
         }
         case okvis::cameras::NCameraSystem::FOV: {
           trackedFeatures += addMatchToEstimator<
               okvis::cameras::PinholeCamera<okvis::cameras::FovDistortion>>(
-              estimator, previousFrame_, framesInOut, previousFramePose_,
-              T_WS_ref, landmarkFrameMatches);
+              estimator, rit->nframe_, framesInOut, rit->pose_,
+              T_WS_ref, landmarkKeyframeMatches);
           break;
         }
         default:
           OKVIS_THROW(Exception, "Unsupported distortion type.")
           break;
+        }
+        ++numKeyframes;
+      }
+      if (numKeyframes >= kMaxMatchKeyframes) {
+        break;
+      }
+    }
+    // find matches between the previous frame and current frame.
+    auto lastNFrame = nframeList_.rbegin();
+    if (!lastNFrame->isKeyframe_) {
+      std::vector<LandmarkKeypointMatch> landmarkFrameMatches;
+      matchToFrame(lastNFrame->keypointIndices_, keypointIndices,
+                   lastNFrame->nframe_->id(), framesInOut->id(),
+                   &landmarkFrameMatches);
+      switch (distortionType) {
+      case okvis::cameras::NCameraSystem::RadialTangential: {
+        trackedFeatures += addMatchToEstimator<okvis::cameras::PinholeCamera<
+            okvis::cameras::RadialTangentialDistortion>>(
+            estimator, lastNFrame->nframe_, framesInOut, lastNFrame->pose_,
+            T_WS_ref, landmarkFrameMatches);
+        break;
+      }
+      case okvis::cameras::NCameraSystem::Equidistant: {
+        trackedFeatures += addMatchToEstimator<okvis::cameras::PinholeCamera<
+            okvis::cameras::EquidistantDistortion>>(
+            estimator, lastNFrame->nframe_, framesInOut, lastNFrame->pose_,
+            T_WS_ref, landmarkFrameMatches);
+        break;
+      }
+      case okvis::cameras::NCameraSystem::RadialTangential8: {
+        trackedFeatures += addMatchToEstimator<okvis::cameras::PinholeCamera<
+            okvis::cameras::RadialTangentialDistortion8>>(
+            estimator, lastNFrame->nframe_, framesInOut, lastNFrame->pose_,
+            T_WS_ref, landmarkFrameMatches);
+        break;
+      }
+      case okvis::cameras::NCameraSystem::FOV: {
+        trackedFeatures += addMatchToEstimator<
+            okvis::cameras::PinholeCamera<okvis::cameras::FovDistortion>>(
+            estimator, lastNFrame->nframe_, framesInOut, lastNFrame->pose_,
+            T_WS_ref, landmarkFrameMatches);
+        break;
+      }
+      default:
+        OKVIS_THROW(Exception, "Unsupported distortion type.")
+        break;
       }
     }
     if (trackedFeatures <= requiredMatches) {
@@ -327,14 +335,16 @@ int SimulationFrontend::dataAssociationAndInitialization(
   }
 
   *asKeyframe = *asKeyframe || doWeNeedANewKeyframe(estimator, framesInOut, T_WS_ref);
-  if (asKeyframe) {
-    previousKeyframe_ = framesInOut;
+  if (*asKeyframe) {
     previousKeyframePose_ = T_WS_ref;
-    previousKeyframeKeypointIndices_ = keypointIndices;
   }
-  previousFrame_ = framesInOut;
-  previousFramePose_ = T_WS_ref;
-  previousFrameKeypointIndices_ = keypointIndices;
+  nframeList_.emplace_back(framesInOut, T_WS_ref, keypointIndices, *asKeyframe);
+  if (nframeList_.size() > kMaxKeptFrames * 3 / 2) {
+    while (nframeList_.size() >= kMaxKeptFrames) {
+      nframeList_.pop_front();
+    }
+  }
+
   return trackedFeatures;
 }
 
@@ -355,7 +365,7 @@ bool SimulationFrontend::doWeNeedANewKeyframe(
   okvis::kinematics::Transformation T_SpSc = previousKeyframePose_.inverse() * T_WS;
   double distance = T_SpSc.r().norm();
   double rotAngle = std::acos(T_SpSc.q().w()) * 2;
-  if (distance > 0.4 || rotAngle > 10 * M_PI / 180) {
+  if (distance > kMinKeyframeDistance || rotAngle > kMinKeyframeAngle) {
     return true;
   } else {
     return false;
@@ -385,9 +395,11 @@ int SimulationFrontend::addMatchToEstimator(
         currFrames->landmarkId(landmarkMatch.currentKeypoint.cameraIndex,
                                landmarkMatch.currentKeypoint.keypointIndex);
     if (lmIdPrevious != 0) {
-      if (lmIdCurrent != 0) { // avoid duplicates
-        LOG(INFO) << "Potential duplicates found " << lmIdPrevious
-                  << " should == " << lmIdCurrent;
+      if (lmIdCurrent != 0) { // avoid duplicates.
+        if (lmIdPrevious != lmIdCurrent) {
+          LOG(INFO) << "Different landmarks " << lmIdPrevious << " and "
+                    << lmIdCurrent << " are involved in a feature match!";
+        }
         continue;
       }
       CHECK_EQ(lmIdPrevious, landmarkMatch.landmarkId);
@@ -398,23 +410,11 @@ int SimulationFrontend::addMatchToEstimator(
         currFrames->setLandmarkId(landmarkMatch.currentKeypoint.cameraIndex,
                                   landmarkMatch.currentKeypoint.keypointIndex,
                                   lmIdPrevious);
-        switch (constraintScheme_) {
-          case okvis::OnlyReprojectionErrors:
-            estimator.addObservation<CAMERA_GEOMETRY_T>(
-                lmIdPrevious, currFrames->id(),
-                landmarkMatch.currentKeypoint.cameraIndex,
-                landmarkMatch.currentKeypoint.keypointIndex);
-            break;
-          case okvis::OnlyTwoViewConstraints:
-            estimator.addEpipolarConstraint<CAMERA_GEOMETRY_T>(
-                lmIdPrevious, currFrames->id(),
-                landmarkMatch.currentKeypoint.cameraIndex,
-                landmarkMatch.currentKeypoint.keypointIndex,
-                singleTwoViewConstraint_);
-            break;
-          case okvis::TwoViewAndReprojection:
-            break;
-        }
+
+        estimator.addObservation<CAMERA_GEOMETRY_T>(
+            lmIdPrevious, currFrames->id(),
+            landmarkMatch.currentKeypoint.cameraIndex,
+            landmarkMatch.currentKeypoint.keypointIndex);
         ++trackedFeatures;
       } // else do nothing
     } else { // The observations are not associated to any landmark.
@@ -472,36 +472,15 @@ int SimulationFrontend::addMatchToEstimator(
         // Use estimated landmark position because true position does not
         // affect VIO results much.
         hP_W = T_WCa * hP_Ca;
-        estimator.addLandmark(landmarkMatch.landmarkId, hP_W);
+        bool inserted = estimator.addLandmark(landmarkMatch.landmarkId, hP_W);
         estimator.setLandmarkInitialized(landmarkMatch.landmarkId,
                                          canBeInitialized);
-        switch (constraintScheme_) {
-          case okvis::OnlyReprojectionErrors:
-            estimator.addObservation<CAMERA_GEOMETRY_T>(
-                landmarkMatch.landmarkId, IdA.frameId, IdA.cameraIndex,
-                IdA.keypointIndex);
-            estimator.addObservation<CAMERA_GEOMETRY_T>(
-                landmarkMatch.landmarkId, IdB.frameId, IdB.cameraIndex,
-                IdB.keypointIndex);
-            break;
-          case okvis::OnlyTwoViewConstraints:
-            if (estimator.numObservations(landmarkMatch.landmarkId) + 1 <
-                estimator.minTrackLength()) {
-              estimator.addObservation<CAMERA_GEOMETRY_T>(
-                  landmarkMatch.landmarkId, IdA.frameId, IdA.cameraIndex,
-                  IdA.keypointIndex);
-            } else {
-              estimator.addEpipolarConstraint<CAMERA_GEOMETRY_T>(
-                  landmarkMatch.landmarkId, IdA.frameId, IdA.cameraIndex,
-                  IdA.keypointIndex, singleTwoViewConstraint_);
-            }
-            estimator.addEpipolarConstraint<CAMERA_GEOMETRY_T>(
-                landmarkMatch.landmarkId, IdB.frameId, IdB.cameraIndex,
-                IdB.keypointIndex, singleTwoViewConstraint_);
-            break;
-          case okvis::TwoViewAndReprojection:
-            break;
-        }
+        estimator.addObservation<CAMERA_GEOMETRY_T>(
+            landmarkMatch.landmarkId, IdA.frameId, IdA.cameraIndex,
+            IdA.keypointIndex);
+        estimator.addObservation<CAMERA_GEOMETRY_T>(
+            landmarkMatch.landmarkId, IdB.frameId, IdB.cameraIndex,
+            IdB.keypointIndex);
         trackedFeatures += 2;
       } // else do nothing
     }
