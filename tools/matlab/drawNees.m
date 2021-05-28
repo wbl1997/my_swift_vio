@@ -28,9 +28,9 @@ single_line_styles={'r-', 'k-.', 'g--', 'b:'};
 single_line_widths={1, 1, 1, 1.5};
 indices = 2:4;
 Q = 0.05;
-[Tl, Tr] = two_sided_prob_region_nees(Q, 6, num_runs);
-[rl, rr] = two_sided_prob_region_nees(Q, 3, num_runs);
-[ql, qr] = two_sided_prob_region_nees(Q, 3, num_runs);
+[Tl, Tr] = twoSidedProbabilityRegionNees(Q, 6, num_runs);
+[rl, rr] = twoSidedProbabilityRegionNees(Q, 3, num_runs);
+[ql, qr] = twoSidedProbabilityRegionNees(Q, 3, num_runs);
 
 close all;
 figure;

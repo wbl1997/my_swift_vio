@@ -1,101 +1,44 @@
-function plotSwiftVioResult(vio_csv, export_fig_path, ...
-    gt_file, output_dir, avg_since_start, avg_trim_end, ...
-    misalignment_dim, extrinsic_dim, project_intrinsic_dim, ...
-    distort_intrinsic_dim, fix_extrinsic, fix_intrinsic, td_dim, tr_dim)
-addpath('cgraumann-umeyama');
-if nargin < 1
-    disp(['Usage:plotSwiftVioResult swift_vio.csv ...']);
+function plotSwiftVioResult(vio_file, options, gt_file, outputPath)
+if nargin < 2
+    disp('Usage:plotSwiftVioResult swift_vio.csv options [gt_file] [outputPath]');
     return;
 end
-if ~exist('fix_extrinsic', 'var')
-    fix_extrinsic = 0;
+if nargin < 3
+    gt_file = '';
 end
-if ~exist('fix_intrinsic', 'var')
-    fix_intrinsic = 0;
+if nargin < 4
+    [outputPath, ~, ~] = fileparts(vio_file);
+    disp(['outputPath is set to ', outputPath]);
 end
-if ~exist('td_dim', 'var')
-    td_dim = 1;
+
+if options.export_fig_path
+    addpath(options.export_fig_path);
 end
-if ~exist('tr_dim', 'var')
-    tr_dim = 1;
-end
+
+addpath('plotters');
 
 close all;
-if ~exist('export_fig_path','var')
-    export_fig_path = input('path of export_fig:', 's');
-end
-if isempty(export_fig_path)
-    export_fig_path = '/media/jhuai/Seagate/jhuai/tools/export_fig/';
-end
 
-addpath(export_fig_path);
+indexServer = SwiftVioConstants(options.misalignment_dim, ...
+    options.extrinsic_dim, options.project_intrinsic_dim, ...
+    options.distort_intrinsic_dim, options.fix_extrinsic, ...
+    options.fix_intrinsic, options.td_dim, options.tr_dim);
 
-if ~exist('output_dir','var')
-    output_dir = input('output_dir, if empty, set to dir of the csv:', 's');
-end
-if isempty(output_dir)
-    [output_dir, ~, ~] = fileparts(vio_csv);
-    disp(['output_dir is set to ', output_dir]);
-end
-
-if ~exist('misalignment_dim','var')
-    misalignment_dim_str = input('dim of IMU misalignment:', 's');
-if isempty(misalignment_dim_str)
-    misalignment_dim = 27;
-else
-    misalignment_dim = str2double(misalignment_dim_str);
-end
-end
-if ~exist('extrinsic_dim','var')
-    extrinsic_dim_str = input('dim of camera extrinsics:', 's');
-if isempty(extrinsic_dim_str)
-    extrinsic_dim = 3;
-else
-    extrinsic_dim = str2double(extrinsic_dim_str);
-end
-end
-
-if ~exist('project_intrinsic_dim','var')
-    project_intrinsic_dim_str = input('dim of camera projection intrinsics:', 's');
-
-if isempty(project_intrinsic_dim_str)
-    project_intrinsic_dim = 4;
-else
-    project_intrinsic_dim = str2double(project_intrinsic_dim_str);
-end
-end
-
-if ~exist('distort_intrinsic_dim','var')
-    distort_intrinsic_dim_str = input('dim of camera distortion intrinsics:', 's');
-if isempty(distort_intrinsic_dim_str)
-    distort_intrinsic_dim = 4;
-else
-    distort_intrinsic_dim = str2double(distort_intrinsic_dim_str);
-end
-end
-indexServer = SwiftVioConstants(misalignment_dim, extrinsic_dim, ...
-    project_intrinsic_dim, distort_intrinsic_dim, fix_extrinsic, ...
-    fix_intrinsic, td_dim, tr_dim);
-
-fontsize = 18;
-data = readmatrix(vio_csv, 'NumHeaderLines', 1);
+data = readmatrix(vio_file, 'NumHeaderLines', 1);
 original_data = data;
 
 sec_to_nanos = 1e9;
 startTime = data(1, 1);
 endTime = data(end, 1);
 
-if ~exist('gt_file','var')
-    % ground truth file must have the same number of rows as output data
-    gt_file = input('Ground truth csv:', 's');
-end
+gt_index.r = 3:5;
+gt_index.q = 6:9;
+gt_index.v = 10:12;
+gt_index.b_g = 13:15;
+gt_index.b_a = 16:18;
+applyUmeyama = 0;
 
-if (gt_file)
-    gt_index.r = 3:5;
-    gt_index.q = 6:9;
-    gt_index.v = 10:12;
-    applyUmeyama = 0;
-
+if gt_file
     gt = readmatrix(gt_file, 'NumHeaderLines', 1);
     index= find(abs(gt(:,1) - startTime)<5e-2);
     gt = gt(index:end,:);
@@ -107,7 +50,7 @@ if (gt_file)
         index= find(abs(gt(:,1) - endTime)<5e-2);
         gt= gt(1:index,:);
     end
-
+    
     % associate the data by timestamps, discrepancy less than 0.02sec
     starter =1;
     assocIndex = zeros(size(data,1), 1);
@@ -118,7 +61,7 @@ if (gt_file)
         starter = index(uniqIndex) + starter-1;
     end
     % association end
-
+    
     gt(:,1) = gt(:,1) - startTime;
     if data(1, 1) > sec_to_nanos
         data(:,1) = (data(:,1) - startTime) / sec_to_nanos;
@@ -133,8 +76,8 @@ if (gt_file)
         [R_res, t_res] = umeyama(src',dst');
         data(:,indexServer.r) = (R_res*data(:, indexServer.r)'+ ...
             repmat(t_res, 1, size(data,1)))';
-
-        q_res= quaternion(R_res, 'rotmat', 'point');    
+        
+        q_res= quaternion(R_res, 'rotmat', 'point');
         for i=1:size(data,1)
             res4 = compact(q_res * quaternion(...
                 [data(i,indexServer.q(4)), ...
@@ -144,7 +87,7 @@ if (gt_file)
         end
         data(:,indexServer.v) = (R_res*data(:, indexServer.v)')';
     end
-
+    
     data_diff = data;
     data_diff(:, indexServer.r) = ...
         data_diff(:, indexServer.r) - gt(assocIndex, gt_index.r);
@@ -159,6 +102,14 @@ if (gt_file)
     if size(gt, 2) >= gt_index.v(3)
         data_diff(:, indexServer.v) = ...
             data_diff(:, indexServer.v) - gt(assocIndex, gt_index.v);
+    end
+    if size(gt, 2) >= gt_index.b_g(3)
+        data_diff(:, indexServer.b_g) = ...
+            data_diff(:, indexServer.b_g) - gt(assocIndex, gt_index.b_g);
+    end
+    if size(gt, 2) >= gt_index.b_a(3)
+        data_diff(:, indexServer.b_a) = ...
+            data_diff(:, indexServer.b_a) - gt(assocIndex, gt_index.b_a);
     end
 else
     gt = [];
@@ -191,7 +142,7 @@ ylabel('y[m]');
 zlabel('z[m]');
 axis equal;
 grid on;
-outputfig = [output_dir, '/p_GB.eps'];
+outputfig = [outputPath, '/p_GB.eps'];
 if exist(outputfig, 'file')==2
     delete(outputfig);
 end
@@ -202,28 +153,42 @@ if(~isempty(gt))
     distance = totalDistance(gt(assocIndex, gt_index.r));
     errorPosition = data(:,indexServer.r)- gt(assocIndex, gt_index.r);
     absError = sqrt(sum(errorPosition.^2,2));
-    [maxError, idx]= max(absError)
-    maxError/distance
-    rmse = sqrt(sum(sum(errorPosition.^2,2))/size(data,1))
-    rmse/distance
-
+    [maxError, idx]= max(absError);
+    rmse = sqrt(sum(sum(errorPosition.^2,2))/size(data,1));
+    fprintf('max error over distance %f, rmse over distance %f.\n', ...
+        maxError/distance, rmse/distance);
+    
     figure;
     drawMeanAndStdBound(data_diff, indexServer.r, indexServer.r_std, 1, 1);
     ylabel('$\delta \mathbf{t}_{WB}$ (m)', 'Interpreter', 'Latex');
-    saveas(gcf,[output_dir, '\Error p_WB'],'epsc');
-
+    saveas(gcf,[outputPath, '\Error p_WB'],'epsc');
+    
     figure;
     drawMeanAndStdBound(data_diff, indexServer.q(1:3), ...
         indexServer.q_std, 180/pi, 1);
     ylabel('$\delta \mathbf{\theta}_{WB}{} (^{\circ})$', 'Interpreter', 'Latex');
-    saveas(gcf,[output_dir, '\Error R_WB'],'epsc');
-
+    saveas(gcf,[outputPath, '\Error R_WB'],'epsc');
+    
     figure;
-    if size(gt, 2) >= 11
+    if size(gt, 2) >= 2 + 7 + 3
         drawMeanAndStdBound(data_diff, indexServer.v, ...
             indexServer.v_std, 1, 1);
         ylabel('$\delta \mathbf{v}_{WB} (m/s)$', 'Interpreter', 'Latex');
-        saveas(gcf,[output_dir, '\Error v_WB'],'epsc');
+        saveas(gcf,[outputPath, '\Error v_WB'],'epsc');
+    end
+    figure;
+    if size(gt, 2) >= 2 + 7 + 3 + 3
+        drawMeanAndStdBound(data_diff, indexServer.b_g, ...
+            indexServer.b_g_std, 180/pi, 1);
+        ylabel('$\delta \mathbf{b}_{g} (^\circ/s)$', 'Interpreter', 'Latex');
+        saveas(gcf,[outputPath, '\Error b_g'],'epsc');
+    end
+    figure;
+    if size(gt, 2) >= 2 + 7 + 3 + 6
+        drawMeanAndStdBound(data_diff, indexServer.b_a, ...
+            indexServer.b_a_std, 1, 1);
+        ylabel('$\delta \mathbf{b}_{a} (m/s)$', 'Interpreter', 'Latex');
+        saveas(gcf,[outputPath, '\Error b_a'],'epsc');
     end
 end
 
@@ -244,9 +209,9 @@ end
 xlabel('time[sec]');
 ylabel('q xyz[1]');
 grid on;
-outputfig = [output_dir, '/qxyz_GB.eps'];
+outputfig = [outputPath, '/qxyz_GB.eps'];
 if exist(outputfig, 'file')==2
-  delete(outputfig);
+    delete(outputfig);
 end
 export_fig(outputfig);
 
@@ -260,104 +225,168 @@ if(~isempty(gt))
     plot(gt(:,1), gt(:,gt_index.v(1)), '-.r');
     plot(gt(:,1), gt(:,gt_index.v(2)), '-.g');
     plot(gt(:,1), gt(:,gt_index.v(3)), '-.b');
-    legend('vx', 'vy', 'vz', 'std x', 'std y', 'std z', '-std x', '-std y', '-std z', 'gt vx', 'gt vy', 'gt vz');
+    legend('vx', 'vy', 'vz', 'std x', 'std y', 'std z', '-std x', ...
+        '-std y', '-std z', 'gt vx', 'gt vy', 'gt vz');
 end
 ylabel('v_{GB}[m/s]');
-outputfig = [output_dir, '/v_GB.eps'];
+outputfig = [outputPath, '/v_GB.eps'];
 if exist(outputfig, 'file')==2
-  delete(outputfig);
+    delete(outputfig);
 end
 export_fig(outputfig);
 
+plotImuBiases(data, indexServer, outputPath);
+
+if ~isempty(indexServer.p_BC_std)
+    figure;
+    drawMeanAndStdBound(data, indexServer.p_BC, indexServer.p_BC_std, 100.0);
+    ylabel('p_{BC}[cm]');
+    outputfig = [outputPath, '/p_BC.eps'];
+    if exist(outputfig, 'file')==2
+        delete(outputfig);
+    end
+    export_fig(outputfig);
+end
+
+plotCameraIntrinsics(data, indexServer, options.trueCameraIntrinsics, outputPath);
+
+plotTemporalParameters(data, indexServer, outputPath);
+
+plotImuIntrinsicParameters(data, indexServer, outputPath);
+
+averageSwiftVioVariableEstimates(original_data, indexServer, ...
+    [outputPath, '/avg_estimates.txt'], options.avg_since_start, ...
+    options.avg_trim_end);
+
+end
+
+function plotImuBiases(data, indexServer, outputPath)
 figure;
 drawMeanAndStdBound(data, indexServer.b_g, indexServer.b_g_std, 180/pi);
 ylabel(['b_g[' char(176) '/s]']);
-outputfig = [output_dir, '/b_g.eps'];
+outputfig = [outputPath, '/b_g.eps'];
 if exist(outputfig, 'file')==2
-  delete(outputfig);
+    delete(outputfig);
 end
 export_fig(outputfig);
 
 figure;
 drawMeanAndStdBound(data, indexServer.b_a, indexServer.b_a_std, 1.0);
-
 ylabel('b_a[m/s^2]');
-outputfig = [output_dir, '/b_a.eps'];
+outputfig = [outputPath, '/b_a.eps'];
 if exist(outputfig, 'file')==2
-  delete(outputfig);
-end
-export_fig(outputfig);
-
-if ~isempty(indexServer.p_BC_std)
-figure;
-
-drawMeanAndStdBound(data, indexServer.p_BC, indexServer.p_BC_std, 100.0);
-
-ylabel('p_{BC}[cm]');
-outputfig = [output_dir, '/p_BC.eps'];
-if exist(outputfig, 'file')==2
-  delete(outputfig);
+    delete(outputfig);
 end
 export_fig(outputfig);
 end
 
-nominal_intrinsics = data(1, indexServer.fxy_cxy);
-disp('The nominal fxy cxy is set to ');
-disp(nominal_intrinsics);
-
-if ~isempty(indexServer.fxy_cxy_std)
-figure;
-data(:, indexServer.fxy_cxy) = data(:, indexServer.fxy_cxy) - ...
-    repmat(nominal_intrinsics, size(data, 1), 1);
-drawMeanAndStdBound(data, indexServer.fxy_cxy, ...
-    indexServer.fxy_cxy_std);
-legend('f_x','f_y','c_x','c_y','3\sigma_f_x', '3\sigma_f_y','3\sigma_c_x','3\sigma_c_y');
-ylabel('deviation from nominal values ($f_x$, $f_y$), ($c_x$, $c_y$)[px]', 'Interpreter', 'Latex');
-outputfig = [output_dir, '/fxy_cxy.eps'];
-if exist(outputfig, 'file')==2
-  delete(outputfig);
-end
-export_fig(outputfig);
-end
-
-if ~isempty(indexServer.k1_k2_std)
-figure;
-drawMeanAndStdBound(data, indexServer.k1_k2, indexServer.k1_k2_std);
-ylabel('k_1 and k_2[1]');
-legend('k_1','k_2', '3\sigma_{k_1}', '3\sigma_{k_2}');
-outputfig = [output_dir, '/k1_k2.eps'];
-if exist(outputfig, 'file')==2
-  delete(outputfig);
-end
-export_fig(outputfig);
-end
-
-if ~isempty(indexServer.p1_p2_std)
-figure;
-p1p2Scale = 1e2;
-drawMeanAndStdBound(data, indexServer.p1_p2, indexServer.p1_p2_std, p1p2Scale);
-ylabel('p_1 and p_2[0.01]');
-legend('p_1','p_2', '3\sigma_{p_1}', '3\sigma_{p_2}');
-outputfig = [output_dir, '/p1_p2.eps'];
-if exist(outputfig, 'file')==2
-  delete(outputfig);
-end
-export_fig(outputfig);
-end
-
-intermediatePlotter(data, indexServer, output_dir);
-if exist('avg_since_start','var')
-    if exist('avg_trim_end','var')
-        averageSwiftVioVariableEstimates(original_data, indexServer, ...
-            [output_dir, '/avg_estimates.txt'], avg_since_start, avg_trim_end);
-    else
-        averageSwiftVioVariableEstimates(original_data, indexServer, ...
-            [output_dir, '/avg_estimates.txt'], avg_since_start);
+function plotCameraIntrinsics(data, indexServer, trueIntrinsics, outputPath)
+if ~isempty(indexServer.fxy_cxy_std) && indexServer.fxy_cxy_std(end) < size(data, 2)
+    figure;
+    data(:, indexServer.fxy_cxy) = data(:, indexServer.fxy_cxy) - ...
+        repmat(trueIntrinsics, size(data, 1), 1);
+    drawMeanAndStdBound(data, indexServer.fxy_cxy, ...
+        indexServer.fxy_cxy_std);
+    legend('f_x','f_y','c_x','c_y','3\sigma_f_x','3\sigma_f_y',...
+        '3\sigma_c_x','3\sigma_c_y');
+    ylabel(['deviation from nominal values ($f_x$, $f_y$), ', ...
+        '($c_x$, $c_y$)[px]'], 'Interpreter', 'Latex');
+    outputfig = [outputPath, '/fxy_cxy.eps'];
+    if exist(outputfig, 'file')==2
+        delete(outputfig);
     end
-else
-    averageSwiftVioVariableEstimates(original_data, indexServer, ...
-            [output_dir, '/avg_estimates.txt']);
+    export_fig(outputfig);
 end
 
+if ~isempty(indexServer.k1_k2_std) && indexServer.k1_k2_std(end) < size(data, 2)
+    figure;
+    drawMeanAndStdBound(data, indexServer.k1_k2, indexServer.k1_k2_std);
+    ylabel('k_1 and k_2[1]');
+    legend('k_1','k_2', '3\sigma_{k_1}', '3\sigma_{k_2}');
+    outputfig = [outputPath, '/k1_k2.eps'];
+    if exist(outputfig, 'file')==2
+        delete(outputfig);
+    end
+    export_fig(outputfig);
 end
 
+if ~isempty(indexServer.p1_p2_std) && indexServer.p1_p2_std(end) < size(data, 2)
+    figure;
+    p1p2Scale = 1e2;
+    drawMeanAndStdBound(data, indexServer.p1_p2, indexServer.p1_p2_std, p1p2Scale);
+    ylabel('p_1 and p_2[0.01]');
+    legend('p_1','p_2', '3\sigma_{p_1}', '3\sigma_{p_2}');
+    outputfig = [outputPath, '/p1_p2.eps'];
+    if exist(outputfig, 'file')==2
+        delete(outputfig);
+    end
+    export_fig(outputfig);
+end
+end
+
+function plotImuIntrinsicParameters(data, indexServer, outputPath)
+% It will modify data by subtracting reference values from data
+if ~isempty(indexServer.T_g_std) && indexServer.T_g_std(end) < size(data, 2)
+    figure;
+    data(:, indexServer.T_g_diag) = data(:, indexServer.T_g_diag) ...
+        - ones(size(data, 1), 3);
+    drawMeanAndStdBound(data, indexServer.T_g, ...
+        indexServer.T_g_std);
+    ylabel('$\mathbf{T}_g$[1]' , 'Interpreter', 'Latex');
+    outputfig = [outputPath, '/T_g.eps'];
+    if exist(outputfig, 'file')==2
+        delete(outputfig);
+    end
+    export_fig(outputfig);
+    
+    figure;
+    drawMeanAndStdBound(data, indexServer.T_s, ...
+        indexServer.T_s_std);
+    ylabel('$\mathbf{T}_s$[1]' , 'Interpreter', 'Latex');
+    outputfig = [outputPath, '/T_s.eps'];
+    if exist(outputfig, 'file')==2
+        delete(outputfig);
+    end
+    export_fig(outputfig);
+    
+    figure;
+    data(:, indexServer.T_a_diag) = data(:, indexServer.T_a_diag) ...
+        - ones(size(data, 1), 3);
+    drawMeanAndStdBound(data, indexServer.T_a, ...
+        indexServer.T_a_std);
+    ylabel('$\mathbf{T}_a$[1]' , 'Interpreter', 'Latex');
+    outputfig = [outputPath, '/T_a.eps'];
+    if exist(outputfig, 'file')==2
+        delete(outputfig);
+    end
+    export_fig(outputfig);
+end
+end
+
+function plotTemporalParameters(data, indexServer, outputPath)
+if ~isempty(indexServer.td_std) && indexServer.td_std < size(data, 2)
+    figure;
+    drawMeanAndStdBound(data, indexServer.td, ...
+        indexServer.td_std, 1000);
+    legend('t_d', '3\sigma_t_d');
+    ylabel('$t_d$[ms]', 'Interpreter', 'Latex');
+    outputfig = [outputPath, '/t_d.eps'];
+    if exist(outputfig, 'file')==2
+        delete(outputfig);
+    end
+    export_fig(outputfig);
+end
+
+if ~isempty(indexServer.tr_std) && indexServer.tr_std < size(data, 2)
+    figure;
+    drawMeanAndStdBound(data, indexServer.tr, ...
+        indexServer.tr_std, 1000);
+    legend('t_r', '3\sigma_{t_r}');
+    ylabel('$t_r$[ms]', 'Interpreter', 'Latex');
+    outputfig = [outputPath, '/t_r.eps'];
+    if exist(outputfig, 'file')==2
+        delete(outputfig);
+    end
+    export_fig(outputfig);
+end
+end

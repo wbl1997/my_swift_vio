@@ -48,6 +48,11 @@ fprintf(fileID, '%.4f ', estimate_average(indexServer.b_a));
 
 fprintf(fileID, '+/- ');
 fprintf(fileID, '%.5f ', estimate_average(indexServer.b_a_std));
+
+if isempty(indexServer.p_BC)
+    return;
+end
+
 fprintf(fileID, '\np_{BC}[cm]:');
 fprintf(fileID, '%.3f ', estimate_average(indexServer.p_BC(1:3))*100);
 if size(indexServer.p_BC, 2) > 3
