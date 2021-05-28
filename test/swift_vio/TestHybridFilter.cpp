@@ -67,6 +67,10 @@ DEFINE_double(sim_imu_bias_noise_factor, 1.0,
 DEFINE_string(sim_trajectory_label, "WavyCircle",
               "Ball has the most exciting motion, wavycircle is general");
 
+DEFINE_int32(sim_landmark_model, 1,
+             "Landmark model 0 for global homogeneous point, 1 for anchored "
+             "inverse depth point, 2 for parallax angle parameterization");
+
 typedef boost::iterator_range<std::vector<std::pair<double, double>>::iterator>
     HistogramType;
 
@@ -450,7 +454,7 @@ void testHybridFilterSinusoid(
         frameFeatureTally(trackedFeatures);
 
         okvis::Optimization sharedOptConfig;
-        sharedOptConfig.getCovariance = true;
+        sharedOptConfig.getSmootherCovariance = false;
         sharedOptConfig.numKeyframes = 5;
         sharedOptConfig.numImuFrames = 3;
         estimator->setOptimizationOptions(sharedOptConfig);
@@ -567,7 +571,7 @@ TEST(DeadreckoningM, TrajectoryLabel) {
   bool useImageObservation = false;
   bool useEpipolarConstraint = false;
   int cameraObservationModelId = 0;
-  int landmarkModelId = 1;
+  int landmarkModelId = FLAGS_sim_landmark_model;
   double landmarkRadius = 5;
   simul::TestSetting testSetting(
       true, FLAGS_noisyInitialSpeedAndBiases, FLAGS_noisyInitialSensorParams,
@@ -603,7 +607,7 @@ TEST(HybridFilter, TrajectoryLabel) {
   bool useImageObservation = true;
   bool useEpipolarConstraint = false;
   int cameraObservationModelId = 0;
-  int landmarkModelId = 1;
+  int landmarkModelId = FLAGS_sim_landmark_model;
   double landmarkRadius = 5;
   simul::TestSetting testSetting(
       true, FLAGS_noisyInitialSpeedAndBiases, FLAGS_noisyInitialSensorParams,
@@ -621,7 +625,7 @@ TEST(MSCKF, TrajectoryLabel) {
   bool useImageObservation = true;
   bool useEpipolarConstraint = false;
   int cameraObservationModelId = 0;
-  int landmarkModelId = 1;
+  int landmarkModelId = FLAGS_sim_landmark_model;
   double landmarkRadius = 5;
   simul::TestSetting testSetting(
       true, FLAGS_noisyInitialSpeedAndBiases, FLAGS_noisyInitialSensorParams,
@@ -639,7 +643,7 @@ TEST(MSCKF, HuaiThesis) {
   bool useImageObservation = true;
   bool useEpipolarConstraint = false;
   int cameraObservationModelId = 0;
-  int landmarkModelId = 1;
+  int landmarkModelId = FLAGS_sim_landmark_model;
   double landmarkRadius = 5;
   simul::TestSetting testSetting(
       true, FLAGS_noisyInitialSpeedAndBiases, FLAGS_noisyInitialSensorParams,
@@ -656,7 +660,7 @@ TEST(MSCKF, CircleFarPoints) {
   bool addImageNoise = true;
   bool useImageObservation = true;
   int cameraObservationModelId = 0;
-  int landmarkModelId = 1;
+  int landmarkModelId = FLAGS_sim_landmark_model;
   bool useEpipolarConstraint = false;
   double landmarkRadius = 50;
   simul::TestSetting testSetting(
@@ -847,7 +851,7 @@ TEST(MSCKFWithEpipolarConstraint, TrajectoryLabel) {
   bool useImageObservation = true;
   bool useEpipolarConstraint = false;
   int cameraObservationModelId = 0;
-  int landmarkModelId = 1;
+  int landmarkModelId = FLAGS_sim_landmark_model;
   double landmarkRadius = 5;
   simul::TestSetting testSetting(
       true, FLAGS_noisyInitialSpeedAndBiases, FLAGS_noisyInitialSensorParams,
@@ -866,7 +870,7 @@ TEST(MSCKFWithEpipolarConstraint, CircleFarPoints) {
   bool useImageObservation = true;
   bool useEpipolarConstraint = true;
   int cameraObservationModelId = 0;
-  int landmarkModelId = 1;
+  int landmarkModelId = FLAGS_sim_landmark_model;
   double landmarkRadius = 50;
   simul::TestSetting testSetting(
       true, FLAGS_noisyInitialSpeedAndBiases, FLAGS_noisyInitialSensorParams,

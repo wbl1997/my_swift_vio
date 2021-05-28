@@ -149,11 +149,9 @@ void VioTestSystemBuilder::createVioSystem(
   plOptions.landmarkModelId = testSetting.landmarkModelId;
   estimator->setPointLandmarkOptions(plOptions);
 
-  frontend.reset(new SimulationFrontend(trueCameraSystem_->numCameras(),
-                                               testSetting.addImageNoise, 60,
-                                               testSetting.gridType,
-                                               testSetting.landmarkRadius,
-                                               pointFile));
+  frontend.reset(new SimulationFrontend(
+      trueCameraSystem_->numCameras(), testSetting.addImageNoise, 60,
+      testSetting.gridType, testSetting.landmarkRadius, pointFile));
 
   estimator->addImu(imuParameters);
   estimator->addCameraSystem(
