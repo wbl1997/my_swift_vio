@@ -19,9 +19,9 @@ class PointLandmarkSimulationRS
    * @param framesInOut the keypoints for every frame are created from
    * observations of successfully projected landmarks.
    * @param frameLandmarkIndices {{landmark index of every keypoint} in every
-   * frame}, every entry >= 0
+   * frame}, every entry >= 0, length = number of valid projections = number of keypoints.
    * @param keypointIndices {{every landmark's keypoint index} in every frame},
-   * valid entry >= 0, void entry -1
+   * valid entry >= 0, void entry -1, length = number of landmarks.
    * @param imageNoiseMag
    */
   static void projectLandmarksToNFrame(

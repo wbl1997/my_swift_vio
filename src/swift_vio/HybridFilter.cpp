@@ -2723,7 +2723,7 @@ void HybridFilter::initializeLandmarksInFilter() {
     mInCovLmIds.insert(mInCovLmIds.end(), landmarksToAdd.begin(),
                        landmarksToAdd.end());
 
-    // TODO(jhuai): add homogeneous point parameter block to satisfy setLandmark
+    // TODO(jhuai): For now, we add homogeneous point parameter block to satisfy setLandmark
     // which potentially needs point blocks to be registered in the map.
     // This would be unnecessary if the frontend refers to the backendInterface
     // instead of the concrete Estimator class.

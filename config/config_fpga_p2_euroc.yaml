@@ -84,7 +84,6 @@ optimization:
     cameraObservationModelId: 0
 
 frontend:
-    initializeWithoutEnoughParallax: true
     stereoMatchWithEpipolarCheck: true
     epipolarDistanceThreshold: 2.5
     featureTrackingMethod: 0
