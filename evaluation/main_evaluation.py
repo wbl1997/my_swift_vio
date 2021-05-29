@@ -72,7 +72,6 @@ if __name__ == '__main__':
                   "numImuFrames": 3,
                   "monocular_input": 1,
                   "landmarkModelId": 1,
-                  "anchorAtObservationTime": 0,
                   "model_type": "BG_BA",
                   'projection_opt_mode': 'FXY_CXY',
                   "extrinsic_opt_mode_main_camera": "P_BC_Q_BC",

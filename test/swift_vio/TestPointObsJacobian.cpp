@@ -311,25 +311,14 @@ void CameraMeasurementJacobianTest::computeAndCheckJacobians() const {
     Eigen::MatrixXd J_x_diff = J_x - J_x_legacy;
     EXPECT_LT(J_x_diff.leftCols(tdIndex).lpNorm<Eigen::Infinity>(), 1e-6);
 
-    if (pointLandmarkOptions_.anchorAtObservationTime) {
-      // We do not check Jacobians relative to time (td, tr) as the new AIDP
-      // implementation considers the effect of time error on anchor frame. and
-      // we do not check Jacobian relative to anchor frame velocity as the new
-      // AIDP implementation considers the velocity of anchor frame.
-      EXPECT_LT(J_x_diff.block(0, tdIndex + 2, 2, J_x.cols() - tdIndex - 2 - 3)
-                    .lpNorm<Eigen::Infinity>(),
-                0.02)
-          << "J_x\n"
-          << J_x.format(commaInitFmt) << "\nJ_x_legacy\n"
-          << J_x_legacy.format(commaInitFmt);
-    } else {
-      EXPECT_LT(J_x_diff.block(0, tdIndex, 2, J_x.cols() - tdIndex)
-                    .lpNorm<Eigen::Infinity>(),
-                0.02)
-          << "J_x\n"
-          << J_x.format(commaInitFmt) << "\nJ_x_legacy\n"
-          << J_x_legacy.format(commaInitFmt);
-    }
+    // We do not check Jacobian relative to anchor frame velocity as the new
+    // AIDP implementation considers the velocity of anchor frame.
+    EXPECT_LT(J_x_diff.block(0, tdIndex, 2, J_x.cols() - tdIndex)
+                  .lpNorm<Eigen::Infinity>(),
+              0.02)
+        << "J_x\n"
+        << J_x.format(commaInitFmt) << "\nJ_x_legacy\n"
+        << J_x_legacy.format(commaInitFmt);
 
     EXPECT_LT((J_pfi - J_pfi_legacy).lpNorm<Eigen::Infinity>(), 1e-6);
     EXPECT_LT((residual - residual_legacy).lpNorm<Eigen::Infinity>(), 1e-4);
@@ -363,30 +352,9 @@ void CameraMeasurementJacobianTest::computeAndCheckJacobians() const {
   }
 }
 
-TEST(CameraMeasurementJacobianTest, RadialTangential_AIDP) {
-  swift_vio::PointLandmarkOptions plOptions;
-  plOptions.landmarkModelId = swift_vio::InverseDepthParameterization::kModelId;
-  plOptions.anchorAtObservationTime = true;
-  CameraMeasurementJacobianTest cmjt(
-      okvis::cameras::NCameraSystem::DistortionType::RadialTangential,
-      plOptions);
-  cmjt.computeAndCheckJacobians();
-}
-
-TEST(CameraMeasurementJacobianTest, FOV_AIDP) {
-  swift_vio::PointLandmarkOptions plOptions;
-  plOptions.landmarkModelId = swift_vio::InverseDepthParameterization::kModelId;
-  plOptions.anchorAtObservationTime = true;
-  CameraMeasurementJacobianTest cmjt(
-      okvis::cameras::NCameraSystem::DistortionType::FOV,
-      plOptions);
-  cmjt.computeAndCheckJacobians();
-}
-
 TEST(CameraMeasurementJacobianTest, RadialTangential_AIDP_onesided) {
   swift_vio::PointLandmarkOptions plOptions;
   plOptions.landmarkModelId = swift_vio::InverseDepthParameterization::kModelId;
-  plOptions.anchorAtObservationTime = false;
   CameraMeasurementJacobianTest cmjt(
       okvis::cameras::NCameraSystem::DistortionType::RadialTangential,
       plOptions);
@@ -396,7 +364,6 @@ TEST(CameraMeasurementJacobianTest, RadialTangential_AIDP_onesided) {
 TEST(CameraMeasurementJacobianTest, FOV_AIDP_onesided) {
   swift_vio::PointLandmarkOptions plOptions;
   plOptions.landmarkModelId = swift_vio::InverseDepthParameterization::kModelId;
-  plOptions.anchorAtObservationTime = false;
   CameraMeasurementJacobianTest cmjt(
       okvis::cameras::NCameraSystem::DistortionType::FOV,
       plOptions);
@@ -406,7 +373,6 @@ TEST(CameraMeasurementJacobianTest, FOV_AIDP_onesided) {
 TEST(CameraMeasurementJacobianTest, RadialTangential_HPP) {
   swift_vio::PointLandmarkOptions plOptions;
   plOptions.landmarkModelId = swift_vio::HomogeneousPointParameterization::kModelId;
-  plOptions.anchorAtObservationTime = false;
   CameraMeasurementJacobianTest cmjt(
       okvis::cameras::NCameraSystem::DistortionType::RadialTangential,
       plOptions);
@@ -416,7 +382,6 @@ TEST(CameraMeasurementJacobianTest, RadialTangential_HPP) {
 TEST(CameraMeasurementJacobianTest, FOV_HPP) {
   swift_vio::PointLandmarkOptions plOptions;
   plOptions.landmarkModelId = swift_vio::HomogeneousPointParameterization::kModelId;
-  plOptions.anchorAtObservationTime = false;
   CameraMeasurementJacobianTest cmjt(
       okvis::cameras::NCameraSystem::DistortionType::FOV,
       plOptions);

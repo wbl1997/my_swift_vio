@@ -1058,10 +1058,6 @@ void HybridFilter::changeAnchors(
             mtpjFej.dp_dT(mtpjPoseIndices[ja]);
         size_t navStateIndex = startIndices[ja] - startIndexCameraParams;
         startIndexToMinDim.emplace_back(navStateIndex, 6u);
-        OKVIS_ASSERT_FALSE(Exception,
-                           pointLandmarkOptions_.anchorAtObservationTime,
-                           "We assume landmarks are anchored at the state "
-                           "epoch of the anchor frame in changing the anchor.");
         dpoint_dX.emplace_back(dpoint_dT_WBt_fej);
       }
 
@@ -1078,7 +1074,7 @@ void HybridFilter::changeAnchors(
       // Jacobian relative to landmark parameters.
       size_t covPtId = std::distance(mInCovLmIds.begin(), landmarkIter);
       vCovPtId.push_back(covPtId);
-      Eigen::Matrix<double, 4, 3> dhPoint_dparams; // dHomogeneousPoint_dParameters.
+      Eigen::Matrix<double, 4, 3> dhPoint_dparams;
       dhPoint_dparams.setZero();
       dhPoint_dparams(0, 0) = 1;
       dhPoint_dparams(1, 1) = 1;
@@ -1356,15 +1352,11 @@ bool HybridFilter::measurementJacobian(
     okvis::kinematics::Transformation T_WBta;
     size_t anchorObservationIndex = pointDataPtr->anchorIds()[0].observationIndex_;
     okvis::kinematics::Transformation T_WBta_fej;
-    if (pointLandmarkOptions_.anchorAtObservationTime) {
-      T_WBta = pointDataPtr->T_WB_mainAnchor();
-      T_WBta_fej = pointDataPtr->T_WB_mainAnchorForJacobian(
-            FLAGS_use_first_estimate);
-    } else {
-      T_WBta = pointDataPtr->T_WB_mainAnchorStateEpoch();
-      T_WBta_fej = pointDataPtr->T_WB_mainAnchorStateEpochForJacobian(
-            FLAGS_use_first_estimate);
-    }
+
+    T_WBta = pointDataPtr->T_WB_mainAnchorStateEpoch();
+    T_WBta_fej = pointDataPtr->T_WB_mainAnchorStateEpochForJacobian(
+          FLAGS_use_first_estimate);
+
     okvis::kinematics::Transformation T_WCta = T_WBta * T_BCa;
     T_CtjX = (T_WBtj * T_BCj).inverse() * T_WCta;
 
@@ -1456,7 +1448,7 @@ bool HybridFilter::measurementJacobian(
     startIndexToMinDim.emplace_back(navStateIndex, 6u);
 
     // Jacobians relative to time parameters and velocity.
-    if (ja == 1u && !pointLandmarkOptions_.anchorAtObservationTime) {
+    if (ja == 1u) {
       // Because the anchor frame is at state epoch, then the Jacobian of its
       // pose relative to time and velocity are zero.
       dpoint_dX.emplace_back(dpoint_dT_WBt_fej);
@@ -2999,22 +2991,15 @@ swift_vio::TriangulationStatus HybridFilter::triangulateAMapPoint(
       okvis::kinematics::Transformation,
       Eigen::aligned_allocator<okvis::kinematics::Transformation>> T_WCa_list;
   T_WCa_list.reserve(anchorIds.size());
-  if (pointLandmarkOptions_.anchorAtObservationTime) {
-    // anchor body frame's pose is propagated to feature observation time with IMU readings.
-    for (auto anchorId : anchorIds) {
-      size_t anchorObsIndex = anchorId.observationIndex_;
-      T_WCa_list.push_back(T_WSs.at(anchorObsIndex) *
-                           T_BCs[camIndices[anchorObsIndex]]);
-    }
-  } else {
-    // anchor body frame is at the state epoch, so its pose does not depend on td and tr any more.
-    for (auto anchorId : anchorIds) {
-      size_t anchorObsIndex = anchorId.observationIndex_;
-      okvis::kinematics::Transformation T_WB =
-          pointDataPtr->poseParameterBlockPtr(anchorObsIndex)->estimate();
-      T_WCa_list.push_back(T_WB * T_BCs[camIndices[anchorObsIndex]]);
-    }
+
+  // anchor body frame is at the state epoch, so its pose does not depend on td and tr any more.
+  for (auto anchorId : anchorIds) {
+    size_t anchorObsIndex = anchorId.observationIndex_;
+    okvis::kinematics::Transformation T_WB =
+        pointDataPtr->poseParameterBlockPtr(anchorObsIndex)->estimate();
+    T_WCa_list.push_back(T_WB * T_BCs[camIndices[anchorObsIndex]]);
   }
+
   status = pointLandmark.initialize(T_WSs, obsDirections, T_BCs, T_WCa_list,
                                     camIndices, anchorSeqIds);
   triangulateTimer.stop();

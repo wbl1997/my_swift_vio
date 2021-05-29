@@ -97,11 +97,8 @@ bool MSCKF::measurementJacobianAIDPMono(
   okvis::kinematics::Transformation T_WBtj = pointDataPtr->T_WBtij(observationIndex);
 
   okvis::kinematics::Transformation T_WBta;
-  if (pointLandmarkOptions_.anchorAtObservationTime) {
-    T_WBta = pointDataPtr->T_WB_mainAnchor();
-  } else {
-    T_WBta = pointDataPtr->T_WB_mainAnchorStateEpoch();
-  }
+
+  T_WBta = pointDataPtr->T_WB_mainAnchorStateEpoch();
 
   okvis::kinematics::Transformation T_WCta = T_WBta * T_BCa;  // anchor frame to global frame
   okvis::kinematics::Transformation T_CtjCta = (T_WBtj * T_BCj).inverse() * T_WCta;  // anchor frame to current camera frame

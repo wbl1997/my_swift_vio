@@ -20,7 +20,6 @@ def default_algo_config():
          "numImuFrames": 5,
          "monocular_input": 0,
          "landmarkModelId": 1,
-         "anchorAtObservationTime": 0,
          "extrinsic_opt_mode_main_camera" : "p_CB",
          "extrinsic_opt_mode_other_camera": "p_C0C_q_C0C",
          "sigma_absolute_translation": "0.0",
@@ -59,7 +58,6 @@ def apply_config_to_yaml(config_dict, vio_yaml, debug_output_dir):
 
     padding = " " * 4
     sed_cmd += sed_line_with_parameter(config_dict, "landmarkModelId", padding, vio_yaml)
-    sed_cmd += sed_line_with_parameter(config_dict, "anchorAtObservationTime", padding, vio_yaml)
 
     # the fields for extrinsic_opt_mode will become scrabbled in the generated vio config file,
     # so we look for the string combination of extrinsic_opt_mode + default value.
