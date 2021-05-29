@@ -10,8 +10,6 @@
 
 #include <gtsam/VioBackEndParams.h>
 
-#include <io_wrap/StreamHelper.hpp>
-
 #include <okvis/IdProvider.hpp>
 #include <okvis/assert_macros.hpp>
 #include <okvis/cameras/PinholeCamera.hpp>
@@ -306,6 +304,7 @@ void testHybridFilterSinusoid(
   std::string neesFile = pathEstimatorTrajectory + "_NEES.txt";
   std::string rmseFile = pathEstimatorTrajectory + "_RMSE.txt";
   std::string metadataFile = pathEstimatorTrajectory + "_metadata.txt";
+  std::string headerLine;
   std::ofstream metaStream;
   metaStream.open(metadataFile, std::ofstream::out);
 
@@ -354,16 +353,11 @@ void testHybridFilterSinusoid(
                                      verbose ? imuSampleFile : "",
                                      verbose ? pointFile : "");
     int projOptModelId = swift_vio::ProjectionOptNameToId(projOptModelName);
-    int extrinsicModelId = swift_vio::ExtrinsicModelNameToId(extrinsicModelName);
 
     std::ofstream debugStream;  // record state history of a trial
     if (!debugStream.is_open()) {
       debugStream.open(outputFile, std::ofstream::out);
-      std::string headerLine;
-      swift_vio::StreamHelper::composeHeaderLine(
-          vioSystemBuilder.imuModelType(), {extrinsicModelName},
-          {projOptModelName}, {vioSystemBuilder.distortionType()},
-          swift_vio::FULL_STATE_WITH_ALL_CALIBRATION, &headerLine);
+      std::string headerLine = vioSystemBuilder.mutableEstimator()->headerLine();
       debugStream << headerLine << std::endl;
     }
 
@@ -382,6 +376,7 @@ void testHybridFilterSinusoid(
         vioSystemBuilder.ref_T_WS_list();
     okvis::ImuMeasurementDeque imuMeasurements = vioSystemBuilder.imuMeasurements();
     std::shared_ptr<okvis::Estimator> estimator = vioSystemBuilder.mutableEstimator();
+    headerLine = estimator->headerLine();
 
     std::shared_ptr<simul::SimulationFrontend> frontend = vioSystemBuilder.mutableFrontend();
     std::shared_ptr<const okvis::cameras::NCameraSystem> cameraSystem0 =
@@ -424,20 +419,6 @@ void testHybridFilterSinusoid(
           frameCount = 0;
           estimator->setInitialNavState(vioSystemBuilder.initialNavState());
           estimator->addStates(mf, imuSegment, asKeyframe);
-          if (isFilteringMethod(estimatorAlgorithm)) {
-            const int kDistortionCoeffDim =
-                okvis::cameras::RadialTangentialDistortion::NumDistortionIntrinsics;
-            const int kNavImuCamParamDim =
-                swift_vio::ode::kNavErrorStateDim +
-                swift_vio::ImuModelGetMinimalDim(
-                    swift_vio::ImuModelNameToId(vioSystemBuilder.imuModelType())) +
-                2 + kDistortionCoeffDim +
-                swift_vio::ExtrinsicModelGetMinimalDim(extrinsicModelId) +
-                swift_vio::ProjectionOptGetMinimalDim(projOptModelId);
-            ASSERT_EQ(estimator->getEstimatedVariableMinimalDim(),
-                      kNavImuCamParamDim + swift_vio::HybridFilter::kClonedStateMinimalDimen)
-                << "Initial cov with one cloned state has a wrong dim";
-          }
         } else {
           estimator->addStates(mf, imuSegment, asKeyframe);
           ++frameCount;
@@ -466,7 +447,7 @@ void testHybridFilterSinusoid(
         okvis::MapPointVector removedLandmarks;
         estimator->applyMarginalizationStrategy(sharedOptConfig.numKeyframes,
             sharedOptConfig.numImuFrames, removedLandmarks);
-        estimator->print(debugStream);
+        estimator->printStatesAndStdevs(debugStream);
         debugStream << std::endl;
 
         Eigen::Vector3d v_WS_true = vioSystemBuilder.sinusoidalTrajectory()
@@ -544,13 +525,9 @@ void testHybridFilterSinusoid(
   std::string neesHeaderLine = "%state timestamp, NEES of p_WS, \\alpha_WS, T_WS";
   neesAccumulator.computeMean();
   neesAccumulator.dump(neesFile, neesHeaderLine);
-  std::string rmseHeaderLine;
-  swift_vio::StreamHelper::composeHeaderLine(
-      "BG_BA_TG_TS_TA", {extrinsicModelName}, {projOptModelName},
-      {"RadialTangentialDistortion"}, swift_vio::FULL_STATE_WITH_ALL_CALIBRATION,
-      &rmseHeaderLine, false);
+
   rmseAccumulator.computeRootMean();
-  rmseAccumulator.dump(rmseFile, rmseHeaderLine);
+  rmseAccumulator.dump(rmseFile, headerLine);
 
   metaStream << "#successful runs " << numSucceededRuns << " out of runs " << numRuns << std::endl;
   metaStream.close();
@@ -564,7 +541,7 @@ void testHybridFilterSinusoid(
 //  MSCKF with parallax angle and chordal distance,
 //  MSCKF with parallax angle and reprojection errors,
 //  TFVIO (roughly MSCKF with only epipolar constraints),
-//  OKVIS, General estimator}
+//  OKVIS}
 
 TEST(DeadreckoningM, TrajectoryLabel) {
   bool addImageNoise = true;

@@ -44,11 +44,16 @@ void VioTestSystemBuilder::createVioSystem(
                         zeroCameraIntrinsicParamNoise);
 
   okvis::ImuParameters imuParameters;
-  simul::initImuNoiseParams(&imuParameters, testSetting.noisyInitialSpeedAndBiases,
+  if (testSetting.estimator_algorithm <
+      swift_vio::EstimatorAlgorithm::HybridFilter) {
+    imuParameters.model_type = "BG_BA";
+  } else {
+    imuParameters.model_type = "BG_BA_TG_TS_TA";
+  }
+  simul::initImuNoiseParams(testSetting.noisyInitialSpeedAndBiases,
                           testSetting.noisyInitialSensorParams, bg_std, ba_std,
                           Tg_std, Ts_std, Ta_std,
-                          zeroImuIntrinsicParamNoise);
-  imuModelType_ = imuParameters.model_type;
+                          zeroImuIntrinsicParamNoise, &imuParameters);
 
   const okvis::Time tStart(100);
   const okvis::Time tEnd = tStart + okvis::Duration(kDuration);
@@ -134,7 +139,6 @@ void VioTestSystemBuilder::createVioSystem(
   } else {
     csc.createNominalCameraSystem(&cameraGeometry2, &cameraSystem2);
   }
-  distortionType_ = cameraSystem2->cameraGeometry(0)->distortionType();
 
   estimator = swift_vio::createBackend(testSetting.estimator_algorithm,
                                        backendParams, mapPtr);

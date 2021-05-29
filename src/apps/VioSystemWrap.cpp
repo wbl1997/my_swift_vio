@@ -19,7 +19,6 @@ void VioSystemWrap::registerCallbacks(
       std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
 
   std::string stateFilename = path + "/swift_vio.csv";
-  std::string headerLine;
   size_t numCameras = parameters.nCameraSystem.numCameras();
   std::vector<std::string> extrinsicParamRepList(numCameras);
   std::vector<std::string> projectionParamRepList(numCameras);
@@ -32,10 +31,7 @@ void VioSystemWrap::registerCallbacks(
         parameters.nCameraSystem.cameraGeometry(camIdx)->distortionType();
   }
 
-  StreamHelper::composeHeaderLine(
-      parameters.imu.model_type, extrinsicParamRepList, projectionParamRepList,
-      distortionParamRepList, swift_vio::FULL_STATE_WITH_ALL_CALIBRATION,
-      &headerLine);
+  std::string headerLine = vioSystem->headerLine();
   publisher->setCsvFile(stateFilename, headerLine);
   if (FLAGS_dump_output_option == 2) {
     // save estimates of evolving states, and camera extrinsics

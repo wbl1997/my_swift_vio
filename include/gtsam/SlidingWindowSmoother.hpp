@@ -169,7 +169,7 @@ class SlidingWindowSmoother : public okvis::Estimator {
   bool getStateStd(
       Eigen::Matrix<double, Eigen::Dynamic, 1>* stateStd) const final;
 
-  bool print(std::ostream& stream) const override;
+  bool printStatesAndStdevs(std::ostream& stream) const override;
 
   /**
    * @brief getMapLmkIdsTo3dPointsInTimeHorizon Get valid 3D points and corresponding lmk id.

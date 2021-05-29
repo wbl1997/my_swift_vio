@@ -12,13 +12,14 @@ DEFINE_double(sim_sigma_aw_c, 5.5e-5, "simulated accelerometer bias noise densit
 
 namespace simul {
 void initImuNoiseParams(
-    okvis::ImuParameters* imuParameters, bool noisyInitialSpeedAndBiases,
+    bool noisyInitialSpeedAndBiases,
     bool noisyInitialSensorParams,
     double sigma_bg, double sigma_ba,
     double std_Tg_elem,
     double std_Ts_elem,
     double std_Ta_elem,
-    bool fixImuInternalParams) {
+    bool fixImuInternalParams,
+    okvis::ImuParameters* imuParameters) {
   imuParameters->g = 9.81;
   imuParameters->a_max = 1000.0;
   imuParameters->g_max = 1000.0;
@@ -49,7 +50,6 @@ void initImuNoiseParams(
     imuParameters->sigma_TSElement = std_Ts_elem;
     imuParameters->sigma_TAElement = std_Ta_elem;
   }
-  imuParameters->model_type = "BG_BA_TG_TS_TA";
 
   Eigen::Matrix<double, 9, 1> eye;
   eye << 1, 0, 0, 0, 1, 0, 0, 0, 1;

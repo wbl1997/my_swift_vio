@@ -62,7 +62,7 @@ This model is used for observability analysis and degenerate motion identificati
 
 
 ## Design the coding structure for the swift_vio methods adaptive to different camera and IMU models,
-minor thing: absorb the camera model parameters like T_SC0, tdLatestEstimate, etc, of the HybridFilter to the camera_rig_,
+minor thing: absorb the camera model parameters like T_SC0, tdLatestEstimate, etc, of the HybridFilter to the cameraRig_,
 
 Foundation level: IMU camera landmark speedBias parameter blocks, expressed essentially by Eigen::Vectors
 used by Optimizer and Filter

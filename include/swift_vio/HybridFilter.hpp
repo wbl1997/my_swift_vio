@@ -310,7 +310,9 @@ class HybridFilter : public okvis::Estimator, public BaseFilter {
   /// print out the most recent state vector and the stds of its elements.
   /// It can be called in the optimizationLoop, but a better way to save
   /// results is to save in the publisher loop
-  bool print(std::ostream &stream) const final;
+  bool printStatesAndStdevs(std::ostream &stream) const final;
+
+  std::string headerLine(const std::string delimiter=" ") const final;
 
   void printTrackLengthHistogram(std::ostream &stream) const final;
 
@@ -394,8 +396,8 @@ class HybridFilter : public okvis::Estimator, public BaseFilter {
   }
 
   inline size_t startIndexOfClonedStates() const {
-    size_t dim = swift_vio::ode::kNavErrorStateDim + imu_rig_.getImuParamsMinimalDim(0);
-    for (size_t j = 0; j < camera_rig_.numberCameras(); ++j) {
+    size_t dim = swift_vio::ode::kNavErrorStateDim + imuRig_.getImuParamsMinimalDim(0);
+    for (size_t j = 0; j < cameraRig_.numberCameras(); ++j) {
       dim += cameraParamsMinimalDimen(j);
     }
     return dim;
@@ -416,7 +418,7 @@ class HybridFilter : public okvis::Estimator, public BaseFilter {
   }
 
   inline size_t startIndexOfCameraParams(size_t camIdx = 0u) const {
-    size_t dim = swift_vio::ode::kNavErrorStateDim + imu_rig_.getImuParamsMinimalDim(0);
+    size_t dim = swift_vio::ode::kNavErrorStateDim + imuRig_.getImuParamsMinimalDim(0);
     for (size_t i = 0u; i < camIdx; ++i) {
       dim += cameraParamsMinimalDimen(i);
     }
@@ -469,7 +471,7 @@ class HybridFilter : public okvis::Estimator, public BaseFilter {
    */
   inline size_t navStateAndImuParamsMinimalDim(size_t imuIdx = 0u) {
     return swift_vio::ode::kNavErrorStateDim +
-           imu_rig_.getImuParamsMinimalDim(imuIdx);
+           imuRig_.getImuParamsMinimalDim(imuIdx);
   }
 
   // error state: \delta p, \alpha for q, \delta v
@@ -506,7 +508,7 @@ class HybridFilter : public okvis::Estimator, public BaseFilter {
   bool getOdometryConstraintsForKeyframe(
       std::shared_ptr<LoopQueryKeyframeMessage> queryKeyframe) const final;
 
-  // using latest state estimates set imu_rig_ and camera_rig_ which are then
+  // using latest state estimates set imuRig_ and cameraRig_ which are then
   // used in computing Jacobians of all feature observations
   void updateSensorRigs();
 
@@ -525,7 +527,7 @@ class HybridFilter : public okvis::Estimator, public BaseFilter {
                              okvis::Estimator::SpecificSensorStatesContainer* imuInfo);
 
   /**
-   * @brief updateImuRig update imu_rig_ from states.
+   * @brief updateImuRig update imuRig_ from states.
    * @param
    */
   void updateImuRig();

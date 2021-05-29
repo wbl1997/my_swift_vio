@@ -50,9 +50,6 @@ std::shared_ptr<okvis::Estimator> createBackend(
     case EstimatorAlgorithm::TFVIO:
       return std::shared_ptr<okvis::Estimator>(new TFVIO(mapPtr));
 
-    case EstimatorAlgorithm::InvariantEKF:
-      return std::shared_ptr<okvis::Estimator>(new MSCKF(mapPtr));
-
     default:
       LOG(ERROR) << "Unknown Estimator type!";
       break;

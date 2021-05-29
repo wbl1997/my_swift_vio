@@ -26,11 +26,12 @@ namespace simul {
  *     to fix IMU intrinsic parameters in estimator.
  */
 void initImuNoiseParams(
-    okvis::ImuParameters* imuParameters, bool noisyInitialSpeedAndBiases,
+    bool noisyInitialSpeedAndBiases,
     bool noisyInitialSensorParams,
     double sigma_bg, double sigma_ba, double std_Tg_elem,
     double std_Ts_elem, double std_Ta_elem,
-    bool fixImuInternalParams);
+    bool fixImuInternalParams,
+    okvis::ImuParameters* imuParameters);
 
 /**
  * @brief addNoiseToImuReadings

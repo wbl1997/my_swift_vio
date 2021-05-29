@@ -161,7 +161,7 @@ bool RiSlidingWindowSmoother::addLandmarkToGraph(
   uint64_t currentFrameId = statesMap_.rbegin()->first;
   okvis::kinematics::Transformation T_WB;
   get_T_WS(currentFrameId, T_WB);
-  okvis::kinematics::Transformation T_CW = (T_WB * camera_rig_.getCameraExtrinsic(0)).inverse();
+  okvis::kinematics::Transformation T_CW = (T_WB * cameraRig_.getCameraExtrinsic(0)).inverse();
   Eigen::Vector4d hpC = T_CW * hpW;
   double rho = 1.0 / hpC[2];
   gtsam::Point3 abrho(hpC[0] * rho, hpC[1] * rho, rho);
@@ -208,9 +208,9 @@ bool RiSlidingWindowSmoother::addLandmarkToGraph(
       gtsam::RiProjectionFactorIDPAnchor::shared_ptr factor =
           boost::make_shared<gtsam::RiProjectionFactorIDPAnchor>(
               gtsam::Symbol('l', lmkId), variance, measurement,
-              camera_rig_.getCameraGeometry(obsIter->first.cameraIndex),
-              camera_rig_.getCameraExtrinsic(obsIter->first.cameraIndex),
-              camera_rig_.getCameraExtrinsic(0));
+              cameraRig_.getCameraGeometry(obsIter->first.cameraIndex),
+              cameraRig_.getCameraExtrinsic(obsIter->first.cameraIndex),
+              cameraRig_.getCameraExtrinsic(0));
       new_reprojection_factors_.add(factor);
       mp.anchorStateId = observingFrameId;
       OKVIS_ASSERT_EQ(Exception, mp.anchorStateId, currentFrameId,
@@ -222,17 +222,17 @@ bool RiSlidingWindowSmoother::addLandmarkToGraph(
             gtsam::Symbol('x', observingFrameId),
             gtsam::Symbol('x', mp.anchorStateId), gtsam::Symbol('l', lmkId),
             variance, measurement,
-            camera_rig_.getCameraGeometry(obsIter->first.cameraIndex),
-            camera_rig_.getCameraExtrinsic(obsIter->first.cameraIndex),
-            camera_rig_.getCameraExtrinsic(0), FLAGS_rifls_huber_threshold);
+            cameraRig_.getCameraGeometry(obsIter->first.cameraIndex),
+            cameraRig_.getCameraExtrinsic(obsIter->first.cameraIndex),
+            cameraRig_.getCameraExtrinsic(0), FLAGS_rifls_huber_threshold);
       } else {
         factor = boost::make_shared<gtsam::RiProjectionFactorIDP>(
             gtsam::Symbol('x', observingFrameId),
             gtsam::Symbol('x', mp.anchorStateId), gtsam::Symbol('l', lmkId),
             variance, measurement,
-            camera_rig_.getCameraGeometry(obsIter->first.cameraIndex),
-            camera_rig_.getCameraExtrinsic(obsIter->first.cameraIndex),
-            camera_rig_.getCameraExtrinsic(0));
+            cameraRig_.getCameraGeometry(obsIter->first.cameraIndex),
+            cameraRig_.getCameraExtrinsic(obsIter->first.cameraIndex),
+            cameraRig_.getCameraExtrinsic(0));
       }
       new_reprojection_factors_.add(factor);
     }
@@ -270,17 +270,17 @@ void RiSlidingWindowSmoother::updateLandmarkInGraph(uint64_t lmkId) {
         gtsam::Symbol('x', obsIter->first.frameId),
         gtsam::Symbol('x', mp.anchorStateId), gtsam::Symbol('l', lmkId),
         variance, measurement,
-        camera_rig_.getCameraGeometry(obsIter->first.cameraIndex),
-        camera_rig_.getCameraExtrinsic(obsIter->first.cameraIndex),
-        camera_rig_.getCameraExtrinsic(0), FLAGS_rifls_huber_threshold);
+        cameraRig_.getCameraGeometry(obsIter->first.cameraIndex),
+        cameraRig_.getCameraExtrinsic(obsIter->first.cameraIndex),
+        cameraRig_.getCameraExtrinsic(0), FLAGS_rifls_huber_threshold);
   } else {
     factor = boost::make_shared<gtsam::RiProjectionFactorIDP>(
         gtsam::Symbol('x', obsIter->first.frameId),
         gtsam::Symbol('x', mp.anchorStateId), gtsam::Symbol('l', lmkId),
         variance, measurement,
-        camera_rig_.getCameraGeometry(obsIter->first.cameraIndex),
-        camera_rig_.getCameraExtrinsic(obsIter->first.cameraIndex),
-        camera_rig_.getCameraExtrinsic(0));
+        cameraRig_.getCameraGeometry(obsIter->first.cameraIndex),
+        cameraRig_.getCameraExtrinsic(obsIter->first.cameraIndex),
+        cameraRig_.getCameraExtrinsic(0));
   }
   new_reprojection_factors_.add(factor);
 }
@@ -304,7 +304,7 @@ void RiSlidingWindowSmoother::addLandmarkSmartFactorToGraph(const LandmarkId& lm
 
   gtsam::RiSmartProjectionFactor<gtsam::Cal3DS2>::shared_ptr new_factor =
       boost::make_shared<gtsam::RiSmartProjectionFactor<gtsam::Cal3DS2>>(
-          smart_noise_, body_P_cam0_, cal0_, camera_rig_.getCameraGeometry(0),
+          smart_noise_, body_P_cam0_, cal0_, cameraRig_.getCameraGeometry(0),
           smart_factors_params_);
 
   okvis::IsObservedInFrame lastImageId(0u, 0u);
@@ -450,7 +450,7 @@ void RiSlidingWindowSmoother::updateStates() {
       okvis::kinematics::Transformation T_WB;
       get_T_WS(it->second.anchorStateId, T_WB);
       okvis::kinematics::Transformation T_WC =
-          T_WB * *camera_rig_.getCameraExtrinsicPtr(0u);
+          T_WB * *cameraRig_.getCameraExtrinsicPtr(0u);
       it->second.quality = 1.0;
       it->second.pointHomog = T_WC * ab1rho;
     }

@@ -80,16 +80,16 @@ bool MSCKF::measurementJacobianAIDPMono(
   const int minCamParamDim = cameraParamsMinimalDimFast(camIdx);
   // $\frac{\partial [z_u, z_v]^T}{\partial(extrinsic, intrinsic, t_d, t_r)}$
   Eigen::Matrix<double, 2, Eigen::Dynamic> J_Xc(2, minCamParamDim);
-  const okvis::kinematics::Transformation T_BCj = camera_rig_.getCameraExtrinsic(camIdx);
+  const okvis::kinematics::Transformation T_BCj = cameraRig_.getCameraExtrinsic(camIdx);
 
   size_t anchorCamIdx = pointDataPtr->anchorIds()[0].cameraIndex_;
   const int minAnchorCamParamDim = cameraParamsMinimalDimFast(anchorCamIdx);
   Eigen::Matrix<double, 2, Eigen::Dynamic> anchor_J_Xc(2, minAnchorCamParamDim);
-  const okvis::kinematics::Transformation T_BCa = camera_rig_.getCameraExtrinsic(anchorCamIdx);
-  okvis::kinematics::Transformation T_BC0 = camera_rig_.getCameraExtrinsic(kMainCameraIndex);
+  const okvis::kinematics::Transformation T_BCa = cameraRig_.getCameraExtrinsic(anchorCamIdx);
+  okvis::kinematics::Transformation T_BC0 = cameraRig_.getCameraExtrinsic(kMainCameraIndex);
 
-  int projOptModelId = camera_rig_.getProjectionOptMode(camIdx);
-  int extrinsicModelId = camera_rig_.getExtrinsicOptMode(camIdx);
+  int projOptModelId = cameraRig_.getProjectionOptMode(camIdx);
+  int extrinsicModelId = cameraRig_.getExtrinsicOptMode(camIdx);
 
   double kpN = pointDataPtr->normalizedRow(observationIndex);
   const double featureTime = pointDataPtr->normalizedFeatureTime(observationIndex);
@@ -105,7 +105,7 @@ bool MSCKF::measurementJacobianAIDPMono(
   Eigen::Vector3d rhoxpCtj = (T_CtjCta * ab1rho).head<3>();
 
   std::shared_ptr<const okvis::cameras::CameraBase> cameraGeometry =
-      camera_rig_.getCameraGeometry(camIdx);
+      cameraRig_.getCameraGeometry(camIdx);
   okvis::cameras::CameraBase::ProjectionStatus status = cameraGeometry->project(
       rhoxpCtj, &imagePoint, &dz_drhoxpCtj, &intrinsicsJacobian);
   *residual = obs - imagePoint;
@@ -216,10 +216,10 @@ bool MSCKF::measurementJacobianHPPMono(
 
   size_t camIdx = pointDataPtr->cameraIndex(observationIndex);
   std::shared_ptr<const okvis::cameras::CameraBase> tempCameraGeometry =
-      camera_rig_.getCameraGeometry(camIdx);
-  int projOptModelId = camera_rig_.getProjectionOptMode(camIdx);
-  int extrinsicModelId = camera_rig_.getExtrinsicOptMode(camIdx);
-  const okvis::kinematics::Transformation T_SC0 = camera_rig_.getCameraExtrinsic(camIdx);
+      cameraRig_.getCameraGeometry(camIdx);
+  int projOptModelId = cameraRig_.getProjectionOptMode(camIdx);
+  int extrinsicModelId = cameraRig_.getExtrinsicOptMode(camIdx);
+  const okvis::kinematics::Transformation T_SC0 = cameraRig_.getCameraExtrinsic(camIdx);
   double featureTime = pointDataPtr->normalizedFeatureTime(observationIndex);
   double kpN = pointDataPtr->normalizedRow(observationIndex);
 
@@ -289,7 +289,7 @@ bool MSCKF::featureJacobianGeneric(
     std::vector<uint64_t> *orderedCulledFrameIds) const {
   const int camIdx = 0;
   std::shared_ptr<const okvis::cameras::CameraBase> tempCameraGeometry =
-      camera_rig_.getCameraGeometry(camIdx);
+      cameraRig_.getCameraGeometry(camIdx);
   // dimension of variables used in computing feature Jacobians, including
   // camera intrinsics and all cloned states except the most recent one
   // in which the marginalized observations should never occur.
@@ -428,10 +428,10 @@ swift_vio::MeasurementJacobianStatus MSCKF::measurementJacobianGeneric(
     Eigen::VectorXd* residual) const {
   size_t camIdx = pointDataPtr->cameraIndex(observationIndex);
   okvis::cameras::NCameraSystem::DistortionType distortionType =
-      camera_rig_.getDistortionType(camIdx);
-  int projOptModelId = camera_rig_.getProjectionOptMode(camIdx);
-  int extrinsicModelId = camera_rig_.getExtrinsicOptMode(camIdx);
-  int imuModelId = imu_rig_.getModelId(0);
+      cameraRig_.getDistortionType(camIdx);
+  int projOptModelId = cameraRig_.getProjectionOptMode(camIdx);
+  int extrinsicModelId = cameraRig_.getExtrinsicOptMode(camIdx);
+  int imuModelId = imuRig_.getModelId(0);
   swift_vio::MeasurementJacobianStatus status =
       swift_vio::MeasurementJacobianStatus::GeneralProjectionFailed;
   switch (imuModelId) {
@@ -586,7 +586,7 @@ void MSCKF::optimize(size_t /*numIter*/, size_t /*numThreads*/, bool verbose) {
   {
     updateLandmarksTimer.start();
     const int camIdx = 0;
-    const okvis::kinematics::Transformation T_SC0 = camera_rig_.getCameraExtrinsic(camIdx);
+    const okvis::kinematics::Transformation T_SC0 = cameraRig_.getCameraExtrinsic(camIdx);
 
     okvis::kinematics::Transformation T_WSc;
     get_T_WS(currentFrameId(), T_WSc);

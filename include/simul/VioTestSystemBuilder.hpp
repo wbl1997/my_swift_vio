@@ -38,14 +38,6 @@ public:
     return circularSinusoidalTrajectory;
   }
 
-  std::string distortionType() const {
-    return distortionType_;
-  }
-
-  std::string imuModelType() const {
-    return imuModelType_;
-  }
-
   std::vector<okvis::Time> sampleTimes() const {
     return times_;
   }
@@ -75,8 +67,7 @@ private:
   std::shared_ptr<::ceres::EvaluationCallback> evaluationCallback_;
   std::shared_ptr<SimulationFrontend> frontend;
   std::shared_ptr<CircularSinusoidalTrajectory> circularSinusoidalTrajectory;
-  std::string distortionType_;
-  std::string imuModelType_;
+
   std::vector<okvis::Time> times_;
   okvis::ImuMeasurementDeque trueBiases_; // true biases used for computing RMSE
   std::vector<okvis::kinematics::Transformation> ref_T_WS_list_;

@@ -160,11 +160,7 @@ public:
 
     if (!debugStream.is_open()) {
       debugStream.open(outputFile, std::ofstream::out);
-      std::string headerLine;
-      swift_vio::StreamHelper::composeHeaderLine(
-          vioSystemBuilder.imuModelType(), {extrinsicModelName},
-          {projOptModelName}, {vioSystemBuilder.distortionType()},
-          swift_vio::FULL_STATE_WITH_ALL_CALIBRATION, &headerLine);
+      std::string headerLine = estimator->headerLine();
       debugStream << headerLine << std::endl;
     }
   }
@@ -238,7 +234,7 @@ public:
       okvis::MapPointVector removedLandmarks;
       estimator->applyMarginalizationStrategy(sharedOptConfig.numKeyframes,
           sharedOptConfig.numImuFrames, removedLandmarks);
-      estimator->print(debugStream);
+      estimator->printStatesAndStdevs(debugStream);
       debugStream << std::endl;
 
       Eigen::Vector3d v_WS_true =

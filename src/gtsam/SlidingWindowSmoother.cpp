@@ -390,14 +390,14 @@ void SlidingWindowSmoother::addCameraExtrinsicFactor() {
 void SlidingWindowSmoother::addCameraSystem(const okvis::cameras::NCameraSystem& cameras) {
   Estimator::addCameraSystem(cameras);
   Eigen::VectorXd intrinsics;
-  camera_rig_.getCameraGeometry(0u)->getIntrinsics(intrinsics);
-  std::string distortionName = camera_rig_.getCameraGeometry(0u)->distortionType();
+  cameraRig_.getCameraGeometry(0u)->getIntrinsics(intrinsics);
+  std::string distortionName = cameraRig_.getCameraGeometry(0u)->distortionType();
   OKVIS_ASSERT_EQ(Exception, distortionName, "RadialTangentialDistortion",
                   "Sliding window smoother currently only work radial "
                   "tangential distortion!");
   cal0_.reset(new gtsam::Cal3DS2(intrinsics[0], intrinsics[1], 0, intrinsics[2], intrinsics[3],
       intrinsics[4], intrinsics[5], intrinsics[6], intrinsics[7]));
-  body_P_cam0_ = GtsamWrap::toPose3(camera_rig_.getCameraExtrinsic(0u));
+  body_P_cam0_ = GtsamWrap::toPose3(cameraRig_.getCameraExtrinsic(0u));
 }
 
 bool SlidingWindowSmoother::addStates(
@@ -1281,7 +1281,7 @@ bool SlidingWindowSmoother::triangulateSafe(uint64_t lmkId, Eigen::Vector4d* hpW
     // use the latest estimates for camera intrinsic parameters
     Eigen::Vector3d backProjectionDirection;
     std::shared_ptr<const okvis::cameras::CameraBase> cameraGeometry =
-        camera_rig_.getCameraGeometry(itObs->first.cameraIndex);
+        cameraRig_.getCameraGeometry(itObs->first.cameraIndex);
     bool validDirection =
         cameraGeometry->backProject(measurement, &backProjectionDirection);
     if (!validDirection) {
@@ -1344,7 +1344,7 @@ void SlidingWindowSmoother::optimize(size_t /*numIter*/, size_t /*numThreads*/,
   // To avoid confusion, do not interpret the second half of the status value.
 
   Eigen::VectorXd intrinsics;
-  camera_rig_.getCameraGeometry(0)->getIntrinsics(intrinsics);
+  cameraRig_.getCameraGeometry(0)->getIntrinsics(intrinsics);
   double focalLength = intrinsics[0];
   int numTracked = 0;
   for (okvis::PointMap::iterator it = landmarksMap_.begin();
@@ -1978,7 +1978,7 @@ void findSlotsOfFactorsWithKey(
   }
 }
 
-bool SlidingWindowSmoother::print(std::ostream& stream) const {
+bool SlidingWindowSmoother::printStatesAndStdevs(std::ostream& stream) const {
   printNavStateAndBiases(stream, statesMap_.rbegin()->first);
   Eigen::Matrix<double, Eigen::Dynamic, 1> variances = covariance_.diagonal();
   stream << " " << variances.cwiseSqrt().transpose().format(kSpaceInitFmt);

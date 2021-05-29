@@ -35,9 +35,11 @@ TEST(EpipolarFactor, Jacobians) {
   double sigma_td = 5e-3;
   bool zeroImuIntrinsicParamNoise = !noisyInitialSensorParams;
   okvis::ImuParameters imuParameters;
-  simul::initImuNoiseParams(&imuParameters, noisyInitialSpeedAndBiases,
+  imuParameters.model_type = "BG_BA";
+  simul::initImuNoiseParams(noisyInitialSpeedAndBiases,
                             noisyInitialSensorParams, bg_std, ba_std, Tg_std,
-                            Ts_std, Ta_std, zeroImuIntrinsicParamNoise);
+                            Ts_std, Ta_std, zeroImuIntrinsicParamNoise,
+                            &imuParameters);
 
   std::shared_ptr<simul::CircularSinusoidalTrajectory> cst;
   cst.reset(new simul::RoundedSquare(imuParameters.rate,
