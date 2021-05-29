@@ -968,11 +968,10 @@ void HybridFilter::changeAnchors(
       landmarkIter->setEstimate(rhoxpCj / rhoxpCj[2]);
 
       // compute Jacobians.
-      swift_vio::MultipleTransformPointJacobian mtpj;
       swift_vio::MultipleTransformPointJacobian mtpjFej;
       Eigen::AlignedVector<okvis::kinematics::Transformation> transformList{
           T_BCj, T_WBj, T_WBa, T_BCa};
-
+      okvis::kinematics::Transformation T_WBa_fej = T_WBa;
       std::vector<int> exponentList{-1, -1, 1, 1};
       Eigen::AlignedVector<okvis::kinematics::Transformation> transformFejList;
       transformFejList.reserve(4);
@@ -987,15 +986,17 @@ void HybridFilter::changeAnchors(
                                       T_WBj.q());
         transformFejList.emplace_back(positionVelocityPtr->head<3>(),
                                       T_WBa.q());
+        T_WBa_fej = transformFejList.back();
       } else {
         transformFejList.push_back(T_WBj);
         transformFejList.push_back(T_WBa);
       }
       transformFejList.push_back(T_BCa);
 
-      mtpj.initialize(transformList, exponentList, landmarkIter->estimate());
-      mtpjFej.initialize(transformFejList, exponentList,
-                         landmarkIter->estimate());
+      const Eigen::Vector4d& hPoint = landmarkIter->estimate();
+      Eigen::Vector4d hPointFej = (T_WBa_fej * T_BCa).inverse() * (T_WBa * T_BCa) * hPoint;
+      hPointFej = hPointFej / hPointFej[2];
+      mtpjFej.initialize(transformFejList, exponentList, hPointFej);
 
       Eigen::Matrix<double, 3, 4> dnewParams_drhoxpCj;
       double inverseZ = 1.0 / rhoxpCj[2];
@@ -1031,7 +1032,7 @@ void HybridFilter::changeAnchors(
         // Extrinsic Jacobians.
         if (!fixCameraExtrinsicParams_[camIndices[ja]]) {
           Eigen::Matrix<double, 4, 6> dpoint_dT_BC =
-              mtpj.dp_dT(mtpjExtrinsicIndices[ja]);
+              mtpjFej.dp_dT(mtpjExtrinsicIndices[ja]);
           std::vector<size_t> involvedCameraIndices;
           involvedCameraIndices.reserve(2);
           involvedCameraIndices.push_back(camIndices[ja]);
@@ -1053,7 +1054,7 @@ void HybridFilter::changeAnchors(
         }
 
         // Jacobians relative to nav states
-        Eigen::Matrix<double, 4, 6> lP_dpoint_dT_WBt =
+        Eigen::Matrix<double, 4, 6> dpoint_dT_WBt_fej =
             mtpjFej.dp_dT(mtpjPoseIndices[ja]);
         size_t navStateIndex = startIndices[ja] - startIndexCameraParams;
         startIndexToMinDim.emplace_back(navStateIndex, 6u);
@@ -1061,7 +1062,7 @@ void HybridFilter::changeAnchors(
                            pointLandmarkOptions_.anchorAtObservationTime,
                            "We assume landmarks are anchored at the state "
                            "epoch of the anchor frame in changing the anchor.");
-        dpoint_dX.emplace_back(lP_dpoint_dT_WBt);
+        dpoint_dX.emplace_back(dpoint_dT_WBt_fej);
       }
 
       // Accumulate Jacobians relative to nav states and camera extrinsics.
@@ -1077,15 +1078,14 @@ void HybridFilter::changeAnchors(
       // Jacobian relative to landmark parameters.
       size_t covPtId = std::distance(mInCovLmIds.begin(), landmarkIter);
       vCovPtId.push_back(covPtId);
-      Eigen::Matrix<double, 4, 3>
-          dhomo_dparams; // dHomogeneousPoint_dParameters.
-      dhomo_dparams.setZero();
-      dhomo_dparams(0, 0) = 1;
-      dhomo_dparams(1, 1) = 1;
-      dhomo_dparams(3, 2) = 1;
+      Eigen::Matrix<double, 4, 3> dhPoint_dparams; // dHomogeneousPoint_dParameters.
+      dhPoint_dparams.setZero();
+      dhPoint_dparams(0, 0) = 1;
+      dhPoint_dparams(1, 1) = 1;
+      dhPoint_dparams(3, 2) = 1;
 
       reparamJacobian.block<3, 3>(0, numNavImuCamPoseStates + 3 * covPtId) =
-          dnewParams_drhoxpCj * mtpj.dp_dpoint() * dhomo_dparams;
+          dnewParams_drhoxpCj * mtpjFej.dp_dpoint() * dhPoint_dparams;
       reparamJacobianList.push_back(reparamJacobian);
 
       mapPoint.anchorStateId = newAnchorFrameId;
@@ -1322,11 +1322,11 @@ bool HybridFilter::measurementJacobian(
   // transformations from left to right.
   transformList.push_back(T_BCj);
   exponentList.push_back(-1);
-  Eigen::AlignedVector<okvis::kinematics::Transformation> lP_transformList = transformList;
-  lP_transformList.reserve(4);
-  okvis::kinematics::Transformation lP_T_WBtj =
+  Eigen::AlignedVector<okvis::kinematics::Transformation> transformFejList = transformList;
+  transformFejList.reserve(4);
+  okvis::kinematics::Transformation T_WBtj_fej =
       pointDataPtr->T_WBtij_ForJacobian(observationIndex);
-  lP_transformList.push_back(lP_T_WBtj);
+  transformFejList.push_back(T_WBtj_fej);
   transformList.push_back(T_WBtj);
   exponentList.push_back(-1);
 
@@ -1342,10 +1342,11 @@ bool HybridFilter::measurementJacobian(
   std::vector<uint64_t> frameIndices{poseId};
   Eigen::AlignedVector<okvis::kinematics::Transformation> T_WBt_list{T_WBtj};
 
-  Eigen::Matrix<double, 4, 3> dhomo_dparams; // dHomogeneousPoint_dParameters.
-  dhomo_dparams.setZero();
+  Eigen::Matrix<double, 4, 3> dhPoint_dparams; // dHomogeneousPoint_dParameters.
+  dhPoint_dparams.setZero();
 
   okvis::kinematics::Transformation T_CtjX; // X is W or \f$C_{t(i,a)}\f$ or \f$C_{t(a)}\f$.
+  Eigen::Vector4d homogeneousPointFej;
   if (pointLandmarkOptions_.landmarkModelId ==
       swift_vio::InverseDepthParameterization::kModelId) {
     size_t anchorCamIdx = pointDataPtr->anchorIds()[0].cameraIndex_;
@@ -1354,24 +1355,24 @@ bool HybridFilter::measurementJacobian(
 
     okvis::kinematics::Transformation T_WBta;
     size_t anchorObservationIndex = pointDataPtr->anchorIds()[0].observationIndex_;
-    okvis::kinematics::Transformation lP_T_WBta;
+    okvis::kinematics::Transformation T_WBta_fej;
     if (pointLandmarkOptions_.anchorAtObservationTime) {
       T_WBta = pointDataPtr->T_WB_mainAnchor();
-      lP_T_WBta = pointDataPtr->T_WB_mainAnchorForJacobian(
+      T_WBta_fej = pointDataPtr->T_WB_mainAnchorForJacobian(
             FLAGS_use_first_estimate);
     } else {
       T_WBta = pointDataPtr->T_WB_mainAnchorStateEpoch();
-      lP_T_WBta = pointDataPtr->T_WB_mainAnchorStateEpochForJacobian(
+      T_WBta_fej = pointDataPtr->T_WB_mainAnchorStateEpochForJacobian(
             FLAGS_use_first_estimate);
     }
     okvis::kinematics::Transformation T_WCta = T_WBta * T_BCa;
     T_CtjX = (T_WBtj * T_BCj).inverse() * T_WCta;
 
-    lP_transformList.push_back(lP_T_WBta);
+    transformFejList.push_back(T_WBta_fej);
     transformList.push_back(T_WBta);
     exponentList.push_back(1);
 
-    lP_transformList.push_back(T_BCa);
+    transformFejList.push_back(T_BCa);
     transformList.push_back(T_BCa);
     exponentList.push_back(1);
 
@@ -1386,15 +1387,20 @@ bool HybridFilter::measurementJacobian(
     frameIndices.push_back(pointDataPtr->anchorIds()[0].frameId_);
     T_WBt_list.push_back(T_WBta);
 
-    dhomo_dparams(0, 0) = 1;
-    dhomo_dparams(1, 1) = 1;
-    dhomo_dparams(3, 2) = 1;
+    homogeneousPointFej = (T_WBta_fej * T_BCa).inverse() * T_WCta * homogeneousPoint;
+    homogeneousPointFej /= homogeneousPointFej[2];
+
+    dhPoint_dparams(0, 0) = 1;
+    dhPoint_dparams(1, 1) = 1;
+    dhPoint_dparams(3, 2) = 1;
   } else {
     T_CtjX = (T_WBtj * T_BCj).inverse();
 
-    dhomo_dparams(0, 0) = 1;
-    dhomo_dparams(1, 1) = 1;
-    dhomo_dparams(2, 2) = 1;
+    homogeneousPointFej = homogeneousPoint;
+
+    dhPoint_dparams(0, 0) = 1;
+    dhPoint_dparams(1, 1) = 1;
+    dhPoint_dparams(2, 2) = 1;
   }
 
   std::shared_ptr<const okvis::cameras::CameraBase> cameraGeometry =
@@ -1414,8 +1420,7 @@ bool HybridFilter::measurementJacobian(
     }
   }
 
-  swift_vio::MultipleTransformPointJacobian lP_mtpj(lP_transformList, exponentList, homogeneousPoint);
-  swift_vio::MultipleTransformPointJacobian mtpj(transformList, exponentList, homogeneousPoint);
+  swift_vio::MultipleTransformPointJacobian mtpjFej(transformFejList, exponentList, homogeneousPointFej);
   std::vector<std::pair<size_t, size_t>> startIndexToMinDim;
   Eigen::AlignedVector<Eigen::MatrixXd> dpoint_dX; // drhoxpCtj_dParameters
   // compute drhoxpCtj_dParameters
@@ -1425,7 +1430,7 @@ bool HybridFilter::measurementJacobian(
     int mainExtrinsicModelId =
         camera_rig_.getExtrinsicOptMode(kMainCameraIndex);
     if (!fixCameraExtrinsicParams_[camIndices[ja]]) {
-      Eigen::Matrix<double, 4, 6> dpoint_dT_BC = mtpj.dp_dT(mtpjExtrinsicIndices[ja]);
+      Eigen::Matrix<double, 4, 6> dpoint_dT_BC = mtpjFej.dp_dT(mtpjExtrinsicIndices[ja]);
       std::vector<size_t> involvedCameraIndices;
       involvedCameraIndices.reserve(2);
       involvedCameraIndices.push_back(camIndices[ja]);
@@ -1444,8 +1449,7 @@ bool HybridFilter::measurementJacobian(
     }
 
     // Jacobians relative to nav states
-    Eigen::Matrix<double, 4, 6> lP_dpoint_dT_WBt = lP_mtpj.dp_dT(mtpjPoseIndices[ja]);
-    Eigen::Matrix<double, 4, 6> dpoint_dT_WBt = mtpj.dp_dT(mtpjPoseIndices[ja]);
+    Eigen::Matrix<double, 4, 6> dpoint_dT_WBt_fej = mtpjFej.dp_dT(mtpjPoseIndices[ja]);
     auto stateIter = statesMap_.find(frameIndices[ja]);
     int orderInCov = stateIter->second.global.at(GlobalStates::T_WS).startIndexInCov;
     size_t navStateIndex = orderInCov - startIndexCameraParams;
@@ -1455,11 +1459,11 @@ bool HybridFilter::measurementJacobian(
     if (ja == 1u && !pointLandmarkOptions_.anchorAtObservationTime) {
       // Because the anchor frame is at state epoch, then the Jacobian of its
       // pose relative to time and velocity are zero.
-      dpoint_dX.emplace_back(lP_dpoint_dT_WBt);
+      dpoint_dX.emplace_back(dpoint_dT_WBt_fej);
     } else {
       Eigen::Matrix3d Phi_pq_tij_tj = pointDataPtr->Phi_pq_feature(observationIndices[ja]);
-      lP_dpoint_dT_WBt.rightCols(3) += lP_dpoint_dT_WBt.leftCols(3) * Phi_pq_tij_tj;
-      dpoint_dX.emplace_back(lP_dpoint_dT_WBt);
+      dpoint_dT_WBt_fej.rightCols(3) += dpoint_dT_WBt_fej.leftCols(3) * Phi_pq_tij_tj;
+      dpoint_dX.emplace_back(dpoint_dT_WBt_fej);
       Eigen::Vector3d v_WBt =
           pointDataPtr->v_WBtij(observationIndices[ja]);
       Eigen::Matrix<double, 6, 1> dT_WBt_dt;
@@ -1475,20 +1479,14 @@ bool HybridFilter::measurementJacobian(
       size_t cameraDelayIntraIndex =
           intraStartIndexOfCameraParams(camIndices[ja], okvis::Estimator::CameraSensorStates::TD);
       startIndexToMinDim.emplace_back(cameraDelayIntraIndex, 2u);
-      dpoint_dX.emplace_back(dpoint_dT_WBt * dT_WBt_dt * dt_dtdtr.transpose());
+      dpoint_dX.emplace_back(dpoint_dT_WBt_fej * dT_WBt_dt * dt_dtdtr.transpose());
 
       double featureDelay =
           pointDataPtr->normalizedFeatureTime(observationIndices[ja]);
       startIndexToMinDim.emplace_back(navStateIndex + 6u, 3u);
-      dpoint_dX.emplace_back(lP_dpoint_dT_WBt.leftCols(3) * featureDelay);
+      dpoint_dX.emplace_back(dpoint_dT_WBt_fej.leftCols(3) * featureDelay);
     }
   }
-
-  // According to Li 2013 IJRR high precision, eq 41 and 55, among all Jacobian
-  // components, only the Jacobian of nav states need to use first estimates of
-  // position and velocity. The Jacobians relative to intrinsic parameters, and
-  // relative to \f$\rho p^{C(t_{i,j})}\f$ do not need to use first estimates.
-
   // Accumulate Jacobians relative to nav states.
   J_x->setZero();
   size_t iterIndex = 0u;
@@ -1505,11 +1503,7 @@ bool HybridFilter::measurementJacobian(
     J_x->block(0, startIndex, 2, intrinsicsJacobian.cols()) = intrinsicsJacobian;
   }
   // Jacobian relative to landmark parameters.
-  // According to Li 2013 IJRR high precision, eq 41 and 55, J_pfi does not need
-  // to use first estimates. As a result, expression 2 should be used.
-  // And tests show that (1) often cause divergence for mono MSCKF.
-//  (*J_pfi) = dz_drhoxpCtj * lP_mtpj.dp_dpoint().topRows<3>() * dhomo_dparams; //  (1)
-  (*J_pfi) = dz_drhoxpCtj * T_CtjX.T().topRows<3>() * dhomo_dparams; // (2)
+  (*J_pfi) = dz_drhoxpCtj * mtpjFej.dp_dpoint().topRows<3>() * dhPoint_dparams;
   return true;
 }
 
@@ -3229,9 +3223,9 @@ bool HybridFilter::EpipolarMeasurement::measurementJacobian(
   // compute the head and tail pose, velocity, Jacobians, and covariance
   std::vector<okvis::kinematics::Transformation,
               Eigen::aligned_allocator<okvis::kinematics::Transformation>>
-      T_WBtij, lP_T_WBtij;  // lp is short for linearization point
+      T_WBtij, T_WBtij_fej;  // lp is short for linearization point
   std::vector<Eigen::Vector3d, Eigen::aligned_allocator<Eigen::Vector3d>>
-      lP_v_WBtij;
+      v_WBtij_fej;
   std::vector<Eigen::Vector3d, Eigen::aligned_allocator<Eigen::Vector3d>>
       omega_WBtij;
   double dtij_dtr[2];
@@ -3241,22 +3235,22 @@ bool HybridFilter::EpipolarMeasurement::measurementJacobian(
     featureDelay[j] = pointDataPtr->normalizedFeatureTime(observationIndexPair[j]);
     T_WBtij.emplace_back(pointDataPtr->T_WBtij(observationIndexPair[j]));
     omega_WBtij.emplace_back(pointDataPtr->omega_Btij(observationIndexPair[j]));
-    lP_T_WBtij.emplace_back(pointDataPtr->T_WBtij_ForJacobian(observationIndexPair[j]));
-    lP_v_WBtij.emplace_back(pointDataPtr->v_WBtij_ForJacobian(observationIndexPair[j]));
+    T_WBtij_fej.emplace_back(pointDataPtr->T_WBtij_ForJacobian(observationIndexPair[j]));
+    v_WBtij_fej.emplace_back(pointDataPtr->v_WBtij_ForJacobian(observationIndexPair[j]));
   }
 
   // compute residual
   okvis::kinematics::Transformation T_BC0 = filter_.camera_rig_.getCameraExtrinsic(camIdx_);
   okvis::kinematics::Transformation T_Ctij_Ctik =
       (T_WBtij[0] * T_BC0).inverse() * (T_WBtij[1] * T_BC0);
-  okvis::kinematics::Transformation lP_T_Ctij_Ctik =
-      (lP_T_WBtij[0] * T_BC0).inverse() * (lP_T_WBtij[1] * T_BC0);
+  okvis::kinematics::Transformation T_Ctij_Ctik_fej =
+      (T_WBtij_fej[0] * T_BC0).inverse() * (T_WBtij_fej[1] * T_BC0);
   EpipolarJacobian epj(T_Ctij_Ctik.C(), T_Ctij_Ctik.r(), obsDirection2[0],
                        obsDirection2[1]);
   *residual = -epj.evaluate();  // observation is 0
 
   // compute Jacobians for camera parameters
-  EpipolarJacobian epj_lp(lP_T_Ctij_Ctik.C(), lP_T_Ctij_Ctik.r(),
+  EpipolarJacobian epj_lp(T_Ctij_Ctik_fej.C(), T_Ctij_Ctik_fej.r(),
                           obsDirection2[0], obsDirection2[1]);
   Eigen::Matrix<double, 1, 3> de_dfj[2];
   epj_lp.de_dfj(&de_dfj[0]);
@@ -3264,7 +3258,7 @@ bool HybridFilter::EpipolarMeasurement::measurementJacobian(
   Eigen::Matrix<double, 1, 3> de_dtheta_Ctij_Ctik, de_dt_Ctij_Ctik;
   epj_lp.de_dtheta_CjCk(&de_dtheta_Ctij_Ctik);
   epj_lp.de_dt_CjCk(&de_dt_Ctij_Ctik);
-  RelativeMotionJacobian rmj_lp(T_BC0, lP_T_WBtij[0], lP_T_WBtij[1]);
+  RelativeMotionJacobian rmj_lp(T_BC0, T_WBtij_fej[0], T_WBtij_fej[1]);
   Eigen::Matrix<double, 3, 3> dtheta_dtheta_BC;
   Eigen::Matrix<double, 3, 3> dp_dtheta_BC;
   Eigen::Matrix<double, 3, 3> dp_dt_BC;
@@ -3307,8 +3301,8 @@ bool HybridFilter::EpipolarMeasurement::measurementJacobian(
   Eigen::Matrix<double, 3, 1> dtheta_GBtij_dtij[2];
   Eigen::Matrix<double, 3, 1> dt_GBtij_dtij[2];
   for (int j = 0; j < 2; ++j) {
-    dtheta_GBtij_dtij[j] = lP_T_WBtij[j].C() * omega_WBtij[j];
-    dt_GBtij_dtij[j] = lP_v_WBtij[j];
+    dtheta_GBtij_dtij[j] = T_WBtij_fej[j].C() * omega_WBtij[j];
+    dt_GBtij_dtij[j] = v_WBtij_fej[j];
   }
 
   double de_dtj[2];

@@ -124,14 +124,14 @@ bool MSCKF::measurementJacobianAIDPMono(
   }
 
   double rho = ab1rho[3];
-  okvis::kinematics::Transformation lP_T_WBtj = pointDataPtr->T_WBtij_ForJacobian(observationIndex);
+  okvis::kinematics::Transformation T_WBtj_fej = pointDataPtr->T_WBtij_ForJacobian(observationIndex);
   Eigen::Vector3d omega_Btj = pointDataPtr->omega_Btij(observationIndex);
-  Eigen::Vector3d lP_v_WBtj = pointDataPtr->v_WBtij_ForJacobian(observationIndex);
-  okvis::kinematics::Transformation T_BcA = lP_T_WBtj.inverse() * T_WCta;
+  Eigen::Vector3d v_WBtj_fej = pointDataPtr->v_WBtij_ForJacobian(observationIndex);
+  okvis::kinematics::Transformation T_BcA = T_WBtj_fej.inverse() * T_WCta;
   J_td = dz_drhoxpCtj * T_BCj.C().transpose() *
          (okvis::kinematics::crossMx((T_BcA * ab1rho).head<3>()) *
               omega_Btj -
-          T_WBtj.C().transpose() * lP_v_WBtj * rho);
+          T_WBtj.C().transpose() * v_WBtj_fej * rho);
   J_tr = J_td * kpN;
 
   if (fixCameraExtrinsicParams_[camIdx]) {
@@ -163,7 +163,7 @@ bool MSCKF::measurementJacobianAIDPMono(
   // Jacobians relative to nav states.
   Eigen::Vector3d pfinG = (T_WCta * ab1rho).head<3>();
   factorJ_XBj << -rho * Eigen::Matrix3d::Identity(),
-      okvis::kinematics::crossMx(pfinG - lP_T_WBtj.r() * rho),
+      okvis::kinematics::crossMx(pfinG - T_WBtj_fej.r() * rho),
       -rho * Eigen::Matrix3d::Identity() * featureTime;
   J_XBj = dz_drhoxpCtj * (T_WBtj.C() * T_BCj.C()).transpose() * factorJ_XBj;
 
@@ -244,15 +244,15 @@ bool MSCKF::measurementJacobianHPPMono(
     }
   }
 
-  okvis::kinematics::Transformation lP_T_WB =
+  okvis::kinematics::Transformation T_WB_fej =
       pointDataPtr->T_WBtij_ForJacobian(observationIndex);
-  Eigen::Vector3d lP_v_WBtij =
+  Eigen::Vector3d v_WBtij_fej =
       pointDataPtr->v_WBtij_ForJacobian(observationIndex);
 
   J_td = dz_dpCtij * T_SC0.C().transpose() *
-         (okvis::kinematics::crossMx((lP_T_WB.inverse() * v4Xhomog).head<3>()) *
+         (okvis::kinematics::crossMx((T_WB_fej.inverse() * v4Xhomog).head<3>()) *
               omega_Btij -
-          T_WB.C().transpose() * lP_v_WBtij);
+          T_WB.C().transpose() * v_WBtij_fej);
   J_tr = J_td * kpN;
 
   J_Xc->resize(2, cameraParamsMinimalDimFast(camIdx));
@@ -278,7 +278,7 @@ bool MSCKF::measurementJacobianHPPMono(
   (*J_pfi) = dz_dpCtij * T_CW.C();
   Eigen::Matrix3d Phi_pq = pointDataPtr->Phi_pq_feature(observationIndex);
   factorJ_XBj << -Eigen::Matrix3d::Identity(),
-      okvis::kinematics::crossMx(v3Point - lP_T_WB.r()) - Phi_pq,
+      okvis::kinematics::crossMx(v3Point - T_WB_fej.r()) - Phi_pq,
       -Eigen::Matrix3d::Identity() * featureTime;
 
   (*J_XBj) = (*J_pfi) * factorJ_XBj;
