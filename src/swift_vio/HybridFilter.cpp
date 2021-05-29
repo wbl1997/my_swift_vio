@@ -904,6 +904,7 @@ void HybridFilter::removeAnchorlessLandmarks(
   decimateCovarianceForLandmarks(toRemoveLmIds);
 }
 
+// TODO(jhuai): Refactor common code shared with measurementJacobian().
 void HybridFilter::changeAnchors(
     const std::vector<uint64_t> &sortedRemovedStateIds) {
   int covDim = covariance_.rows();
@@ -968,10 +969,13 @@ void HybridFilter::changeAnchors(
       landmarkIter->setEstimate(rhoxpCj / rhoxpCj[2]);
 
       // compute Jacobians.
+      Eigen::Vector4d hPointFej = ab1rho;
+      okvis::kinematics::Transformation T_WBa_fej = T_WBa;
+
       swift_vio::MultipleTransformPointJacobian mtpjFej;
       Eigen::AlignedVector<okvis::kinematics::Transformation> transformList{
           T_BCj, T_WBj, T_WBa, T_BCa};
-      okvis::kinematics::Transformation T_WBa_fej = T_WBa;
+
       std::vector<int> exponentList{-1, -1, 1, 1};
       Eigen::AlignedVector<okvis::kinematics::Transformation> transformFejList;
       transformFejList.reserve(4);
@@ -987,23 +991,24 @@ void HybridFilter::changeAnchors(
         transformFejList.emplace_back(positionVelocityPtr->head<3>(),
                                       T_WBa.q());
         T_WBa_fej = transformFejList.back();
+
+        hPointFej = (T_WBa_fej * T_BCa).inverse() * (T_WBa * T_BCa) * ab1rho;
+        hPointFej = hPointFej / hPointFej[2];
       } else {
         transformFejList.push_back(T_WBj);
         transformFejList.push_back(T_WBa);
       }
       transformFejList.push_back(T_BCa);
 
-      const Eigen::Vector4d& hPoint = landmarkIter->estimate();
-      Eigen::Vector4d hPointFej = (T_WBa_fej * T_BCa).inverse() * (T_WBa * T_BCa) * hPoint;
-      hPointFej = hPointFej / hPointFej[2];
       mtpjFej.initialize(transformFejList, exponentList, hPointFej);
+      Eigen::Vector4d rhoxpCjFej = mtpjFej.evaluate();
 
       Eigen::Matrix<double, 3, 4> dnewParams_drhoxpCj;
-      double inverseZ = 1.0 / rhoxpCj[2];
+      double inverseZ = 1.0 / rhoxpCjFej[2];
       double inverseZ2 = inverseZ * inverseZ;
-      dnewParams_drhoxpCj << inverseZ, 0, -rhoxpCj[0] * inverseZ2, 0, 0,
-          inverseZ, -rhoxpCj[1] * inverseZ2, 0, 0, 0, -rhoxpCj[3] * inverseZ2,
-          inverseZ;
+      dnewParams_drhoxpCj << inverseZ, 0, -rhoxpCjFej[0] * inverseZ2, 0,
+          0, inverseZ, -rhoxpCjFej[1] * inverseZ2, 0,
+          0, 0, -rhoxpCjFej[3] * inverseZ2, inverseZ;
 
       size_t startRowC = statesMap_[newAnchorFrameId]
                              .global.at(GlobalStates::T_WS)
