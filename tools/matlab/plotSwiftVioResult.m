@@ -103,14 +103,6 @@ if gt_file
         data_diff(:, indexServer.v) = ...
             data_diff(:, indexServer.v) - gt(assocIndex, gt_index.v);
     end
-    if size(gt, 2) >= gt_index.b_g(3)
-        data_diff(:, indexServer.b_g) = ...
-            data_diff(:, indexServer.b_g) - gt(assocIndex, gt_index.b_g);
-    end
-    if size(gt, 2) >= gt_index.b_a(3)
-        data_diff(:, indexServer.b_a) = ...
-            data_diff(:, indexServer.b_a) - gt(assocIndex, gt_index.b_a);
-    end
 else
     gt = [];
     if data(1, 1) > sec_to_nanos
@@ -175,20 +167,6 @@ if(~isempty(gt))
             indexServer.v_std, 1, 1);
         ylabel('$\delta \mathbf{v}_{WB} (m/s)$', 'Interpreter', 'Latex');
         saveas(gcf,[outputPath, '\Error v_WB'],'epsc');
-    end
-    figure;
-    if size(gt, 2) >= 2 + 7 + 3 + 3
-        drawMeanAndStdBound(data_diff, indexServer.b_g, ...
-            indexServer.b_g_std, 180/pi, 1);
-        ylabel('$\delta \mathbf{b}_{g} (^\circ/s)$', 'Interpreter', 'Latex');
-        saveas(gcf,[outputPath, '\Error b_g'],'epsc');
-    end
-    figure;
-    if size(gt, 2) >= 2 + 7 + 3 + 6
-        drawMeanAndStdBound(data_diff, indexServer.b_a, ...
-            indexServer.b_a_std, 1, 1);
-        ylabel('$\delta \mathbf{b}_{a} (m/s)$', 'Interpreter', 'Latex');
-        saveas(gcf,[outputPath, '\Error b_a'],'epsc');
     end
 end
 

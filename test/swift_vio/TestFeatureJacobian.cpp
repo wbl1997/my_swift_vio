@@ -226,14 +226,9 @@ public:
       size_t maxIterations = 10u;
       size_t numThreads = 2u;
       estimator->optimize(maxIterations, numThreads, false);
-      okvis::Optimization sharedOptConfig;
-      sharedOptConfig.numKeyframes = 5;
-      sharedOptConfig.numImuFrames = 3;
-      estimator->setOptimizationOptions(sharedOptConfig);
 
       okvis::MapPointVector removedLandmarks;
-      estimator->applyMarginalizationStrategy(sharedOptConfig.numKeyframes,
-          sharedOptConfig.numImuFrames, removedLandmarks);
+      estimator->applyMarginalizationStrategy(removedLandmarks);
       estimator->printStatesAndStdevs(debugStream);
       debugStream << std::endl;
 

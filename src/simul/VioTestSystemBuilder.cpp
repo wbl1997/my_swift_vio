@@ -146,6 +146,9 @@ void VioTestSystemBuilder::createVioSystem(
   okvis::Optimization optimOptions;
   optimOptions.useEpipolarConstraint = testSetting.useEpipolarConstraint;
   optimOptions.cameraObservationModelId = testSetting.cameraObservationModelId;
+  optimOptions.getSmootherCovariance = false;
+  optimOptions.numKeyframes = 5;
+  optimOptions.numImuFrames = 3;
   estimator->setOptimizationOptions(optimOptions);
 
   swift_vio::PointLandmarkOptions plOptions;

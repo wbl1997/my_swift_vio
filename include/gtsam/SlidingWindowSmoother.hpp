@@ -151,9 +151,7 @@ class SlidingWindowSmoother : public okvis::Estimator {
    * are outside of the sliding window will be erased.
    * @return True if successful.
    */
-  bool applyMarginalizationStrategy(
-      size_t numKeyframes, size_t numImuFrames,
-      okvis::MapPointVector& removedLandmarks) final;
+  bool applyMarginalizationStrategy(okvis::MapPointVector& removedLandmarks) final;
 
   /**
    * @brief computeCovariance the block covariance for the navigation state

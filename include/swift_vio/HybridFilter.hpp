@@ -104,9 +104,7 @@ class HybridFilter : public okvis::Estimator, public BaseFilter {
    * numKeyframes+numImuFrames.
    * @return True if successful.
    */
-  bool applyMarginalizationStrategy(
-      size_t numKeyframes, size_t numImuFrames,
-      okvis::MapPointVector &removedLandmarks) override;
+  bool applyMarginalizationStrategy(okvis::MapPointVector &removedLandmarks) override;
 
   /// @name Getters
   ///\{

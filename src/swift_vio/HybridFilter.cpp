@@ -1110,10 +1110,9 @@ void HybridFilter::changeAnchors(
   }
 }
 
-bool HybridFilter::applyMarginalizationStrategy(
-    size_t numKeyframes, size_t numImuFrames,
-    okvis::MapPointVector& removedLandmarks) {
-  marginalizeRedundantFrames(numKeyframes, numImuFrames);
+bool HybridFilter::applyMarginalizationStrategy(okvis::MapPointVector& removedLandmarks) {
+  marginalizeRedundantFrames(optimizationOptions_.numKeyframes,
+                             optimizationOptions_.numImuFrames);
 
   // remove features no longer tracked which can be in or out of the state vector.
   std::vector<uint64_t> toRemoveLmIds;

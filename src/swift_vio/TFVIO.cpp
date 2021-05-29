@@ -37,9 +37,7 @@ TFVIO::TFVIO() :
 
 TFVIO::~TFVIO() {}
 
-bool TFVIO::applyMarginalizationStrategy(
-    size_t /*numKeyframes*/, size_t /*numImuFrames*/,
-    okvis::MapPointVector& removedLandmarks) {
+bool TFVIO::applyMarginalizationStrategy(okvis::MapPointVector& removedLandmarks) {
   std::vector<uint64_t> removeFrames;
   std::map<uint64_t, States>::reverse_iterator rit = statesMap_.rbegin();
   while (rit != statesMap_.rend()) {

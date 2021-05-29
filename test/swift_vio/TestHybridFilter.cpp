@@ -364,8 +364,8 @@ void testHybridFilterSinusoid(
     std::vector<uint64_t> multiFrameIds;
     size_t poseIndex = 0u;
     bool hasStarted = false;
-    int frameCount = -1;               // number of frames used in estimator
-    int trackedFeatures = 0;  // feature tracks observed in a frame
+    int frameCount = -1;                // number of frames used in estimator
+    int trackedFeatures = 0;            // feature tracks observed in a frame
     const int cameraIntervalRatio = 10; // number imu meas for 1 camera frame
     std::vector<okvis::Time> times = vioSystemBuilder.sampleTimes();
     okvis::Time lastKFTime = times.front();
@@ -434,19 +434,12 @@ void testHybridFilterSinusoid(
         }
         frameFeatureTally(trackedFeatures);
 
-        okvis::Optimization sharedOptConfig;
-        sharedOptConfig.getSmootherCovariance = false;
-        sharedOptConfig.numKeyframes = 5;
-        sharedOptConfig.numImuFrames = 3;
-        estimator->setOptimizationOptions(sharedOptConfig);
-
         size_t maxIterations = 10u;
         size_t numThreads = 2u;
         estimator->optimize(maxIterations, numThreads, false);
 
         okvis::MapPointVector removedLandmarks;
-        estimator->applyMarginalizationStrategy(sharedOptConfig.numKeyframes,
-            sharedOptConfig.numImuFrames, removedLandmarks);
+        estimator->applyMarginalizationStrategy(removedLandmarks);
         estimator->printStatesAndStdevs(debugStream);
         debugStream << std::endl;
 
@@ -507,7 +500,6 @@ void testHybridFilterSinusoid(
       if (debugStream.is_open()) {
           debugStream.close();
       }
-//      unlink(outputFile.c_str());
     }
     double elapsedTime = filterTimer.stop();
     std::stringstream sstream;
@@ -651,11 +643,7 @@ TEST(MSCKF, CircleFarPoints) {
                            FLAGS_num_runs);
 }
 
-// It is also possible to test OKVIS with an infinity time horizon by
-// disabling the applyMarginalizationStrategy line in testHybridFilterSinusoid.
-// That setting has been shown to output consistent covariance to the actual
-// errors up to 10 secs simulation, however, it is very time-consuming,
-// much slower than iSAM2.
+// When set getSmootherCovariance true, OKVIS outputs consistent covariances indicated by NEES.
 TEST(OKVIS, TrajectoryLabel) {
   bool addImageNoise = true;
   bool useImageObservation = true;

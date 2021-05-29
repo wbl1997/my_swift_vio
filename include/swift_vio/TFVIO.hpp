@@ -54,9 +54,7 @@ class TFVIO : public HybridFilter {
    * numKeyframes+numImuFrames.
    * @return True if successful.
    */
-  bool
-  applyMarginalizationStrategy(size_t numKeyframes, size_t numImuFrames,
-                               okvis::MapPointVector &removedLandmarks) final;
+  bool applyMarginalizationStrategy(okvis::MapPointVector &removedLandmarks) final;
 
   void optimize(size_t numIter, size_t numThreads = 1,
                 bool verbose = false) final;

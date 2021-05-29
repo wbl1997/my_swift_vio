@@ -605,9 +605,7 @@ size_t SlidingWindowSmoother::getLandmarks(okvis::MapPointVector& landmarks) con
 
 // The major job of marginalization is done in the smoother optimization step.
 // Here we only remove old landmarks and states.
-bool SlidingWindowSmoother::applyMarginalizationStrategy(
-    size_t /*numKeyframes*/, size_t /*numImuFrames*/,
-    okvis::MapPointVector& removedLandmarks) {
+bool SlidingWindowSmoother::applyMarginalizationStrategy(okvis::MapPointVector& removedLandmarks) {
   uint64_t minValidStateId = getMinValidStateId();
   std::vector<uint64_t> removeFrames;
   std::map<uint64_t, States>::iterator it = statesMap_.begin();
