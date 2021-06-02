@@ -109,10 +109,6 @@ class HybridFilter : public okvis::Estimator, public BaseFilter {
   /// @name Getters
   ///\{
 
-  int getEstimatedVariableMinimalDim() const final {
-    return covariance_.rows();
-  }
-
   bool computeCovariance(Eigen::MatrixXd* cov) const final {
     *cov = covariance_;
     return true;
@@ -323,13 +319,33 @@ class HybridFilter : public okvis::Estimator, public BaseFilter {
   std::vector<std::shared_ptr<const okvis::ceres::ParameterBlock>>
       getImuAugmentedParameterPtrs() const;
 
-  void getCameraCalibrationEstimate(
-      Eigen::Matrix<double, Eigen::Dynamic, 1>* cameraParams) const final;
+  void getEstimatedCameraIntrinsics(
+      Eigen::Matrix<double, Eigen::Dynamic, 1>* cameraParams, size_t camIdx) const final;
 
   void getImuAugmentedStatesEstimate(
       Eigen::Matrix<double, Eigen::Dynamic, 1>* extraParams) const final;
 
   bool getStateStd(Eigen::Matrix<double, Eigen::Dynamic, 1>* stateStd) const final;
+
+  Eigen::VectorXd getDesiredImuAugmentedParamStdevs() const;
+
+  Eigen::VectorXd getDesiredCameraParamStdevs() const;
+
+  std::vector<std::string> getCameraParamLabels() const;
+
+  bool getDesiredStdevs(Eigen::VectorXd* desiredStdevs, std::vector<std::string>* dimensionLabels) const override;
+
+  bool computeErrors(
+      const okvis::kinematics::Transformation &ref_T_WS,
+      const Eigen::Vector3d &ref_v_WS,
+      const okvis::ImuSensorReadings &refBiases,
+      std::shared_ptr<const okvis::cameras::NCameraSystem> refCameraSystem,
+      Eigen::VectorXd *errors) const override;
+
+  Eigen::VectorXd
+  computeCameraParamsError(const States &stateInQuestion,
+                           std::shared_ptr<const okvis::cameras::NCameraSystem>
+                               refCameraSystem) const;
 
   void initCovariance();
 

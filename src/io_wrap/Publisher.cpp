@@ -56,6 +56,7 @@
 #include <swift_vio/CameraRig.hpp>
 #include <swift_vio/ExtrinsicModels.hpp>
 #include <swift_vio/imu/ImuRig.hpp>
+#include <swift_vio/memory.h>
 #include <swift_vio/ProjParamOptModels.hpp>
 
 DECLARE_string(datafile_separator);
@@ -777,14 +778,10 @@ void StreamPublisher::csvSaveFullStateWithExtrinsicsAsCallback(
 
 // Set and write full state including camera extrinsics to file.
 void Publisher::csvSaveFullStateWithAllCalibrationAsCallback(
-    const okvis::Time &t, const okvis::kinematics::Transformation &T_WS,
-    const Eigen::Matrix<double, 9, 1> &speedAndBiases,
-    const Eigen::Matrix<double, 3, 1> &omega_S, const int frameIdInSource,
-    const std::vector<
-        Eigen::VectorXd,
-        Eigen::aligned_allocator<Eigen::VectorXd>>& extrinsics,
+    const okvis::Time &t, int frameIdInSource, const okvis::kinematics::Transformation &T_WS,
+    const Eigen::Matrix<double, 9, 1> &speedAndBiases, const Eigen::Matrix<double, 3, 1> &omega_S,
     const Eigen::Matrix<double, Eigen::Dynamic, 1> &imuAugmentedParams,
-    const Eigen::Matrix<double, Eigen::Dynamic, 1> &cameraParams,
+    const Eigen::AlignedVector<Eigen::Matrix<double, Eigen::Dynamic, 1>> &cameraParams,
     const Eigen::Matrix<double, Eigen::Dynamic, 1> &stateStd,
     const std::vector<okvis::kinematics::Transformation,
           Eigen::aligned_allocator<okvis::kinematics::Transformation> >& T_BC_list) {
@@ -795,23 +792,17 @@ void Publisher::csvSaveFullStateWithAllCalibrationAsCallback(
   setPoseStd(stateStd);
   publishPoseStd();
   StreamPublisher::csvSaveFullStateWithAllCalibrationAsCallback(
-      t, T_WS, speedAndBiases, omega_S, frameIdInSource, extrinsics,
-      imuAugmentedParams, cameraParams, stateStd, T_BC_list);
+      t, frameIdInSource, T_WS, speedAndBiases, omega_S, imuAugmentedParams, cameraParams, stateStd, T_BC_list);
 }
 
 void StreamPublisher::csvSaveFullStateWithAllCalibrationAsCallback(
-    const okvis::Time &t, const okvis::kinematics::Transformation &T_WS,
-    const Eigen::Matrix<double, 9, 1> &speedAndBiases,
-    const Eigen::Matrix<double, 3, 1> &/*omega_S*/, const int frameIdInSource,
-    const std::vector<Eigen::VectorXd,
-                      Eigen::aligned_allocator<Eigen::VectorXd>> &extrinsics,
+    const okvis::Time &t, const int frameIdInSource, const okvis::kinematics::Transformation &T_WS,
+    const Eigen::Matrix<double, 9, 1> &speedAndBiases, const Eigen::Matrix<double, 3, 1> &/*omega_S*/,
     const Eigen::Matrix<double, Eigen::Dynamic, 1> &imuAugmentedParams,
-    const Eigen::Matrix<double, Eigen::Dynamic, 1> &cameraParams,
+    const Eigen::AlignedVector<Eigen::Matrix<double, Eigen::Dynamic, 1>> &variableCameraParams,
     const Eigen::Matrix<double, Eigen::Dynamic, 1> &stateStd,
-    const std::vector<
-        okvis::kinematics::Transformation,
-        Eigen::aligned_allocator<okvis::kinematics::Transformation>>
-        &/*T_BC_list*/) {
+    const std::vector<okvis::kinematics::Transformation,
+          Eigen::aligned_allocator<okvis::kinematics::Transformation> >& /*T_BC_list*/) {
   if (csvFile_) {
     if (csvFile_->good()) {
       Eigen::Vector3d p_WS_W = T_WS.r();
@@ -837,16 +828,11 @@ void StreamPublisher::csvSaveFullStateWithAllCalibrationAsCallback(
       for (int jack = 0; jack < imuAugmentedParams.size(); ++jack)
         *csvFile_ << FLAGS_datafile_separator << imuAugmentedParams[jack];
 
-      for (size_t i = 0; i < extrinsics.size(); ++i) {
-        int n = extrinsics[i].size();
-        const Eigen::VectorXd& T_BC_coeffs = extrinsics[i];
-        for (int jack = 0; jack < n; ++jack) {
-          *csvFile_ << FLAGS_datafile_separator << T_BC_coeffs[jack];
+      for (const Eigen::VectorXd &oneCamera : variableCameraParams) {
+        for (int jack = 0; jack < oneCamera.size(); ++jack) {
+          *csvFile_ << FLAGS_datafile_separator << oneCamera[jack];
         }
       }
-
-      for (int jack = 0; jack < cameraParams.size(); ++jack)
-        *csvFile_ << FLAGS_datafile_separator << cameraParams[jack];
 
       for (int jack = 0; jack < stateStd.size(); ++jack)
         *csvFile_ << FLAGS_datafile_separator << stateStd[jack];

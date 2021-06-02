@@ -18,6 +18,13 @@ namespace swift_vio {
 /**
  * @brief A frontend that uses BRISK descriptor based matching or
  * KLT feature tracking.
+ *
+ * As with okvis::Frontend, the HybridFrontend also initializes landmarks with
+ * the (perhaps imprecisely calibrated) camera system.
+ * These initial landmark positions will seed the landmarks in the smoothers,
+ * but will not be used by filters which will triangulate landmarks based on feature tracks.
+ *
+ * The camera system of a MultiFrame may be updated in the loop for feature association.
  */
 class HybridFrontend : public okvis::Frontend {
  public:
@@ -48,7 +55,7 @@ class HybridFrontend : public okvis::Frontend {
    * @param T_WS_propagated Pose of sensor at image capture time.
    * @param params          Configuration parameters.
    * @param map             Unused.
-   * @param framesInOut     Multiframe including the descriptors of all the
+   * @param[in, out] nframes     Multiframe including the descriptors of all the
    * keypoints.
    * @param[out] asKeyframe Should the frame be a keyframe?
    * @return True if successful.
@@ -58,7 +65,7 @@ class HybridFrontend : public okvis::Frontend {
       okvis::kinematics::Transformation& T_WS_propagated,
       const okvis::VioParameters& params,
       const std::shared_ptr<okvis::MapPointVector> map,
-      std::shared_ptr<okvis::MultiFrame> framesInOut, bool* asKeyframe);
+      std::shared_ptr<okvis::MultiFrame> nframes, bool* asKeyframe);
 
  
   ///@}
@@ -89,7 +96,7 @@ class HybridFrontend : public okvis::Frontend {
   template <class CAMERA_GEOMETRY_T>
   int matchToLastFrameKLT(okvis::Estimator& estimator,
                           const okvis::VioParameters& params,
-                          std::shared_ptr<okvis::MultiFrame> framesInOut,
+                          std::shared_ptr<okvis::MultiFrame> nframes,
                           bool& rotationOnly, bool usePoseUncertainty = true,
                           bool removeOutliers = true);
 

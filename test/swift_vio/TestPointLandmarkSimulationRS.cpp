@@ -33,12 +33,14 @@ class PointLandmarkSimulationRSTest : public ::testing::Test {
       okvis::ExtrinsicsEstimationParameters extrinsicsEstimationParameters;
       extrinsicsEstimationParameters.sigma_distortion =
           std::vector<double>{0.05, 0.01, 0.001, 0.001, 0.0001};
-      csc.createNoisyCameraSystem(&cameraGeometry0, &trueCameraSystem,
+      csc.createNoisyCameraSystem(&cameraSystem,
                                   extrinsicsEstimationParameters);
     } else {
-      csc.createNominalCameraSystem(&cameraGeometry0, &trueCameraSystem);
+      csc.createNominalCameraSystem(&cameraSystem);
     }
-    mf->resetCameraSystemAndFrames(*trueCameraSystem);
+    cameraGeometry0 = cameraSystem->cameraGeometry(0);
+
+    mf->resetCameraSystemAndFrames(*cameraSystem);
     mf->setTimestamp(0u, mf->timestamp());
 
     size_t totalLandmarks = 5u;
@@ -64,7 +66,7 @@ class PointLandmarkSimulationRSTest : public ::testing::Test {
           centralRowEpoch +
           okvis::Duration(
               (imagePoint[1] / cameraGeometry0->imageHeight() - 0.5) * tr));
-      Eigen::Vector4d pW = T_WBt * *trueCameraSystem->T_SC(0) * pCt;
+      Eigen::Vector4d pW = T_WBt * *cameraSystem->T_SC(0) * pCt;
       homogeneousPoints.push_back(pW);
       imagePoints.push_back(imagePoint);
     }
@@ -73,7 +75,7 @@ class PointLandmarkSimulationRSTest : public ::testing::Test {
     std::vector<std::vector<size_t>> frameLandmarkIndices;
     std::vector<std::vector<int>> keypointIndices;
     simul::PointLandmarkSimulationRS::projectLandmarksToNFrame(
-        homogeneousPoints, cst, centralRowEpoch, trueCameraSystem, mf,
+        homogeneousPoints, cst, centralRowEpoch, cameraSystem, mf,
         &frameLandmarkIndices, &keypointIndices, nullptr);
 
     // check the predicted projection is exactly the original input
@@ -93,8 +95,8 @@ class PointLandmarkSimulationRSTest : public ::testing::Test {
   std::shared_ptr<simul::CircularSinusoidalTrajectory> cst;
   double td;
   double tr;
-  std::shared_ptr<okvis::cameras::CameraBase> cameraGeometry0;
-  std::shared_ptr<okvis::cameras::NCameraSystem> trueCameraSystem;
+  std::shared_ptr<const okvis::cameras::CameraBase> cameraGeometry0;
+  std::shared_ptr<okvis::cameras::NCameraSystem> cameraSystem;
   okvis::Time centralRowEpoch;
   std::shared_ptr<okvis::MultiFrame> mf;
 };

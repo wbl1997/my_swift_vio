@@ -24,303 +24,115 @@
 
 namespace simul {
 
-const double SimulationFrontend::imageNoiseMag_ = 1.0;
 const double SimulationFrontend::fourthRoot2_ = 1.1892071150;
-const double SimulationFrontend::kRangeThreshold = 20;
 const int SimulationFrontend::kMaxMatchKeyframes = 2;
-const int SimulationFrontend::kMaxKeptFrames = 20;
 const double SimulationFrontend::kMinKeyframeDistance = 0.4;
 const double SimulationFrontend::kMinKeyframeAngle = 10 * M_PI / 180;
 
-void saveLandmarkGrid(
-    const std::vector<Eigen::Vector4d,
-                      Eigen::aligned_allocator<Eigen::Vector4d>>&
-        homogeneousPoints,
-    const std::vector<uint64_t>& lmIds, std::string pointFile) {
-  // save these points into file
-  if (pointFile.size()) {
-    std::ofstream pointStream(pointFile, std::ofstream::out);
-    pointStream << "%id, x, y, z in the world frame " << std::endl;
-    auto iter = homogeneousPoints.begin();
-    for (auto it = lmIds.begin(); it != lmIds.end(); ++it, ++iter)
-      pointStream << *it << " " << (*iter)[0] << " " << (*iter)[1] << " "
-                  << (*iter)[2] << std::endl;
-    pointStream.close();
-    assert(iter == homogeneousPoints.end());
-  }
-}
-
-void createBoxLandmarkGrid(
-    std::vector<Eigen::Vector4d, Eigen::aligned_allocator<Eigen::Vector4d>>
-        *homogeneousPoints,
-    std::vector<uint64_t> *lmIds,
-    double halfz,
-    double addFloorCeling,
-    std::string pointFile = "") {
-  const double xyLimit = 5, zLimit = halfz,
-      xyIncrement = 1.0, zIncrement = 0.5, offsetNoiseMag = 0.0;
-  // four walls
-  double x(xyLimit), y(xyLimit), z(zLimit);
-  for (y = -xyLimit; y <= xyLimit; y += xyIncrement) {
-    for (z = -zLimit; z <= zLimit; z += zIncrement) {
-      homogeneousPoints->push_back(
-          Eigen::Vector4d(x + vio::gauss_rand(0, offsetNoiseMag),
-                          y + vio::gauss_rand(0, offsetNoiseMag),
-                          z + vio::gauss_rand(0, offsetNoiseMag), 1));
-      lmIds->push_back(okvis::IdProvider::instance().newId());
-    }
-  }
-
-  for (y = -xyLimit; y <= xyLimit; y += xyIncrement) {
-    for (z = -zLimit; z <= zLimit; z += zIncrement) {
-      homogeneousPoints->push_back(
-          Eigen::Vector4d(y + vio::gauss_rand(0, offsetNoiseMag),
-                          x + vio::gauss_rand(0, offsetNoiseMag),
-                          z + vio::gauss_rand(0, offsetNoiseMag), 1));
-      lmIds->push_back(okvis::IdProvider::instance().newId());
-    }
-  }
-
-  x = -xyLimit;
-  for (y = -xyLimit; y <= xyLimit; y += xyIncrement) {
-    for (z = -zLimit; z <= zLimit; z += zIncrement) {
-      homogeneousPoints->push_back(
-          Eigen::Vector4d(x + vio::gauss_rand(0, offsetNoiseMag),
-                          y + vio::gauss_rand(0, offsetNoiseMag),
-                          z + vio::gauss_rand(0, offsetNoiseMag), 1));
-      lmIds->push_back(okvis::IdProvider::instance().newId());
-    }
-  }
-
-  for (y = -xyLimit; y <= xyLimit; y += xyIncrement) {
-    for (z = -zLimit; z <= zLimit; z += zIncrement) {
-      homogeneousPoints->push_back(
-          Eigen::Vector4d(y + vio::gauss_rand(0, offsetNoiseMag),
-                          x + vio::gauss_rand(0, offsetNoiseMag),
-                          z + vio::gauss_rand(0, offsetNoiseMag), 1));
-      lmIds->push_back(okvis::IdProvider::instance().newId());
-    }
-  }
-
-  if (addFloorCeling) {
-    std::vector<double> zlist{-zLimit, zLimit};
-    for (double z : zlist) {
-      for (x = -xyLimit; x <= xyLimit; x += xyIncrement) {
-        for (y = -xyLimit; y <= xyLimit; y += xyIncrement) {
-          homogeneousPoints->push_back(
-              Eigen::Vector4d(x + vio::gauss_rand(0, offsetNoiseMag),
-                              y + vio::gauss_rand(0, offsetNoiseMag),
-                              z + vio::gauss_rand(0, offsetNoiseMag), 1));
-          lmIds->push_back(okvis::IdProvider::instance().newId());
-        }
-      }
-    }
-  }
-
-  saveLandmarkGrid(*homogeneousPoints, *lmIds, pointFile);
-}
-
-void createCylinderLandmarkGrid(
-    std::vector<Eigen::Vector4d, Eigen::aligned_allocator<Eigen::Vector4d>>*
-        homogeneousPoints,
-    std::vector<uint64_t>* lmIds, double radius, std::string pointFile = "") {
-  const int numSteps = 40;
-  double zmin = -1.5, zmax = 1.5;
-  double zstep = 0.5;
-  if (radius >= SimulationFrontend::kRangeThreshold) {
-    zmin = -1.5;
-    zmax = 3.5;
-    zstep = 0.8;
-  }
-  double step = 2 * M_PI / numSteps;
-  for (int j = 0; j < numSteps; ++j) {
-    double theta = step * j;
-    double px = radius * sin(theta);
-    double py = radius * cos(theta);
-    for (double pz = zmin; pz < zmax; pz += zstep) {
-      homogeneousPoints->emplace_back(px, py, pz, 1.0);
-      lmIds->push_back(okvis::IdProvider::instance().newId());
-    }
-  }
-  saveLandmarkGrid(*homogeneousPoints, *lmIds, pointFile);
-}
-
-void addLandmarkNoise(
-    const std::vector<Eigen::Vector4d,
-                      Eigen::aligned_allocator<Eigen::Vector4d>>&
-        homogeneousPoints,
-    std::vector<Eigen::Vector4d, Eigen::aligned_allocator<Eigen::Vector4d>>*
-        noisyHomogeneousPoints,
-    double axisSigma = 0.1) {
-  *noisyHomogeneousPoints = homogeneousPoints;
-  for (auto iter = noisyHomogeneousPoints->begin();
-       iter != noisyHomogeneousPoints->end(); ++iter) {
-    iter->head<3>() = iter->head<3>() + Eigen::Vector3d::Random() * axisSigma;
-  }
-}
-
-void initCameraNoiseParams(
-    okvis::ExtrinsicsEstimationParameters* cameraNoiseParams,
-    double sigma_abs_position, bool fixCameraInternalParams) {
-  cameraNoiseParams->sigma_absolute_translation = sigma_abs_position;
-  cameraNoiseParams->sigma_absolute_orientation = 0;
-  cameraNoiseParams->sigma_c_relative_translation = 0;
-  cameraNoiseParams->sigma_c_relative_orientation = 0;
-  if (fixCameraInternalParams) {
-    cameraNoiseParams->sigma_focal_length = 0;
-    cameraNoiseParams->sigma_principal_point = 0;
-    cameraNoiseParams->sigma_distortion.resize(5, 0);
-    cameraNoiseParams->sigma_td = 0;
-    cameraNoiseParams->sigma_tr = 0;
-  } else {
-    cameraNoiseParams->sigma_focal_length = 5;
-    cameraNoiseParams->sigma_principal_point = 5;
-    cameraNoiseParams->sigma_distortion =
-        std::vector<double>{5e-2, 1e-2, 1e-3, 1e-3, 1e-3};
-    cameraNoiseParams->sigma_td = 5e-3;
-    cameraNoiseParams->sigma_tr = 5e-3;
-  }
-}
-
-// Constructor.
 SimulationFrontend::SimulationFrontend(
-    size_t numCameras, bool addImageNoise,
-    int maxTrackLength,
-    LandmarkGridType gridType,
-    double landmarkRadius,
-    std::string pointFile)
+    const std::vector<Eigen::Vector4d,
+                      Eigen::aligned_allocator<Eigen::Vector4d>>
+        &homogeneousPoints,
+    const std::vector<uint64_t> &lmIds, size_t numCameras, int maxTrackLength)
     : isInitialized_(true), numCameras_(numCameras),
-      addImageNoise_(addImageNoise),
-      maxTrackLength_(maxTrackLength) {
-  double halfz = 1.5;
-  bool addFloorCeiling = false;
-  switch (gridType) {
-    case LandmarkGridType::FourWalls:
-      createBoxLandmarkGrid(&homogeneousPoints_, &lmIds_, halfz,
-                            addFloorCeiling, pointFile);
-      break;
-    case LandmarkGridType::FourWallsFloorCeiling:
-      halfz = 2.5;
-      addFloorCeiling = true;
-      createBoxLandmarkGrid(&homogeneousPoints_, &lmIds_, halfz,
-                            addFloorCeiling, pointFile);
-      break;
-    case LandmarkGridType::Cylinder:
-      createCylinderLandmarkGrid(&homogeneousPoints_, &lmIds_, landmarkRadius,
-                                 pointFile);
-      break;
-  }
-}
+      maxTrackLength_(maxTrackLength), homogeneousPoints_(homogeneousPoints),
+      lmIds_(lmIds) {}
 
 int SimulationFrontend::dataAssociationAndInitialization(
-    okvis::Estimator& estimator,
-    std::shared_ptr<const simul::CircularSinusoidalTrajectory> simulatedTrajectory,
-    okvis::Time trueCentralRowEpoch,
-    std::shared_ptr<const okvis::cameras::NCameraSystem> cameraSystemRef,
-    std::shared_ptr<okvis::MultiFrame> framesInOut, bool* asKeyframe) {
-  // find distortion type
+    okvis::Estimator& estimator, const std::vector<std::vector<int>>& keypointIndices,
+    std::shared_ptr<okvis::MultiFrame> nframes, bool* asKeyframe) {
   okvis::cameras::NCameraSystem::DistortionType distortionType =
-      cameraSystemRef->distortionType(0);
-  for (size_t i = 1; i < cameraSystemRef->numCameras(); ++i) {
-    OKVIS_ASSERT_TRUE(Exception,
-                      distortionType == cameraSystemRef->distortionType(i),
-                      "mixed frame types are not supported yet");
-  }
+      nframes->cameraSystem().distortionType(0);
   int requiredMatches = 5;
-
-  okvis::kinematics::Transformation T_WS_ref =
-      simulatedTrajectory->computeGlobalPose(trueCentralRowEpoch);
-
-  std::vector<std::vector<size_t>> frameLandmarkIndices;
-  std::vector<std::vector<int>> keypointIndices;
-  PointLandmarkSimulationRS::projectLandmarksToNFrame(
-      homogeneousPoints_, simulatedTrajectory, trueCentralRowEpoch,
-      cameraSystemRef, framesInOut, &frameLandmarkIndices, &keypointIndices,
-      addImageNoise_ ? &imageNoiseMag_ : nullptr);
-
   int trackedFeatures = 0;
   if (estimator.numFrames() > 1) {
     // Find matches between a previous keyframe and current frame.
     std::vector<LandmarkKeypointMatch> landmarkKeyframeMatches;
     int numKeyframes = 0;
-    for (auto rit = nframeList_.rbegin(); rit != nframeList_.rend(); ++rit) {
-      if (rit->isKeyframe_) {
-        matchToFrame(rit->keypointIndices_, keypointIndices,
-                     rit->nframe_->id(), framesInOut->id(),
-                     &landmarkKeyframeMatches);
-        switch (distortionType) {
-        case okvis::cameras::NCameraSystem::RadialTangential: {
-          trackedFeatures += addMatchToEstimator<okvis::cameras::PinholeCamera<
-              okvis::cameras::RadialTangentialDistortion>>(
-              estimator, rit->nframe_, framesInOut, rit->pose_,
-              T_WS_ref, landmarkKeyframeMatches);
+    for (size_t age = 1; age < estimator.numFrames(); ++age) {
+      uint64_t olderFrameId = estimator.frameIdByAge(age);
+      if (!estimator.isKeyframe(olderFrameId))
+        continue;
+
+      auto rit = nframeList_.rbegin();
+      for (; rit != nframeList_.rend(); ++rit) {
+        if (rit->nframe_->id() == olderFrameId) {
+          OKVIS_ASSERT_TRUE(Exception, rit->isKeyframe_,
+                            "Inconsistent frontend and backend frame status!");
           break;
         }
-        case okvis::cameras::NCameraSystem::Equidistant: {
-          trackedFeatures += addMatchToEstimator<okvis::cameras::PinholeCamera<
-              okvis::cameras::EquidistantDistortion>>(
-              estimator, rit->nframe_, framesInOut, rit->pose_,
-              T_WS_ref, landmarkKeyframeMatches);
-          break;
-        }
-        case okvis::cameras::NCameraSystem::RadialTangential8: {
-          trackedFeatures += addMatchToEstimator<okvis::cameras::PinholeCamera<
-              okvis::cameras::RadialTangentialDistortion8>>(
-              estimator, rit->nframe_, framesInOut, rit->pose_,
-              T_WS_ref, landmarkKeyframeMatches);
-          break;
-        }
-        case okvis::cameras::NCameraSystem::FOV: {
-          trackedFeatures += addMatchToEstimator<
-              okvis::cameras::PinholeCamera<okvis::cameras::FovDistortion>>(
-              estimator, rit->nframe_, framesInOut, rit->pose_,
-              T_WS_ref, landmarkKeyframeMatches);
-          break;
-        }
-        default:
-          OKVIS_THROW(Exception, "Unsupported distortion type.")
-          break;
-        }
-        ++numKeyframes;
       }
-      if (numKeyframes >= kMaxMatchKeyframes) {
-        break;
-      }
-    }
-    // find matches between the previous frame and current frame.
-    auto lastNFrame = nframeList_.rbegin();
-    if (!lastNFrame->isKeyframe_) {
-      std::vector<LandmarkKeypointMatch> landmarkFrameMatches;
-      matchToFrame(lastNFrame->keypointIndices_, keypointIndices,
-                   lastNFrame->nframe_->id(), framesInOut->id(),
-                   &landmarkFrameMatches);
+      matchToFrame(rit->keypointIndices_, keypointIndices, rit->nframe_->id(),
+                   nframes->id(), &landmarkKeyframeMatches);
       switch (distortionType) {
       case okvis::cameras::NCameraSystem::RadialTangential: {
         trackedFeatures += addMatchToEstimator<okvis::cameras::PinholeCamera<
             okvis::cameras::RadialTangentialDistortion>>(
-            estimator, lastNFrame->nframe_, framesInOut, lastNFrame->pose_,
-            T_WS_ref, landmarkFrameMatches);
+            estimator, rit->nframe_, nframes, landmarkKeyframeMatches);
         break;
       }
       case okvis::cameras::NCameraSystem::Equidistant: {
         trackedFeatures += addMatchToEstimator<okvis::cameras::PinholeCamera<
             okvis::cameras::EquidistantDistortion>>(
-            estimator, lastNFrame->nframe_, framesInOut, lastNFrame->pose_,
-            T_WS_ref, landmarkFrameMatches);
+            estimator, rit->nframe_, nframes, landmarkKeyframeMatches);
         break;
       }
       case okvis::cameras::NCameraSystem::RadialTangential8: {
         trackedFeatures += addMatchToEstimator<okvis::cameras::PinholeCamera<
             okvis::cameras::RadialTangentialDistortion8>>(
-            estimator, lastNFrame->nframe_, framesInOut, lastNFrame->pose_,
-            T_WS_ref, landmarkFrameMatches);
+            estimator, rit->nframe_, nframes, landmarkKeyframeMatches);
         break;
       }
       case okvis::cameras::NCameraSystem::FOV: {
         trackedFeatures += addMatchToEstimator<
             okvis::cameras::PinholeCamera<okvis::cameras::FovDistortion>>(
-            estimator, lastNFrame->nframe_, framesInOut, lastNFrame->pose_,
-            T_WS_ref, landmarkFrameMatches);
+            estimator, rit->nframe_, nframes, landmarkKeyframeMatches);
+        break;
+      }
+      default:
+        OKVIS_THROW(Exception, "Unsupported distortion type.")
+        break;
+      }
+      ++numKeyframes;
+
+      if (numKeyframes >= kMaxMatchKeyframes) {
+        break;
+      }
+    }
+    // find matches between the previous frame and current frame.
+    uint64_t lastFrameId = estimator.frameIdByAge(1);
+    if (!estimator.isKeyframe(lastFrameId)) {
+      auto lastNFrame = nframeList_.rbegin();
+      OKVIS_ASSERT_EQ(Exception, lastNFrame->nframe_->id(), lastFrameId,
+                      "Inconsistent frontend and backend frame status!");
+
+      std::vector<LandmarkKeypointMatch> landmarkFrameMatches;
+      matchToFrame(lastNFrame->keypointIndices_, keypointIndices,
+                   lastNFrame->nframe_->id(), nframes->id(),
+                   &landmarkFrameMatches);
+      switch (distortionType) {
+      case okvis::cameras::NCameraSystem::RadialTangential: {
+        trackedFeatures += addMatchToEstimator<okvis::cameras::PinholeCamera<
+            okvis::cameras::RadialTangentialDistortion>>(
+            estimator, lastNFrame->nframe_, nframes, landmarkFrameMatches);
+        break;
+      }
+      case okvis::cameras::NCameraSystem::Equidistant: {
+        trackedFeatures += addMatchToEstimator<okvis::cameras::PinholeCamera<
+            okvis::cameras::EquidistantDistortion>>(
+            estimator, lastNFrame->nframe_, nframes, landmarkFrameMatches);
+        break;
+      }
+      case okvis::cameras::NCameraSystem::RadialTangential8: {
+        trackedFeatures += addMatchToEstimator<okvis::cameras::PinholeCamera<
+            okvis::cameras::RadialTangentialDistortion8>>(
+            estimator, lastNFrame->nframe_, nframes, landmarkFrameMatches);
+        break;
+      }
+      case okvis::cameras::NCameraSystem::FOV: {
+        trackedFeatures += addMatchToEstimator<
+            okvis::cameras::PinholeCamera<okvis::cameras::FovDistortion>>(
+            estimator, lastNFrame->nframe_, nframes, landmarkFrameMatches);
         break;
       }
       default:
@@ -334,35 +146,34 @@ int SimulationFrontend::dataAssociationAndInitialization(
     }
   }
 
-  *asKeyframe = *asKeyframe || doWeNeedANewKeyframe(estimator, framesInOut, T_WS_ref);
+  okvis::kinematics::Transformation current_T_WS;
+  estimator.get_T_WS(nframes->id(), current_T_WS);
+  *asKeyframe = *asKeyframe || doWeNeedANewKeyframe(estimator, nframes);
   if (*asKeyframe) {
-    previousKeyframePose_ = T_WS_ref;
+    previousKeyframePose_ = current_T_WS;
   }
-  nframeList_.emplace_back(framesInOut, T_WS_ref, keypointIndices, *asKeyframe);
-  if (nframeList_.size() > kMaxKeptFrames * 3 / 2) {
-    while (nframeList_.size() >= kMaxKeptFrames) {
-      nframeList_.pop_front();
-    }
+  nframeList_.emplace_back(nframes, current_T_WS, keypointIndices, *asKeyframe);
+  uint64_t oldestFrameId = estimator.oldestFrameId();
+  while (nframeList_.front().nframe_->id() < oldestFrameId) {
+    nframeList_.pop_front();
   }
 
   return trackedFeatures;
 }
 
-// Decision whether a new frame should be keyframe or not.
-// count the number of common landmarks in the current frame and the previous keyframe
 bool SimulationFrontend::doWeNeedANewKeyframe(
     const okvis::Estimator& estimator,
-    std::shared_ptr<okvis::MultiFrame> /*currentFrame*/,
-    const okvis::kinematics::Transformation& T_WS) const {
+    std::shared_ptr<okvis::MultiFrame> currentFrame) const {
   if (estimator.numFrames() < 2) {
-    // just starting, so yes, we need this as a new keyframe
     return true;
   }
 
   if (!isInitialized_)
     return false;
 
-  okvis::kinematics::Transformation T_SpSc = previousKeyframePose_.inverse() * T_WS;
+  okvis::kinematics::Transformation current_T_WS;
+  estimator.get_T_WS(currentFrame->id(), current_T_WS);
+  okvis::kinematics::Transformation T_SpSc = previousKeyframePose_.inverse() * current_T_WS;
   double distance = T_SpSc.r().norm();
   double rotAngle = std::acos(T_SpSc.q().w()) * 2;
   if (distance > kMinKeyframeDistance || rotAngle > kMinKeyframeAngle) {
@@ -383,8 +194,6 @@ template <class CAMERA_GEOMETRY_T>
 int SimulationFrontend::addMatchToEstimator(
     okvis::Estimator& estimator, std::shared_ptr<okvis::MultiFrame> prevFrames,
     std::shared_ptr<okvis::MultiFrame> currFrames,
-    const okvis::kinematics::Transformation& T_WSp_ref,
-    const okvis::kinematics::Transformation& T_WSc_ref,
     const std::vector<LandmarkKeypointMatch>& landmarkMatches) const {
   int trackedFeatures = 0;
   for (auto landmarkMatch : landmarkMatches) {
@@ -394,10 +203,10 @@ int SimulationFrontend::addMatchToEstimator(
     uint64_t lmIdCurrent =
         currFrames->landmarkId(landmarkMatch.currentKeypoint.cameraIndex,
                                landmarkMatch.currentKeypoint.keypointIndex);
-    if (lmIdPrevious != 0) {
+    if (lmIdPrevious != 0 && estimator.isLandmarkAdded(lmIdPrevious)) {
       if (lmIdCurrent != 0) { // avoid duplicates.
         if (lmIdPrevious != lmIdCurrent) {
-          LOG(INFO) << "Different landmarks " << lmIdPrevious << " and "
+          LOG(WARNING) << "Different landmarks " << lmIdPrevious << " and "
                     << lmIdCurrent << " are involved in a feature match!";
         }
         continue;
@@ -410,19 +219,21 @@ int SimulationFrontend::addMatchToEstimator(
         currFrames->setLandmarkId(landmarkMatch.currentKeypoint.cameraIndex,
                                   landmarkMatch.currentKeypoint.keypointIndex,
                                   lmIdPrevious);
-
         estimator.addObservation<CAMERA_GEOMETRY_T>(
             lmIdPrevious, currFrames->id(),
             landmarkMatch.currentKeypoint.cameraIndex,
             landmarkMatch.currentKeypoint.keypointIndex);
         ++trackedFeatures;
-      } // else do nothing
-    } else { // The observations are not associated to any landmark.
+      } // else pass
+    } else {
+      // This happens when either both observations are not associated to any landmark yet, or
+      // a landmark added earlier has been marginalized from the estimator but
+      // its observations in the multiframe is not nullified yet.
       okvis::KeypointIdentifier IdA = landmarkMatch.previousKeypoint;
       okvis::KeypointIdentifier IdB = landmarkMatch.currentKeypoint;
 
-      okvis::kinematics::Transformation T_WSa = T_WSp_ref;
-      okvis::kinematics::Transformation T_WSb = T_WSc_ref;
+      okvis::kinematics::Transformation T_WSa;
+      okvis::kinematics::Transformation T_WSb;
       // Use estimated values rather than reference ones to triangulate the landmark.
       estimator.get_T_WS(IdA.frameId, T_WSa);
       estimator.get_T_WS(IdB.frameId, T_WSb);
@@ -482,7 +293,7 @@ int SimulationFrontend::addMatchToEstimator(
             landmarkMatch.landmarkId, IdB.frameId, IdB.cameraIndex,
             IdB.keypointIndex);
         trackedFeatures += 2;
-      } // else do nothing
+      } // else pass
     }
   }
   return trackedFeatures;

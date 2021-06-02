@@ -203,13 +203,16 @@ LIST(APPEND SOURCEFILES
     src/swift_vio/VioFactoryMethods.cpp
     src/swift_vio/triangulate.cpp
 
+    include/simul/SimParameters.h
     src/simul/CameraSystemCreator.cpp
     src/simul/curves.cpp
     src/simul/ImuNoiseSimulator.cpp
+    src/simul/LandmarkGrid.cpp
     src/simul/numeric_ceres_residual_Jacobian.cpp
     src/simul/PointLandmarkSimulationRS.cpp
+    src/simul/SimDataInterface.cpp
     src/simul/SimulationFrontend.cpp
-    src/simul/VioTestSystemBuilder.cpp
+    src/simul/VioSimTestSystem.cpp
 )
 
 if(GTSAM_FOUND)

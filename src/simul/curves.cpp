@@ -67,13 +67,21 @@ Eigen::Vector3d CircularSinusoidalTrajectory::computeLocalAngularVelocity(
 }
 
 void CircularSinusoidalTrajectory::getTruePoses(
-    const okvis::Time tStart, const okvis::Time tEnd,
-    std::vector<okvis::kinematics::Transformation>& vT_WB) {
-  okvis::Time time = tStart;
+    const std::vector<okvis::Time> &times,
+    Eigen::AlignedVector<okvis::kinematics::Transformation> &vT_WB) {
   vT_WB.clear();
-  vT_WB.reserve((int)((tEnd - tStart).toSec() * freq + 1));
-  for (; time < tEnd; time += okvis::Duration(interval)) {
+  vT_WB.reserve(times.size());
+  for (auto time : times) {
     vT_WB.push_back(computeGlobalPose(time));
+  }
+}
+
+void CircularSinusoidalTrajectory::getTrueVelocities(const std::vector<okvis::Time> &times,
+                                                     Eigen::AlignedVector<Eigen::Vector3d> &velocities) {
+  velocities.clear();
+  velocities.reserve(times.size());
+  for (auto time : times) {
+    velocities.push_back(computeGlobalLinearVelocity(time));
   }
 }
 

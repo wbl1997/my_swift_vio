@@ -723,7 +723,7 @@ bool SlidingWindowSmoother::applyMarginalizationStrategy(okvis::MapPointVector& 
                   .at(okvis::Estimator::CameraSensorStates::T_SCi)
                   .id);
           // The associated residual will be removed by ceres solver.
-        }  // else do nothing
+        }  // else pass
       } else {
         break;
       }
@@ -1370,11 +1370,11 @@ void SlidingWindowSmoother::optimize(size_t /*numIter*/, size_t /*numThreads*/,
               it->first, &hpW, focalLength, FLAGS_ray_sigma_scalar);
           if (triangulateOk) {
             addLandmarkToGraph(it->first, hpW);
-          }  // else do nothing
+          }  // else pass
         } else {
           addLandmarkSmartFactorToGraph(it->first);
         }
-      }  // else do nothing
+      }  // else pass
     } else {  // The landmark has been added to the graph.
       if (observedInCurrentFrame) {
         if (backendParams_.backendModality_ == BackendModality::PROJECTION) {
@@ -1382,7 +1382,7 @@ void SlidingWindowSmoother::optimize(size_t /*numIter*/, size_t /*numThreads*/,
         } else {
           updateLandmarkSmartFactorInGraph(it->first);
         }
-      }  // else do nothing
+      }  // else pass
     }
   }
   addLandmarkFactorsTimer.stop();

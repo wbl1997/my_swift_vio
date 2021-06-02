@@ -33,9 +33,9 @@ class RiProjectionFactorIDPTest : public ::testing::Test {
                                    projOptModelName, extrinsicModelName, td,
                                    tr);
     // reference camera system
-    std::shared_ptr<okvis::cameras::CameraBase> cameraGeometryRef;
     std::shared_ptr<okvis::cameras::NCameraSystem> cameraSystemRef;
-    csc.createNominalCameraSystem(&cameraGeometryRef, &cameraSystemRef);
+    std::shared_ptr<okvis::cameras::CameraBase> cameraGeometryRef =
+        csc.createNominalCameraSystem(&cameraSystemRef);
 
     // camera extrinsics
     okvis::kinematics::Transformation T_BC = *cameraSystemRef->T_SC(0u);

@@ -4,7 +4,7 @@
 #include <vio/eigen_utils.h>
 
 #include <io_wrap/StreamHelper.hpp>
-#include <simul/VioTestSystemBuilder.hpp>
+#include <simul/VioSimTestSystem.hpp>
 
 
 namespace {
@@ -17,8 +17,8 @@ void computeNavErrors(
   uint64_t currFrameId = estimator->currentFrameId();
   estimator->get_T_WS(currFrameId, T_WS_est);
   Eigen::Vector3d delta = T_WS.r() - T_WS_est.r();
-  Eigen::Vector3d alpha = vio::unskew3d(T_WS.C() * T_WS_est.C().transpose() -
-                                        Eigen::Matrix3d::Identity());
+  Eigen::Matrix3d dR = T_WS.C() * T_WS_est.C().transpose();
+  Eigen::Vector3d alpha = okvis::kinematics::vee(dR);
   Eigen::Matrix<double, 6, 1> deltaPose;
   deltaPose << delta, alpha;
 
@@ -116,139 +116,68 @@ int examineLandmarkMeasurementJacobian(
   return jacOk;
 }
 
-} // namespace
-
 enum class EstimatorCheck {
   FEATURE_TRACK_JACOBIAN=0,
   FEATURE_MEASUREMENT_JACOBIAN,
   NAVSTATE_COVARIANCE,
 };
 
+void checkMSE(const Eigen::VectorXd & /*mse*/,
+              const Eigen::VectorXd & /*desiredStdevs*/,
+              const std::vector<std::string> & /*dimensionLabels*/) {}
+
+void checkNEES(const Eigen::Vector3d & /*nees*/) {}
+
+}  // namespace
+
 class EstimatorTest {
 public:
   EstimatorTest(std::string _projOptModelName, std::string _extrinsicModelName,
-                std::string _outputFile, double _timeOffset, double _readoutTime,
-                int _cameraObservationModelId = 0, int _landmarkModelId = 0) :
-    projOptModelName(_projOptModelName),
-    extrinsicModelName(_extrinsicModelName), outputFile(_outputFile),
-    timeOffset(_timeOffset), readoutTime(_readoutTime),
-    cameraObservationModelId(_cameraObservationModelId), landmarkModelId(_landmarkModelId) {
-
-  }
+                std::string _outputFile, double _timeOffset,
+                double _readoutTime, int _cameraObservationModelId = 0,
+                int _landmarkModelId = 0)
+      : projOptModelName(_projOptModelName),
+        extrinsicModelName(_extrinsicModelName),
+        outputFile(_outputFile),
+        timeOffset(_timeOffset),
+        readoutTime(_readoutTime),
+        cameraObservationModelId(_cameraObservationModelId),
+        landmarkModelId(_landmarkModelId), simSystem(checkMSE, checkNEES) {}
 
   void SetUp() {
-    testSetting = simul::TestSetting(
-        true, noisyInitialSpeedAndBiases, false, true, true, noise_factor,
-        noise_factor, algorithm, useEpipolarConstraint,
-        cameraObservationModelId, landmarkModelId, cameraModelId,
-        cameraOrientationId, simul::LandmarkGridType::FourWalls,
-        landmarkRadius);
-    vioSystemBuilder.createVioSystem(testSetting, backendParams, trajectoryType,
-                                     projOptModelName, extrinsicModelName,
-                                     timeOffset, readoutTime, "", "");
+    bool addImuNoise = true;
+    bool noisyInitialSpeedAndBiases = true;
+    bool useEpipolarConstraint = false;
+    double noise_factor = 1.0;
+    simul::SimCameraModelType cameraModelId = simul::SimCameraModelType::EUROC;
+    simul::CameraOrientation cameraOrientationId =
+        simul::CameraOrientation::Forward;
+    double landmarkRadius = 5;
+    swift_vio::BackendParams backendParams;
 
-    times = vioSystemBuilder.sampleTimes();
+    swift_vio::EstimatorAlgorithm algorithm = swift_vio::EstimatorAlgorithm::MSCKF;
 
-    trueBiases = vioSystemBuilder.trueBiases();
-    ref_T_WS_list = vioSystemBuilder.ref_T_WS_list();
-    imuMeasurements = vioSystemBuilder.imuMeasurements();
-    estimator = vioSystemBuilder.mutableEstimator();
-
-    frontend = vioSystemBuilder.mutableFrontend();
-    cameraSystem0 = vioSystemBuilder.trueCameraSystem();
-    cameraGeometry0 = cameraSystem0->cameraGeometry(0);
-
-    if (!debugStream.is_open()) {
-      debugStream.open(outputFile, std::ofstream::out);
-      std::string headerLine = estimator->headerLine();
-      debugStream << headerLine << std::endl;
-    }
+    simul::SimImuParameters imuParams(
+        "Torus", addImuNoise, noisyInitialSpeedAndBiases,
+        false, true,
+        noise_factor, noise_factor);
+    simul::SimVisionParameters visionParams(
+        true, true, cameraModelId,
+        cameraOrientationId, "FXY_CXY", "P_CB",
+        true, timeOffset,
+        readoutTime, false,
+        simul::LandmarkGridType::FourWalls, landmarkRadius);
+    simul::SimEstimatorParameters estimatorParams(
+        "MSCKF", algorithm, 1,
+        cameraObservationModelId, landmarkModelId, useEpipolarConstraint);
+    testSetting = simul::TestSetting(imuParams, visionParams,
+                                   estimatorParams, backendParams, "");
   }
 
   void Run(EstimatorCheck checkCase) {
-    std::vector<uint64_t> multiFrameIds;
-    size_t poseIndex = 0u;
-    bool hasStarted = false;
-    int frameCount = -1;                // number of frames used in estimator
-    int trackedFeatures = 0;            // feature tracks observed in a frame
-    const int cameraIntervalRatio = 10; // number imu meas for 1 camera frame
-
-    Eigen::VectorXd navError(9);
-    okvis::Time lastKFTime = times.front();
-    okvis::ImuMeasurementDeque::const_iterator trueBiasIter = trueBiases.begin();
-    for (auto iter = times.begin(), iterEnd = times.end(); iter != iterEnd;
-         iter += cameraIntervalRatio, poseIndex += cameraIntervalRatio,
-              trueBiasIter += cameraIntervalRatio) {
-      okvis::kinematics::Transformation T_WS(ref_T_WS_list[poseIndex]);
-      // assemble a multi-frame
-      std::shared_ptr<okvis::MultiFrame> mf(new okvis::MultiFrame);
-      uint64_t id = okvis::IdProvider::instance().newId();
-      mf->setId(id);
-      okvis::Time frameStamp = *iter - okvis::Duration(timeOffset);
-      mf->setTimestamp(frameStamp);
-
-      // The reference cameraSystem will be used for triangulating landmarks in
-      // the frontend which provides observations to the estimator.
-      mf->resetCameraSystemAndFrames(*cameraSystem0);
-      mf->setTimestamp(0u, frameStamp);
-
-      // reference ID will be and stay the first frame added.
-      multiFrameIds.push_back(id);
-
-      okvis::Time currentKFTime = *iter;
-      okvis::Time imuDataEndTime = currentKFTime + okvis::Duration(1);
-      okvis::Time imuDataBeginTime = lastKFTime - okvis::Duration(1);
-      okvis::ImuMeasurementDeque imuSegment = swift_vio::getImuMeasurements(
-          imuDataBeginTime, imuDataEndTime, imuMeasurements, nullptr);
-      bool asKeyframe = true;
-      // add it in the window to create a new time instance
-      if (!hasStarted) {
-        hasStarted = true;
-        frameCount = 0;
-        estimator->setInitialNavState(vioSystemBuilder.initialNavState());
-        estimator->addStates(mf, imuSegment, asKeyframe);
-      } else {
-        estimator->addStates(mf, imuSegment, asKeyframe);
-        ++frameCount;
-      }
-
-      // add landmark observations
-      trackedFeatures = 0;
-      if (testSetting.useImageObservs) {
-        trackedFeatures = frontend->dataAssociationAndInitialization(
-            *estimator, vioSystemBuilder.sinusoidalTrajectory(), *iter,
-            cameraSystem0, mf, &asKeyframe);
-        estimator->setKeyframe(mf->id(), asKeyframe);
-      }
-
-      examineCase(checkCase, frameCount);
-
-      size_t maxIterations = 10u;
-      size_t numThreads = 2u;
-      estimator->optimize(maxIterations, numThreads, false);
-
-      okvis::MapPointVector removedLandmarks;
-      estimator->applyMarginalizationStrategy(removedLandmarks);
-      estimator->printStatesAndStdevs(debugStream);
-      debugStream << std::endl;
-
-      Eigen::Vector3d v_WS_true =
-          vioSystemBuilder.sinusoidalTrajectory()->computeGlobalLinearVelocity(
-              *iter);
-
-      computeNavErrors(estimator.get(), T_WS, v_WS_true, &navError);
-
-      lastKFTime = currentKFTime;
-    } // every keyframe
-
-    LOG(INFO) << "Finishes with last added frame " << frameCount
-              << " of tracked features " << trackedFeatures;
-    EXPECT_LT(navError.head<3>().lpNorm<Eigen::Infinity>(), 0.5)
-        << "Final position error";
-    EXPECT_LT(navError.segment<3>(3).lpNorm<Eigen::Infinity>(), 0.2)
-        << "Final orientation error";
-    EXPECT_LT(navError.tail<3>().lpNorm<Eigen::Infinity>(), 0.2)
-        << "Final velocity error";
+    // TODO(jhuai): loop through the optimization and callback the health check.
+    int frameCount = 100;
+    examineCase(checkCase, frameCount);
   }
 
   void examineCase(EstimatorCheck checkCase, int frameCount) {
@@ -360,36 +289,28 @@ public:
   // input arguments
   std::string projOptModelName;
   std::string extrinsicModelName;
+
   std::string outputFile;
+
   double timeOffset;
   double readoutTime;
-  int cameraObservationModelId = 0;
-  int landmarkModelId = 0;
+
+  int cameraObservationModelId;
+  int landmarkModelId;
   swift_vio::EstimatorAlgorithm algorithm = swift_vio::EstimatorAlgorithm::MSCKF;
 
 private:
-
   // internal default system parameters
-  simul::VioTestSystemBuilder vioSystemBuilder;
-  bool noisyInitialSpeedAndBiases = true;
-  bool useEpipolarConstraint = false;
-  double noise_factor = 1.0;
-  simul::SimCameraModelType cameraModelId = simul::SimCameraModelType::EUROC;
-  simul::CameraOrientation cameraOrientationId =
-      simul::CameraOrientation::Forward;
-  double landmarkRadius = 5;
-  simul::TestSetting testSetting;
-  simul::SimulatedTrajectoryType trajectoryType =
-      simul::SimulatedTrajectoryType::Torus;
-  swift_vio::BackendParams backendParams;
+  simul::VioSimTestSystem simSystem;
 
+  simul::TestSetting testSetting;
 
   std::ofstream debugStream; // record state history of a trial
   std::shared_ptr<okvis::Estimator> estimator;
   std::vector<okvis::Time> times;
   okvis::ImuMeasurementDeque imuMeasurements;
   okvis::ImuMeasurementDeque trueBiases;
-  std::vector<okvis::kinematics::Transformation> ref_T_WS_list;
+  Eigen::AlignedVector<okvis::kinematics::Transformation> ref_T_WS_list;
 
   std::shared_ptr<simul::SimulationFrontend> frontend;
   std::shared_ptr<const okvis::cameras::NCameraSystem> cameraSystem0;

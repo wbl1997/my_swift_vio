@@ -36,7 +36,6 @@
 using namespace okvis;
 
 namespace swift_vio {
-// Constructor.
 HybridFrontend::HybridFrontend(size_t numCameras, const FrontendOptions& frontendOptions)
     : okvis::Frontend(numCameras, frontendOptions) {
 
@@ -49,7 +48,7 @@ bool HybridFrontend::dataAssociationAndInitialization(
     const okvis::VioParameters& params,
     // TODO(sleutenegger): why is this not used here?
     const std::shared_ptr<okvis::MapPointVector> /*map*/,
-    std::shared_ptr<okvis::MultiFrame> framesInOut,
+    std::shared_ptr<okvis::MultiFrame> nframes,
     bool* asKeyframe) {
   // match new keypoints to existing landmarks/keypoints
   // initialise new landmarks (states)
@@ -77,7 +76,7 @@ bool HybridFrontend::dataAssociationAndInitialization(
         num3dMatches = matchToLastFrameKLT<
             okvis::cameras::PinholeCamera<
                 okvis::cameras::RadialTangentialDistortion> >(
-            estimator, params, framesInOut,
+            estimator, params, nframes,
             rotationOnly, false);
         break;
       }
@@ -85,7 +84,7 @@ bool HybridFrontend::dataAssociationAndInitialization(
         num3dMatches = matchToLastFrameKLT<
             okvis::cameras::PinholeCamera<
                 okvis::cameras::EquidistantDistortion> >(
-            estimator, params, framesInOut,
+            estimator, params, nframes,
             rotationOnly, false);
         break;
       }
@@ -93,7 +92,7 @@ bool HybridFrontend::dataAssociationAndInitialization(
         num3dMatches = matchToLastFrameKLT<
             okvis::cameras::PinholeCamera<
                 okvis::cameras::RadialTangentialDistortion8> >(
-            estimator, params, framesInOut,
+            estimator, params, nframes,
             rotationOnly, false);
 
         break;
@@ -102,7 +101,7 @@ bool HybridFrontend::dataAssociationAndInitialization(
         num3dMatches = matchToLastFrameKLT<
             okvis::cameras::PinholeCamera<
                 okvis::cameras::FovDistortion> >(
-            estimator, params, framesInOut,
+            estimator, params, nframes,
             rotationOnly, false);
         break;
       }
@@ -122,7 +121,7 @@ bool HybridFrontend::dataAssociationAndInitialization(
       LOG(WARNING) << "Tracking last frame failure. Number of 3d2d-matches: " << num3dMatches;
     }
     if (estimator.numFrames() > 1) {
-      uint64_t currentFrameId = framesInOut->id();
+      uint64_t currentFrameId = nframes->id();
       uint64_t lastKeyframeId = estimator.currentKeyframeId();
       bool removeOutliers = false;
       checkMotionByRansac2d2d(estimator, params, currentFrameId, lastKeyframeId,
@@ -148,7 +147,7 @@ bool HybridFrontend::dataAssociationAndInitialization(
             VioKeyframeWindowMatchingAlgorithm<
                 okvis::cameras::PinholeCamera<
                     okvis::cameras::RadialTangentialDistortion> > >(
-            estimator, params, framesInOut->id(), rotationOnly, false,
+            estimator, params, nframes->id(), rotationOnly, false,
             &uncertainMatchFraction);
         break;
       }
@@ -157,7 +156,7 @@ bool HybridFrontend::dataAssociationAndInitialization(
             VioKeyframeWindowMatchingAlgorithm<
                 okvis::cameras::PinholeCamera<
                     okvis::cameras::EquidistantDistortion> > >(
-            estimator, params, framesInOut->id(), rotationOnly, false,
+            estimator, params, nframes->id(), rotationOnly, false,
             &uncertainMatchFraction);
         break;
       }
@@ -166,7 +165,7 @@ bool HybridFrontend::dataAssociationAndInitialization(
             VioKeyframeWindowMatchingAlgorithm<
                 okvis::cameras::PinholeCamera<
                     okvis::cameras::RadialTangentialDistortion8> > >(
-            estimator, params, framesInOut->id(), rotationOnly, false,
+            estimator, params, nframes->id(), rotationOnly, false,
             &uncertainMatchFraction);
         break;
       }
@@ -175,7 +174,7 @@ bool HybridFrontend::dataAssociationAndInitialization(
             VioKeyframeWindowMatchingAlgorithm<
                 okvis::cameras::PinholeCamera<
                     okvis::cameras::FovDistortion> > >(
-            estimator, params, framesInOut->id(), rotationOnly, false,
+            estimator, params, nframes->id(), rotationOnly, false,
             &uncertainMatchFraction);
         break;
       }
@@ -196,7 +195,7 @@ bool HybridFrontend::dataAssociationAndInitialization(
     }
 
     // keyframe decision, at the moment only landmarks that match with keyframe are initialised
-    *asKeyframe = *asKeyframe || doWeNeedANewKeyframe(estimator, framesInOut);
+    *asKeyframe = *asKeyframe || doWeNeedANewKeyframe(estimator, nframes);
     }
     // match to last frame
     TimerSwitchable matchToLastFrameTimer("2.4.2 matchToLastFrame");
@@ -205,7 +204,7 @@ bool HybridFrontend::dataAssociationAndInitialization(
         num3dMatches = matchToLastFrame<
             VioKeyframeWindowMatchingAlgorithm<okvis::cameras::PinholeCamera<
                 okvis::cameras::RadialTangentialDistortion> > >(
-            estimator, params, framesInOut->id(),
+            estimator, params, nframes->id(),
             rotationOnly, false);
         break;
       }
@@ -213,7 +212,7 @@ bool HybridFrontend::dataAssociationAndInitialization(
         num3dMatches = matchToLastFrame<
             VioKeyframeWindowMatchingAlgorithm<okvis::cameras::PinholeCamera<
                 okvis::cameras::EquidistantDistortion> > >(
-            estimator, params, framesInOut->id(),
+            estimator, params, nframes->id(),
             rotationOnly, false);
         break;
       }
@@ -221,7 +220,7 @@ bool HybridFrontend::dataAssociationAndInitialization(
         num3dMatches = matchToLastFrame<
             VioKeyframeWindowMatchingAlgorithm<okvis::cameras::PinholeCamera<
                 okvis::cameras::RadialTangentialDistortion8> > >(
-            estimator, params, framesInOut->id(),
+            estimator, params, nframes->id(),
             rotationOnly, false);
 
         break;
@@ -230,7 +229,7 @@ bool HybridFrontend::dataAssociationAndInitialization(
         num3dMatches = matchToLastFrame<
             VioKeyframeWindowMatchingAlgorithm<okvis::cameras::PinholeCamera<
                 okvis::cameras::FovDistortion> > >(
-            estimator, params, framesInOut->id(),
+            estimator, params, nframes->id(),
             rotationOnly, false);
         break;
       }
@@ -251,16 +250,16 @@ bool HybridFrontend::dataAssociationAndInitialization(
       }
       // At the moment, landmarks that match with last frame are initialised so
       // checking overlap and matching ratio will not work as well as checking relative motion.
-      *asKeyframe = *asKeyframe || doWeNeedANewKeyframePosterior(estimator, framesInOut);
+      *asKeyframe = *asKeyframe || doWeNeedANewKeyframePosterior(estimator, nframes);
     }
   } else
     *asKeyframe = true;  // first frame needs to be keyframe
 
   // do stereo match to get new landmarks
   if (frontendOptions_.stereoMatchWithEpipolarCheck) {
-    matchStereoWithEpipolarCheckSwitch(distortionType, estimator, framesInOut);
+    matchStereoWithEpipolarCheckSwitch(distortionType, estimator, nframes);
   } else {
-    matchStereoSwitch(distortionType, estimator, framesInOut);
+    matchStereoSwitch(distortionType, estimator, nframes);
   }
 
   return true;
@@ -313,17 +312,17 @@ template <class CAMERA_GEOMETRY_T>
 int HybridFrontend::matchToLastFrameKLT(
     okvis::Estimator& estimator,
     const okvis::VioParameters& /*params*/,
-    std::shared_ptr<okvis::MultiFrame> framesInOut,
+    std::shared_ptr<okvis::MultiFrame> nframes,
     bool& rotationOnly,
     bool /*usePoseUncertainty*/, bool /*removeOutliers*/) {
   int retCtr = 0;
   rotationOnly = false;
 
   if (estimator.numFrames() == 1) {
-    loadParameters<CAMERA_GEOMETRY_T>(framesInOut, estimator, &featureTracker_);
+    loadParameters<CAMERA_GEOMETRY_T>(nframes, estimator, &featureTracker_);
     featureTracker_.initialize();
   } else {
-    uint64_t fIdB = framesInOut->id();
+    uint64_t fIdB = nframes->id();
     okvis::kinematics::Transformation T_WSb;
     estimator.get_T_WS(fIdB, T_WSb);
 
@@ -332,7 +331,7 @@ int HybridFrontend::matchToLastFrameKLT(
     estimator.get_T_WS(fIdA, T_WSa);
 
     std::vector<cv::Matx33f> R_CkCkm1_list;
-    for (size_t camId = 0; camId < framesInOut->numFrames(); ++camId) {
+    for (size_t camId = 0; camId < nframes->numFrames(); ++camId) {
       okvis::kinematics::Transformation T_SC;
       estimator.getCameraSensorExtrinsics(fIdA, camId, T_SC);
       Eigen::Quaterniond q_CkCkm1 =
@@ -346,11 +345,11 @@ int HybridFrontend::matchToLastFrameKLT(
   }
 
   featureTracker_.stereoCallback(
-      framesInOut->image(0),
-      framesInOut->numFrames() > 1 ?
-          framesInOut->image(1) :
+      nframes->image(0),
+      nframes->numFrames() > 1 ?
+          nframes->image(1) :
           cv::Mat(),
-      feature_tracker::MessageHeader{framesInOut->timestamp()});
+      feature_tracker::MessageHeader{nframes->timestamp()});
 
 //  featureTracker_.drawFeaturesMono();
 
@@ -363,15 +362,12 @@ int HybridFrontend::matchToLastFrameKLT(
 
   featureTracker_.prepareForNextFrame(); // clear many things for next frame
 
-  for (size_t im = 0; im < framesInOut->numFrames(); ++im) {
-    framesInOut->resetKeypoints(im, curr_keypoints[im]);
+  for (size_t im = 0; im < nframes->numFrames(); ++im) {
+    nframes->resetKeypoints(im, curr_keypoints[im]);
   }
 
   addConstraintToEstimator<CAMERA_GEOMETRY_T>(
-      curr_ids, framesInOut, estimator);
-
-  // TODO(jhuai): check relative motion type
-
+      curr_ids, nframes, estimator);
   return retCtr;
 }
 

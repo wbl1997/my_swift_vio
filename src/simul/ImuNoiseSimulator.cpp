@@ -79,7 +79,8 @@ void initImuNoiseParams(
   }
 }
 
-void addNoiseToImuReadings(const okvis::ImuParameters& imuParameters,
+void
+addNoiseToImuReadings(const okvis::ImuParameters& imuParameters,
                            okvis::ImuMeasurementDeque* imuMeasurements,
                            okvis::ImuMeasurementDeque* trueBiases,
                            double gyroAccelNoiseFactor,

@@ -53,9 +53,9 @@ TEST(EpipolarFactor, Jacobians) {
   cst->getTrueInertialMeasurements(twoTimes[0] - okvis::Duration(1),
                                    twoTimes[1] + okvis::Duration(1),
                                    imuMeasurements);
-  std::vector<okvis::kinematics::Transformation> two_T_WS = {
+  Eigen::AlignedVector<okvis::kinematics::Transformation> two_T_WS = {
       cst->computeGlobalPose(twoTimes[0]), cst->computeGlobalPose(twoTimes[1])};
-  std::vector<Eigen::Vector3d> two_vW = {
+  Eigen::AlignedVector<Eigen::Vector3d> two_vW = {
       cst->computeGlobalLinearVelocity(twoTimes[0]),
       cst->computeGlobalLinearVelocity(twoTimes[1])};
 
@@ -65,14 +65,13 @@ TEST(EpipolarFactor, Jacobians) {
   simul::SimCameraModelType cameraModelId = simul::SimCameraModelType::EUROC;
   simul::CameraOrientation cameraOrientationId = simul::CameraOrientation::Forward;
   simul::CameraSystemCreator csc(cameraModelId, cameraOrientationId,
-                                 projOptModelName, extrinsicModelName, 0.0,
+                                 projOptModelName, extrinsicModelName, vio::gauss_rand(0, sigma_td),
                                  0.0);
 
   // reference camera system
-  std::shared_ptr<okvis::cameras::CameraBase> cameraGeometry0;
+
   std::shared_ptr<okvis::cameras::NCameraSystem> cameraSystem0;
-  csc.createNominalCameraSystem(&cameraGeometry0, &cameraSystem0);
-  cameraGeometry0->setImageDelay(vio::gauss_rand(0, sigma_td));
+  std::shared_ptr<okvis::cameras::CameraBase> cameraGeometry0 = csc.createNominalCameraSystem(&cameraSystem0);
 
   // create the camera visible landmarks, compute their observations in two
   // views

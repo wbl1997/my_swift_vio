@@ -91,21 +91,21 @@ void loadParameters(const std::shared_ptr<okvis::MultiFrame> multiframe,
 template <class CAMERA_GEOMETRY_T>
 int addConstraintToEstimator(
     const std::vector<feature_tracker::FeatureIDType>& curr_ids,
-    std::shared_ptr<okvis::MultiFrame> framesInOut,
+    std::shared_ptr<okvis::MultiFrame> nframes,
     okvis::Estimator& estimator) {
-  uint64_t fIdB = framesInOut->id();
+  uint64_t fIdB = nframes->id();
   okvis::kinematics::Transformation T_WSb;
   // T_WS is available because addStates precedes dataAssociationAndInitialization
   estimator.get_T_WS(fIdB, T_WSb);
   const double fourthRoot2 = 1.1892071150; // sqrt(sqrt(2))
-  for (size_t im = 0; im < framesInOut->numFrames(); ++im) {
+  for (size_t im = 0; im < nframes->numFrames(); ++im) {
     int keypointIndex = 0;
     okvis::kinematics::Transformation T_SbCb;
     estimator.getCameraSensorExtrinsics(fIdB, im, T_SbCb);
 
     for (auto lmId : curr_ids) {
       bool added = estimator.isLandmarkAdded(lmId);
-      framesInOut->setLandmarkId(im, keypointIndex, lmId);
+      nframes->setLandmarkId(im, keypointIndex, lmId);
       if (added) {
         bool initialized = estimator.isLandmarkInitialized(lmId);
         if (!initialized) {
@@ -122,7 +122,7 @@ int addConstraintToEstimator(
           okvis::kinematics::Transformation T_CaCb = T_WCa.inverse() * (T_WSb * T_SbCb);
 
           okvis::MultiFramePtr frameA = estimator.multiFrame(IdA.frameId);
-          okvis::MultiFramePtr frameB = framesInOut;
+          okvis::MultiFramePtr frameB = nframes;
           okvis::triangulation::ProbabilisticStereoTriangulator<
               CAMERA_GEOMETRY_T>
               probabilisticStereoTriangulator(frameA, frameB, IdA.cameraIndex,

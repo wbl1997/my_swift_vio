@@ -1,9 +1,6 @@
 #ifndef SIMUL_CURVE_H_
 #define SIMUL_CURVE_H_
 
-#include "okvis/ImuMeasurements.hpp"
-#include "okvis/kinematics/Transformation.hpp"
-
 #include <Eigen/Core>
 #include <Eigen/Dense>
 #include <Eigen/StdVector>
@@ -12,6 +9,11 @@
 #include <iostream>
 #include <map>
 #include <vector>
+
+#include "okvis/ImuMeasurements.hpp"
+#include "okvis/kinematics/Transformation.hpp"
+
+#include <swift_vio/memory.h>
 
 namespace simul {
 typedef std::vector<okvis::ImuMeasurement,
@@ -90,8 +92,12 @@ class CircularSinusoidalTrajectory {
    */
   Eigen::Vector3d computeLocalAngularVelocity(const okvis::Time time) const;
 
-  void getTruePoses(const okvis::Time tStart, const okvis::Time tEnd,
-                    std::vector<okvis::kinematics::Transformation> &vT_WB);
+  void
+  getTruePoses(const std::vector<okvis::Time> &times,
+               Eigen::AlignedVector<okvis::kinematics::Transformation> &vT_WB);
+
+  void getTrueVelocities(const std::vector<okvis::Time> &times,
+                         Eigen::AlignedVector<Eigen::Vector3d> &velocities);
 
   void getSampleTimes(const okvis::Time tStart, const okvis::Time tEnd,
                       std::vector<okvis::Time> &vTime);

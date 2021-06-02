@@ -177,27 +177,23 @@ public:
    * @param T_WS The pose.
    * @param speedAndBiases The speeds and IMU biases.
    * @param omega_S Rotation speed of the sensor frame.
-   * @param extrinsics Camera extrinsic parameters in terms of T_BC's optimized coeffs.
    * @param vTgsa Augmented imu parameters except for biases.
-   * @param cameraParams projection intrinsics, distortion, time offset and frame readout time.
+   * @param cameraParams optimized extrinsics, projection intrinsics, distortion, time offset and frame readout time for cameras.
    * @param stateStd std. dev. of the states including nav states, imu parameters,
    *     camera extrinsic parameters, and camera intrinsic parameters and
    *     time offset and frame readout time.
    * @param T_BC_list Camera extrinsic in terms of T_BC.
    */
   virtual void csvSaveFullStateWithAllCalibrationAsCallback(
-      const okvis::Time & t,
+      const okvis::Time & t, int frameIdInSource,
       const okvis::kinematics::Transformation & T_WS,
       const Eigen::Matrix<double, 9, 1> & speedAndBiases,
       const Eigen::Matrix<double, 3, 1> & omega_S,
-      const int frameIdInSource,
-      const std::vector<Eigen::VectorXd,
-          Eigen::aligned_allocator<Eigen::VectorXd>> & extrinsics,
       const Eigen::Matrix<double, Eigen::Dynamic, 1>& vTgsa,
-      const Eigen::Matrix<double, Eigen::Dynamic, 1>& cameraParams,
+      const std::vector<Eigen::VectorXd, Eigen::aligned_allocator<Eigen::VectorXd>>& cameraParams,
       const Eigen::Matrix<double, Eigen::Dynamic, 1>& stateStd,
       const std::vector<okvis::kinematics::Transformation,
-          Eigen::aligned_allocator<okvis::kinematics::Transformation> > & T_BC_list);
+          Eigen::aligned_allocator<okvis::kinematics::Transformation> >& T_BC_list);
 
   /**
    * @brief Set and write landmarks to file.
@@ -383,27 +379,23 @@ class Publisher : public StreamPublisher
    * @param T_WS The pose.
    * @param speedAndBiases The speeds and IMU biases.
    * @param omega_S Rotation speed of the sensor frame.
-   * @param extrinsics Camera extrinsic parameters in terms of T_BC's optimized coeffs.
    * @param vTgsa Augmented imu parameters except for biases.
-   * @param cameraParams projection intrinsics, distortion, time offset and frame readout time.
+   * @param cameraParams optimized extrinsics, projection intrinsics, distortion, time offset and frame readout time of cameras.
    * @param stateStd std. dev. of the states including nav states, imu parameters,
    *     camera extrinsic parameters, and camera intrinsic parameters and 
    *     time offset and frame readout time.
    * @param T_BC_list Camera extrinsic in terms of T_BC.
    */
   void csvSaveFullStateWithAllCalibrationAsCallback(
-      const okvis::Time & t,
+      const okvis::Time & t, int frameIdInSource,
       const okvis::kinematics::Transformation & T_WS,
       const Eigen::Matrix<double, 9, 1> & speedAndBiases,
       const Eigen::Matrix<double, 3, 1> & omega_S,
-      const int frameIdInSource,
-      const std::vector<Eigen::VectorXd,
-          Eigen::aligned_allocator<Eigen::VectorXd>> & extrinsics,
       const Eigen::Matrix<double, Eigen::Dynamic, 1>& vTgsa,
-      const Eigen::Matrix<double, Eigen::Dynamic, 1>& cameraParams,
+      const std::vector<Eigen::VectorXd, Eigen::aligned_allocator<Eigen::VectorXd>>& cameraParams,
       const Eigen::Matrix<double, Eigen::Dynamic, 1>& stateStd,
       const std::vector<okvis::kinematics::Transformation,
-          Eigen::aligned_allocator<okvis::kinematics::Transformation> > & T_BC_list) final;
+          Eigen::aligned_allocator<okvis::kinematics::Transformation> >& T_BC_list) final;
   /**
    * @brief Set and write landmarks to file.
    * @remark This can be registered with the VioInterface.
