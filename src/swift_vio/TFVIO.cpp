@@ -60,6 +60,10 @@ bool TFVIO::applyMarginalizationStrategy(okvis::MapPointVector& removedLandmarks
           mapPtr_->removeResidualBlock(
               reinterpret_cast<::ceres::ResidualBlockId>(it->second));
         }
+
+        // TODO(jhuai): Nullifying recorded landmark id in a multiframe increases coupling and
+        // is unnecessary if the frontend checks whether the landmark exists in the backend
+        // when adding a new observation to the landmark. This condition is probably satisfied.
         const okvis::KeypointIdentifier& kpi = it->first;
         auto mfp = multiFramePtrMap_.find(kpi.frameId);
         OKVIS_ASSERT_TRUE(Exception, mfp != multiFramePtrMap_.end(), "frame id not found in frame map!");

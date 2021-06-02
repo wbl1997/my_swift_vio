@@ -252,7 +252,7 @@ void VioSimTestSystem::run(const simul::TestSetting &testSetting,
         mf->resetCameraSystemAndFrames(estimator_->getEstimatedCameraSystem());
         mf->setTimestamp(0u, frameStamp);
 
-        LOG(INFO) << "Processing frame " << id << " of index " << frameCount;
+        VLOG(1) << "Processing frame " << id << " of index " << frameCount;
 
         bool asKeyframe = false;
         if (!hasStarted) {
