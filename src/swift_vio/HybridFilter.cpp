@@ -2869,24 +2869,6 @@ bool HybridFilter::hasLowDisparity(
                                                raySigma);
 }
 
-bool HybridFilter::isPureRotation(const okvis::MapPoint& mp) const {
-  const std::map<okvis::KeypointIdentifier, uint64_t>& observations =
-      mp.observations;
-  const okvis::KeypointIdentifier& headKpi = observations.begin()->first;
-  const okvis::KeypointIdentifier& tailKpi = observations.rbegin()->first;
-  const int camIdx = 0;
-  std::vector<uint64_t> relativeFrameIds(2);
-  std::vector<okvis::RelativeMotionType> relativeMotionTypes(2);
-  auto headIter = multiFramePtrMap_.find(headKpi.frameId);
-  headIter->second->getRelativeMotion(
-      camIdx, &relativeFrameIds[0], &relativeMotionTypes[0]);
-  auto tailIter = multiFramePtrMap_.find(tailKpi.frameId);
-  tailIter->second->getRelativeMotion(
-      camIdx, &relativeFrameIds[1], &relativeMotionTypes[1]);
-  // TODO(jhuai): do we need to make it more complex?
-  return relativeMotionTypes[1] == okvis::ROTATION_ONLY;
-}
-
 void HybridFilter::propagatePoseAndVelocityForMapPoint(
     swift_vio::PointSharedData* pointDataPtr) const {
   std::vector<std::pair<uint64_t, size_t>> frameIds = pointDataPtr->frameIds();
@@ -2965,11 +2947,6 @@ swift_vio::TriangulationStatus HybridFilter::triangulateAMapPoint(
     T_BCs.push_back(cameraRig_.getCameraExtrinsic(j));
   }
   if (checkDisparity) {
-//    if (isPureRotation(mp)) {
-//      triangulateTimer.stop();
-//      status.raysParallel = true;
-//      return false;
-//    }
     if (hasLowDisparity(obsDirections, T_WSs, T_BCs, camIndices)) {
       triangulateTimer.stop();
       status.raysParallel = true;

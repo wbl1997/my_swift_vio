@@ -458,8 +458,6 @@ int HybridFrontend::checkMotionByRansac2d2d(okvis::Estimator& estimator,
     size_t numCorrespondences = adapter.getNumberCorrespondences();
 
     if (numCorrespondences < 10) { // won't generate meaningful results.
-      estimator.multiFrame(currentFrameId)
-          ->setRelativeMotion(im, olderFrameId, rmt);
       continue;
     }
     // try both the rotation-only RANSAC and the relative one:
@@ -512,9 +510,6 @@ int HybridFrontend::checkMotionByRansac2d2d(okvis::Estimator& estimator,
     int translation_only_inliers = translation_only_ransac.inliers_.size();
     float translation_only_ratio = static_cast<float>(translation_only_inliers) /
                            static_cast<float>(numCorrespondences);
-    // TODO(jhuai): assess the distribution of inliers,
-    // so that we can determine the motion type more accurately
-    // successful ransac should have evenly distributed inliers, esp for rotation only
 
     // decide on success and fill inliers
     std::vector<bool> inliers(numCorrespondences, false);
@@ -537,9 +532,6 @@ int HybridFrontend::checkMotionByRansac2d2d(okvis::Estimator& estimator,
         inliers.at(translation_only_ransac.inliers_.at(k)) = true;
       }
     }
-
-    estimator.multiFrame(currentFrameId)
-        ->setRelativeMotion(im, olderFrameId, rmt);
 
     // failure?
     if (!rotation_only_success && !translation_only_success) {

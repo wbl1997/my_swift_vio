@@ -156,8 +156,6 @@ class HybridFilter : public okvis::Estimator, public BaseFilter {
       const Eigen::AlignedVector<okvis::kinematics::Transformation>& T_BCs,
       const std::vector<size_t>& camIndices) const;
 
-  bool isPureRotation(const okvis::MapPoint& mp) const;
-
   void propagatePoseAndVelocityForMapPoint(swift_vio::PointSharedData* pointDataPtr) const;
 
   /**
