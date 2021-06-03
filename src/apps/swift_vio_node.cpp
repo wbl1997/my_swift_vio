@@ -89,33 +89,33 @@ int main(int argc, char **argv) {
   }
   std::shared_ptr<swift_vio::LoopClosureMethod> loopClosureMethod =
       swift_vio::createLoopClosureMethod(lcParams);
-  okvis::ThreadedKFVio okvis_estimator(parameters, estimator, frontend,
+  okvis::ThreadedKFVio vioSystem(parameters, estimator, frontend,
                                        loopClosureMethod);
 
 
   swift_vio::VioSystemWrap::registerCallbacks(
-      FLAGS_output_dir, parameters, &okvis_estimator, &publisher,
+      FLAGS_output_dir, parameters, &vioSystem, &publisher,
       &pgoPublisher);
 
   // player to grab messages directly from files on a hard drive.
   std::shared_ptr<swift_vio::Player> pPlayer;
   std::shared_ptr<std::thread> ptPlayer;
   if (FLAGS_load_input_option == 0) {
-    swift_vio::Subscriber subscriber(nh, &okvis_estimator,
+    swift_vio::Subscriber subscriber(nh, &vioSystem,
                                  vio_parameters_reader);
-    ros::Rate rate(20);
+    ros::Rate rate(parameters.sensors_information.cameraRate);
     while (ros::ok()) {
       ros::spinOnce();
-      okvis_estimator.display();
+      vioSystem.display();
       rate.sleep();
     }
   } else {
-    pPlayer.reset(new swift_vio::Player(&okvis_estimator, parameters));
+    pPlayer.reset(new swift_vio::Player(&vioSystem, parameters));
     ptPlayer.reset(new std::thread(&swift_vio::Player::Run, std::ref(*pPlayer)));
 
-    ros::Rate rate(20);
+    ros::Rate rate(parameters.sensors_information.cameraRate);
     while (!pPlayer->mbFinished) {
-      okvis_estimator.display();
+      vioSystem.display();
       rate.sleep();
     }
     ptPlayer->join();
@@ -125,6 +125,6 @@ int main(int argc, char **argv) {
 
   std::string filename =
       swift_vio::removeTrailingSlash(FLAGS_output_dir) + "/feature_statistics.txt";
-  okvis_estimator.saveStatistics(filename);
+  vioSystem.saveStatistics(filename);
   return 0;
 }

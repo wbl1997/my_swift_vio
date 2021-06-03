@@ -49,7 +49,7 @@ void SimDataInterface::saveRefMotion(const std::string &truthFile) {
   rewind();
 
   uint64_t id = 0u;
-  while (nextNFrame()) {
+  do {
     truthStream << currentTime() << " " << id << " " << std::setfill(' ')
                 << currentPose().parameters().transpose().format(
                        swift_vio::kSpaceInitFmt)
@@ -58,7 +58,7 @@ void SimDataInterface::saveRefMotion(const std::string &truthFile) {
                        swift_vio::kSpaceInitFmt)
                 << std::endl;
     ++id;
-  }
+  } while (nextNFrame());
   truthStream.close();
 }
 

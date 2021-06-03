@@ -22,6 +22,9 @@ DEFINE_bool(noisyInitialSensorParams, false,
             "which is used to initialize an estimator. But the noise may be "
             "zero by setting e.g. zero_imu_intrinsic_param_noise");
 
+DEFINE_bool(sim_compute_OKVIS_NEES, false,
+            "False to analyze OKVIS accuracy, true to analyze OKVIS consistency!");
+
 DEFINE_int32(num_runs, 5, "How many times to run one simulation?");
 
 DECLARE_bool(use_mahalanobis);
@@ -215,7 +218,7 @@ TEST(MSCKF, CircleFarPoints) {
   simSystem.run(testSetting, FLAGS_log_dir);
 }
 
-// When set getSmootherCovariance true, OKVIS outputs consistent covariances indicated by NEES.
+// When set computeOkvisNees true, OKVIS outputs consistent covariances indicated by NEES.
 TEST(OKVIS, TrajectoryLabel) {
   int cameraObservationModelId = 0;
   int landmarkModelId = 0;
@@ -230,9 +233,12 @@ TEST(OKVIS, TrajectoryLabel) {
       FLAGS_zero_camera_intrinsic_param_noise, FLAGS_sim_camera_time_offset_sec,
       FLAGS_sim_frame_readout_time_sec, FLAGS_noisyInitialSensorParams,
       simul::LandmarkGridType::FourWalls, landmarkRadius);
+
+  std::string suffix  = FLAGS_sim_compute_OKVIS_NEES ? "_NEES" : "";
+  std::string label = "OKVIS" + suffix;
   simul::SimEstimatorParameters estimatorParams(
-      "OKVIS", swift_vio::EstimatorAlgorithm::OKVIS, FLAGS_num_runs,
-      cameraObservationModelId, landmarkModelId, false);
+      label, swift_vio::EstimatorAlgorithm::OKVIS, FLAGS_num_runs,
+      cameraObservationModelId, landmarkModelId, false, FLAGS_sim_compute_OKVIS_NEES);
   swift_vio::BackendParams backendParams;
   simul::TestSetting testSetting(imuParams, visionParams,
                                  estimatorParams, backendParams, "");

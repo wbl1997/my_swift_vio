@@ -129,7 +129,7 @@ void VioSimTestSystem::createEstimator(const TestSetting &testSetting) {
   okvis::Optimization optimOptions;
   optimOptions.useEpipolarConstraint = testSetting.estimatorParams.useEpipolarConstraint;
   optimOptions.cameraObservationModelId = testSetting.estimatorParams.cameraObservationModelId;
-  optimOptions.getSmootherCovariance = false;
+  optimOptions.computeOkvisNees = testSetting.estimatorParams.computeOkvisNees;
   optimOptions.numKeyframes = 5;
   optimOptions.numImuFrames = 3;
   estimator_->setOptimizationOptions(optimOptions);
@@ -209,8 +209,6 @@ void VioSimTestSystem::run(const simul::TestSetting &testSetting,
     std::stringstream ss;
     ss << run;
     std::string outputFile = pathEstimatorTrajectory + "_" + ss.str() + ".txt";
-    std::string trackStatFile =
-        pathEstimatorTrajectory + "_trackstat_" + ss.str() + ".txt";
 
     frontend_.reset(new SimulationFrontend(simData_->homogeneousPoints(),
                                            simData_->landmarkIds(),
@@ -317,10 +315,6 @@ void VioSimTestSystem::run(const simul::TestSetting &testSetting,
                     << " #keyframes " << keyframeCount;
       LOG(INFO) << messageStream.str();
       metaStream << messageStream.str() << std::endl;
-      // output track length distribution
-      std::ofstream trackStatStream(trackStatFile, std::ios_base::out);
-      estimator_->printTrackLengthHistogram(trackStatStream);
-      trackStatStream.close();
     } catch (std::exception &e) {
       LOG(INFO) << "Run " << run << " aborts with #processed frames " << frameCount
                 << " #keyframes " << keyframeCount << " and error: " << e.what();

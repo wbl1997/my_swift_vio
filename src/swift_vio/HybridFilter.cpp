@@ -1360,7 +1360,7 @@ bool HybridFilter::measurementJacobian(
   Eigen::Matrix<double, 4, 3> dhPoint_dparams; // dHomogeneousPoint_dParameters.
   dhPoint_dparams.setZero();
 
-  okvis::kinematics::Transformation T_CtjX; // X is W or \f$C_{t(i,a)}\f$ or \f$C_{t(a)}\f$.
+  okvis::kinematics::Transformation T_CtjX; // X is W or \f$C_{t(a)}\f$.
   Eigen::Vector4d homogeneousPointFej;
   if (pointLandmarkOptions_.landmarkModelId ==
       swift_vio::InverseDepthParameterization::kModelId) {
@@ -1804,6 +1804,9 @@ bool HybridFilter::slamFeatureJacobian(const okvis::MapPoint &mp, Eigen::MatrixX
     Eigen::Matrix<double, 2, Eigen::Dynamic> J_x(2, featureVariableDimen);
     Eigen::Matrix<double, 2, 3> J_pfi;
     Eigen::Vector2d residual;
+    // TODO(jhuai): A point in the state vector and expressed in the world frame should
+    // use its first estimate in computing Jacobians for consistency.
+    // The first estimate is not needed for anchored inverse depth parameterization.
     bool validJacobian = measurementJacobian(
         homogeneousPoint, obsInPixel[observationIndex],
         observationIndex, pointDataPtr, &J_x, &J_pfi, &residual);
@@ -3038,7 +3041,16 @@ bool HybridFilter::printStatesAndStdevs(std::ostream& stream) const {
 }
 
 std::string HybridFilter::headerLine(const std::string delimiter) const {
-  std::stringstream stream(Estimator::headerLine(delimiter));
+  std::vector<std::string> variableList{
+      "timestamp(sec)", "frameId",       "p_WB_W_x(m)",   "p_WB_W_y(m)",
+      "p_WB_W_z(m)",    "q_WB_x",        "q_WB_y",        "q_WB_z",
+      "q_WB_w",         "v_WB_W_x(m/s)", "v_WB_W_y(m/s)", "v_WB_W_z(m/s)",
+      "b_g_x(rad/s)",   "b_g_y(rad/s)",  "b_g_z(rad/s)",  "b_a_x(m/s^2)",
+      "b_a_y(m/s^2)",   "b_a_z(m/s^2)"};
+  std::stringstream stream;
+  for (auto variable : variableList) {
+    stream << variable << delimiter;
+  }
 
   std::vector<std::string> imuParameterNames;
   ImuModelToAugmentedDimensionLabels(
@@ -3055,13 +3067,17 @@ std::string HybridFilter::headerLine(const std::string delimiter) const {
   return stream.str();
 }
 
-void HybridFilter::printTrackLengthHistogram(std::ostream& stream) const {
-  stream << "Track length histogram in one test with bins 0,1,2..."
-         << std::endl;
-  size_t bin = 0;
+void HybridFilter::printTrackLengthHistogram(std::ostream &stream) const {
+  stream << "Track length histogram in one test with bins 0, 1, 2...\n";
+  for (size_t bin = 0u; bin < mTrackLengthAccumulator.size(); ++bin) {
+    stream << bin << "\t";
+  }
+  stream << std::endl;
   for (auto it = mTrackLengthAccumulator.begin();
-       it != mTrackLengthAccumulator.end(); ++it, ++bin)
-    stream << bin << " " << *it << std::endl;
+       it != mTrackLengthAccumulator.end(); ++it) {
+    stream << *it << "\t";
+  }
+  stream << std::endl;
 }
 
 void HybridFilter::getEstimatedCameraIntrinsics(

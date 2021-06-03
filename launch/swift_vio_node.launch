@@ -1,6 +1,6 @@
 <launch>
   <node name="swift_vio_node" pkg="swift_vio" type="swift_vio_node" output="screen">
-    <param name="config_filename" value="$(find swift_vio)/config/config_fpga_p2_euroc_copy.yaml" />
+    <param name="config_filename" value="$(find swift_vio)/config/config_fpga_p2_euroc.yaml" />
     <param name="mesh_file" value="firefly.dae" />
     <remap from="/camera0" to="/cam0/image_raw" />
     <remap from="/camera1" to="/cam1/image_raw" />

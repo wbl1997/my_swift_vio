@@ -121,18 +121,21 @@ struct SimEstimatorParameters {
   int cameraObservationModelId;
   int landmarkModelId;
   bool useEpipolarConstraint;
+  bool computeOkvisNees;
 
   SimEstimatorParameters(std::string _estimatorLabel = "MSCKF",
                          swift_vio::EstimatorAlgorithm _estimator_algorithm =
                              swift_vio::EstimatorAlgorithm::MSCKF,
                          int _numRuns = 10, int _cameraObservationModelId = 0,
                          int _landmarkModelId = 0,
-                         bool _useEpipolarConstraint = false)
+                         bool _useEpipolarConstraint = false,
+                         bool _computeOkvisNees = false)
       : estimatorLabel(_estimatorLabel),
         estimator_algorithm(_estimator_algorithm), numRuns(_numRuns),
         cameraObservationModelId(_cameraObservationModelId),
         landmarkModelId(_landmarkModelId),
-        useEpipolarConstraint(_useEpipolarConstraint) {}
+        useEpipolarConstraint(_useEpipolarConstraint),
+        computeOkvisNees(_computeOkvisNees) {}
 
   std::string toString() const {
     std::stringstream ss;
@@ -140,7 +143,8 @@ struct SimEstimatorParameters {
        << swift_vio::EstimatorAlgorithmIdToName(estimator_algorithm) << " #runs "
        << numRuns << "\ncamera observation model id "
        << cameraObservationModelId << " landmark model id " << landmarkModelId
-       << " use epipolar constraint? " << useEpipolarConstraint;
+       << " use epipolar constraint? " << useEpipolarConstraint
+       << " compute OKVIS NEES? " << computeOkvisNees;
 
     return ss.str();
   }

@@ -10,7 +10,7 @@
 
 #include <swift_vio/imu/odeHybrid.hpp>
 
-DEFINE_double(max_inc_tol, 2,
+DEFINE_double(max_inc_tol, 10,
               "the tolerance of the lpNorm of an EKF state update");
 
 namespace swift_vio {

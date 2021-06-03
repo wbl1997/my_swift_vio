@@ -308,23 +308,21 @@ rosrun rviz rviz -d $SWIFT_VIO_WS/src/swift_vio/config/rviz.rviz
 export SWIFT_VIO_WS=/path/to/swift_vio_ws
 source $SWIFT_VIO_WS/devel/setup.bash
 rosrun swift_vio swift_vio_node $SWIFT_VIO_WS/src/swift_vio/config/config_fpga_p2_euroc.yaml \
- --vocabulary_path=$SWIFT_VIO_WS/src/swift_vio/vocabulary/ORBvoc.yml \
  --dump_output_option=0 --load_input_option=0 --output_dir=$HOME/Desktop/temp
 
 # In terminal 4
-rosbag play --pause --start=5.0 --rate=1.0 /media/$USER/Seagate/$USER/data/euroc/MH_01_easy.bag /cam0/image_raw:=/camera0 /imu0:=/imu
+rosbag play --pause --start=5.0 --rate=1.0 /path/to/euroc/MH_01_easy.bag /cam0/image_raw:=/camera0 /imu0:=/imu
 
 ```
 
 3. Process the zip synchronously.
 
 ```
-export SWIFT_VIO_WS=/path/to/swift_vio_ws
-source $SWIFT_VIO_WS/devel/setup.bash
+SWIFT_VIO_WS=/path/to/swift_vio_ws
+cd $SWIFT_VIO_WS
+source devel/setup.bash
 rosrun swift_vio swift_vio_node_synchronous $SWIFT_VIO_WS/src/swift_vio/config/config_fpga_p2_euroc.yaml \
- --vocabulary_path=$SWIFT_VIO_WS/src/swift_vio/vocabulary/ORBvoc.yml \
- --bagname=/media/$USER/Seagate/$USER/data/euroc/MH_01_easy.bag --skip_first_seconds=0 --max_inc_tol=30.0 \
- --camera_topics="/cam0/image_raw,/cam1/image_raw" --imu_topic="/imu0" \
+ --bagname=/path/to/euroc/MH_01_easy.bag --camera_topics="/cam0/image_raw,/cam1/image_raw" --imu_topic="/imu0" \
  --dump_output_option=3 --output_dir=$HOME/Desktop/temp
 
 rosrun rviz rviz -d $SWIFT_VIO_WS/src/swift_vio/config/rviz.rviz

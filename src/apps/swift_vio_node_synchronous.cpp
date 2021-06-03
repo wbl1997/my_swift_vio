@@ -202,21 +202,21 @@ int main(int argc, char **argv) {
   }
   std::shared_ptr<swift_vio::LoopClosureMethod> loopClosureMethod =
       swift_vio::createLoopClosureMethod(lcParams);
-  okvis::ThreadedKFVio okvis_estimator(parameters, estimator, frontend,
+  okvis::ThreadedKFVio vioSystem(parameters, estimator, frontend,
                                        loopClosureMethod);
   swift_vio::VioSystemWrap::registerCallbacks(
-      FLAGS_output_dir, parameters, &okvis_estimator, publisher.get(),
+      FLAGS_output_dir, parameters, &vioSystem, publisher.get(),
       &pgoPublisher);
 
-  okvis_estimator.setBlocking(true);
+  vioSystem.setBlocking(true);
 
   if (FLAGS_bagname.empty()) {
     // player to grab messages directly from files on a hard drive
-    swift_vio::Player player(&okvis_estimator, parameters);
+    swift_vio::Player player(&vioSystem, parameters);
     player.RunBlocking();
     std::string filename = swift_vio::removeTrailingSlash(FLAGS_output_dir) +
                            "/feature_statistics.txt";
-    okvis_estimator.saveStatistics(filename);
+    vioSystem.saveStatistics(filename);
     return 0;
   }
 
@@ -269,7 +269,7 @@ int main(int argc, char **argv) {
   RosbagIteratorChecker endGuard(view_imu, view_cams_ptr);
   while (messageCenterOk()) {
     messageCenterSpinOnce();
-    okvis_estimator.display();
+    vioSystem.display();
 
     // check if at the end
     if (endGuard.atImuEnd(view_imu_iterator)) {
@@ -305,13 +305,13 @@ int main(int argc, char **argv) {
 
         // add the IMU measurement for (blocking) processing
         if (t_imu - start > deltaT)
-          okvis_estimator.addImuMeasurement(t_imu, acc, gyr);
+          vioSystem.addImuMeasurement(t_imu, acc, gyr);
 
         view_imu_iterator++;
       } while (view_imu_iterator != view_imu.end() && t_imu <= t);
 
       // add the image to the frontend for (blocking) processing
-      if (t - start > deltaT) okvis_estimator.addImage(t, i, filtered);
+      if (t - start > deltaT) vioSystem.addImage(t, i, filtered);
       // The imu messages may end for the next image message in the NFrame.
       if (endGuard.atImuEnd(view_imu_iterator)) {
         return 0;

@@ -65,7 +65,7 @@ bool RosParametersReader::getCameraCalibration(
   if (parseOk && monocularInput) {
     calibrations.resize(1);
   }
-  LOG(INFO) << "monocular_input?" << monocularInput << " #Cameras:" << calibrations.size();
+  LOG(INFO) << "Use images from " << calibrations.size() << " cameras.";
   if (!useDriver && !success) {
     success = getCalibrationViaRosService(calibrations);
   }
