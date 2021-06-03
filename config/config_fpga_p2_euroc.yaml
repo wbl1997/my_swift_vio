@@ -30,12 +30,12 @@ cameras:
         image_delay: 0.0,
         image_readout_time: 0.00}
 
-monocular_input: true
+monocular_input: false
 
 camera_params:
     camera_rate: 20 # just to manage the expectations of when there should be frames arriving
-    sigma_absolute_translation: 0.0 # The standard deviation of the camera extrinsics translation, e.g. 1.0e-10 for online-calib [m].
-    sigma_absolute_orientation: 0.0 # The standard deviation of the camera extrinsics orientation, e.g. 1.0e-3 for online-calib [rad].
+    sigma_absolute_translation: 0.03 # The standard deviation of the camera extrinsics translation, e.g. 1.0e-10 for online-calib [m].
+    sigma_absolute_orientation: 0.02 # The standard deviation of the camera extrinsics orientation, e.g. 1.0e-3 for online-calib [rad].
     sigma_c_relative_translation: 0.0 # The std. dev. of the cam. extr. transl. change between frames, e.g. 1.0e-6 for adaptive online calib (not less for numerics) [m].
     sigma_c_relative_orientation: 0.0 # The std. dev. of the cam. extr. orient. change between frames, e.g. 1.0e-6 for adaptive online calib (not less for numerics) [rad].
     timestamp_tolerance: 0.005 # [s] stereo frame out-of-sync tolerance
@@ -79,7 +79,7 @@ numKeyframes: 5 # number of keyframes in optimisation window
 numImuFrames: 3 # number of frames linked by most recent nonlinear IMU error terms
 optimization:
     triangulationMaxDepth: 1000.0
-    algorithm: "MSCKF"
+    algorithm: "HybridFilter"
     useEpipolarConstraint: false
     cameraObservationModelId: 0
 
