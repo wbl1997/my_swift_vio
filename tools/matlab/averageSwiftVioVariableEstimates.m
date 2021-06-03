@@ -49,18 +49,18 @@ fprintf(fileID, '%.4f ', estimate_average(indexServer.b_a));
 fprintf(fileID, '+/- ');
 fprintf(fileID, '%.5f ', estimate_average(indexServer.b_a_std));
 
-if isempty(indexServer.p_BC)
+if isempty(indexServer.p_camera)
     return;
 end
 
-fprintf(fileID, '\np_{BC}[cm]:');
-fprintf(fileID, '%.3f ', estimate_average(indexServer.p_BC(1:3))*100);
-if size(indexServer.p_BC, 2) > 3
-fprintf(fileID, '%.3f ', estimate_average(indexServer.p_BC(4:end)));
+fprintf(fileID, '\np_{camera}[cm]:');
+fprintf(fileID, '%.3f ', estimate_average(indexServer.p_camera(1:3))*100);
+if size(indexServer.p_camera, 2) > 3
+fprintf(fileID, '%.3f ', estimate_average(indexServer.p_camera(4:end)));
 end
-if ~isempty(indexServer.p_BC_std)
+if ~isempty(indexServer.p_camera_std)
 fprintf(fileID, '+/- ');
-fprintf(fileID, '%.4f ', estimate_average(indexServer.p_BC_std)*100);
+fprintf(fileID, '%.4f ', estimate_average(indexServer.p_camera_std)*100);
 end
 
 fprintf(fileID, '\nfx fy cx cy[px]:');

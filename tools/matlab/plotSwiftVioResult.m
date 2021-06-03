@@ -9,7 +9,7 @@ end
 if nargin < 4
     [outputPath, ~, ~] = fileparts(vio_file);
     disp(['outputPath is set to ', outputPath]);
-end
+endoptions.p_BC = [];
 
 if options.export_fig_path
     addpath(options.export_fig_path);
@@ -18,11 +18,6 @@ end
 addpath('plotters');
 
 close all;
-
-indexServer = SwiftVioConstants(options.misalignment_dim, ...
-    options.extrinsic_dim, options.project_intrinsic_dim, ...
-    options.distort_intrinsic_dim, options.fix_extrinsic, ...
-    options.fix_intrinsic, options.td_dim, options.tr_dim);
 
 data = readmatrix(vio_file, 'NumHeaderLines', 1);
 original_data = data;
@@ -40,7 +35,7 @@ applyUmeyama = 0;
 
 if gt_file
     gt = readmatrix(gt_file, 'NumHeaderLines', 1);
-    index= find(abs(gt(:,1) - startTime)<5e-2);
+    index= find(abs(gt(:,1) - startToptions.p_BC = [];ime)<5e-2);
     gt = gt(index:end,:);
     if(endTime>gt(end,1))
         endTime = gt(end,1);
@@ -71,37 +66,37 @@ if gt_file
     
     if applyUmeyama == 1
         % umeyama transform to gt
-        src = data(100:end, indexServer.r);
+        src = data(100:end, options.r);
         dst = gt(assocIndex(100:end), gt_index.r);
         [R_res, t_res] = umeyama(src',dst');
-        data(:,indexServer.r) = (R_res*data(:, indexServer.r)'+ ...
+        data(:,options.r) = (R_res*data(:, options.r)'+ ...
             repmat(t_res, 1, size(data,1)))';
         
         q_res= quaternion(R_res, 'rotmat', 'point');
         for i=1:size(data,1)
             res4 = compact(q_res * quaternion(...
-                [data(i,indexServer.q(4)), ...
-                data(i, indexServer.q(1:3))]));
-            data(i,indexServer.q(1:3)) = res4(2:4);
-            data(i,indexServer.q(4)) = res4(1);
+                [data(i,options.q(4)), ...
+                data(i, options.q(1:3))]));
+            data(i,options.q(1:3)) = res4(2:4);
+            data(i,options.q(4)) = res4(1);
         end
-        data(:,indexServer.v) = (R_res*data(:, indexServer.v)')';
+        data(:,options.v) = (R_res*data(:, options.v)')';
     end
     
     data_diff = data;
-    data_diff(:, indexServer.r) = ...
-        data_diff(:, indexServer.r) - gt(assocIndex, gt_index.r);
+    data_diff(:, options.r) = ...
+        data_diff(:, options.r) - gt(assocIndex, gt_index.r);
     alpha= zeros(size(data,1),3);
     for i=1:size(data,1)
         qs2w= gt(assocIndex(i), [gt_index.q(4), gt_index.q(1:3)]);
-        qs2w_hat = data(i, [indexServer.q(4), indexServer.q(1:3)]);
+        qs2w_hat = data(i, [options.q(4), options.q(1:3)]);
         alpha(i,:)= unskew(rotmat(quaternion(qs2w), 'point') * ...
             rotmat(quaternion(qs2w_hat), 'point')'-eye(3))';
     end
-    data_diff(:, indexServer.q(1:3)) = alpha;
+    data_diff(:, options.q(1:3)) = alpha;
     if size(gt, 2) >= gt_index.v(3)
-        data_diff(:, indexServer.v) = ...
-            data_diff(:, indexServer.v) - gt(assocIndex, gt_index.v);
+        data_diff(:, options.v) = ...
+            data_diff(:, options.v) - gt(assocIndex, gt_index.v);
     end
 else
     gt = [];
@@ -114,12 +109,12 @@ else
 end
 
 figure;
-plot3(data(:, indexServer.r(1)), data(:, indexServer.r(2)), ...
-    data(:, indexServer.r(3)), '-b'); hold on;
-plot3(data(1, indexServer.r(1)), data(1, indexServer.r(2)), ...
-    data(1, indexServer.r(3)), '-or');
-plot3(data(end, indexServer.r(1)), data(end, indexServer.r(2)), ...
-    data(end, indexServer.r(3)), '-sr');
+plot3(data(:, options.r(1)), data(:, options.r(2)), ...
+    data(:, options.r(3)), '-b'); hold on;
+plot3(data(1, options.r(1)), data(1, options.r(2)), ...
+    data(1, options.r(3)), '-or');
+plot3(data(end, options.r(1)), data(end, options.r(2)), ...
+    data(end, options.r(3)), '-sr');
 legend_list = {'swift_vio', 'start', 'finish'};
 
 if(~isempty(gt))
@@ -143,7 +138,7 @@ export_fig(outputfig);
 if(~isempty(gt))
     % compute totla distance, max error, rmse
     distance = totalDistance(gt(assocIndex, gt_index.r));
-    errorPosition = data(:,indexServer.r)- gt(assocIndex, gt_index.r);
+    errorPosition = data(:,options.r)- gt(assocIndex, gt_index.r);
     absError = sqrt(sum(errorPosition.^2,2));
     [maxError, idx]= max(absError);
     rmse = sqrt(sum(sum(errorPosition.^2,2))/size(data,1));
@@ -151,30 +146,30 @@ if(~isempty(gt))
         maxError/distance, rmse/distance);
     
     figure;
-    drawMeanAndStdBound(data_diff, indexServer.r, indexServer.r_std, 1, 1);
+    drawMeanAndStdBound(data_diff, options.r, options.r_std, 1, 1);
     ylabel('$\delta \mathbf{t}_{WB}$ (m)', 'Interpreter', 'Latex');
     saveas(gcf,[outputPath, '\Error p_WB'],'epsc');
     
     figure;
-    drawMeanAndStdBound(data_diff, indexServer.q(1:3), ...
-        indexServer.q_std, 180/pi, 1);
+    drawMeanAndStdBound(data_diff, options.q(1:3), ...
+        options.q_std, 180/pi, 1);
     ylabel('$\delta \mathbf{\theta}_{WB}{} (^{\circ})$', 'Interpreter', 'Latex');
     saveas(gcf,[outputPath, '\Error R_WB'],'epsc');
     
     figure;
     if size(gt, 2) >= 2 + 7 + 3
-        drawMeanAndStdBound(data_diff, indexServer.v, ...
-            indexServer.v_std, 1, 1);
+        drawMeanAndStdBound(data_diff, options.v, ...
+            options.v_std, 1, 1);
         ylabel('$\delta \mathbf{v}_{WB} (m/s)$', 'Interpreter', 'Latex');
         saveas(gcf,[outputPath, '\Error v_WB'],'epsc');
     end
 end
 
 figure;
-plot(data(:,1), data(:, indexServer.q(1)), '-r');
+plot(data(:,1), data(:, options.q(1)), '-r');
 hold on;
-plot(data(:,1), data(:, indexServer.q(2)), '-g');
-plot(data(:,1), data(:, indexServer.q(3)), '-b');
+plot(data(:,1), data(:, options.q(2)), '-g');
+plot(data(:,1), data(:, options.q(3)), '-b');
 
 if(~isempty(gt))
     plot(gt(:,1), gt(:,gt_index.q(1)), '--r');
@@ -193,12 +188,12 @@ if exist(outputfig, 'file')==2
 end
 export_fig(outputfig);
 
-if indexServer.v_std(1) > size(data, 2)
+if options.v_std(1) > size(data, 2)
     return;
 end
 
 figure;
-drawMeanAndStdBound(data, indexServer.v, indexServer.v_std);
+drawMeanAndStdBound(data, options.v, options.v_std);
 if(~isempty(gt))
     plot(gt(:,1), gt(:,gt_index.v(1)), '-.r');
     plot(gt(:,1), gt(:,gt_index.v(2)), '-.g');
@@ -213,34 +208,34 @@ if exist(outputfig, 'file')==2
 end
 export_fig(outputfig);
 
-plotImuBiases(data, indexServer, outputPath);
+plotImuBiases(data, options, outputPath);
 
-if ~isempty(indexServer.p_BC_std)
+if ~isempty(options.p_camera_std)
     figure;
-    drawMeanAndStdBound(data, indexServer.p_BC, indexServer.p_BC_std, 100.0);
-    ylabel('p_{BC}[cm]');
-    outputfig = [outputPath, '/p_BC.eps'];
+    drawMeanAndStdBound(data, options.p_camera, options.p_camera_std, 100.0);
+    ylabel('p_{camera}[cm]');
+    outputfig = [outputPath, '/p_camera.eps'];
     if exist(outputfig, 'file')==2
         delete(outputfig);
     end
     export_fig(outputfig);
 end
 
-plotCameraIntrinsics(data, indexServer, options.trueCameraIntrinsics, outputPath);
+plotCameraIntrinsics(data, options, outputPath);
 
-plotTemporalParameters(data, indexServer, outputPath);
+plotTemporalParameters(data, options, outputPath);
 
-plotImuIntrinsicParameters(data, indexServer, outputPath);
+plotImuIntrinsicParameters(data, options, outputPath);
 
-averageSwiftVioVariableEstimates(original_data, indexServer, ...
+averageSwiftVioVariableEstimates(original_data, options, ...
     [outputPath, '/avg_estimates.txt'], options.avg_since_start, ...
     options.avg_trim_end);
 
 end
 
-function plotImuBiases(data, indexServer, outputPath)
+function plotImuBiases(data, options, outputPath)
 figure;
-drawMeanAndStdBound(data, indexServer.b_g, indexServer.b_g_std, 180/pi);
+drawMeanAndStdBound(data, options.b_g, options.b_g_std, 180/pi);
 ylabel(['b_g[' char(176) '/s]']);
 outputfig = [outputPath, '/b_g.eps'];
 if exist(outputfig, 'file')==2
@@ -249,7 +244,7 @@ end
 export_fig(outputfig);
 
 figure;
-drawMeanAndStdBound(data, indexServer.b_a, indexServer.b_a_std, 1.0);
+drawMeanAndStdBound(data, options.b_a, options.b_a_std, 1.0);
 ylabel('b_a[m/s^2]');
 outputfig = [outputPath, '/b_a.eps'];
 if exist(outputfig, 'file')==2
@@ -258,13 +253,13 @@ end
 export_fig(outputfig);
 end
 
-function plotCameraIntrinsics(data, indexServer, trueIntrinsics, outputPath)
-if ~isempty(indexServer.fxy_cxy_std) && indexServer.fxy_cxy_std(end) < size(data, 2)
+function plotCameraIntrinsics(data, options, outputPath)
+if ~isempty(options.fxy_cxy_std) && options.fxy_cxy_std(end) < size(data, 2)
     figure;
-    data(:, indexServer.fxy_cxy) = data(:, indexServer.fxy_cxy) - ...
-        repmat(trueIntrinsics, size(data, 1), 1);
-    drawMeanAndStdBound(data, indexServer.fxy_cxy, ...
-        indexServer.fxy_cxy_std);
+    data(:, options.fxy_cxy) = data(:, options.fxy_cxy) - ...
+        repmat(options.trueIntrinsics, size(data, 1), 1);
+    drawMeanAndStdBound(data, options.fxy_cxy, ...
+        options.fxy_cxy_std);
     legend('f_x','f_y','c_x','c_y','3\sigma_f_x','3\sigma_f_y',...
         '3\sigma_c_x','3\sigma_c_y');
     ylabel(['deviation from nominal values ($f_x$, $f_y$), ', ...
@@ -276,9 +271,9 @@ if ~isempty(indexServer.fxy_cxy_std) && indexServer.fxy_cxy_std(end) < size(data
     export_fig(outputfig);
 end
 
-if ~isempty(indexServer.k1_k2_std) && indexServer.k1_k2_std(end) < size(data, 2)
+if ~isempty(options.k1_k2_std) && options.k1_k2_std(end) < size(data, 2)
     figure;
-    drawMeanAndStdBound(data, indexServer.k1_k2, indexServer.k1_k2_std);
+    drawMeanAndStdBound(data, options.k1_k2, options.k1_k2_std);
     ylabel('k_1 and k_2[1]');
     legend('k_1','k_2', '3\sigma_{k_1}', '3\sigma_{k_2}');
     outputfig = [outputPath, '/k1_k2.eps'];
@@ -288,10 +283,10 @@ if ~isempty(indexServer.k1_k2_std) && indexServer.k1_k2_std(end) < size(data, 2)
     export_fig(outputfig);
 end
 
-if ~isempty(indexServer.p1_p2_std) && indexServer.p1_p2_std(end) < size(data, 2)
+if ~isempty(options.p1_p2_std) && options.p1_p2_std(end) < size(data, 2)
     figure;
     p1p2Scale = 1e2;
-    drawMeanAndStdBound(data, indexServer.p1_p2, indexServer.p1_p2_std, p1p2Scale);
+    drawMeanAndStdBound(data, options.p1_p2, options.p1_p2_std, p1p2Scale);
     ylabel('p_1 and p_2[0.01]');
     legend('p_1','p_2', '3\sigma_{p_1}', '3\sigma_{p_2}');
     outputfig = [outputPath, '/p1_p2.eps'];
@@ -302,14 +297,14 @@ if ~isempty(indexServer.p1_p2_std) && indexServer.p1_p2_std(end) < size(data, 2)
 end
 end
 
-function plotImuIntrinsicParameters(data, indexServer, outputPath)
+function plotImuIntrinsicParameters(data, options, outputPath)
 % It will modify data by subtracting reference values from data
-if ~isempty(indexServer.T_g_std) && indexServer.T_g_std(end) < size(data, 2)
+if ~isempty(options.T_g_std) && options.T_g_std(end) < size(data, 2)
     figure;
-    data(:, indexServer.T_g_diag) = data(:, indexServer.T_g_diag) ...
+    data(:, options.T_g_diag) = data(:, options.T_g_diag) ...
         - ones(size(data, 1), 3);
-    drawMeanAndStdBound(data, indexServer.T_g, ...
-        indexServer.T_g_std);
+    drawMeanAndStdBound(data, options.T_g, ...
+        options.T_g_std);
     ylabel('$\mathbf{T}_g$[1]' , 'Interpreter', 'Latex');
     outputfig = [outputPath, '/T_g.eps'];
     if exist(outputfig, 'file')==2
@@ -318,8 +313,8 @@ if ~isempty(indexServer.T_g_std) && indexServer.T_g_std(end) < size(data, 2)
     export_fig(outputfig);
     
     figure;
-    drawMeanAndStdBound(data, indexServer.T_s, ...
-        indexServer.T_s_std);
+    drawMeanAndStdBound(data, options.T_s, ...
+        options.T_s_std);
     ylabel('$\mathbf{T}_s$[1]' , 'Interpreter', 'Latex');
     outputfig = [outputPath, '/T_s.eps'];
     if exist(outputfig, 'file')==2
@@ -328,10 +323,10 @@ if ~isempty(indexServer.T_g_std) && indexServer.T_g_std(end) < size(data, 2)
     export_fig(outputfig);
     
     figure;
-    data(:, indexServer.T_a_diag) = data(:, indexServer.T_a_diag) ...
+    data(:, options.T_a_diag) = data(:, options.T_a_diag) ...
         - ones(size(data, 1), 3);
-    drawMeanAndStdBound(data, indexServer.T_a, ...
-        indexServer.T_a_std);
+    drawMeanAndStdBound(data, options.T_a, ...
+        options.T_a_std);
     ylabel('$\mathbf{T}_a$[1]' , 'Interpreter', 'Latex');
     outputfig = [outputPath, '/T_a.eps'];
     if exist(outputfig, 'file')==2
@@ -341,11 +336,11 @@ if ~isempty(indexServer.T_g_std) && indexServer.T_g_std(end) < size(data, 2)
 end
 end
 
-function plotTemporalParameters(data, indexServer, outputPath)
-if ~isempty(indexServer.td_std) && indexServer.td_std < size(data, 2)
+function plotTemporalParameters(data, options, outputPath)
+if ~isempty(options.td_std) && options.td_std < size(data, 2)
     figure;
-    drawMeanAndStdBound(data, indexServer.td, ...
-        indexServer.td_std, 1000);
+    drawMeanAndStdBound(data, options.td, ...
+        options.td_std, 1000);
     legend('t_d', '3\sigma_t_d');
     ylabel('$t_d$[ms]', 'Interpreter', 'Latex');
     outputfig = [outputPath, '/t_d.eps'];
@@ -355,10 +350,10 @@ if ~isempty(indexServer.td_std) && indexServer.td_std < size(data, 2)
     export_fig(outputfig);
 end
 
-if ~isempty(indexServer.tr_std) && indexServer.tr_std < size(data, 2)
+if ~isempty(options.tr_std) && options.tr_std <= size(data, 2)
     figure;
-    drawMeanAndStdBound(data, indexServer.tr, ...
-        indexServer.tr_std, 1000);
+    drawMeanAndStdBound(data, options.tr, ...
+        options.tr_std, 1000);
     legend('t_r', '3\sigma_{t_r}');
     ylabel('$t_r$[ms]', 'Interpreter', 'Latex');
     outputfig = [outputPath, '/t_r.eps'];
