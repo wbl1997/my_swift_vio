@@ -140,9 +140,9 @@ protected:
       }
     }
 
-    std::shared_ptr<const okvis::kinematics::Transformation> T_SC_0(
+    std::shared_ptr<okvis::kinematics::Transformation> T_SC_0(
         new okvis::kinematics::Transformation());
-    std::shared_ptr<const okvis::cameras::CameraBase> cameraGeometry0(
+    std::shared_ptr<okvis::cameras::CameraBase> cameraGeometry0(
         okvis::cameras::PinholeCamera<
             okvis::cameras::EquidistantDistortion>::createTestObject());
     cameraSystem.reset(new okvis::cameras::NCameraSystem);

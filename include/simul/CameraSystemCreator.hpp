@@ -54,7 +54,7 @@ class CameraSystemCreator {
       std::shared_ptr<okvis::cameras::NCameraSystem> *cameraSystem) {
     Eigen::Matrix<double, 4, 4> matT_SC0 =
         create_T_BC(cameraOrientationId_, camIdx_);
-    std::shared_ptr<const okvis::kinematics::Transformation> T_SC_0(
+    std::shared_ptr<okvis::kinematics::Transformation> T_SC_0(
         new okvis::kinematics::Transformation(matT_SC0));
     std::shared_ptr<okvis::cameras::CameraBase> cameraGeometry(
         new okvis::cameras::PinholeCamera<
@@ -75,7 +75,7 @@ class CameraSystemCreator {
       std::shared_ptr<okvis::cameras::NCameraSystem> *cameraSystem) {
     Eigen::Matrix<double, 4, 4> matT_SC0 =
         create_T_BC(cameraOrientationId_, camIdx_);
-    std::shared_ptr<const okvis::kinematics::Transformation> T_SC_0(
+    std::shared_ptr<okvis::kinematics::Transformation> T_SC_0(
         new okvis::kinematics::Transformation(matT_SC0));
 
     std::shared_ptr<okvis::cameras::CameraBase> cameraGeometry0 =
@@ -108,10 +108,10 @@ class CameraSystemCreator {
 
     okvis::kinematics::Transformation ref_T_SC(
         create_T_BC(cameraOrientationId_, 0));
-    std::shared_ptr<const okvis::kinematics::Transformation> T_SC_noisy(
+    std::shared_ptr<okvis::kinematics::Transformation> T_SC_noisy(
         new okvis::kinematics::Transformation(
             ref_T_SC.r() - ref_T_SC.C() * p_CBNoise, ref_T_SC.q()));
-    std::shared_ptr<const okvis::cameras::CameraBase> refCameraGeometry =
+    std::shared_ptr<okvis::cameras::CameraBase> refCameraGeometry =
         createCameraGeometry(cameraModelId_);
     Eigen::VectorXd projDistortIntrinsics;
     refCameraGeometry->getIntrinsics(projDistortIntrinsics);

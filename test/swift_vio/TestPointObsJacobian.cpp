@@ -130,8 +130,8 @@ class CameraMeasurementJacobianTest {
 
   okvis::ImuParameters imuParameters_;
 
-  std::shared_ptr<const okvis::kinematics::Transformation> T_SC0_;
-  std::shared_ptr<const okvis::cameras::CameraBase> cameraGeometry_;
+  std::shared_ptr<okvis::kinematics::Transformation> T_SC0_;
+  std::shared_ptr<okvis::cameras::CameraBase> cameraGeometry_;
   Eigen::Vector4d hpW_;
 
 

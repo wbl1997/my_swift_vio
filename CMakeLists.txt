@@ -198,10 +198,10 @@ LIST(APPEND SOURCEFILES
 
     src/swift_vio/StatAccumulator.cpp
     src/swift_vio/TFVIO.cpp
+    src/swift_vio/triangulate.cpp
     src/swift_vio/TwoViewPair.cpp
     src/swift_vio/VioEvaluationCallback.cpp
     src/swift_vio/VioFactoryMethods.cpp
-    src/swift_vio/triangulate.cpp
 
     include/simul/SimParameters.h
     src/simul/CameraSystemCreator.cpp

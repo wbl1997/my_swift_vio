@@ -47,8 +47,9 @@ private:
 
 
   std::shared_ptr<okvis::cameras::NCameraSystem> refCameraSystem_;
-  std::shared_ptr<okvis::cameras::NCameraSystem> noisyCameraSystem_;
+  std::shared_ptr<okvis::cameras::NCameraSystem> initialCameraSystem_;
   okvis::ExtrinsicsEstimationParameters extrinsicsEstimationParameters_;
+  std::shared_ptr<okvis::cameras::NCameraSystem> estimatedCameraSystem_;
 
   okvis::ImuParameters imuParameters_;
 

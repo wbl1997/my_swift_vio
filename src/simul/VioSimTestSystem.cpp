@@ -92,11 +92,12 @@ void VioSimTestSystem::createSensorSystem(const TestSetting &testSetting) {
 
   // camera system used for initilizing the estimator.
   if (testSetting.visionParams.noisyInitialSensorParams) {
-    csc.createNoisyCameraSystem(&noisyCameraSystem_,
+    csc.createNoisyCameraSystem(&initialCameraSystem_,
                                 extrinsicsEstimationParameters_);
   } else {
-    csc.createNominalCameraSystem(&noisyCameraSystem_);
+    csc.createNominalCameraSystem(&initialCameraSystem_);
   }
+  estimatedCameraSystem_ = initialCameraSystem_->deepCopy();
 }
 
 void VioSimTestSystem::createEstimator(const TestSetting &testSetting) {
@@ -140,7 +141,7 @@ void VioSimTestSystem::createEstimator(const TestSetting &testSetting) {
   estimator_->setPointLandmarkOptions(plOptions);
 
   estimator_->addImu(imuParameters_);
-  estimator_->addCameraSystem(*noisyCameraSystem_);
+  estimator_->addCameraSystem(*initialCameraSystem_);
   estimator_->addCameraParameterStds(extrinsicsEstimationParameters_);
 }
 
@@ -247,7 +248,8 @@ void VioSimTestSystem::run(const simul::TestSetting &testSetting,
         mf->setId(id);
         okvis::Time frameStamp = refNFrameTime - okvis::Duration(testSetting.visionParams.timeOffset);
         mf->setTimestamp(frameStamp);
-        mf->resetCameraSystemAndFrames(estimator_->getEstimatedCameraSystem());
+        estimator_->getEstimatedCameraSystem(estimatedCameraSystem_);
+        mf->resetCameraSystemAndFrames(*estimatedCameraSystem_);
         mf->setTimestamp(0u, frameStamp);
 
         VLOG(1) << "Processing frame " << id << " of index " << frameCount;
