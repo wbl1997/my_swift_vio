@@ -1,4 +1,4 @@
-#include "TimeAndRotationCalibrator.h"
+#include "swift_vio/TimeAndRotationCalibrator.h"
 #include "swift_vio/imu/SimpleImuOdometry.hpp"
 #include "okvis/kinematics/sophus_operators.hpp"
 
@@ -141,7 +141,7 @@ void TimeAndRotationCalibrator::addTargetAngularRate(
 
       Eigen::Vector3d gyroBias = Eigen::Vector3d::Zero();
       if (leftOk && rightOk) {
-        okvis::ceres::predictStates(uniformAngularRates_, &rotVector, gyroBias,
+        swift_vio::ode::predictStates(uniformAngularRates_, &rotVector, gyroBias,
                                     t_k + td, t_kp1 + td);
 
         Eigen::Vector3d omega_I = rotVector / (t_kp1 - t_k).toSec();
@@ -159,7 +159,7 @@ void TimeAndRotationCalibrator::addTargetOrientation(
   if (targetOrientations_.size()) {
     // Extract averaging angular velocity of the target sensor.
     okvis::Time t_k = targetOrientations_.back().timeStamp;
-    Eigen::Quaternion q_WGtk = targetOrientations_.back().measurement;
+    Eigen::Quaterniond q_WGtk = targetOrientations_.back().measurement;
     double theta;
     Eigen::Vector3d omega_Gtk =
         okvis::kinematics::logAndTheta(q_WGtk.inverse() * q_WG, &theta);
@@ -251,7 +251,7 @@ TimeAndRotationCalibrator::calibrate() {
     Eigen::Vector3d rotVector;
     Eigen::Vector3d gyroBias = Eigen::Vector3d::Zero();
     if (leftOk && rightOk) {
-      okvis::ceres::predictStates(uniformAngularRates_, &rotVector, gyroBias,
+      swift_vio::ode::predictStates(uniformAngularRates_, &rotVector, gyroBias,
                                   t_k + td, t_kp1 + td);
 
       Eigen::Vector3d omega_I = rotVector / (t_kp1 - t_k).toSec();

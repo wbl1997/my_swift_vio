@@ -283,7 +283,10 @@ target_link_libraries(swift_vio_node ${PROJECT_NAME})
 
 add_executable(swift_vio_node_synchronous src/apps/swift_vio_node_synchronous.cpp
     src/apps/VioSystemWrap.cpp)
-target_link_libraries(swift_vio_node_synchronous ${PROJECT_NAME} )
+target_link_libraries(swift_vio_node_synchronous ${PROJECT_NAME})
+
+add_executable(time_rotation_calibrator src/apps/time_rotation_calibrator.cpp src/swift_vio/TimeAndRotationCalibrator.cpp)
+target_link_libraries(time_rotation_calibrator okvis_util okvis_time okvis_timing okvis_common okvis_kinematics okvis_ceres)
 
 list(APPEND TEST_SRC_FILES
     test/test_main.cpp
@@ -324,6 +327,8 @@ list(APPEND TEST_SRC_FILES
     test/swift_vio/TestRsReprojectionError.cpp
     test/swift_vio/TestReprojectionErrorWithPap.cpp
     test/swift_vio/TestSE3Interpolation.cpp
+    src/swift_vio/TimeAndRotationCalibrator.cpp
+    test/swift_vio/TestTimeAndRotationCalibrator.cpp
     test/swift_vio/TestTriangulate.cpp
     test/swift_vio/TestTwoViewPair.cpp
 

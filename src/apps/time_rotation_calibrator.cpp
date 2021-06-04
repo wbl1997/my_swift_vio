@@ -1,7 +1,7 @@
 #include <cstdlib>
 #include <iostream>
 
-#include "TimeAndRotationCalibrator.h"
+#include "swift_vio/TimeAndRotationCalibrator.h"
 
 int main(int argc, char **argv) {
   swift_vio::TimeAndRotationCalibrator example{};

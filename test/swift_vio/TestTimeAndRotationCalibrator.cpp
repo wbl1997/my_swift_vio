@@ -1,7 +1,7 @@
 #include "gmock/gmock.h"
 #include "glog/logging.h"
 
-#include "TimeAndRotationCalibrator.h"
+#include "swift_vio/TimeAndRotationCalibrator.h"
 
 #include <Eigen/Core>
 

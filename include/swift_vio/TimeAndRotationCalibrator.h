@@ -1,5 +1,8 @@
 #pragma once
 
+// An implementation of Qiu et al. 2020 T-RO for real time time offset and rotation calibration 
+// of a target generic sensor relative to a central IMU.
+
 #include <Eigen/Core>
 #include <Eigen/Geometry>
 
