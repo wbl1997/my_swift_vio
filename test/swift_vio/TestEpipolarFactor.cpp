@@ -33,13 +33,14 @@ TEST(EpipolarFactor, Jacobians) {
   double Ts_std = 1e-3;
   double Ta_std = 5e-3;
   double sigma_td = 5e-3;
-  bool zeroImuIntrinsicParamNoise = !noisyInitialSensorParams;
+  bool fixImuIntrinsicParams = true;
   okvis::ImuParameters imuParameters;
   imuParameters.model_type = "BG_BA";
-  simul::initImuNoiseParams(noisyInitialSpeedAndBiases,
-                            noisyInitialSensorParams, bg_std, ba_std, Tg_std,
-                            Ts_std, Ta_std, zeroImuIntrinsicParamNoise,
-                            &imuParameters);
+  simul::SimImuParameters simImuParameters(
+      "Squircle", false, noisyInitialSpeedAndBiases, noisyInitialSensorParams,
+      fixImuIntrinsicParams, bg_std, ba_std, Tg_std, Ts_std, Ta_std);
+
+  simul::initImuNoiseParams(simImuParameters, &imuParameters);
 
   std::shared_ptr<simul::CircularSinusoidalTrajectory> cst;
   cst.reset(new simul::RoundedSquare(imuParameters.rate,
@@ -69,7 +70,6 @@ TEST(EpipolarFactor, Jacobians) {
                                  0.0);
 
   // reference camera system
-
   std::shared_ptr<okvis::cameras::NCameraSystem> cameraSystem0;
   std::shared_ptr<okvis::cameras::CameraBase> cameraGeometry0 = csc.createNominalCameraSystem(&cameraSystem0);
 

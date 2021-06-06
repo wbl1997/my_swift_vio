@@ -270,8 +270,6 @@ int SimulationFrontend::addMatchToEstimator(
           raySigma, true);
 
       if (valid) {
-        // For filtering methods with delayed initialization, landmarks need
-        // not be initialized successfully at construction.
         prevFrames->setLandmarkId(landmarkMatch.previousKeypoint.cameraIndex,
                                   landmarkMatch.previousKeypoint.keypointIndex,
                                   landmarkMatch.landmarkId);
@@ -283,7 +281,7 @@ int SimulationFrontend::addMatchToEstimator(
         // Use estimated landmark position because true position does not
         // affect VIO results much.
         hP_W = T_WCa * hP_Ca;
-        bool inserted = estimator.addLandmark(landmarkMatch.landmarkId, hP_W);
+        estimator.addLandmark(landmarkMatch.landmarkId, hP_W);
         estimator.setLandmarkInitialized(landmarkMatch.landmarkId,
                                          canBeInitialized);
         estimator.addObservation<CAMERA_GEOMETRY_T>(

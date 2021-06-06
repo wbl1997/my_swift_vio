@@ -1,10 +1,57 @@
 #include <simul/SimDataInterface.hpp>
+
+#include <random>
+
+#include "okvis/IdProvider.hpp"
+
 #include <swift_vio/IoUtil.hpp>
 #include <swift_vio/imu/BoundedImuDeque.hpp>
 #include <simul/PointLandmarkSimulationRS.hpp>
 
+#include <gflags/gflags.h>
+
+DEFINE_int32(sim_start_index, 0, "start index in real data");
+
 namespace simul {
 const double SimDataInterface::imageNoiseMag_ = 1.0;
+
+okvis::ImuSensorReadings interpolate(const okvis::ImuSensorReadings &left,
+                                     const okvis::ImuSensorReadings &right,
+                                     double ratio) {
+  Eigen::Vector3d gyro =
+      left.gyroscopes + (right.gyroscopes - left.gyroscopes) * ratio;
+  Eigen::Vector3d accel = left.accelerometers +
+                          (right.accelerometers - left.accelerometers) * ratio;
+  return okvis::ImuSensorReadings(gyro, accel);
+}
+
+void loadImuYaml(const std::string &imuYaml,
+                 okvis::ImuParameters *imuParameters, Eigen::Vector3d *g_W) {
+  cv::FileStorage file(imuYaml, cv::FileStorage::READ);
+  OKVIS_ASSERT_TRUE(std::runtime_error, file.isOpened(),
+                    "Could not open config file: " << imuYaml);
+
+  imuParameters->sigma_a_c = file["accelerometer_noise_density"];
+  imuParameters->sigma_aw_c = file["accelerometer_random_walk"];
+  imuParameters->sigma_g_c = file["gyroscope_noise_density"];
+  imuParameters->sigma_gw_c = file["gyroscope_random_walk"];
+  imuParameters->rate = file["update_rate"];
+  if (file["initial_gyro_bias"].isSeq()) {
+    for (int i = 0; i < 3; ++i) {
+      imuParameters->g0[i] = file["initial_gyro_bias"][i];
+    }
+  }
+  if (file["initial_accelerometer_bias"].isSeq()) {
+    for (int i = 0; i < 3; ++i) {
+      imuParameters->a0[i] = file["initial_accelerometer_bias"][i];
+    }
+  }
+  const cv::FileNode &gravityNode = file["gravity_in_target"];
+  for (int i = 0; i < 3; ++i) {
+    (*g_W)[i] = gravityNode[i];
+  }
+  file.release();
+}
 
 void SimDataInterface::resetImuBiases(const okvis::ImuParameters &imuParameters,
                                       const SimImuParameters &simParameters,
@@ -29,16 +76,6 @@ void SimDataInterface::resetImuBiases(const okvis::ImuParameters &imuParameters,
       refBiases_[i].measurement.accelerometers.setZero();
     }
   }
-
-  // remove the padding part of refBiases.
-  auto it = refBiases_.begin();
-  for (; it != refBiases_.end(); ++it) {
-    if (fabs((it->timeStamp - times_.front()).toSec()) < 1e-8)
-      break;
-  }
-  OKVIS_ASSERT_FALSE(std::runtime_error, it == refBiases_.end(),
-                     "No imu reading close to motion start epoch by 1e-8");
-  refBiases_.erase(refBiases_.begin(), it);
 }
 
 void SimDataInterface::saveRefMotion(const std::string &truthFile) {
@@ -46,7 +83,10 @@ void SimDataInterface::saveRefMotion(const std::string &truthFile) {
   truthStream.open(truthFile, std::ofstream::out);
   truthStream << "%state timestamp, frameIdInSource, T_WS(xyz, qxyzw), v_WS" << std::endl;
 
-  rewind();
+  if (!rewind()) {
+    LOG(WARNING) << "Skip saving reference motion because of failed rewinding!";
+    return;
+  }
 
   uint64_t id = 0u;
   do {
@@ -66,6 +106,44 @@ void SimDataInterface::saveLandmarkGrid(const std::string &gridFile) const {
   return simul::saveLandmarkGrid(homogeneousPoints_, lmIds_, gridFile);
 }
 
+okvis::ImuSensorReadings SimDataInterface::currentBiases() const {
+  okvis::Time timenow = currentTime();
+  if (refBiasIter_->timeStamp < timenow) {
+    if ((timenow - refBiasIter_->timeStamp).toSec() < 1e-5) {
+      return refBiasIter_->measurement;
+    }
+    auto left = refBiasIter_;
+    auto right = refBiasIter_;
+    ++right;
+    if (right == refBiases_.end()) {
+      return left->measurement;
+    }
+    OKVIS_ASSERT_TRUE(
+        std::runtime_error, refBiasIter_->timeStamp < right->timeStamp,
+        "Current bias timestamp should be close to current time!");
+    double ratio = (timenow - left->timeStamp).toSec() /
+                   (right->timeStamp - left->timeStamp).toSec();
+    return interpolate(left->measurement, right->measurement, ratio);
+  } else {  // refBiasIter_->timeStamp >= timenow
+    if ((refBiasIter_->timeStamp - timenow).toSec() < 1e-5) {
+      return refBiasIter_->measurement;
+    }
+    auto left = refBiasIter_;
+    auto right = refBiasIter_;
+    if (left == refBiases_.begin()) {
+      return left->measurement;
+    }
+    --left;
+    OKVIS_ASSERT_TRUE(
+        std::runtime_error, refBiasIter_->timeStamp > left->timeStamp,
+        "Current bias timestamp should be close to current time!");
+    double ratio = (timenow - left->timeStamp).toSec() /
+                   (right->timeStamp - left->timeStamp).toSec();
+    return interpolate(left->measurement, right->measurement, ratio);
+  }
+  return refBiasIter_->measurement;
+}
+
 void saveCameraParameters(
     std::shared_ptr<okvis::cameras::NCameraSystem> cameraSystem,
     const std::string cameraFile) {
@@ -82,32 +160,194 @@ void saveCameraParameters(
   stream.close();
 }
 
-SimFromRealData::SimFromRealData(const std::string &dataDir, bool addImageNoise)
-    : SimDataInterface(addImageNoise) {
-  // load maplab data
+SimFromRealData::SimFromRealData(const std::string &dataDir, const okvis::ImuParameters& imuParameters, bool addImageNoise)
+    : SimDataInterface(imuParameters, addImageNoise) {
+  vimap_.loadVimapFromFolder(dataDir);
+  const auto& imuData = vimap_.imuData();
 
-  // add image noise to feature observations.
+  for (const auto& entry : imuData) {
+    okvis::Time time(entry.sec_, entry.nsec_);
+    okvis::ImuSensorReadings measurement(entry.w_, entry.a_);
+    imuMeasurements_.emplace_back(time, measurement);
+  }
+  const int64_t secToNanos = 1000000000;
+  const auto& times = vimap_.vertexTimestamps();
+  times_.reserve(times.size() - FLAGS_sim_start_index);
 
-  rewind();
+  int index = 0;
+  for (const auto &time : times) {
+    if (index >= FLAGS_sim_start_index) {
+      times_.emplace_back(time / secToNanos, time % secToNanos);
+    }
+    ++index;
+  }
+
+  startTime_ = times_.front();
+  finishTime_ = times_.back();
+
+  const auto &vertices = vimap_.vertices();
+  ref_T_WS_list_.reserve(vertices.size());
+  ref_v_WS_list_.reserve(vertices.size());
+  index = 0;
+  for (const auto &vertex : vertices) {
+    if (index >= FLAGS_sim_start_index) {
+      ref_T_WS_list_.emplace_back(vertex.p_WS_, vertex.q_WS_);
+      ref_v_WS_list_.emplace_back(vertex.v_WS_);
+    }
+    ++index;
+  }
+
+  // Transform entities in the world frame used by the real data to
+  // a new world frame with z along negative gravity.
+  std::string imuYaml = dataDir + "/imu.yaml";
+  loadImuYaml(imuYaml, &imuParameters_, &g_oldW_);
+  Eigen::Quaterniond q_newW_oldW;
+  swift_vio::alignZ(-g_oldW_, &q_newW_oldW);
+  LOG(INFO) << "g new " << q_newW_oldW._transformVector(g_oldW_).transpose() << " should be 0,0,-1";
+  T_newW_oldW_ = okvis::kinematics::Transformation(Eigen::Vector3d::Zero(), q_newW_oldW);
+  for (auto& T_WS : ref_T_WS_list_) {
+    T_WS = T_newW_oldW_ * T_WS;
+  }
+  for (auto &v_W : ref_v_WS_list_) {
+    v_W = q_newW_oldW._transformVector(v_W);
+  }
 }
 
-void SimFromRealData::rewind() {}
+void SimFromRealData::initializeLandmarkGrid(LandmarkGridType /*gridType*/,
+                                             double /*landmarkRadius*/) {
+  homogeneousPoints_.reserve(vimap_.landmarks().size());
+  lmIds_.reserve(vimap_.landmarks().size());
+  const auto &landmarks = vimap_.landmarks();
+  for (const auto &lmk : landmarks) {
+    Eigen::Vector4d hPoint;
+    hPoint << lmk.position, 1.0;
+    homogeneousPoints_.push_back(T_newW_oldW_ * hPoint);
+    lmIds_.push_back(okvis::IdProvider::instance().newId());
+  }
+}
 
 bool SimFromRealData::nextNFrame() {
-  return false;
+  ++refIndex_;
+  if (refIndex_ == ref_T_WS_list_.size()) {
+    return false;
+  }
+  ++refTimeIter_;
+
+  while (refBiasIter_ != refBiases_.end() && refBiasIter_->timeStamp < *refTimeIter_) {
+    ++refBiasIter_;
+  }
+  if (refBiasIter_ == refBiases_.end()) {
+    return false;
+  }
+
+  okvis::Time imuDataEndTime = currentTime() + okvis::Duration(1);
+  okvis::Time imuDataBeginTime = lastRefNFrameTime_ - okvis::Duration(1);
+  latestImuMeasurements_ = swift_vio::getImuMeasurements(
+      imuDataBeginTime, imuDataEndTime, imuMeasurements_, nullptr);
+  lastRefNFrameTime_ = currentTime();
+  return true;
 }
 
 void SimFromRealData::addFeaturesToNFrame(
     std::shared_ptr<const okvis::cameras::NCameraSystem> refCameraSystem,
     std::shared_ptr<okvis::MultiFrame> multiFrame,
     std::vector<std::vector<int>> *keypointIndexForLandmarks) const {
+  int numCameras = multiFrame->numFrames();
+  keypointIndexForLandmarks->resize(numCameras);
+  for (auto &keypointIndices : *keypointIndexForLandmarks) {
+    keypointIndices.resize(vimap_.landmarks().size(), -1);
+  }
 
+  std::random_device rd{};
+  std::mt19937 gen{rd()};
+  std::normal_distribution<> d{0, imageNoiseMag_};
+
+  const std::vector<vio::CornersInImage,
+                    Eigen::aligned_allocator<vio::CornersInImage>>
+      &keypointsInAllFrames = vimap_.validKeypoints();
+  for (size_t camId = 0u; camId < vimap_.numberCameras(); ++camId) {
+    const vio::CornersInImage &corners =
+        keypointsInAllFrames.at(refIndex_ * vimap_.numberCameras() + camId);
+    std::vector<cv::KeyPoint> keypoints;
+    keypoints.reserve(corners.corner_ids.size());
+    for (size_t i = 0u; i < corners.corner_ids.size(); ++i) {
+      const Eigen::Vector2d &uv = corners.corners.at(i);
+      keypointIndexForLandmarks->at(corners.cam_id)
+          .at(corners.corner_ids.at(i)) = i;
+      if (addImageNoise_) {
+        keypoints.emplace_back(uv[0] + d(gen), uv[1] + d(gen),
+                               corners.radii[i]);
+      } else {
+        keypoints.emplace_back(uv[0], uv[1], corners.radii[i]);
+      }
+    }
+    multiFrame->resetKeypoints(camId, keypoints);
+  }
+
+  // check
+  for (size_t camId = 0u; camId < keypointIndexForLandmarks->size(); ++camId) {
+    const auto &keypointIndices = keypointIndexForLandmarks->at(camId);
+    int landmarkId = 0;
+    for (auto index : keypointIndices) {
+      if (index != -1) {
+        OKVIS_ASSERT_EQ(
+            std::runtime_error, landmarkId,
+            keypointsInAllFrames[refIndex_ * vimap_.numberCameras() + camId]
+                .corner_ids[index],
+            "Wrong landmark ID association!");
+        Eigen::Vector2d keypoint;
+        multiFrame->getKeypoint(camId, index, keypoint);
+        Eigen::Vector2d projection(100, 100);
+        Eigen::Vector4d hpC =
+            (ref_T_WS_list_[refIndex_] * (*(refCameraSystem->T_SC(camId))))
+                .inverse() *
+            homogeneousPoints_[landmarkId];
+        auto status =
+            refCameraSystem->cameraGeometry(camId)->projectHomogeneous(
+                hpC, &projection);
+        if (status !=
+                okvis::cameras::CameraBase::ProjectionStatus::Successful ||
+            (keypoint - projection).norm() > 15) {
+          LOG(INFO) << "keypoint " << keypoint.transpose() << " reprojection "
+                    << projection.transpose() << " status " << (int)status;
+        }
+      }
+      ++landmarkId;
+    }
+  }
+}
+
+bool SimFromRealData::rewind() {
+  if (refBiases_.size() < 1) {
+    LOG(WARNING) << "Call resetImuBiases to init IMU biases before going through the sim data!";
+    return false;
+  }
+
+  refIndex_ = 0u;
+  refTimeIter_ = times_.begin();
+  latestImuMeasurements_.clear();
+  lastRefNFrameTime_ = currentTime();
+
+  refBiasIter_ = refBiases_.begin();
+  while (refBiasIter_->timeStamp < *refTimeIter_) {
+    ++refBiasIter_;
+  }
+
+  okvis::Time imuDataEndTime = currentTime() + okvis::Duration(1);
+  okvis::Time imuDataBeginTime = lastRefNFrameTime_ - okvis::Duration(1);
+  latestImuMeasurements_ = swift_vio::getImuMeasurements(
+      imuDataBeginTime, imuDataEndTime, imuMeasurements_, nullptr);
+  return true;
+}
+
+int SimFromRealData::expectedNumNFrames() const {
+  return vimap_.vertices().size();
 }
 
 CurveData::CurveData(SimulatedTrajectoryType trajectoryType,
                      const okvis::ImuParameters& imuParameters,
                      bool addImageNoise) :
-  SimDataInterface(addImageNoise) {
+  SimDataInterface(imuParameters, addImageNoise) {
   startTime_ = okvis::Time(100);
   finishTime_ =  startTime_ + okvis::Duration(kDuration);
 
@@ -119,7 +359,6 @@ CurveData::CurveData(SimulatedTrajectoryType trajectoryType,
   trajectory_->getTrueVelocities(times_, ref_v_WS_list_);
   trajectory_->getTrueInertialMeasurements(
       startTime_ - okvis::Duration(1), finishTime_ + okvis::Duration(1), imuMeasurements_);
-  rewind();
 }
 
 void CurveData::initializeLandmarkGrid(LandmarkGridType gridType,
@@ -141,10 +380,24 @@ void CurveData::initializeLandmarkGrid(LandmarkGridType gridType,
   }
 }
 
-void CurveData::rewind() {
+bool CurveData::rewind() {
+  if (refBiases_.size() < 1) {
+    LOG(WARNING) << "Call resetImuBiases to init IMU biases before going through the sim data!";
+    return false;
+  }
+
   refIndex_ = 0u;
-  refBiasIter_ = refBiases_.begin();
   refTimeIter_ = times_.begin();
+
+  refBiasIter_ = refBiases_.begin();
+  while (refBiasIter_->timeStamp < *refTimeIter_ &&
+         (*refTimeIter_ - refBiasIter_->timeStamp).toSec() > 1e-3) {
+    ++refBiasIter_;
+  }
+  OKVIS_ASSERT_LT(std::runtime_error,
+                  (refBiasIter_->timeStamp - *refTimeIter_).toSec(), 1e-3,
+                  "IMU data from curves are not perfectly synced with poses!");
+
   latestImuMeasurements_.clear();
   lastRefNFrameTime_ = currentTime();
 
@@ -152,6 +405,7 @@ void CurveData::rewind() {
   okvis::Time imuDataBeginTime = lastRefNFrameTime_ - okvis::Duration(1);
   latestImuMeasurements_ = swift_vio::getImuMeasurements(
       imuDataBeginTime, imuDataEndTime, imuMeasurements_, nullptr);
+  return true;
 }
 
 bool CurveData::nextNFrame() {

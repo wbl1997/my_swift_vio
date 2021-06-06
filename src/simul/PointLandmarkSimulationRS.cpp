@@ -28,10 +28,13 @@ void PointLandmarkSimulationRS::projectLandmarksToNFrame(
       simulatedTrajectory->computeGlobalPose(trueCentralRowEpoch);
   // project landmarks onto frames of nframes
   for (size_t i = 0; i < numFrames; ++i) {
-    std::vector<size_t> lmk_indices;
-    std::vector<cv::KeyPoint> keypoints;
-    std::vector<int> frameKeypointIndices(homogeneousPoints.size(), -1);
+    std::vector<size_t> landmarkIndices;
+    landmarkIndices.reserve(homogeneousPoints.size() / 2);
 
+    std::vector<cv::KeyPoint> keypoints;
+    keypoints.reserve(homogeneousPoints.size() / 2);
+
+    std::vector<int> frameKeypointIndices(homogeneousPoints.size(), -1);
     for (size_t j = 0; j < homogeneousPoints.size(); ++j) {
       Eigen::Vector2d projection;
       double tr = cameraSystemRef->cameraGeometry(i)->readoutTime();
@@ -96,10 +99,10 @@ void PointLandmarkSimulationRS::projectLandmarksToNFrame(
         }
         frameKeypointIndices[j] = keypoints.size();
         keypoints.emplace_back(measurement[0], measurement[1], 8.0);
-        lmk_indices.emplace_back(j);
+        landmarkIndices.emplace_back(j);
       }
     }
-    frameLandmarkIndices->emplace_back(lmk_indices);
+    frameLandmarkIndices->emplace_back(landmarkIndices);
     frame_keypoints.emplace_back(keypoints);
     nframes->resetKeypoints(i, keypoints);
     keypointIndices->emplace_back(frameKeypointIndices);

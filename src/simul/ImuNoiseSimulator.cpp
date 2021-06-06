@@ -1,60 +1,44 @@
 #include "simul/ImuNoiseSimulator.h"
 
-#include <gflags/gflags.h>
 #include <glog/logging.h>
 
 #include "vio/Sample.h"
 
-DEFINE_double(sim_sigma_g_c, 1.2e-3, "simulated gyro noise density");
-DEFINE_double(sim_sigma_a_c, 8e-3, "simulated accelerometer noise density");
-DEFINE_double(sim_sigma_gw_c, 2e-5, "simulated gyro bias noise density");
-DEFINE_double(sim_sigma_aw_c, 5.5e-5, "simulated accelerometer bias noise density");
 
 namespace simul {
 void initImuNoiseParams(
-    bool noisyInitialSpeedAndBiases,
-    bool noisyInitialSensorParams,
-    double sigma_bg, double sigma_ba,
-    double std_Tg_elem,
-    double std_Ts_elem,
-    double std_Ta_elem,
-    bool fixImuInternalParams,
+    const SimImuParameters& simParams,
     okvis::ImuParameters* imuParameters) {
   imuParameters->g = 9.81;
   imuParameters->a_max = 1000.0;
   imuParameters->g_max = 1000.0;
   imuParameters->rate = 100;
 
-  imuParameters->sigma_g_c = FLAGS_sim_sigma_g_c;
-  imuParameters->sigma_a_c = FLAGS_sim_sigma_a_c;
-  imuParameters->sigma_gw_c = FLAGS_sim_sigma_gw_c;
-  imuParameters->sigma_aw_c = FLAGS_sim_sigma_aw_c;
-
-  LOG(INFO) << "sigma_g_c " << FLAGS_sim_sigma_g_c
-            << " sigma_a_c " << FLAGS_sim_sigma_a_c
-            << " sigma_gw_c " << FLAGS_sim_sigma_gw_c
-            << " sigma_aw_c " << FLAGS_sim_sigma_aw_c;
+  imuParameters->sigma_g_c = simParams.sigma_g_c;
+  imuParameters->sigma_a_c = simParams.sigma_a_c;
+  imuParameters->sigma_gw_c = simParams.sigma_gw_c;
+  imuParameters->sigma_aw_c = simParams.sigma_aw_c;
 
   imuParameters->tau = 600.0;
 
-  imuParameters->sigma_bg = sigma_bg;
-  imuParameters->sigma_ba = sigma_ba;
+  imuParameters->sigma_bg = simParams.bg_std;
+  imuParameters->sigma_ba = simParams.ba_std;
 
-  if (fixImuInternalParams) {
+  if (simParams.fixImuIntrinsicParams) {
     imuParameters->sigma_TGElement = 0;
     imuParameters->sigma_TSElement = 0;
     imuParameters->sigma_TAElement = 0;
   } else {
     // std for every element in shape matrix T_g
-    imuParameters->sigma_TGElement = std_Tg_elem;
-    imuParameters->sigma_TSElement = std_Ts_elem;
-    imuParameters->sigma_TAElement = std_Ta_elem;
+    imuParameters->sigma_TGElement = simParams.Tg_std;
+    imuParameters->sigma_TSElement = simParams.Ts_std;
+    imuParameters->sigma_TAElement = simParams.Ta_std;
   }
 
   Eigen::Matrix<double, 9, 1> eye;
   eye << 1, 0, 0, 0, 1, 0, 0, 0, 1;
 
-  if (noisyInitialSpeedAndBiases) {
+  if (simParams.noisyInitialSpeedAndBiases) {
     imuParameters->a0[0] = vio::gauss_rand(0, imuParameters->sigma_ba);
     imuParameters->a0[1] = vio::gauss_rand(0, imuParameters->sigma_ba);
     imuParameters->a0[2] = vio::gauss_rand(0, imuParameters->sigma_ba);
@@ -65,7 +49,7 @@ void initImuNoiseParams(
     imuParameters->a0.setZero();
     imuParameters->g0.setZero();
   }
-  if (noisyInitialSensorParams) {
+  if (simParams.noisyInitialSensorParams) {
     imuParameters->Tg0 =
         eye + vio::Sample::gaussian(imuParameters->sigma_TGElement, 9);
     imuParameters->Ts0 =

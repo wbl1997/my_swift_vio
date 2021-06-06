@@ -37,8 +37,9 @@ void addLandmarkNoise(
     double axisSigma = 0.1);
 
 void initCameraNoiseParams(
-    okvis::ExtrinsicsEstimationParameters *cameraNoiseParams,
-    double sigma_abs_position, bool fixCameraInternalParams);
+    double sigma_abs_position, double sigma_abs_orientation,
+    bool fixCameraInternalParams,
+    okvis::ExtrinsicsEstimationParameters *cameraNoiseParams);
 
 } // namespace simul
 #endif // LANDMARKGRID_H

@@ -286,7 +286,7 @@ bool HybridFilter::addStates(okvis::MultiFramePtr multiFrame,
     if (initialNavState_.initWithExternalSource) {
       T_WS = okvis::kinematics::Transformation(initialNavState_.p_WS, initialNavState_.q_WS);
     } else {
-      bool success0 = initPoseFromImu(imuMeasurements, T_WS);
+      bool success0 = swift_vio::initPoseFromImu(imuMeasurements, T_WS);
       OKVIS_ASSERT_TRUE_DBG(
           Exception, success0,
           "pose could not be initialized from imu measurements.");
@@ -373,8 +373,8 @@ bool HybridFilter::addStates(okvis::MultiFramePtr multiFrame,
       }
     }
     if (numUsedImuMeasurements < 2) {
-      LOG(WARNING) << "numUsedImuMeasurements=" << numUsedImuMeasurements
-                   << " correctedStateTime " << correctedStateTime
+      LOG(WARNING) << "numUsedImuMeasurements " << numUsedImuMeasurements
+                   << " is too small. correctedStateTime " << correctedStateTime
                    << " lastFrameTimestamp " << startTime << " tdEstimate "
                    << tdEstimate << std::endl;
     }
@@ -3009,28 +3009,35 @@ swift_vio::TriangulationStatus HybridFilter::triangulateAMapPoint(
 
 bool HybridFilter::printStatesAndStdevs(std::ostream& stream) const {
   printNavStateAndBiases(stream, statesMap_.rbegin()->first);
-  const States stateInQuestion = statesMap_.rbegin()->second;
+  const States& stateInQuestion = statesMap_.rbegin()->second;
   Eigen::Matrix<double, Eigen::Dynamic, 1> extraParams;
   getImuAugmentedStatesEstimate(&extraParams);
   stream << " " << extraParams.transpose().format(kSpaceInitFmt);
 
   size_t numCameras = cameraRig_.numberCameras();
   for (size_t camIdx = 0u; camIdx < numCameras; ++camIdx) {
-    uint64_t extrinsicId = stateInQuestion.sensors.at(SensorStates::Camera)
-                               .at(camIdx)
-                               .at(okvis::Estimator::CameraSensorStates::T_SCi)
-                               .id;
-    std::shared_ptr<okvis::ceres::PoseParameterBlock> extrinsicParamBlockPtr =
-        std::static_pointer_cast<okvis::ceres::PoseParameterBlock>(
-            mapPtr_->parameterBlockPtr(extrinsicId));
-    okvis::kinematics::Transformation T_XC = extrinsicParamBlockPtr->estimate();
-    Eigen::VectorXd extrinsicValues;
-    ExtrinsicModelToParamValues(cameraRig_.getExtrinsicOptMode(camIdx), T_XC, &extrinsicValues);
-    stream << " " << extrinsicValues.transpose().format(kSpaceInitFmt);
+    if (!fixCameraExtrinsicParams_[camIdx]) {
+      uint64_t extrinsicId =
+          stateInQuestion.sensors.at(SensorStates::Camera)
+              .at(camIdx)
+              .at(okvis::Estimator::CameraSensorStates::T_SCi)
+              .id;
+      std::shared_ptr<okvis::ceres::PoseParameterBlock> extrinsicParamBlockPtr =
+          std::static_pointer_cast<okvis::ceres::PoseParameterBlock>(
+              mapPtr_->parameterBlockPtr(extrinsicId));
+      okvis::kinematics::Transformation T_XC =
+          extrinsicParamBlockPtr->estimate();
+      Eigen::VectorXd extrinsicValues;
+      ExtrinsicModelToParamValues(cameraRig_.getExtrinsicOptMode(camIdx), T_XC,
+                                  &extrinsicValues);
+      stream << " " << extrinsicValues.transpose().format(kSpaceInitFmt);
+    }
 
-    Eigen::VectorXd cameraParams;
-    getEstimatedCameraIntrinsics(&cameraParams, camIdx);
-    stream << " " << cameraParams.transpose().format(kSpaceInitFmt);
+    if (!fixCameraIntrinsicParams_[camIdx]) {
+      Eigen::VectorXd cameraParams;
+      getEstimatedCameraIntrinsics(&cameraParams, camIdx);
+      stream << " " << cameraParams.transpose().format(kSpaceInitFmt);
+    }
   }
 
   const int stateDim = startIndexOfClonedStatesFast();
@@ -3202,27 +3209,31 @@ Eigen::VectorXd HybridFilter::getDesiredCameraParamStdevs() const {
   int index = 0;
   size_t numCameras = extrinsicsEstimationParametersVec_.size();
   for (size_t j = 0u; j < numCameras; ++j) {
-    Eigen::VectorXd camExtrinsicStdevs;
-    ExtrinsicModelToDesiredStdevs(cameraRig_.getExtrinsicOptMode(j),
-                                  &camExtrinsicStdevs);
-    desiredCameraParamStdevs.segment(index, camExtrinsicStdevs.size()) =
-        camExtrinsicStdevs;
-    index += camExtrinsicStdevs.size();
+    if (!fixCameraExtrinsicParams_[j]) {
+      Eigen::VectorXd camExtrinsicStdevs;
+      ExtrinsicModelToDesiredStdevs(cameraRig_.getExtrinsicOptMode(j),
+                                    &camExtrinsicStdevs);
+      desiredCameraParamStdevs.segment(index, camExtrinsicStdevs.size()) =
+          camExtrinsicStdevs;
+      index += camExtrinsicStdevs.size();
+    }
 
-    Eigen::VectorXd camProjectionIntrinsicStdevs;
-    ProjectionOptToDesiredStdevs(cameraRig_.getProjectionOptMode(j),
-                                 &camProjectionIntrinsicStdevs);
-    Eigen::VectorXd camDistortionStdevs;
-    swift_vio::cameras::DistortionTypeToDesiredStdevs(
-        cameraRig_.getDistortionType(j), &camDistortionStdevs);
+    if (!fixCameraIntrinsicParams_[j]) {
+      Eigen::VectorXd camProjectionIntrinsicStdevs;
+      ProjectionOptToDesiredStdevs(cameraRig_.getProjectionOptMode(j),
+                                   &camProjectionIntrinsicStdevs);
+      Eigen::VectorXd camDistortionStdevs;
+      swift_vio::cameras::DistortionTypeToDesiredStdevs(
+          cameraRig_.getDistortionType(j), &camDistortionStdevs);
 
-    desiredCameraParamStdevs.segment(index,
-                                     camProjectionIntrinsicStdevs.size()) =
-        camProjectionIntrinsicStdevs;
-    index += camProjectionIntrinsicStdevs.size();
-    desiredCameraParamStdevs.segment(index, camDistortionStdevs.size()) =
-        camDistortionStdevs;
-    index += camDistortionStdevs.size();
+      desiredCameraParamStdevs.segment(index,
+                                       camProjectionIntrinsicStdevs.size()) =
+          camProjectionIntrinsicStdevs;
+      index += camProjectionIntrinsicStdevs.size();
+      desiredCameraParamStdevs.segment(index, camDistortionStdevs.size()) =
+          camDistortionStdevs;
+      index += camDistortionStdevs.size();
+    }
     desiredCameraParamStdevs[index] = 1e-3;
     index++;
     desiredCameraParamStdevs[index] = 1e-3;
@@ -3235,25 +3246,29 @@ std::vector<std::string> HybridFilter::getCameraParamLabels() const {
   std::vector<std::string> cameraParamLabels;
   size_t numCameras = extrinsicsEstimationParametersVec_.size();
   for (size_t j = 0u; j < numCameras; ++j) {
-    std::vector<std::string> camExtrinsicLabels;
-    ExtrinsicModelToDimensionLabels(cameraRig_.getExtrinsicOptMode(j),
-                                    &camExtrinsicLabels);
-    cameraParamLabels.insert(cameraParamLabels.end(),
-                             camExtrinsicLabels.begin(),
-                             camExtrinsicLabels.end());
+    if (!fixCameraExtrinsicParams_[j]) {
+      std::vector<std::string> camExtrinsicLabels;
+      ExtrinsicModelToDimensionLabels(cameraRig_.getExtrinsicOptMode(j),
+                                      &camExtrinsicLabels);
+      cameraParamLabels.insert(cameraParamLabels.end(),
+                               camExtrinsicLabels.begin(),
+                               camExtrinsicLabels.end());
+    }
 
-    std::vector<std::string> camProjectionIntrinsicLabels;
-    ProjectionOptToDimensionLabels(cameraRig_.getProjectionOptMode(j),
-                                   &camProjectionIntrinsicLabels);
-    std::vector<std::string> camDistortionLabels;
-    swift_vio::cameras::DistortionTypeToDimensionLabels(
-        cameraRig_.getDistortionType(j), &camDistortionLabels);
-    cameraParamLabels.insert(cameraParamLabels.end(),
-                             camProjectionIntrinsicLabels.begin(),
-                             camProjectionIntrinsicLabels.end());
-    cameraParamLabels.insert(cameraParamLabels.end(),
-                             camDistortionLabels.begin(),
-                             camDistortionLabels.end());
+    if (!fixCameraIntrinsicParams_[j]) {
+      std::vector<std::string> camProjectionIntrinsicLabels;
+      ProjectionOptToDimensionLabels(cameraRig_.getProjectionOptMode(j),
+                                     &camProjectionIntrinsicLabels);
+      std::vector<std::string> camDistortionLabels;
+      swift_vio::cameras::DistortionTypeToDimensionLabels(
+          cameraRig_.getDistortionType(j), &camDistortionLabels);
+      cameraParamLabels.insert(cameraParamLabels.end(),
+                               camProjectionIntrinsicLabels.begin(),
+                               camProjectionIntrinsicLabels.end());
+      cameraParamLabels.insert(cameraParamLabels.end(),
+                               camDistortionLabels.begin(),
+                               camDistortionLabels.end());
+    }
     cameraParamLabels.push_back("td[s]");
     cameraParamLabels.push_back("tr[s]");
   }

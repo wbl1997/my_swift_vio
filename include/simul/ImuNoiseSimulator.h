@@ -3,6 +3,7 @@
 
 #include "okvis/ImuMeasurements.hpp"
 #include "okvis/Parameters.hpp"
+#include <simul/SimParameters.h>
 
 #include <Eigen/Core>
 #include <Eigen/Dense>
@@ -15,22 +16,11 @@
 namespace simul {
 /**
  * @brief initImuNoiseParams
- * @param imuParameters
- * @param noisyInitialSpeedAndBiases
- * @param noisyInitialSensorParams
- * @param sigma_bg std dev of initial gyroscope bias.
- * @param sigma_ba std dev of initial accelerometer bias.
- * @param std_Ta_elem
- * @param fixImuInternalParams If true, set the noise of IMU intrinsic
- *     parameters (including misalignment shape matrices) to zeros in order
- *     to fix IMU intrinsic parameters in estimator.
+ * @param[in] simImuParameters
+ * @param[out] imuParameters
  */
 void initImuNoiseParams(
-    bool noisyInitialSpeedAndBiases,
-    bool noisyInitialSensorParams,
-    double sigma_bg, double sigma_ba, double std_Tg_elem,
-    double std_Ts_elem, double std_Ta_elem,
-    bool fixImuInternalParams,
+    const SimImuParameters& simImuParameters,
     okvis::ImuParameters* imuParameters);
 
 /**

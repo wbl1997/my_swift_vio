@@ -6,7 +6,14 @@
 
 #include <simul/curves.h>
 
+#include <vio/VimapContainer.h>
+
 namespace simul {
+
+okvis::ImuSensorReadings interpolate(const okvis::ImuSensorReadings &left,
+                                     const okvis::ImuSensorReadings &right,
+                                     double ratio);
+
 class SimDataInterface {
  protected:
   bool addImageNoise_;                ///< Add noise to image observations
@@ -25,10 +32,13 @@ class SimDataInterface {
 
   // imu meas. covering at least [start, finish].
   okvis::ImuMeasurementDeque imuMeasurements_;
+  okvis::ImuParameters imuParameters_;
 
   // landmarks
   std::vector<Eigen::Vector4d, Eigen::aligned_allocator<Eigen::Vector4d>>
       homogeneousPoints_;
+  // Warn: To avoid conflicits with ids used in the backend estimator,
+  // okvis::IdProvider should be used for generating Ids.
   std::vector<uint64_t> lmIds_;
 
   // variables for iterations
@@ -40,18 +50,25 @@ class SimDataInterface {
   okvis::Time lastRefNFrameTime_;
 
 public:
-
-  SimDataInterface(bool addImageNoise) : addImageNoise_(addImageNoise) {}
+  SimDataInterface(const okvis::ImuParameters& imuParams, bool addImageNoise) :
+    addImageNoise_(addImageNoise), imuParameters_(imuParams) {}
 
   virtual ~SimDataInterface() {}
 
   /**
-   * @brief rewind prepare for iteration at the start.
+   * @brief rewind prepare for iteration at the start. Call this after resetImuBiases.
+   * @return whether rewind is successful.
    */
-  virtual void rewind() = 0;
+  virtual bool rewind() = 0;
 
   virtual bool nextNFrame() = 0;
 
+  /**
+   * @brief addFeaturesToNFrame
+   * @param[in] refCameraSystem
+   * @param[out] multiFrame will be assigned keypoints for individual frames.
+   * @param[out] keypointIndexForLandmarks keypoint indices for landmarks in frames.
+   */
   virtual void addFeaturesToNFrame(
       std::shared_ptr<const okvis::cameras::NCameraSystem> refCameraSystem,
       std::shared_ptr<okvis::MultiFrame> multiFrame,
@@ -85,9 +102,7 @@ public:
     return ref_v_WS_list_[refIndex_];
   }
 
-  okvis::ImuSensorReadings currentBiases() const {
-    return refBiasIter_->measurement;
-  }
+  okvis::ImuSensorReadings currentBiases() const;
 
   okvis::ImuMeasurementDeque imuMeasurementsSinceLastNFrame() const {
     return latestImuMeasurements_;
@@ -101,22 +116,26 @@ public:
   const std::vector<uint64_t> &landmarkIds() { return lmIds_; }
 
   void navStateAtStart(okvis::kinematics::Transformation *T_WB,
-                                  Eigen::Vector3d *v_WB) const {
+                       Eigen::Vector3d *v_WB) const {
     *T_WB = ref_T_WS_list_.front();
     *v_WB = ref_v_WS_list_.front();
+  }
+
+  const okvis::ImuParameters& imuParameters() const {
+    return imuParameters_;
   }
 };
 
 class SimFromRealData : public SimDataInterface {
 public:
-  SimFromRealData(const std::string& dataDir, bool addImageNoise);
+  SimFromRealData(const std::string& dataDir, const okvis::ImuParameters& imuParameters, bool addImageNoise);
 
   virtual ~SimFromRealData() {}
 
   void initializeLandmarkGrid(LandmarkGridType /*gridType*/,
-                              double /*landmarkRadius*/) final {}
+                              double /*landmarkRadius*/) final;
 
-  void rewind() final;
+  bool rewind() final;
 
   bool nextNFrame() final;
 
@@ -125,7 +144,15 @@ public:
       std::shared_ptr<okvis::MultiFrame> multiFrame,
       std::vector<std::vector<int>> *keypointIndexForLandmarks) const final;
 
-  int expectedNumNFrames() const { return 0; }
+  int expectedNumNFrames() const;
+
+private:
+  Eigen::Vector3d g_oldW_;  // gravity in the world frame used by the real data.
+  okvis::kinematics::Transformation
+      T_newW_oldW_; // To transform entities in the world frame used by the real
+                    // data to a new world frame with z along negative gravity.
+
+  vio::VimapContainer vimap_;
 };
 
 class CurveData : public SimDataInterface {
@@ -143,7 +170,7 @@ public:
 
   void initializeLandmarkGrid(LandmarkGridType gridType, double landmarkRadius) final;
 
-  void rewind() final;
+  bool rewind() final;
 
   bool nextNFrame() final;
 
@@ -160,6 +187,14 @@ public:
 void saveCameraParameters(
     std::shared_ptr<okvis::cameras::NCameraSystem> cameraSystem,
     const std::string cameraFile);
+
+/**
+ * @brief loadImuYaml
+ * @param[in] imuYaml imu yaml in the format of the Kalibr output.
+ * @param[out] imuParams
+ * @param[out] g_W gravity vector in the external world frame.
+ */
+void loadImuYaml(const std::string& imuYaml, okvis::ImuParameters* imuParams, Eigen::Vector3d *g_W);
 
 } // namespace simul
 #endif // INCLUDE_SWIFT_VIO_SIM_DATA_INTERFACE_HPP_

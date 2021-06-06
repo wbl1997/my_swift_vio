@@ -651,23 +651,23 @@ TEST(ImuOdometry, RiCovariancePropagationWithLargeV) {
   propagateRiCovarianceFromZero(nullptr, velocityPtr, true);
 }
 
-TEST(ImuOdometry, InitPoseFromImu) {
-  Eigen::Vector3d acc_B(2, -1, 3);
-  Eigen::Vector3d e_acc = acc_B.normalized();
-
-  // align with ez_W:
-  Eigen::Vector3d ez_W(0.0, 0.0, 1.0);  // Negative gravity direction, i.e., Z
-                                        // direction, in the local frame
-  Eigen::Matrix<double, 6, 1> poseIncrement;
-  poseIncrement.head<3>() = Eigen::Vector3d::Zero();
-  poseIncrement.tail<3>() = ez_W.cross(e_acc).normalized();
-  double angle = std::acos(ez_W.transpose() * e_acc);
-  poseIncrement.tail<3>() *= angle;
-  okvis::kinematics::Transformation T_WS;
-  T_WS.setIdentity();
-  T_WS.oplus(-poseIncrement);
-  Eigen::Vector3d transVec = T_WS.q()._transformVector(acc_B);
-  transVec.normalize();  // predicted negative gravity
-
-  ASSERT_LT((transVec - ez_W).norm(), 1e-8);
+TEST(ImuOdometry, initPoseFromImu) {
+  Eigen::Vector3d acc_B = Eigen::Vector3d::Random();
+  okvis::ImuMeasurementDeque imuMeasurements;
+  imuMeasurements.emplace_back(okvis::Time(1.0), okvis::ImuSensorReadings(Eigen::Vector3d::Random(), acc_B));
+  okvis::kinematics::Transformation T_WB;
+  swift_vio::initPoseFromImu(imuMeasurements, T_WB);
+  Eigen::Vector3d transVec = T_WB.q()._transformVector(acc_B);
+  transVec.normalize();
+  ASSERT_LT((transVec - Eigen::Vector3d(0, 0, 1)).norm(), 1e-8);
 }
+
+TEST(ImuOdometry, alignZ) {
+  Eigen::Vector3d acc_B = Eigen::Vector3d::Random();
+  Eigen::Quaterniond q_WB;
+  swift_vio::alignZ(acc_B, &q_WB);
+  Eigen::Vector3d acc_W = q_WB._transformVector(acc_B);
+  acc_W.normalize();
+  ASSERT_LT((acc_W - Eigen::Vector3d(0, 0, 1)).norm(), 1e-8);
+}
+

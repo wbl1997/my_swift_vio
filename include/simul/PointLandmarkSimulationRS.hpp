@@ -13,16 +13,15 @@ class PointLandmarkSimulationRS
  public:
   /**
    * @brief projectLandmarksToNFrame
-   * @param homogeneousPoints
-   * @param T_WS_ref
-   * @param cameraSystemRef
-   * @param[in, out] nframes the keypoints for every frame are created from
-   * observations of successfully projected landmarks.
-   * @param frameLandmarkIndices {{landmark index of every keypoint} in every
-   * frame}, every entry >= 0, length = number of valid projections = number of keypoints.
-   * @param keypointIndices {{every landmark's keypoint index} in every frame},
-   * valid entry >= 0, void entry -1, length = number of landmarks.
-   * @param imageNoiseMag
+   * @param[in] homogeneousPoints
+   * @param[in] simulatedTrajectory
+   * @param[in] trueCentralRowEpoch
+   * @param[in] cameraSystemRef
+   * @param[out] nframes will be assigned keypoints for individual frames.
+   * Only keypoints for successfully projected landmarks are kept.
+   * @param[out] frameLandmarkIndices landmark indices of keypoints in frames.
+   * @param[out] keypointIndices keypoint indices for landmarks in frames. -1 means projection failure.
+   * @param[in] imageNoiseMag
    */
   static void projectLandmarksToNFrame(
       const std::vector<Eigen::Vector4d,

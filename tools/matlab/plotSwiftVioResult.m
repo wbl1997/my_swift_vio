@@ -9,7 +9,7 @@ end
 if nargin < 4
     [outputPath, ~, ~] = fileparts(vio_file);
     disp(['outputPath is set to ', outputPath]);
-endoptions.p_BC = [];
+end
 
 if options.export_fig_path
     addpath(options.export_fig_path);
@@ -35,7 +35,7 @@ applyUmeyama = 0;
 
 if gt_file
     gt = readmatrix(gt_file, 'NumHeaderLines', 1);
-    index= find(abs(gt(:,1) - startToptions.p_BC = [];ime)<5e-2);
+    index= find(abs(gt(:,1) - startTime)<5e-2);
     gt = gt(index:end,:);
     if(endTime>gt(end,1))
         endTime = gt(end,1);
@@ -100,11 +100,7 @@ if gt_file
     end
 else
     gt = [];
-    if data(1, 1) > sec_to_nanos
-        data(:,1) = (data(:,1) - startTime) / sec_to_nanos;
-    else
-        data(:,1) = data(:,1) - startTime;
-    end
+    data(:,1) = data(:,1) - startTime;
     data_diff = [];
 end
 
@@ -210,7 +206,7 @@ export_fig(outputfig);
 
 plotImuBiases(data, options, outputPath);
 
-if ~isempty(options.p_camera_std)
+if ~isempty(options.p_camera)
     figure;
     drawMeanAndStdBound(data, options.p_camera, options.p_camera_std, 100.0);
     ylabel('p_{camera}[cm]');
@@ -254,10 +250,10 @@ export_fig(outputfig);
 end
 
 function plotCameraIntrinsics(data, options, outputPath)
-if ~isempty(options.fxy_cxy_std) && options.fxy_cxy_std(end) < size(data, 2)
+if ~isempty(options.fxy_cxy) && options.fxy_cxy_std(end) < size(data, 2)
     figure;
     data(:, options.fxy_cxy) = data(:, options.fxy_cxy) - ...
-        repmat(options.trueIntrinsics, size(data, 1), 1);
+        repmat(options.trueCameraIntrinsics, size(data, 1), 1);
     drawMeanAndStdBound(data, options.fxy_cxy, ...
         options.fxy_cxy_std);
     legend('f_x','f_y','c_x','c_y','3\sigma_f_x','3\sigma_f_y',...
@@ -271,7 +267,7 @@ if ~isempty(options.fxy_cxy_std) && options.fxy_cxy_std(end) < size(data, 2)
     export_fig(outputfig);
 end
 
-if ~isempty(options.k1_k2_std) && options.k1_k2_std(end) < size(data, 2)
+if ~isempty(options.k1_k2) && options.k1_k2_std(end) < size(data, 2)
     figure;
     drawMeanAndStdBound(data, options.k1_k2, options.k1_k2_std);
     ylabel('k_1 and k_2[1]');
@@ -283,7 +279,7 @@ if ~isempty(options.k1_k2_std) && options.k1_k2_std(end) < size(data, 2)
     export_fig(outputfig);
 end
 
-if ~isempty(options.p1_p2_std) && options.p1_p2_std(end) < size(data, 2)
+if ~isempty(options.p1_p2) && options.p1_p2_std(end) < size(data, 2)
     figure;
     p1p2Scale = 1e2;
     drawMeanAndStdBound(data, options.p1_p2, options.p1_p2_std, p1p2Scale);
@@ -299,7 +295,7 @@ end
 
 function plotImuIntrinsicParameters(data, options, outputPath)
 % It will modify data by subtracting reference values from data
-if ~isempty(options.T_g_std) && options.T_g_std(end) < size(data, 2)
+if ~isempty(options.T_g) && options.T_g_std(end) < size(data, 2)
     figure;
     data(:, options.T_g_diag) = data(:, options.T_g_diag) ...
         - ones(size(data, 1), 3);
@@ -337,7 +333,7 @@ end
 end
 
 function plotTemporalParameters(data, options, outputPath)
-if ~isempty(options.td_std) && options.td_std < size(data, 2)
+if ~isempty(options.td) && options.td_std < size(data, 2)
     figure;
     drawMeanAndStdBound(data, options.td, ...
         options.td_std, 1000);
@@ -350,7 +346,7 @@ if ~isempty(options.td_std) && options.td_std < size(data, 2)
     export_fig(outputfig);
 end
 
-if ~isempty(options.tr_std) && options.tr_std <= size(data, 2)
+if ~isempty(options.tr) && options.tr_std <= size(data, 2)
     figure;
     drawMeanAndStdBound(data, options.tr, ...
         options.tr_std, 1000);

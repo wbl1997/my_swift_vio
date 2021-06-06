@@ -158,13 +158,13 @@ public:
     swift_vio::EstimatorAlgorithm algorithm = swift_vio::EstimatorAlgorithm::MSCKF;
 
     simul::SimImuParameters imuParams(
-        "Torus", addImuNoise, noisyInitialSpeedAndBiases,
-        false, true,
-        noise_factor, noise_factor);
+        "Torus", addImuNoise, noisyInitialSpeedAndBiases, false, true, 5e-3,
+        2e-2, 5e-3, 1e-3, 5e-3, 1.2e-3, 2e-5, 8e-3, 5.5e-5, noise_factor,
+        noise_factor);
     simul::SimVisionParameters visionParams(
         true, true, cameraModelId,
         cameraOrientationId, "FXY_CXY", "P_CB",
-        true, timeOffset,
+        true, 0.02, 0.0, timeOffset,
         readoutTime, false,
         simul::LandmarkGridType::FourWalls, landmarkRadius);
     simul::SimEstimatorParameters estimatorParams(

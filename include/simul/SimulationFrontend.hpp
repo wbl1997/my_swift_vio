@@ -160,16 +160,17 @@ class SimulationFrontend {
 
 /**
  * @brief initCameraNoiseParams
- * @param cameraNoiseParams
  * @param sigma_abs_position
- * @param fixCameraInteranlParams If true, set the noise of camera intrinsic
- *     parameters (including projection and distortion and time offset and
- *     readout time) to zeros in order to fix camera intrinsic parameters in estimator.
+ * @param sigma_abs_orientation
+ * @param fixCameraInteranlParams If true, set the noises of camera intrinsic
+ * parameters (including projection and distortion), time offset, and
+ * readout time) to zeros in order to fix camera intrinsic parameters in estimator.
+ * @param cameraNoiseParams
  */
 void initCameraNoiseParams(
-    okvis::ExtrinsicsEstimationParameters* cameraNoiseParams,
-    double sigma_abs_position, bool fixCameraInteranlParams);
-
+    double sigma_abs_position, double sigma_abs_orientation,
+    bool fixCameraInternalParams,
+    okvis::ExtrinsicsEstimationParameters *cameraNoiseParams);
 
 }  // namespace simul
 
