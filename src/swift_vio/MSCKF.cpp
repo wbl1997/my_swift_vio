@@ -531,10 +531,11 @@ int MSCKF::computeStackedJacobianAndResidual(
     vR_o.push_back(R_oi);
     vH_o.push_back(H_oi);
     dimH_o[0] += r_oi.rows();
+    ++mTrackLengthAccumulator[mapPoint.observations.size()];
     ++numMarginalizedLandmarks;
   }
-//  LOG(INFO) << "MSCKF landmark candidates " << msckfLandmarks.size() << " used "
-//            << numMarginalizedLandmarks << ".";
+  VLOG(0) << "Used #MSCKF landmarks " << numMarginalizedLandmarks << " out of "
+          << msckfLandmarks.size() << " candidates.";
   if (dimH_o[0] == 0) {
     return 0;
   }
@@ -624,7 +625,7 @@ void MSCKF::optimize(size_t /*numIter*/, size_t /*numThreads*/, bool verbose) {
       }
     }
     slamStats_.finishUpdatingSceneDepth();
-//    LOG(INFO) << "median scene depth " << slamStats_.medianSceneDepth();
+    VLOG(1) << "median scene depth " << slamStats_.medianSceneDepth();
     updateLandmarksTimer.stop();
   }
 

@@ -50,6 +50,7 @@ void loadImuYaml(const std::string &imuYaml,
   for (int i = 0; i < 3; ++i) {
     (*g_W)[i] = gravityNode[i];
   }
+  imuParameters->g = g_W->norm();
   file.release();
 }
 
@@ -203,7 +204,6 @@ SimFromRealData::SimFromRealData(const std::string &dataDir, const okvis::ImuPar
   loadImuYaml(imuYaml, &imuParameters_, &g_oldW_);
   Eigen::Quaterniond q_newW_oldW;
   swift_vio::alignZ(-g_oldW_, &q_newW_oldW);
-  LOG(INFO) << "g new " << q_newW_oldW._transformVector(g_oldW_).transpose() << " should be 0,0,-1";
   T_newW_oldW_ = okvis::kinematics::Transformation(Eigen::Vector3d::Zero(), q_newW_oldW);
   for (auto& T_WS : ref_T_WS_list_) {
     T_WS = T_newW_oldW_ * T_WS;
@@ -267,7 +267,7 @@ void SimFromRealData::addFeaturesToNFrame(
       &keypointsInAllFrames = vimap_.validKeypoints();
   for (size_t camId = 0u; camId < vimap_.numberCameras(); ++camId) {
     const vio::CornersInImage &corners =
-        keypointsInAllFrames.at(refIndex_ * vimap_.numberCameras() + camId);
+        keypointsInAllFrames.at((refIndex_ + FLAGS_sim_start_index) * vimap_.numberCameras() + camId);
     std::vector<cv::KeyPoint> keypoints;
     keypoints.reserve(corners.corner_ids.size());
     for (size_t i = 0u; i < corners.corner_ids.size(); ++i) {
@@ -292,7 +292,7 @@ void SimFromRealData::addFeaturesToNFrame(
       if (index != -1) {
         OKVIS_ASSERT_EQ(
             std::runtime_error, landmarkId,
-            keypointsInAllFrames[refIndex_ * vimap_.numberCameras() + camId]
+            keypointsInAllFrames[(refIndex_ + FLAGS_sim_start_index) * vimap_.numberCameras() + camId]
                 .corner_ids[index],
             "Wrong landmark ID association!");
         Eigen::Vector2d keypoint;
@@ -307,7 +307,7 @@ void SimFromRealData::addFeaturesToNFrame(
                 hpC, &projection);
         if (status !=
                 okvis::cameras::CameraBase::ProjectionStatus::Successful ||
-            (keypoint - projection).norm() > 15) {
+            (keypoint - projection).norm() > 30) {
           LOG(INFO) << "keypoint " << keypoint.transpose() << " reprojection "
                     << projection.transpose() << " status " << (int)status;
         }

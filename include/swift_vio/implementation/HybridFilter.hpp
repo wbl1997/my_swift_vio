@@ -73,7 +73,7 @@ HybridFilter::computeCameraObservationJacobians(
     case swift_vio::cameras::kReprojectionErrorId: {
       typedef okvis::ceres::RsReprojectionError<
           CameraGeometry, ProjectionIntrinsicModel, ExtrinsicModel,
-          PointLandmarkModel, ImuModel>
+          PointLandmarkModel>
           RsReprojectionErrorModel;
       std::shared_ptr<const okvis::ImuMeasurementDeque> imuMeasDequePtr =
           statesIter->second.imuReadingWindow;

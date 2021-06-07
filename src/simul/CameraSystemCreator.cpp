@@ -163,8 +163,6 @@ loadCameraSystemYaml(const std::string &camImuChainYaml) {
         camNode["distortion_coeffs"].size() >= 1 &&
         camNode["distortion_model"].isString() &&
         camNode["intrinsics"].isSeq() && camNode["intrinsics"].size() == 4) {
-      LOG(INFO) << "Found calibration in configuration file for camera "
-                << camIdx;
     } else {
       break;
     }

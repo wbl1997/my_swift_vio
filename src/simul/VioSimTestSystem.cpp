@@ -9,6 +9,13 @@
 
 #include <simul/CameraSystemCreator.hpp>
 
+DEFINE_int32(minTrackLengthForSlam, 6,
+             "A feature has to meet the min track length to be included in the "
+             "state vector.");
+
+DEFINE_int32(maxHibernationFrames, 3,
+             "A feature hibernate longer than or equal to this will be removed from the state vector.");
+
 namespace simul {
 typedef boost::iterator_range<std::vector<std::pair<double, double>>::iterator>
     HistogramType;
@@ -142,7 +149,9 @@ void VioSimTestSystem::createEstimator(const TestSetting &testSetting) {
   estimator_->setOptimizationOptions(optimOptions);
 
   swift_vio::PointLandmarkOptions plOptions;
-  plOptions.minTrackLengthForSlam = 5;
+  plOptions.minTrackLengthForSlam = FLAGS_minTrackLengthForSlam;
+  plOptions.maxHibernationFrames = FLAGS_maxHibernationFrames;
+  plOptions.maxInStateLandmarks = 80;
   plOptions.landmarkModelId = testSetting.estimatorParams.landmarkModelId;
   estimator_->setPointLandmarkOptions(plOptions);
 
@@ -328,6 +337,13 @@ void VioSimTestSystem::run(const simul::TestSetting &testSetting,
                     << " #keyframes " << keyframeCount;
       LOG(INFO) << messageStream.str();
       metaStream << messageStream.str() << std::endl;
+
+      // output track length distribution
+      std::string trackStatFile =
+          pathEstimatorTrajectory + "_trackstat_" + ss.str() + ".txt";
+      std::ofstream trackStatStream(trackStatFile, std::ios_base::out);
+      estimator_->printTrackLengthHistogram(trackStatStream);
+      trackStatStream.close();
     } catch (std::exception &e) {
       LOG(INFO) << "Run " << run << " aborts with #processed frames " << frameCount
                 << " #keyframes " << keyframeCount << " and error: " << e.what();

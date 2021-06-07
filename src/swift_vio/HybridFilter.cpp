@@ -1132,6 +1132,7 @@ bool HybridFilter::applyMarginalizationStrategy(okvis::MapPointVector& removedLa
        pit != landmarksMap_.end();) {
     FeatureTrackStatus status = pit->second.status;
     if (pit->second.shouldRemove(pointLandmarkOptions_.maxHibernationFrames)) {
+      ++mTrackLengthAccumulator[pit->second.observations.size()];
       std::map<okvis::KeypointIdentifier, uint64_t> &observationList =
           pit->second.observations;
       for (auto iter = observationList.begin(); iter != observationList.end();
@@ -2433,6 +2434,7 @@ void HybridFilter::optimize(size_t /*numIter*/, size_t /*numThreads*/,
     vR_o.push_back(R_oi);
     vH_o.push_back(H_oi);
     dimH_o[0] += r_oi.rows();
+    ++mTrackLengthAccumulator[mapPoint.observations.size()];
     ++numMsckfLandmarks;
   }
 
@@ -2464,9 +2466,10 @@ void HybridFilter::optimize(size_t /*numIter*/, size_t /*numThreads*/,
     vR_i.push_back(R_i);
     numSlamObservations += r_i.size();
   }
-//  LOG(INFO) << "MSCKF landmark candidates " << msckfLandmarks.size() << " used "
-//            << numMsckfLandmarks << ". SLAM landmarks " << slamLandmarks.size()
-//            << " observation dim " << numSlamObservations;
+  VLOG(0) << "Used #MSCKF landmarks " << numMsckfLandmarks << " out of "
+          << msckfLandmarks.size() << " candidates. "
+          << "Used #observation rows " << numSlamObservations
+          << " out of #SLAM landmarks " << slamLandmarks.size();
   // update with MSCKF features
   if (dimH_o[0] > 0) {
     Eigen::MatrixXd H_o(dimH_o[0], dimH_o[1]);

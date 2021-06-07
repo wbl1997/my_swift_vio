@@ -109,7 +109,7 @@ TEST(DeadreckoningM, TrajectoryLabel) {
       cameraObservationModelId, landmarkModelId, false);
   swift_vio::BackendParams backendParams;
   simul::TestSetting testSetting(imuParams, visionParams,
-                                 estimatorParams, backendParams, "");
+                                 estimatorParams, backendParams, FLAGS_sim_real_data_dir);
   simul::VioSimTestSystem simSystem(checkMSE, checkNEES);
   simSystem.run(testSetting, FLAGS_log_dir);
 }
