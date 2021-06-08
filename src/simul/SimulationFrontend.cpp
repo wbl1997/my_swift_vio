@@ -25,7 +25,7 @@
 namespace simul {
 
 const double SimulationFrontend::fourthRoot2_ = 1.1892071150;
-const int SimulationFrontend::kMaxMatchKeyframes = 2;
+const int SimulationFrontend::kMaxMatchKeyframes = 3;
 const double SimulationFrontend::kMinKeyframeDistance = 0.4;
 const double SimulationFrontend::kMinKeyframeAngle = 10 * M_PI / 180;
 
