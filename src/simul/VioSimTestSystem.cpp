@@ -16,6 +16,10 @@ DEFINE_int32(minTrackLengthForSlam, 6,
 DEFINE_int32(maxHibernationFrames, 3,
              "A feature hibernate longer than or equal to this will be removed from the state vector.");
 
+DEFINE_bool(allKeyframe, false,
+            "Treat all frames as keyframes. Paradoxically, this means using no "
+            "keyframe scheme.");
+
 namespace simul {
 typedef boost::iterator_range<std::vector<std::pair<double, double>>::iterator>
     HistogramType;
@@ -278,12 +282,17 @@ void VioSimTestSystem::run(const simul::TestSetting &testSetting,
         if (!hasStarted) {
           hasStarted = true;
           estimator_->setInitialNavState(initialNavState_);
-          estimator_->addStates(mf, imuSegment, true);
           asKeyframe = true;
+          estimator_->addStates(mf, imuSegment, asKeyframe);
         } else {
-          estimator_->addStates(mf, imuSegment, false);
+          asKeyframe = false;
+          estimator_->addStates(mf, imuSegment, asKeyframe);
         }
         ++frameCount;
+        if (FLAGS_allKeyframe) {
+          asKeyframe = true;
+        }
+
         // add landmark observations
         trackedFeatures = 0;
         if (testSetting.visionParams.useImageObservs) {
