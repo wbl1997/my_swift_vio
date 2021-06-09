@@ -9,58 +9,23 @@ namespace simul {
 void initImuNoiseParams(
     const SimImuParameters& simParams,
     okvis::ImuParameters* imuParameters) {
-  imuParameters->g = 9.81;
   imuParameters->a_max = 1000.0;
   imuParameters->g_max = 1000.0;
-  imuParameters->rate = 100;
 
   imuParameters->sigma_g_c = simParams.sigma_g_c;
   imuParameters->sigma_a_c = simParams.sigma_a_c;
   imuParameters->sigma_gw_c = simParams.sigma_gw_c;
   imuParameters->sigma_aw_c = simParams.sigma_aw_c;
 
-  imuParameters->tau = 600.0;
-
   imuParameters->sigma_bg = simParams.bg_std;
   imuParameters->sigma_ba = simParams.ba_std;
+  imuParameters->g0 = vio::Sample::gaussian(simParams.bg_std, 3);
+  imuParameters->a0 = vio::Sample::gaussian(simParams.ba_std, 3);
 
-  if (simParams.fixImuIntrinsicParams) {
-    imuParameters->sigma_TGElement = 0;
-    imuParameters->sigma_TSElement = 0;
-    imuParameters->sigma_TAElement = 0;
-  } else {
-    // std for every element in shape matrix T_g
-    imuParameters->sigma_TGElement = simParams.Tg_std;
-    imuParameters->sigma_TSElement = simParams.Ts_std;
-    imuParameters->sigma_TAElement = simParams.Ta_std;
-  }
-
-  Eigen::Matrix<double, 9, 1> eye;
-  eye << 1, 0, 0, 0, 1, 0, 0, 0, 1;
-
-  if (simParams.noisyInitialSpeedAndBiases) {
-    imuParameters->a0[0] = vio::gauss_rand(0, imuParameters->sigma_ba);
-    imuParameters->a0[1] = vio::gauss_rand(0, imuParameters->sigma_ba);
-    imuParameters->a0[2] = vio::gauss_rand(0, imuParameters->sigma_ba);
-    imuParameters->g0[0] = vio::gauss_rand(0, imuParameters->sigma_bg);
-    imuParameters->g0[1] = vio::gauss_rand(0, imuParameters->sigma_bg);
-    imuParameters->g0[2] = vio::gauss_rand(0, imuParameters->sigma_bg);
-  } else {
-    imuParameters->a0.setZero();
-    imuParameters->g0.setZero();
-  }
-  if (simParams.noisyInitialSensorParams) {
-    imuParameters->Tg0 =
-        eye + vio::Sample::gaussian(imuParameters->sigma_TGElement, 9);
-    imuParameters->Ts0 =
-        vio::Sample::gaussian(imuParameters->sigma_TSElement, 9);
-    imuParameters->Ta0 =
-        eye + vio::Sample::gaussian(imuParameters->sigma_TAElement, 9);
-  } else {
-    imuParameters->Tg0 = eye;
-    imuParameters->Ts0.setZero();
-    imuParameters->Ta0 = eye;
-  }
+  // std for every element in shape matrices.
+  imuParameters->sigma_TGElement = simParams.Tg_std;
+  imuParameters->sigma_TSElement = simParams.Ts_std;
+  imuParameters->sigma_TAElement = simParams.Ta_std;
 }
 
 void
@@ -77,10 +42,8 @@ addNoiseToImuReadings(const okvis::ImuParameters& imuParameters,
   double sqrtRate = std::sqrt(imuParameters.rate);
   double sqrtDeltaT = 1 / sqrtRate;
   *trueBiases = (*imuMeasurements);
-  // The expected means of the prior of biases, imuParameters.g0 and a0,
-  // fed to the estimator, are different from the true biases.
-  Eigen::Vector3d bgk = Eigen::Vector3d::Zero();
-  Eigen::Vector3d bak = Eigen::Vector3d::Zero();
+  Eigen::Vector3d bgk = imuParameters.g0;
+  Eigen::Vector3d bak = imuParameters.a0;
 
   for (size_t i = 0; i < imuMeasurements->size(); ++i) {
     if (inertialStream) {

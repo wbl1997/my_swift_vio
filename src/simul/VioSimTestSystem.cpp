@@ -69,13 +69,11 @@ computeNormalizedErrors(const Eigen::VectorXd &errors,
   return normalizedSquaredError;
 }
 
-okvis::ImuParameters VioSimTestSystem::createSensorSystem(const TestSetting &testSetting) {
-  // The following parameters are in metric units.
+void VioSimTestSystem::createSensorSystem(const TestSetting &testSetting) {
   initCameraNoiseParams(testSetting.visionParams.sigma_abs_position,
                         testSetting.visionParams.sigma_abs_orientation,
-                        testSetting.visionParams.fixCameraInternalParams,
-                        &extrinsicsEstimationParameters_);
-
+                        &refCameraNoiseParameters_);
+  // create initial camera system used by the estimator.
   if (testSetting.simDataDir.empty()) {
     simul::CameraSystemCreator csc(testSetting.visionParams.cameraModelId,
                                    testSetting.visionParams.cameraOrientationId,
@@ -83,58 +81,83 @@ okvis::ImuParameters VioSimTestSystem::createSensorSystem(const TestSetting &tes
                                    testSetting.visionParams.extrinsicModelName,
                                    testSetting.visionParams.timeOffset,
                                    testSetting.visionParams.readoutTime);
-
     csc.createNominalCameraSystem(&refCameraSystem_);
-
-    if (testSetting.visionParams.noisyInitialSensorParams) {
-      initialCameraSystem_ = createNoisyCameraSystem(refCameraSystem_, extrinsicsEstimationParameters_);
-    } else {
-      initialCameraSystem_ = refCameraSystem_->deepCopy();
-    }
   } else {
     std::string cameraImuYaml =
         testSetting.simDataDir + "/camchain_imucam.yaml";
     refCameraSystem_ = loadCameraSystemYaml(cameraImuYaml);
-    if (testSetting.visionParams.noisyInitialSensorParams) {
-      initialCameraSystem_ = createNoisyCameraSystem(
-          refCameraSystem_, extrinsicsEstimationParameters_);
-    } else {
-      initialCameraSystem_ = refCameraSystem_->deepCopy();
-    }
-    initialCameraSystem_->setProjectionOptMode(0, testSetting.visionParams.projOptModelName);
-    initialCameraSystem_->setExtrinsicOptMode(0, testSetting.visionParams.extrinsicModelName);
+    refCameraSystem_->setProjectionOptMode(0, testSetting.visionParams.projOptModelName);
+    refCameraSystem_->setExtrinsicOptMode(0, testSetting.visionParams.extrinsicModelName);
   }
-  estimatedCameraSystem_ = initialCameraSystem_->deepCopy();
 
-  okvis::ImuParameters imuParameters;
   if (testSetting.estimatorParams.estimator_algorithm <
       swift_vio::EstimatorAlgorithm::HybridFilter) {
-    imuParameters.model_type = "BG_BA"; // use BG_BA for smoothers.
+    refImuParameters_.model_type = "BG_BA"; // use BG_BA for smoothers.
   } else {
-    imuParameters.model_type = "BG_BA_TG_TS_TA";
+    refImuParameters_.model_type = "BG_BA_TG_TS_TA";
   }
-  simul::initImuNoiseParams(testSetting.imuParams, &imuParameters);
-  return imuParameters;
+  simul::initImuNoiseParams(testSetting.imuParams, &refImuParameters_);
 }
 
 void VioSimTestSystem::createEstimator(const TestSetting &testSetting) {
-  initialNavState_.std_p_WS = Eigen::Vector3d(1e-5, 1e-5, 1e-5);
-  initialNavState_.std_q_WS = Eigen::Vector3d(M_PI / 180, M_PI / 180, 1e-5);
-  initialNavState_.std_v_WS = Eigen::Vector3d(5e-2, 5e-2, 5e-2);
-
+  refNavState_.std_p_WS = Eigen::Vector3d(1e-5, 1e-5, 1e-5);
+  refNavState_.std_q_WS = Eigen::Vector3d(M_PI / 180, M_PI / 180, 1e-5);
+  refNavState_.std_v_WS = Eigen::Vector3d(5e-2, 5e-2, 5e-2);
   okvis::kinematics::Transformation T_WS;
   Eigen::Vector3d v_WS;
   simData_->navStateAtStart(&T_WS, &v_WS);
-  Eigen::Vector3d p_WS = T_WS.r();
+  refNavState_.initWithExternalSource = true;
+  refNavState_.p_WS = T_WS.r();
+  refNavState_.q_WS = T_WS.q();
+  refNavState_.v_WS = v_WS;
 
+  initialNavState_ = refNavState_;
   if (testSetting.imuParams.noisyInitialSpeedAndBiases) {
-    v_WS += vio::Sample::gaussian(1, 3).cwiseProduct(initialNavState_.std_v_WS);
+    initialNavState_.v_WS =
+        refNavState_.v_WS +
+        vio::Sample::gaussian(1, 3).cwiseProduct(refNavState_.std_v_WS);
+    initialImuParameters_.a0 =
+        refImuParameters_.a0 +
+        vio::Sample::gaussian(refImuParameters_.sigma_ba, 3);
+    initialImuParameters_.g0 =
+        refImuParameters_.g0 +
+        vio::Sample::gaussian(refImuParameters_.sigma_bg, 3);
   }
 
-  initialNavState_.initWithExternalSource = true;
-  initialNavState_.p_WS = p_WS;
-  initialNavState_.q_WS = T_WS.q();
-  initialNavState_.v_WS = v_WS;
+  if (testSetting.visionParams.noisyInitialSensorParams) {
+    initialCameraSystem_ = createNoisyCameraSystem(
+        refCameraSystem_, refCameraNoiseParameters_);
+  } else {
+    initialCameraSystem_ = refCameraSystem_->deepCopy();
+  }
+
+  initialCameraNoiseParameters_ = refCameraNoiseParameters_;
+  if (testSetting.visionParams.fixCameraInternalParams) {
+    initialCameraNoiseParameters_.sigma_focal_length = 0;
+    initialCameraNoiseParameters_.sigma_principal_point = 0;
+    initialCameraNoiseParameters_.sigma_distortion.resize(5, 0);
+    initialCameraNoiseParameters_.sigma_td = 0;
+    initialCameraNoiseParameters_.sigma_tr = 0;
+  }
+
+  initialImuParameters_ = refImuParameters_;
+  if (testSetting.imuParams.noisyInitialSensorParams) {
+    initialImuParameters_.Tg0 =
+        refImuParameters_.Tg0 +
+        vio::Sample::gaussian(refImuParameters_.sigma_TGElement, 9);
+    initialImuParameters_.Ts0 =
+        refImuParameters_.Ts0 +
+        vio::Sample::gaussian(refImuParameters_.sigma_TSElement, 9);
+    initialImuParameters_.Ta0 =
+        refImuParameters_.Ta0 +
+        vio::Sample::gaussian(refImuParameters_.sigma_TAElement, 9);
+  }
+
+  if (testSetting.imuParams.fixImuIntrinsicParams) {
+    initialImuParameters_.sigma_TGElement = 0;
+    initialImuParameters_.sigma_TSElement = 0;
+    initialImuParameters_.sigma_TAElement = 0;
+  }
 
   evaluationCallback_.reset(new swift_vio::VioEvaluationCallback());
   std::shared_ptr<okvis::ceres::Map> mapPtr(
@@ -159,9 +182,11 @@ void VioSimTestSystem::createEstimator(const TestSetting &testSetting) {
   plOptions.landmarkModelId = testSetting.estimatorParams.landmarkModelId;
   estimator_->setPointLandmarkOptions(plOptions);
 
-  estimator_->addImu(simData_->imuParameters());
+  estimator_->addImu(initialImuParameters_);
   estimator_->addCameraSystem(*initialCameraSystem_);
-  estimator_->addCameraParameterStds(extrinsicsEstimationParameters_);
+  estimator_->addCameraParameterStds(initialCameraNoiseParameters_);
+
+  estimatedCameraSystem_ = initialCameraSystem_->deepCopy();
 }
 
 void VioSimTestSystem::run(const simul::TestSetting &testSetting,
@@ -192,20 +217,21 @@ void VioSimTestSystem::run(const simul::TestSetting &testSetting,
 
   bool verbose = false;
 
-  okvis::ImuParameters imuParameters = createSensorSystem(testSetting);
+  createSensorSystem(testSetting);
 
   if (testSetting.simDataDir.empty()) {
     simData_ = std::shared_ptr<SimDataInterface>(
-        new CurveData(testSetting.imuParams.trajectoryId, imuParameters,
+        new CurveData(testSetting.imuParams.trajectoryId, refImuParameters_,
                       testSetting.visionParams.addImageNoise));
   } else {
     simData_ = std::shared_ptr<SimDataInterface>(new SimFromRealData(
-        testSetting.simDataDir, imuParameters, testSetting.visionParams.addImageNoise));
-    imuParameters = simData_->imuParameters();
+        testSetting.simDataDir, refImuParameters_, testSetting.visionParams.addImageNoise));
+    refImuParameters_ = simData_->imuParameters();
   }
 
-  LOG(INFO) << "sigma_g_c " << imuParameters.sigma_g_c << " sigma_gw_c " << imuParameters.sigma_gw_c
-            << " sigma_a_c " << imuParameters.sigma_a_c << " sigma_aw_c " << imuParameters.sigma_aw_c;
+  LOG(INFO) << "IMU rate " << refImuParameters_.rate << " sigma_g_c " << refImuParameters_.sigma_g_c
+            << " sigma_gw_c " << refImuParameters_.sigma_gw_c << " sigma_a_c "
+            << refImuParameters_.sigma_a_c << " sigma_aw_c " << refImuParameters_.sigma_aw_c;
 
   simData_->initializeLandmarkGrid(testSetting.visionParams.gridType,
                                    testSetting.visionParams.landmarkRadius);
@@ -214,7 +240,7 @@ void VioSimTestSystem::run(const simul::TestSetting &testSetting,
   simData_->saveLandmarkGrid(pointFile);
 
   std::string imuSampleFile = outputPath + "/" + testSetting.imuParams.trajLabel + "_IMU.txt";
-  simData_->resetImuBiases(imuParameters, testSetting.imuParams, imuSampleFile);
+  simData_->resetImuBiases(refImuParameters_, testSetting.imuParams, imuSampleFile);
 
   std::string truthFile = outputPath + "/" + testSetting.imuParams.trajLabel + ".txt";
   simData_->saveRefMotion(truthFile);
@@ -251,7 +277,7 @@ void VioSimTestSystem::run(const simul::TestSetting &testSetting,
     int keyframeCount = 0;
     int trackedFeatures = 0; // feature tracks observed in a frame
 
-    simData_->resetImuBiases(imuParameters, testSetting.imuParams, "");
+    simData_->resetImuBiases(refImuParameters_, testSetting.imuParams, "");
     simData_->rewind();
 
     int expectedNumFrames = simData_->expectedNumNFrames();

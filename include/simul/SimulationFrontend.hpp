@@ -158,20 +158,6 @@ class SimulationFrontend {
       const std::vector<LandmarkKeypointMatch>& landmarkMatches) const;
 };
 
-/**
- * @brief initCameraNoiseParams
- * @param sigma_abs_position
- * @param sigma_abs_orientation
- * @param fixCameraInteranlParams If true, set the noises of camera intrinsic
- * parameters (including projection and distortion), time offset, and
- * readout time) to zeros in order to fix camera intrinsic parameters in estimator.
- * @param cameraNoiseParams
- */
-void initCameraNoiseParams(
-    double sigma_abs_position, double sigma_abs_orientation,
-    bool fixCameraInternalParams,
-    okvis::ExtrinsicsEstimationParameters *cameraNoiseParams);
-
 }  // namespace simul
 
 #endif  // INCLUDE_OKVIS_SIMULATION_FRONTEND_HPP_

@@ -27,7 +27,7 @@ public:
 
   virtual ~VioSimTestSystem() {}
 
-  okvis::ImuParameters createSensorSystem(const TestSetting &testSetting);
+  void createSensorSystem(const TestSetting &testSetting);
 
   void createEstimator(const TestSetting &testSetting);
 
@@ -47,11 +47,17 @@ private:
 
   std::shared_ptr<okvis::cameras::NCameraSystem> refCameraSystem_;       // camera system used for projecting landmarks.
   std::shared_ptr<okvis::cameras::NCameraSystem> initialCameraSystem_;   // camera system used for initilizing the estimator.
-  okvis::ExtrinsicsEstimationParameters extrinsicsEstimationParameters_;
   std::shared_ptr<okvis::cameras::NCameraSystem> estimatedCameraSystem_; // camera system estimated by the estimator.
 
+  okvis::ExtrinsicsEstimationParameters refCameraNoiseParameters_;       // camera noise parameters for simulation
+  okvis::ExtrinsicsEstimationParameters initialCameraNoiseParameters_;   // camera noise parameters to initialize the estimator.
+
+  okvis::ImuParameters refImuParameters_;                                // IMU parameters for simulation
+  okvis::ImuParameters initialImuParameters_;                            // IMU parameters to initialize the estimator.
+
   std::shared_ptr<okvis::Estimator> estimator_;
-  swift_vio::InitialNavState initialNavState_;
+  swift_vio::InitialNavState refNavState_;                               // reference nav state at the start.
+  swift_vio::InitialNavState initialNavState_;                           // nav state at the start to initialize the estimator.
   std::shared_ptr<SimulationFrontend> frontend_;
 
   std::shared_ptr<::ceres::EvaluationCallback> evaluationCallback_;

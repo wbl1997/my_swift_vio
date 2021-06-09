@@ -38,7 +38,6 @@ void addLandmarkNoise(
 
 void initCameraNoiseParams(
     double sigma_abs_position, double sigma_abs_orientation,
-    bool fixCameraInternalParams,
     okvis::ExtrinsicsEstimationParameters *cameraNoiseParams);
 
 } // namespace simul

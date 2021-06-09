@@ -125,26 +125,17 @@ void addLandmarkNoise(
 
 void initCameraNoiseParams(
     double sigma_abs_position, double sigma_abs_orientation,
-    bool fixCameraInternalParams,
     okvis::ExtrinsicsEstimationParameters *cameraNoiseParams) {
   cameraNoiseParams->sigma_absolute_translation = sigma_abs_position;
   cameraNoiseParams->sigma_absolute_orientation = sigma_abs_orientation;
   cameraNoiseParams->sigma_c_relative_translation = 0;
   cameraNoiseParams->sigma_c_relative_orientation = 0;
-  if (fixCameraInternalParams) {
-    cameraNoiseParams->sigma_focal_length = 0;
-    cameraNoiseParams->sigma_principal_point = 0;
-    cameraNoiseParams->sigma_distortion.resize(5, 0);
-    cameraNoiseParams->sigma_td = 0;
-    cameraNoiseParams->sigma_tr = 0;
-  } else {
-    cameraNoiseParams->sigma_focal_length = 5;
-    cameraNoiseParams->sigma_principal_point = 5;
-    cameraNoiseParams->sigma_distortion =
-        std::vector<double>{5e-2, 1e-2, 1e-3, 1e-3, 1e-3};
-    cameraNoiseParams->sigma_td = 5e-3;
-    cameraNoiseParams->sigma_tr = 5e-3;
-  }
-}
 
+  cameraNoiseParams->sigma_focal_length = 5;
+  cameraNoiseParams->sigma_principal_point = 5;
+  cameraNoiseParams->sigma_distortion =
+      std::vector<double>{5e-2, 5e-2, 5e-2, 5e-2, 5e-2};
+  cameraNoiseParams->sigma_td = 1e-2;
+  cameraNoiseParams->sigma_tr = 5e-3;
+}
 } // namespace simul
