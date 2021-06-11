@@ -41,6 +41,11 @@ HybridFrontend::HybridFrontend(size_t numCameras, const FrontendOptions& fronten
 
 }
 
+HybridFrontend::~HybridFrontend() {
+  LOG(INFO) << "HybridFrontend associated " << numNFrames_
+            << " NFrames, and selected " << numKeyframes_ << " keyframes.";
+}
+
 bool HybridFrontend::dataAssociationAndInitialization(
     okvis::Estimator& estimator,
     // TODO(sleutenegger): why is this not used here?
@@ -129,6 +134,8 @@ bool HybridFrontend::dataAssociationAndInitialization(
     } else {
       *asKeyframe = true;
     }
+    ++numNFrames_;
+    numKeyframes_ += (*asKeyframe ? 1 : 0);
     return true;
   }
 
@@ -262,6 +269,8 @@ bool HybridFrontend::dataAssociationAndInitialization(
     matchStereoSwitch(distortionType, estimator, nframes);
   }
 
+  ++numNFrames_;
+  numKeyframes_ += (*asKeyframe ? 1 : 0);
   return true;
 }
 

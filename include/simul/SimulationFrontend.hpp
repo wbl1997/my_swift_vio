@@ -37,6 +37,20 @@ struct AssociatedFrame {
   }
 };
 
+struct SimFrontendOptions {
+  int maxTrackLength_; ///< Cap feature track length
+  int maxMatchKeyframes_;
+  double minKeyframeDistance_;
+  double minKeyframeAngle_;
+
+  SimFrontendOptions(int maxTrackLength = 10, int maxMatchKeyframes = 3,
+                     double minKeyframeDistance = 0.4,
+                     double minKeyframeAngle = 10 * M_PI / 180)
+      : maxTrackLength_(maxTrackLength), maxMatchKeyframes_(maxMatchKeyframes),
+        minKeyframeDistance_(minKeyframeDistance),
+        minKeyframeAngle_(minKeyframeAngle) {}
+};
+
 /**
  * @brief A frontend for simulation with predefined landmarks.
  */
@@ -54,7 +68,7 @@ class SimulationFrontend {
                         Eigen::aligned_allocator<Eigen::Vector4d>>
           &homogeneousPoints,
       const std::vector<uint64_t> &lmIds, size_t numCameras,
-      int maxTrackLength);
+      const SimFrontendOptions &options);
 
   virtual ~SimulationFrontend() {}
 
@@ -80,10 +94,13 @@ class SimulationFrontend {
   /// @{
 
   /// @brief Returns true if the initialization has been completed (RANSAC with actual translation)
-  bool isInitialized() {
+  bool isInitialized() const {
     return isInitialized_;
   }
 
+  int numKeyframes() const {
+    return numKeyframes_;
+  }
   /// @}
   
 
@@ -92,18 +109,11 @@ class SimulationFrontend {
 
   static const double fourthRoot2_; // sqrt(sqrt(2))
 
-  static const double kRangeThreshold; // This value determines when far landmarks are used.
-  static const int kMaxMatchKeyframes;
-  static const double kMinKeyframeDistance;
-  static const double kMinKeyframeAngle;
-
  private:
-
   bool isInitialized_;       ///< Is the pose initialised?
   const size_t numCameras_;  ///< Number of cameras in the configuration.
 
-  int maxTrackLength_; ///< Cap feature track length
-  static const bool singleTwoViewConstraint_ = false;
+  SimFrontendOptions options_;
   Eigen::AlignedDeque<AssociatedFrame> nframeList_;
 
   okvis::kinematics::Transformation previousKeyframePose_;
@@ -112,6 +122,9 @@ class SimulationFrontend {
   std::vector<Eigen::Vector4d, Eigen::aligned_allocator<Eigen::Vector4d>>
       homogeneousPoints_;
   std::vector<uint64_t> lmIds_;
+
+  int numNFrames_;
+  int numKeyframes_;
 
   struct LandmarkKeypointMatch {
     okvis::KeypointIdentifier currentKeypoint;

@@ -25,18 +25,15 @@
 namespace simul {
 
 const double SimulationFrontend::fourthRoot2_ = 1.1892071150;
-const int SimulationFrontend::kMaxMatchKeyframes = 3;
-const double SimulationFrontend::kMinKeyframeDistance = 0.4;
-const double SimulationFrontend::kMinKeyframeAngle = 10 * M_PI / 180;
 
 SimulationFrontend::SimulationFrontend(
     const std::vector<Eigen::Vector4d,
                       Eigen::aligned_allocator<Eigen::Vector4d>>
         &homogeneousPoints,
-    const std::vector<uint64_t> &lmIds, size_t numCameras, int maxTrackLength)
+    const std::vector<uint64_t> &lmIds, size_t numCameras, const SimFrontendOptions& options)
     : isInitialized_(true), numCameras_(numCameras),
-      maxTrackLength_(maxTrackLength), homogeneousPoints_(homogeneousPoints),
-      lmIds_(lmIds) {}
+      options_(options), homogeneousPoints_(homogeneousPoints),
+      lmIds_(lmIds), numNFrames_(0), numKeyframes_(0) {}
 
 int SimulationFrontend::dataAssociationAndInitialization(
     okvis::Estimator& estimator, const std::vector<std::vector<int>>& keypointIndices,
@@ -95,7 +92,7 @@ int SimulationFrontend::dataAssociationAndInitialization(
       }
       ++numKeyframes;
 
-      if (numKeyframes >= kMaxMatchKeyframes) {
+      if (numKeyframes >= options_.maxMatchKeyframes_) {
         break;
       }
     }
@@ -149,8 +146,10 @@ int SimulationFrontend::dataAssociationAndInitialization(
   okvis::kinematics::Transformation current_T_WS;
   estimator.get_T_WS(nframes->id(), current_T_WS);
   *asKeyframe = *asKeyframe || doWeNeedANewKeyframe(estimator, nframes);
+  ++numNFrames_;
   if (*asKeyframe) {
     previousKeyframePose_ = current_T_WS;
+    ++numKeyframes_;
   }
   nframeList_.emplace_back(nframes, current_T_WS, keypointIndices, *asKeyframe);
   uint64_t oldestFrameId = estimator.oldestFrameId();
@@ -176,7 +175,7 @@ bool SimulationFrontend::doWeNeedANewKeyframe(
   okvis::kinematics::Transformation T_SpSc = previousKeyframePose_.inverse() * current_T_WS;
   double distance = T_SpSc.r().norm();
   double rotAngle = std::acos(T_SpSc.q().w()) * 2;
-  if (distance > kMinKeyframeDistance || rotAngle > kMinKeyframeAngle) {
+  if (distance > options_.minKeyframeDistance_ || rotAngle > options_.minKeyframeAngle_) {
     return true;
   } else {
     return false;
@@ -215,7 +214,7 @@ int SimulationFrontend::addMatchToEstimator(
       size_t numObs = estimator.numObservations(lmIdPrevious);
       double sam = vio::Sample::uniform();
       if (sam >
-          static_cast<double>(numObs) / static_cast<double>(maxTrackLength_)) {
+          static_cast<double>(numObs) / static_cast<double>(options_.maxTrackLength_)) {
         currFrames->setLandmarkId(landmarkMatch.currentKeypoint.cameraIndex,
                                   landmarkMatch.currentKeypoint.keypointIndex,
                                   lmIdPrevious);

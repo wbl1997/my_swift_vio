@@ -10,7 +10,7 @@ enum class LandmarkGridType {
   FourWallsFloorCeiling,
   Cylinder,
 };
-const double kRangeThreshold = 20;
+const double kRangeThreshold = 20;  // This value determines when far landmarks are used.
 
 void saveLandmarkGrid(
     const std::vector<Eigen::Vector4d,

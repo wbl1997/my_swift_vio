@@ -16,6 +16,8 @@ DEFINE_int32(minTrackLengthForSlam, 6,
 DEFINE_int32(maxHibernationFrames, 3,
              "A feature hibernate longer than or equal to this will be removed from the state vector.");
 
+DEFINE_int32(maxMatchKeyframes, 3, "Max number of keyframes to match the current frame bundle to.");
+
 DEFINE_bool(allKeyframe, false,
             "Treat all frames as keyframes. Paradoxically, this means using no "
             "keyframe scheme.");
@@ -263,9 +265,10 @@ void VioSimTestSystem::run(const simul::TestSetting &testSetting,
     ss << run;
     std::string outputFile = pathEstimatorTrajectory + "_" + ss.str() + ".txt";
 
+    SimFrontendOptions frontendOptions(60, FLAGS_maxMatchKeyframes);
     frontend_.reset(new SimulationFrontend(simData_->homogeneousPoints(),
                                            simData_->landmarkIds(),
-                                           refCameraSystem_->numCameras(), 60));
+                                           refCameraSystem_->numCameras(), frontendOptions));
 
     createEstimator(testSetting);
 
@@ -276,7 +279,6 @@ void VioSimTestSystem::run(const simul::TestSetting &testSetting,
 
     bool hasStarted = false;
     int frameCount = 0;     // number of frames used in estimator
-    int keyframeCount = 0;
     int trackedFeatures = 0; // feature tracks observed in a frame
     bool runSuccessful = true;
 
@@ -333,10 +335,6 @@ void VioSimTestSystem::run(const simul::TestSetting &testSetting,
           estimator_->setKeyframe(mf->id(), asKeyframe);
         }
 
-        if (asKeyframe) {
-          ++keyframeCount;
-        }
-
         frameFeatureTally(trackedFeatures);
 
         size_t maxIterations = 10u;
@@ -379,7 +377,7 @@ void VioSimTestSystem::run(const simul::TestSetting &testSetting,
       std::stringstream messageStream;
       messageStream << "Run " << run << " finishes with #processed frames " << frameCount
                     << " #tracked features in last frame " << trackedFeatures
-                    << " #keyframes " << keyframeCount << ". Successful? " << runSuccessful;
+                    << " #keyframes " << frontend_->numKeyframes() << ". Successful? " << runSuccessful;
       LOG(INFO) << messageStream.str();
       metaStream << messageStream.str() << std::endl;
 
@@ -393,7 +391,7 @@ void VioSimTestSystem::run(const simul::TestSetting &testSetting,
       std::stringstream messageStream;
       messageStream << "Run " << run << " aborts with #processed frames " << frameCount
                     << " #tracked features in last frame " << trackedFeatures
-                    << " #keyframes " << keyframeCount << " and error: " << e.what();
+                    << " #keyframes " << frontend_->numKeyframes() << " and error: " << e.what();
       LOG(INFO) << messageStream.str();
       metaStream << messageStream.str() << std::endl;
       if (debugStream.is_open()) {

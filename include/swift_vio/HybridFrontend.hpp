@@ -41,7 +41,7 @@ class HybridFrontend : public okvis::Frontend {
    * @param numCameras Number of cameras in the sensor configuration.
    */
   HybridFrontend(size_t numCameras, const FrontendOptions& frontendOptions);
-  virtual ~HybridFrontend() {}
+  ~HybridFrontend() final;
 
   ///@{
  
@@ -60,19 +60,18 @@ class HybridFrontend : public okvis::Frontend {
    * @param[out] asKeyframe Should the frame be a keyframe?
    * @return True if successful.
    */
-  virtual bool dataAssociationAndInitialization(
+  bool dataAssociationAndInitialization(
       okvis::Estimator& estimator,
       okvis::kinematics::Transformation& T_WS_propagated,
       const okvis::VioParameters& params,
       const std::shared_ptr<okvis::MapPointVector> map,
-      std::shared_ptr<okvis::MultiFrame> nframes, bool* asKeyframe);
-
+      std::shared_ptr<okvis::MultiFrame> nframes, bool* asKeyframe) final;
  
   ///@}
  
-  virtual bool isDescriptorBasedMatching() const;
+  bool isDescriptorBasedMatching() const final;
 
-  virtual void setLandmarkTriangulationParameters(
+  void setLandmarkTriangulationParameters(
       double triangulationTranslationThreshold,
       double triangulationMaxDepth) final;
 
@@ -119,8 +118,6 @@ class HybridFrontend : public okvis::Frontend {
       const okvis::VioParameters& params, const uint64_t currentFrameId,
       bool& rotationOnly,
       bool usePoseUncertainty = true, bool removeOutliers = true);
-
-
 
   /**
    * @brief Check the relative motion between current frame and an older frame,
