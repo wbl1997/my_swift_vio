@@ -20,6 +20,8 @@ DEFINE_bool(allKeyframe, false,
             "Treat all frames as keyframes. Paradoxically, this means using no "
             "keyframe scheme.");
 
+DEFINE_double(maxPositionRmse, 100, "If the final position RMSE is greater, then the run will be considered failed.");
+
 namespace simul {
 typedef boost::iterator_range<std::vector<std::pair<double, double>>::iterator>
     HistogramType;
@@ -276,6 +278,7 @@ void VioSimTestSystem::run(const simul::TestSetting &testSetting,
     int frameCount = 0;     // number of frames used in estimator
     int keyframeCount = 0;
     int trackedFeatures = 0; // feature tracks observed in a frame
+    bool runSuccessful = true;
 
     simData_->resetImuBiases(refImuParameters_, testSetting.imuParams, "");
     simData_->rewind();
@@ -354,22 +357,29 @@ void VioSimTestSystem::run(const simul::TestSetting &testSetting,
         Eigen::VectorXd normalizedSquaredError =
             computeNormalizedErrors(errors, covariance);
 
+        if (errors.head<3>().lpNorm<Eigen::Infinity>() > FLAGS_maxPositionRmse) {
+          runSuccessful = false;
+        }
+
         neesAccumulator.push_back(refNFrameTime, normalizedSquaredError);
         rmseAccumulator.push_back(refNFrameTime, squaredError);
       } while (simData_->nextNFrame());
-
-      neesAccumulator.accumulate();
-      rmseAccumulator.accumulate();
 
       Eigen::VectorXd desiredStdevs;
       std::vector<std::string> dimensionLabels;
       estimator_->getDesiredStdevs(&desiredStdevs, &dimensionLabels);
       checkMseCallback_(rmseAccumulator.lastValue(), desiredStdevs, dimensionLabels);
       checkNeesCallback_(neesAccumulator.lastValue());
+
+      if (runSuccessful) {
+        neesAccumulator.accumulate();
+        rmseAccumulator.accumulate();
+      }
+
       std::stringstream messageStream;
       messageStream << "Run " << run << " finishes with #processed frames " << frameCount
                     << " #tracked features in last frame " << trackedFeatures
-                    << " #keyframes " << keyframeCount;
+                    << " #keyframes " << keyframeCount << ". Successful? " << runSuccessful;
       LOG(INFO) << messageStream.str();
       metaStream << messageStream.str() << std::endl;
 
@@ -380,8 +390,12 @@ void VioSimTestSystem::run(const simul::TestSetting &testSetting,
       estimator_->printTrackLengthHistogram(trackStatStream);
       trackStatStream.close();
     } catch (std::exception &e) {
-      LOG(INFO) << "Run " << run << " aborts with #processed frames " << frameCount
-                << " #keyframes " << keyframeCount << " and error: " << e.what();
+      std::stringstream messageStream;
+      messageStream << "Run " << run << " aborts with #processed frames " << frameCount
+                    << " #tracked features in last frame " << trackedFeatures
+                    << " #keyframes " << keyframeCount << " and error: " << e.what();
+      LOG(INFO) << messageStream.str();
+      metaStream << messageStream.str() << std::endl;
       if (debugStream.is_open()) {
         debugStream.close();
       }

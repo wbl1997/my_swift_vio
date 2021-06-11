@@ -251,20 +251,18 @@ TEST(OKVIS, TrajectoryLabel) {
   double landmarkRadius = 5;
   simul::SimImuParameters imuParams(
       FLAGS_sim_trajectory_label, true, FLAGS_noisyInitialSpeedAndBiases,
-      false, true,
+      FLAGS_noisyInitialSensorParams, true,
       5e-3, 2e-2, 5e-3, 1e-3, 5e-3, FLAGS_sim_sigma_g_c, FLAGS_sim_sigma_gw_c,
       FLAGS_sim_sigma_a_c, FLAGS_sim_sigma_aw_c,
       FLAGS_sim_imu_noise_factor, FLAGS_sim_imu_bias_noise_factor);
   simul::SimVisionParameters visionParams(
       true, true, simul::SimCameraModelType::EUROC,
       simul::CameraOrientation::Forward, "FIXED", "FIXED",
-      true, 0.0, 0.0, 0.0, 0.0, false,
+      true, 2e-2, 0.0, 0.0, 0.0, FLAGS_noisyInitialSensorParams,
       simul::LandmarkGridType::FourWalls, landmarkRadius);
 
-  std::string suffix  = FLAGS_sim_compute_OKVIS_NEES ? "_NEES" : "";
-  std::string label = "OKVIS" + suffix;
   simul::SimEstimatorParameters estimatorParams(
-      label, swift_vio::EstimatorAlgorithm::OKVIS, FLAGS_num_runs,
+      "OKVIS", swift_vio::EstimatorAlgorithm::OKVIS, FLAGS_num_runs,
       cameraObservationModelId, landmarkModelId, false, FLAGS_sim_compute_OKVIS_NEES);
   swift_vio::BackendParams backendParams;
   simul::TestSetting testSetting(imuParams, visionParams,
