@@ -14,12 +14,12 @@ end
 if nargin < 2
     numCameras = 1;
 end
-
+projectionIntrinsicDim = 4;
 if isfilter
     if numCameras == 1
-        variableDimList = [3, 4, 3, 3, 3, 9, 9, 9, 3, 4, 4, 2];
+        variableDimList = [3, 4, 3, 3, 3, 9, 9, 9, 3, projectionIntrinsicDim, 4, 2];
     else
-        variableDimList = [3, 4, 3, 3, 3, 9, 9, 9, 3, 4, 4, 2, 3, 4, 4, 4, 2];
+        variableDimList = [3, 4, 3, 3, 3, 9, 9, 9, 3, projectionIntrinsicDim, 4, 2, 3, 4, projectionIntrinsicDim, 4, 2];
     end
 else
     variableDimList = [3, 4, 3, 3, 3];
@@ -61,35 +61,34 @@ switch isfilter
         
         if stdCamIdx == 1
             options.p_camera = 46:48; % a camera's extrinsic parameters.
-            options.fxy_cxy = 49:52;
-            options.k1_k2 = 53:54;
-            options.p1_p2 = 55:56;
-            options.td = 57;
-            options.tr = 58;
+            options.fxy_cxy = options.p_camera(end) + (1:4);
+            options.k1_k2 = options.fxy_cxy(end) + (1:2);
+            options.p1_p2 = options.k1_k2(end) + (1:2);
+            options.td = options.p1_p2(end) + 1;
+            options.tr = options.td + 1;
             options.std_camera_start_index = options.std_start_index + 15 + 27;
             options.p_camera_std = options.std_camera_start_index + (0:2);
-            
             options.fxy_cxy_std = options.std_camera_start_index + (3:6);
-            options.k1_k2_std = options.std_camera_start_index + (7:8);
-            options.p1_p2_std = options.std_camera_start_index + (9:10);
-            options.td_std = options.std_camera_start_index + 11;
-            options.tr_std = options.std_camera_start_index + 12;
+            options.k1_k2_std = options.fxy_cxy_std(end) + (1:2);
+            options.p1_p2_std = options.k1_k2_std(end) + (1:2);
+            options.td_std = options.p1_p2_std(end) + 1;
+            options.tr_std = options.td_std(end) + 1;
         else
             options.p_camera = 59:61;
             options.q_C0C = 62:65;
             options.fxy_cxy = 66:69;
-            options.k1_k2 = 70:71;
-            options.p1_p2 = 72:73;
-            options.td = 74;
-            options.tr = 75;
+            options.k1_k2 = options.fxy_cxy(end) + (1:2);
+            options.p1_p2 = options.k1_k2(end) + (1:2);
+            options.td = options.p1_p2(end) + 1;
+            options.tr = options.td + 1;
             options.std_camera_start_index = options.std_start_index + 15 + 27 + 13;
             options.p_camera_std = options.std_camera_start_index + (0:2);
             options.q_C0C_std = options.std_camera_start_index + (3:5);
             options.fxy_cxy_std = options.std_camera_start_index + (6:9);
-            options.k1_k2_std = options.std_camera_start_index + (10:11);
-            options.p1_p2_std = options.std_camera_start_index + (12:13);
-            options.td_std = options.std_camera_start_index + 14;
-            options.tr_std = options.std_camera_start_index + 15;
+            options.k1_k2_std = options.fxy_cxy_std(end) + (1:2);
+            options.p1_p2_std = options.k1_k2_std(end) + (1:2);
+            options.td_std = options.p1_p2_std(end) + 1;
+            options.tr_std = options.td_std + 1;
         end
         
     case 0

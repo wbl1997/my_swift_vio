@@ -22,7 +22,6 @@ close all;
 data = readmatrix(vio_file, 'NumHeaderLines', 1);
 original_data = data;
 
-sec_to_nanos = 1e9;
 startTime = data(1, 1);
 endTime = data(end, 1);
 
@@ -58,11 +57,7 @@ if gt_file
     % association end
     
     gt(:,1) = gt(:,1) - startTime;
-    if data(1, 1) > sec_to_nanos
-        data(:,1) = (data(:,1) - startTime) / sec_to_nanos;
-    else
-        data(:,1) = data(:,1) - startTime;
-    end
+    data(:,1) = data(:,1) - startTime;
     
     if applyUmeyama == 1
         % umeyama transform to gt

@@ -22,6 +22,9 @@ DEFINE_bool(allKeyframe, false,
             "Treat all frames as keyframes. Paradoxically, this means using no "
             "keyframe scheme.");
 
+DEFINE_bool(useMahalanobis, false,
+            "Use Mahalanobis gating test to remove outliers.");
+
 DEFINE_double(maxPositionRmse, 100, "If the final position RMSE is greater, then the run will be considered failed.");
 
 namespace simul {
@@ -172,7 +175,7 @@ void VioSimTestSystem::createEstimator(const TestSetting &testSetting) {
   optimOptions.numKeyframes = 5;
   optimOptions.numImuFrames = 3;
   if (testSetting.simDataDir.empty()) {
-    optimOptions.useMahalanobisGating = true;
+    optimOptions.useMahalanobisGating = FLAGS_useMahalanobis;
   } else {
     optimOptions.useMahalanobisGating = false;
   }
