@@ -104,16 +104,7 @@ void VioSimTestSystem::createSensorSystem(const TestSetting &testSetting) {
 }
 
 void VioSimTestSystem::createEstimator(const TestSetting &testSetting) {
-  refNavState_.std_p_WS = Eigen::Vector3d(1e-5, 1e-5, 1e-5);
-  refNavState_.std_q_WS = Eigen::Vector3d(M_PI / 180, M_PI / 180, 1e-5);
-  refNavState_.std_v_WS = Eigen::Vector3d(5e-2, 5e-2, 5e-2);
-  okvis::kinematics::Transformation T_WS;
-  Eigen::Vector3d v_WS;
-  simData_->navStateAtStart(&T_WS, &v_WS);
-  refNavState_.initWithExternalSource = true;
-  refNavState_.p_WS = T_WS.r();
-  refNavState_.q_WS = T_WS.q();
-  refNavState_.v_WS = v_WS;
+  simData_->navStateAtStart(&refNavState_);
 
   initialNavState_ = refNavState_;
   if (testSetting.imuParams.noisyInitialSpeedAndBiases) {
@@ -139,7 +130,10 @@ void VioSimTestSystem::createEstimator(const TestSetting &testSetting) {
   if (testSetting.visionParams.fixCameraInternalParams) {
     initialCameraNoiseParameters_.sigma_focal_length = 0;
     initialCameraNoiseParameters_.sigma_principal_point = 0;
-    initialCameraNoiseParameters_.sigma_distortion.resize(5, 0);
+    for (size_t i = 0u;
+         i < initialCameraNoiseParameters_.sigma_distortion.size(); ++i) {
+      initialCameraNoiseParameters_.sigma_distortion[i] = 0;
+    }
     initialCameraNoiseParameters_.sigma_td = 0;
     initialCameraNoiseParameters_.sigma_tr = 0;
   }
@@ -177,6 +171,11 @@ void VioSimTestSystem::createEstimator(const TestSetting &testSetting) {
   optimOptions.computeOkvisNees = testSetting.estimatorParams.computeOkvisNees;
   optimOptions.numKeyframes = 5;
   optimOptions.numImuFrames = 3;
+  if (testSetting.simDataDir.empty()) {
+    optimOptions.useMahalanobisGating = true;
+  } else {
+    optimOptions.useMahalanobisGating = false;
+  }
   estimator_->setOptimizationOptions(optimOptions);
 
   swift_vio::PointLandmarkOptions plOptions;

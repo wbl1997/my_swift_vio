@@ -76,6 +76,8 @@ public:
 
   virtual int expectedNumNFrames() const = 0;
 
+  virtual void navStateAtStart(swift_vio::InitialNavState* initialStateAndCov) const = 0;
+
   virtual void initializeLandmarkGrid(LandmarkGridType gridType,
                                       double landmarkRadius) = 0;
 
@@ -115,12 +117,6 @@ public:
 
   const std::vector<uint64_t> &landmarkIds() { return lmIds_; }
 
-  void navStateAtStart(okvis::kinematics::Transformation *T_WB,
-                       Eigen::Vector3d *v_WB) const {
-    *T_WB = ref_T_WS_list_.front();
-    *v_WB = ref_v_WS_list_.front();
-  }
-
   const okvis::ImuParameters& imuParameters() const {
     return imuParameters_;
   }
@@ -144,7 +140,9 @@ public:
       std::shared_ptr<okvis::MultiFrame> multiFrame,
       std::vector<std::vector<int>> *keypointIndexForLandmarks) const final;
 
-  int expectedNumNFrames() const;
+  int expectedNumNFrames() const final;
+
+  void navStateAtStart(swift_vio::InitialNavState* initialStateAndCov) const final;
 
 private:
   Eigen::Vector3d g_oldW_;  // gravity in the world frame used by the real data.
@@ -182,6 +180,8 @@ public:
   int expectedNumNFrames() const final {
     return times_.size() / kCameraIntervalRatio + 1;
   }
+
+  void navStateAtStart(swift_vio::InitialNavState* initialStateAndCov) const final;
 };
 
 void saveCameraParameters(

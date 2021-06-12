@@ -4,10 +4,6 @@
 
 #include <gflags/gflags.h>
 
-DEFINE_bool(
-    use_mahalanobis, true,
-    "use malalanobis gating test in optimize or a simple projection distance"
-    " threshold in computing jacobians. true by default");
 namespace swift_vio {
 void FilterHelper::stackJacobianAndResidual(
     const std::vector<Eigen::MatrixXd,
@@ -194,11 +190,10 @@ const double FilterHelper::chi2_95percentile[] = {
     543.656319, 544.708807, 545.761243, 546.813625, 547.865954, 548.918230, 549.970453, 551.022624, 552.074743, 553.126809
 };
 
-bool FilterHelper::gatingTest(const Eigen::MatrixXd &H,
-                              const Eigen::VectorXd &r,
-                              const Eigen::MatrixXd &R,
-                              const Eigen::MatrixXd &cov) {
-  if (FLAGS_use_mahalanobis) {
+bool FilterHelper::gatingTest(const Eigen::MatrixXd &H, const Eigen::VectorXd &r,
+                              const Eigen::MatrixXd &R, const Eigen::MatrixXd &cov,
+                              bool useMahalanobis) {
+  if (useMahalanobis) {
     double gamma =
         r.transpose() * (H * cov * H.transpose() + R).ldlt().solve(r);
     if (gamma < chi2_95percentile[r.rows()]) {

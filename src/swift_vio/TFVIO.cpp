@@ -136,7 +136,7 @@ int TFVIO::computeStackedJacobianAndResidual(
       continue;
     }
 
-    if (!FilterHelper::gatingTest(Hi, ri, Ri, variableCov)) {
+    if (!FilterHelper::gatingTest(Hi, ri, Ri, variableCov, optimizationOptions_.useMahalanobisGating)) {
       continue;
     }
     vr.push_back(ri);

@@ -22,11 +22,8 @@
 #include <swift_vio/PointSharedData.hpp>
 #include <swift_vio/EkfUpdater.h>
 
-DECLARE_bool(use_mahalanobis);
 DECLARE_bool(use_first_estimate);
 DECLARE_bool(use_RK4);
-
-DECLARE_double(max_proj_tolerance);
 
 DEFINE_bool(use_IEKF, false,
             "use iterated EKF in optimization, empirically IEKF cost at"
@@ -111,11 +108,11 @@ bool MSCKF::measurementJacobianAIDPMono(
   *residual = obs - imagePoint;
   if (status != okvis::cameras::CameraBase::ProjectionStatus::Successful) {
     return false;
-  } else if (!FLAGS_use_mahalanobis) {
+  } else if (!optimizationOptions_.useMahalanobisGating) {
     // some heuristics to defend outliers is used, e.g., ignore correspondences
     // of too large discrepancy between prediction and measurement
-    if (std::fabs((*residual)[0]) > FLAGS_max_proj_tolerance ||
-        std::fabs((*residual)[1]) > FLAGS_max_proj_tolerance) {
+    if (std::fabs((*residual)[0]) > optimizationOptions_.maxProjectionErrorTol ||
+        std::fabs((*residual)[1]) > optimizationOptions_.maxProjectionErrorTol) {
       return false;
     }
   }
@@ -234,9 +231,9 @@ bool MSCKF::measurementJacobianHPPMono(
   *residual = obs - imagePoint;
   if (status != okvis::cameras::CameraBase::ProjectionStatus::Successful) {
     return false;
-  } else if (!FLAGS_use_mahalanobis) {
-    if (std::fabs((*residual)[0]) > FLAGS_max_proj_tolerance ||
-        std::fabs((*residual)[1]) > FLAGS_max_proj_tolerance) {
+  } else if (!optimizationOptions_.useMahalanobisGating) {
+    if (std::fabs((*residual)[0]) > optimizationOptions_.maxProjectionErrorTol ||
+        std::fabs((*residual)[1]) > optimizationOptions_.maxProjectionErrorTol) {
       return false;
     }
   }
@@ -521,7 +518,7 @@ int MSCKF::computeStackedJacobianAndResidual(
       }
     }
 
-    if (!FilterHelper::gatingTest(H_oi, r_oi, R_oi, variableCov)) {
+    if (!FilterHelper::gatingTest(H_oi, r_oi, R_oi, variableCov, optimizationOptions_.useMahalanobisGating)) {
       mapPoint.status.measurementFate = FeatureTrackStatus::kPotentialOutlier;
       ++culledPoints[1];
       continue;

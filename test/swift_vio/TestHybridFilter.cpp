@@ -2,8 +2,6 @@
 
 #include <simul/VioSimTestSystem.hpp>
 
-DECLARE_bool(use_mahalanobis);
-
 DECLARE_string(log_dir); // FLAGS_log_dir can be passed in commandline as --log_dir=/some/log/dir
 
 DEFINE_string(sim_real_data_dir, "", "Directory of simulated data in maplab csv format from real data!");
@@ -152,7 +150,7 @@ TEST(HybridFilter, TrajectoryLabel) {
       FLAGS_sim_imu_noise_factor, FLAGS_sim_imu_bias_noise_factor);
   simul::SimVisionParameters visionParams(
       true, true, simul::SimCameraModelType::EUROC,
-      simul::CameraOrientation::Forward, "FXY_CXY", "FIXED",
+      simul::CameraOrientation::Forward, "FXY_CXY", "P_CB",
       FLAGS_fixCameraInternalParams, 2e-2, 0.0, FLAGS_sim_camera_time_offset_sec,
       FLAGS_sim_frame_readout_time_sec, FLAGS_noisyInitialSensorParams,
       simul::LandmarkGridType::FourWalls, landmarkRadius);

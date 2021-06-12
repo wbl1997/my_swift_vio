@@ -344,6 +344,16 @@ int SimFromRealData::expectedNumNFrames() const {
   return vimap_.vertices().size();
 }
 
+void SimFromRealData::navStateAtStart(swift_vio::InitialNavState* initialStateAndCov) const {
+  initialStateAndCov->p_WS = ref_T_WS_list_.front().r();
+  initialStateAndCov->q_WS = ref_T_WS_list_.front().q();
+  initialStateAndCov->v_WS = ref_v_WS_list_.front();
+  initialStateAndCov->std_p_WS = Eigen::Vector3d(0.1, 0.1, 0.1);
+  initialStateAndCov->std_q_WS = Eigen::Vector3d(3 * M_PI / 180, 3 * M_PI / 180, M_PI / 180);
+  initialStateAndCov->std_v_WS = Eigen::Vector3d(0.2, 0.2, 0.2);
+  initialStateAndCov->initWithExternalSource = true;
+}
+
 CurveData::CurveData(SimulatedTrajectoryType trajectoryType,
                      const okvis::ImuParameters& imuParameters,
                      bool addImageNoise) :
@@ -435,6 +445,16 @@ void CurveData::addFeaturesToNFrame(
       homogeneousPoints_, trajectory_, currentTime(),
       refCameraSystem, multiFrame, &frameLandmarkIndices, keypointIndexForLandmarks,
       addImageNoise_ ? &imageNoiseMag_ : nullptr);
+}
+
+void CurveData::navStateAtStart(swift_vio::InitialNavState* initialStateAndCov) const {
+  initialStateAndCov->p_WS = ref_T_WS_list_.front().r();
+  initialStateAndCov->q_WS = ref_T_WS_list_.front().q();
+  initialStateAndCov->v_WS = ref_v_WS_list_.front();
+  initialStateAndCov->std_p_WS = Eigen::Vector3d(1e-5, 1e-5, 1e-5);
+  initialStateAndCov->std_q_WS = Eigen::Vector3d(M_PI / 180, M_PI / 180, 1e-5);
+  initialStateAndCov->std_v_WS = Eigen::Vector3d(5e-2, 5e-2, 5e-2);
+  initialStateAndCov->initWithExternalSource = true;
 }
 
 } // namespace simul

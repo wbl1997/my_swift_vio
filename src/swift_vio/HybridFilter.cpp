@@ -42,12 +42,6 @@ DEFINE_bool(use_RK4, false,
 DEFINE_bool(use_first_estimate, true,
             "use first estimate jacobians to compute covariance?");
 
-DECLARE_bool(use_mahalanobis);
-
-DEFINE_double(max_proj_tolerance, 7,
-              "maximum tolerable discrepancy between predicted and measured "
-              "point coordinates in image in pixel units");
-
 DEFINE_double(image_noise_cov_multiplier, 5.0,
               "Enlarge the image observation noise covariance by this "
               "multiplier for epipolar constraints to weaken their effect.");
@@ -747,7 +741,7 @@ int HybridFilter::marginalizeRedundantFrames(size_t numKeyframes, size_t numImuF
       continue;
     }
 
-    if (!FilterHelper::gatingTest(H_oi, r_oi, R_oi, featureVariableCov)) {
+    if (!FilterHelper::gatingTest(H_oi, r_oi, R_oi, featureVariableCov, optimizationOptions_.useMahalanobisGating)) {
       continue;
     }
 
@@ -1423,11 +1417,11 @@ bool HybridFilter::measurementJacobian(
   *residual = obs - imagePoint;
   if (status != okvis::cameras::CameraBase::ProjectionStatus::Successful) {
     return false;
-  } else if (!FLAGS_use_mahalanobis) {
+  } else if (!optimizationOptions_.useMahalanobisGating) {
     // some heuristics to defend outliers is used, e.g., ignore correspondences
     // of too large discrepancy between prediction and measurement
-    if (std::fabs((*residual)[0]) > FLAGS_max_proj_tolerance ||
-        std::fabs((*residual)[1]) > FLAGS_max_proj_tolerance) {
+    if (std::fabs((*residual)[0]) > optimizationOptions_.maxProjectionErrorTol ||
+        std::fabs((*residual)[1]) > optimizationOptions_.maxProjectionErrorTol) {
       return false;
     }
   }
@@ -2425,7 +2419,7 @@ void HybridFilter::optimize(size_t /*numIter*/, size_t /*numThreads*/,
           FeatureTrackStatus::kComputingJacobiansFailed);
       continue;
     }
-    if (!FilterHelper::gatingTest(H_oi, r_oi, R_oi, variableCov)) {
+    if (!FilterHelper::gatingTest(H_oi, r_oi, R_oi, variableCov, optimizationOptions_.useMahalanobisGating)) {
       mapPoint.setMeasurementFate(FeatureTrackStatus::kPotentialOutlier);
       continue;
     }
@@ -2455,7 +2449,7 @@ void HybridFilter::optimize(size_t /*numIter*/, size_t /*numThreads*/,
     Eigen::MatrixXd H_xf(H_x.rows(), H_x.cols() + H_f.cols());
     H_xf.leftCols(H_x.cols()) = H_x;
     H_xf.rightCols(H_f.cols()) = H_f;
-    if (!FilterHelper::gatingTest(H_xf, r_i, R_i, variableCov2)) {
+    if (!FilterHelper::gatingTest(H_xf, r_i, R_i, variableCov2, optimizationOptions_.useMahalanobisGating)) {
       mapPoint.setMeasurementFate(FeatureTrackStatus::kPotentialOutlier);
       continue;
     }
@@ -2615,7 +2609,7 @@ void HybridFilter::initializeLandmarksInFilter() {
       H_o = Q2.transpose() * H_i;
       R_o = Q2.transpose() * R_i * Q2;
 
-      if (!FilterHelper::gatingTest(H_o, z_o, R_o, variableCov)) {
+      if (!FilterHelper::gatingTest(H_o, z_o, R_o, variableCov, optimizationOptions_.useMahalanobisGating)) {
         pit->second.setMeasurementFate(FeatureTrackStatus::kPotentialOutlier);
         continue;
       }

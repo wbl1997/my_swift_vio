@@ -37,7 +37,8 @@ public:
                                Eigen::MatrixXd *state_cov);
 
   static bool gatingTest(const Eigen::MatrixXd &H, const Eigen::VectorXd &r,
-                         const Eigen::MatrixXd &R, const Eigen::MatrixXd &cov);
+                         const Eigen::MatrixXd &R, const Eigen::MatrixXd &cov,
+                         bool useMahalanobis);
 
   static Eigen::MatrixXd leftNullspaceWithRankCheck(const Eigen::MatrixXd &A,
                                                     int columnRankHint);
