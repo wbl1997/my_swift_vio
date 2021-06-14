@@ -8,24 +8,7 @@
 #include <swift_vio/VioFactoryMethods.hpp>
 
 #include <simul/CameraSystemCreator.hpp>
-
-DEFINE_int32(minTrackLengthForSlam, 6,
-             "A feature has to meet the min track length to be included in the "
-             "state vector.");
-
-DEFINE_int32(maxHibernationFrames, 3,
-             "A feature hibernate longer than or equal to this will be removed from the state vector.");
-
-DEFINE_int32(maxMatchKeyframes, 3, "Max number of keyframes to match the current frame bundle to.");
-
-DEFINE_bool(allKeyframe, false,
-            "Treat all frames as keyframes. Paradoxically, this means using no "
-            "keyframe scheme.");
-
-DEFINE_bool(useMahalanobis, false,
-            "Use Mahalanobis gating test to remove outliers.");
-
-DEFINE_double(maxPositionRmse, 100, "If the final position RMSE is greater, then the run will be considered failed.");
+#include <simul/gflags.hpp>
 
 namespace simul {
 typedef boost::iterator_range<std::vector<std::pair<double, double>>::iterator>

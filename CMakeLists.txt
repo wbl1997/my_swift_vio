@@ -206,6 +206,7 @@ LIST(APPEND SOURCEFILES
     include/simul/SimParameters.h
     src/simul/CameraSystemCreator.cpp
     src/simul/curves.cpp
+    src/simul/gflags.cpp
     src/simul/ImuNoiseSimulator.cpp
     src/simul/LandmarkGrid.cpp
     src/simul/numeric_ceres_residual_Jacobian.cpp
@@ -287,6 +288,11 @@ target_link_libraries(swift_vio_node_synchronous ${PROJECT_NAME})
 
 add_executable(time_rotation_calibrator src/apps/time_rotation_calibrator.cpp src/swift_vio/TimeAndRotationCalibrator.cpp)
 target_link_libraries(time_rotation_calibrator okvis_util okvis_time okvis_timing okvis_common okvis_kinematics okvis_ceres)
+
+add_executable(debugException test/customized_terminate.cpp test/std/debugException.cpp)
+
+add_executable(debugEstimatorException test/customized_terminate.cpp test/swift_vio/debugEstimatorException.cpp)
+target_link_libraries(debugEstimatorException ${PROJECT_NAME})
 
 list(APPEND TEST_SRC_FILES
     test/test_main.cpp

@@ -1,63 +1,10 @@
 #include <gtest/gtest.h>
 
+#include <simul/gflags.hpp>
 #include <simul/VioSimTestSystem.hpp>
 
 DECLARE_string(log_dir); // FLAGS_log_dir can be passed in commandline as --log_dir=/some/log/dir
 
-DEFINE_string(sim_real_data_dir, "", "Directory of simulated data in maplab csv format from real data!");
-
-DEFINE_bool(fixCameraInternalParams, true,
-            "Set the variance of the camera internal parameters (including intrinsics and temporal parameters) zero."
-            " Otherwise, these parameters will be estimated by the filter.");
-
-DEFINE_bool(fixImuIntrinsicParams, true,
-            "Set the variance of the IMU augmented intrinsic parameters zero."
-            " Otherwise, these parameters will be estimated by the filter.");
-
-DEFINE_bool(
-    noisyInitialSpeedAndBiases, true,
-    "add noise to the initial value of velocity, gyro bias, accelerometer "
-    "bias which is used to initialize an estimator.");
-
-DEFINE_bool(noisyInitialSensorParams, false,
-            "add noise to the initial value of sensor parameters, including "
-            "camera extrinsic, intrinsic "
-            "and temporal parameters, and IMU parameters except for biases "
-            "which is used to initialize an estimator. But the noise may be "
-            "zero by setting e.g. fixImuIntrinsicParams");
-
-DEFINE_bool(sim_compute_OKVIS_NEES, false,
-            "False to analyze OKVIS accuracy, true to analyze OKVIS consistency!");
-
-DEFINE_int32(num_runs, 5, "How many times to run one simulation?");
-
-DEFINE_double(
-    sim_camera_time_offset_sec, 0.0,
-    "image raw timestamp + camera time offset = image time in imu clock");
-
-DEFINE_double(sim_frame_readout_time_sec, 0.0,
-              "readout time for one frame in secs");
-
-DEFINE_double(sim_sigma_g_c, 1.2e-3, "simulated gyro noise density");
-
-DEFINE_double(sim_sigma_a_c, 8e-3, "simulated accelerometer noise density");
-
-DEFINE_double(sim_sigma_gw_c, 2e-5, "simulated gyro bias noise density");
-
-DEFINE_double(sim_sigma_aw_c, 5.5e-5, "simulated accelerometer bias noise density");
-
-DEFINE_double(sim_imu_noise_factor, 1.0,
-              "weaken the IMU noise added to IMU readings by this factor");
-
-DEFINE_double(sim_imu_bias_noise_factor, 1.0,
-              "weaken the IMU BIAS noise added to IMU readings by this factor");
-
-DEFINE_string(sim_trajectory_label, "WavyCircle",
-              "Ball has the most exciting motion, wavycircle is general");
-
-DEFINE_int32(sim_landmark_model, 1,
-             "Landmark model 0 for global homogeneous point, 1 for anchored "
-             "inverse depth point, 2 for parallax angle parameterization");
 
 namespace {
 void checkMSE(const Eigen::VectorXd &mse, const Eigen::VectorXd &desiredStdevs,

@@ -1,3 +1,5 @@
+#ifndef IO_WRAP_COMMON_GFLAGS_HPP_
+#define IO_WRAP_COMMON_GFLAGS_HPP_
 #include <okvis/Parameters.hpp>
 
 DECLARE_int32(dump_output_option);
@@ -35,3 +37,4 @@ namespace swift_vio {
 bool setInputParameters(InputData *input);
 
 }  // namespace swift_vio
+#endif  // IO_WRAP_COMMON_GFLAGS_HPP_
