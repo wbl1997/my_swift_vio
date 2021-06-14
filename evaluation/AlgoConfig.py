@@ -14,9 +14,9 @@ def create_algo_config(val_list):
 
 
 def default_algo_config():
-    d = {"algo_code": "MSCKF",
+    d = {"algo_code": "HybridFilter",
          "extra_gflags": "",
-         "numKeyframes": 10,
+         "numKeyframes": 5,
          "numImuFrames": 5,
          "monocular_input": 0,
          "landmarkModelId": 1,

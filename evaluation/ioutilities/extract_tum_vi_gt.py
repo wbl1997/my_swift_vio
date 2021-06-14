@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Extract gt from tum vi benchmark rosbags and save to txt files using
-adaoted bag_to_pose.py from rpg evaluation tool.
+adapted bag_to_pose.py from rpg evaluation tool.
 """
 import os
 import sys

@@ -350,6 +350,10 @@ def parse_args():
                         help='Use nominal values to fill the config yaml?',
                         action='store_true')
 
+    parser.add_argument("--monocular_input",
+                        help='Use monocular input?',
+                        action='store_true')
+
     args = parser.parse_args()
     return args
 
@@ -408,7 +412,8 @@ def printCameraBlock(camConfig):
 def create_okvis_config_yaml(okvis_config_template, calib_format,
                              output_okvis_config, camera_config_yamls=None,
                              imu_config_yaml="",
-                             algo_code="", bagname="", use_nominal_value=False):
+                             algo_code="", bagname="", use_nominal_value=False, 
+                             monocular_input=False):
     """
 
     :param okvis_config_template:
@@ -487,10 +492,12 @@ def create_okvis_config_yaml(okvis_config_template, calib_format,
             imu_data = yaml.load(imu_config)
         template_data['imu_params']['T_BS'] = imu_data['T_BS']['data']
         template_data['imu_params']['imu_rate'] = int(imu_data['rate_hz'])
-        template_data['imu_params']['sigma_a_c'] = OKVIS_EUROC_IMU_PARAMETERS['sigma_a_c']
-        template_data['imu_params']['sigma_aw_c'] = OKVIS_EUROC_IMU_PARAMETERS['sigma_aw_c']
-        template_data['imu_params']['sigma_g_c'] = OKVIS_EUROC_IMU_PARAMETERS['sigma_g_c']
-        template_data['imu_params']['sigma_gw_c'] = OKVIS_EUROC_IMU_PARAMETERS['sigma_gw_c']
+        if monocular_input and algo_code == "OKVIS":
+            for key in OKVIS_MONO_EUROC_IMU_PARAMETERS.keys():
+                template_data["imu_params"][key] = OKVIS_MONO_EUROC_IMU_PARAMETERS[key]
+        else:
+            for key in OKVIS_EUROC_IMU_PARAMETERS.keys():
+                template_data["imu_params"][key] = OKVIS_EUROC_IMU_PARAMETERS[key]
     elif calib_format == "tum-vi":
         used_TUMVI_parameters = TUMVI_PARAMETERS
         if use_nominal_value:
@@ -502,9 +509,13 @@ def create_okvis_config_yaml(okvis_config_template, calib_format,
             for key in used_TUMVI_parameters[group].keys():
                 template_data[group][key] = used_TUMVI_parameters[group][key]
         template_data["displayImages"] = used_TUMVI_parameters["displayImages"]
-        if algo_code == "MSCKF":
-            for key in MSCKF_TUMVI_IMU_PARAMETERS.keys():
-                template_data["imu_params"][key] = MSCKF_TUMVI_IMU_PARAMETERS[key]
+        if algo_code == "MSCKF" or algo_code == "HybridFilter":
+            if monocular_input:
+                for key in MSCKF_TUMVI_MONO_IMU_PARAMETERS.keys():
+                    template_data["imu_params"][key] = MSCKF_TUMVI_MONO_IMU_PARAMETERS[key]
+            else:
+                for key in MSCKF_TUMVI_IMU_PARAMETERS.keys():
+                    template_data["imu_params"][key] = MSCKF_TUMVI_IMU_PARAMETERS[key]
     elif calib_format == 'advio':
         swapped_parameters, swapped_intrinsics = advio_transform_C_Cp_and_halve(use_nominal_value)
         cameraid = 0
@@ -541,6 +552,14 @@ def create_okvis_config_yaml(okvis_config_template, calib_format,
             for key in swapped_parameters[group].keys():
                 template_data[group][key] = swapped_parameters[group][key]
         template_data["displayImages"] = ADVIO_PARAMETERS["displayImages"]
+
+        if algo_code == "MSCKF" or algo_code == "HybridFilter":
+            for key in MSCKF_ADVIO_IMU_PARAMETERS.keys():
+                template_data["imu_params"][key] = MSCKF_ADVIO_IMU_PARAMETERS[key]
+        elif algo_code == "OKVIS":
+            for key in OKVIS_ADVIO_IMU_PARAMETERS.keys():
+                template_data["imu_params"][key] = OKVIS_ADVIO_IMU_PARAMETERS[key]
+
     elif calib_format == "homebrew":
         pass
 

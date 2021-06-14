@@ -72,10 +72,12 @@ class RunOneVioMethod(object):
             if "use_nominal_calib_value" in self.algo_code_flags:
                 config_composer.create_config_for_mission(
                     self.algo_code_flags["algo_code"], 
-                    self.algo_code_flags["use_nominal_calib_value"])
+                    self.algo_code_flags["use_nominal_calib_value"], 
+                    self.algo_code_flags["monocular_input"])
             else:
                 config_composer.create_config_for_mission(
-                    self.algo_code_flags["algo_code"], False)
+                    self.algo_code_flags["algo_code"], False,
+                    self.algo_code_flags["monocular_input"])
 
             # apply algorithm parameters
             AlgoConfig.apply_config_to_yaml(

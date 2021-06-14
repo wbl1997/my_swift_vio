@@ -1,4 +1,4 @@
-function drawNees(est_files, labels, export_fig_path, num_runs)
+function drawNees(est_files, labels, export_fig_path, num_runs, drawOnlyPose)
 % This function requires Matlab signal processing toolbox for downsample()
 
 % Example use:
@@ -7,6 +7,9 @@ function drawNees(est_files, labels, export_fig_path, num_runs)
 % [sim_dir, 'simul_wave/MSCKF_WavyCircle_NEES.txt'], ...
 % [sim_dir, 'simul_ball/MSCKF_Ball_NEES.txt']}, ...
 % {'Naive', 'Wave', 'Torus'}, '/tools/export_fig', 100);
+if nargin < 5
+    drawOnlyPose = 1;  % 0 draw position, orientation, and pose.
+end
 if nargin < 4
     num_runs = 100;
 end
@@ -23,10 +26,9 @@ line_widths = {{2, 2, 2}, {2, 2, 2}, {1, 1, 1}, {2, 2, 2}};
 
 downsamplefactor = 10; % 1 original data.
 backgroundColor = 'None'; % 'w' for debugging, 'None' for production.
-drawOnlyPose = 1; % 0 draw position, orientation, and pose.
 single_line_styles={'r-', 'k-.', 'g--', 'b:'};
 single_line_widths={1, 1, 1, 1.5};
-indices = 2:4;
+indices = 2:7;
 Q = 0.05;
 [Tl, Tr] = twoSidedProbabilityRegionNees(Q, 6, num_runs);
 [rl, rr] = twoSidedProbabilityRegionNees(Q, 3, num_runs);
@@ -43,7 +45,7 @@ for i = 1:length(est_files)
         plot(est_data(:, 1), est_data(:, indices(3)), ...
             single_line_styles{i}, 'LineWidth', single_line_widths{i}, 'MarkerSize', 1.5);
     else
-        drawColumnsInMatrix(est_data, indices, false, 1.0, line_styles{i}, line_widths{i});
+        drawColumnsInMatrix(est_data, indices(1:3), false, 1.0, line_styles{i}, line_widths{i});
     end
 
     % find average of last 10 secs.
