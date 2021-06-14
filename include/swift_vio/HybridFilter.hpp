@@ -106,6 +106,11 @@ class HybridFilter : public okvis::Estimator, public BaseFilter {
    */
   bool applyMarginalizationStrategy(okvis::MapPointVector &removedLandmarks) override;
 
+  /**
+   * @brief update imuRig_ and cameraRig_ with latest state estimates
+   */
+  void updateSensorRigs() final;
+
   /// @name Getters
   ///\{
 
@@ -317,8 +322,8 @@ class HybridFilter : public okvis::Estimator, public BaseFilter {
   std::vector<std::shared_ptr<const okvis::ceres::ParameterBlock>>
       getImuAugmentedParameterPtrs() const;
 
-  void getEstimatedCameraIntrinsics(
-      Eigen::Matrix<double, Eigen::Dynamic, 1>* cameraParams, size_t camIdx) const final;
+  void getVariableCameraIntrinsics(
+      Eigen::Matrix<double, Eigen::Dynamic, 1>* intrinsicParams, size_t camIdx) const final;
 
   void getImuAugmentedStatesEstimate(
       Eigen::Matrix<double, Eigen::Dynamic, 1>* extraParams) const final;
@@ -366,7 +371,7 @@ class HybridFilter : public okvis::Estimator, public BaseFilter {
     size_t totalImuDim = statesMap_.rbegin()
                              ->second.sensors.at(SensorStates::Camera)
                              .at(0u)
-                             .at(okvis::Estimator::CameraSensorStates::T_SCi)
+                             .at(okvis::Estimator::CameraSensorStates::T_XCi)
                              .startIndexInCov;
     return totalCamDim - totalImuDim;
   }
@@ -387,7 +392,7 @@ class HybridFilter : public okvis::Estimator, public BaseFilter {
     size_t totalExclusiveDim = statesMap_.rbegin()
                                    ->second.sensors.at(SensorStates::Camera)
                                    .at(camIdx)
-                                   .at(okvis::Estimator::CameraSensorStates::T_SCi)
+                                   .at(okvis::Estimator::CameraSensorStates::T_XCi)
                                    .startIndexInCov;
     return totalInclusiveDim - totalExclusiveDim;
   }
@@ -445,7 +450,7 @@ class HybridFilter : public okvis::Estimator, public BaseFilter {
    */
   inline size_t startIndexOfCameraParamsFast(
       size_t camIdx,
-      CameraSensorStates camParamBlockName = okvis::Estimator::CameraSensorStates::T_SCi) const {
+      CameraSensorStates camParamBlockName = okvis::Estimator::CameraSensorStates::T_XCi) const {
     return statesMap_.rbegin()
         ->second.sensors.at(SensorStates::Camera)
         .at(camIdx)
@@ -461,7 +466,7 @@ class HybridFilter : public okvis::Estimator, public BaseFilter {
    */
   inline size_t intraStartIndexOfCameraParams(
       size_t camIdx,
-      CameraSensorStates camParamBlockName = okvis::Estimator::CameraSensorStates::T_SCi) const {
+      CameraSensorStates camParamBlockName = okvis::Estimator::CameraSensorStates::T_XCi) const {
     size_t totalInclusiveDim = statesMap_.rbegin()
                                    ->second.sensors.at(SensorStates::Camera)
                                    .at(camIdx)
@@ -470,7 +475,7 @@ class HybridFilter : public okvis::Estimator, public BaseFilter {
     size_t totalExclusiveDim = statesMap_.rbegin()
                                    ->second.sensors.at(SensorStates::Camera)
                                    .at(0u)
-                                   .at(okvis::Estimator::CameraSensorStates::T_SCi)
+                                   .at(okvis::Estimator::CameraSensorStates::T_XCi)
                                    .startIndexInCov;
     return totalInclusiveDim - totalExclusiveDim;
   }
@@ -519,10 +524,6 @@ class HybridFilter : public okvis::Estimator, public BaseFilter {
 
   bool getOdometryConstraintsForKeyframe(
       std::shared_ptr<LoopQueryKeyframeMessage> queryKeyframe) const final;
-
-  // using latest state estimates set imuRig_ and cameraRig_ which are then
-  // used in computing Jacobians of all feature observations
-  void updateSensorRigs();
 
   void cloneImuAugmentedStates(
       const States &stateInQuestion,

@@ -41,7 +41,7 @@ HybridFilter::computeCameraObservationJacobians(
   uint64_t extrinsicBlockId =
       stateInQuestion.sensors.at(okvis::Estimator::SensorStates::Camera)
           .at(camIdx)
-          .at(okvis::Estimator::CameraSensorStates::T_SCi)
+          .at(okvis::Estimator::CameraSensorStates::T_XCi)
           .id;
   std::shared_ptr<const okvis::ceres::ParameterBlock> extrinsicParamBlockPtr =
       mapPtr_->parameterBlockPtr(extrinsicBlockId);

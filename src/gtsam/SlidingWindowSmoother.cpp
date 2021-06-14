@@ -346,10 +346,10 @@ void SlidingWindowSmoother::addCameraExtrinsicFactor() {
   for (size_t i = 0; i < extrinsicsEstimationParametersVec_.size(); ++i) {
     if (penultimateElementIter->second.sensors.at(SensorStates::Camera)
             .at(i)
-            .at(okvis::Estimator::CameraSensorStates::T_SCi)
+            .at(okvis::Estimator::CameraSensorStates::T_XCi)
             .id != lastElementIter->second.sensors.at(SensorStates::Camera)
                        .at(i)
-                       .at(okvis::Estimator::CameraSensorStates::T_SCi)
+                       .at(okvis::Estimator::CameraSensorStates::T_XCi)
                        .id) {
       // i.e. they are different estimated variables, so link them with a
       // temporal error term
@@ -375,12 +375,12 @@ void SlidingWindowSmoother::addCameraExtrinsicFactor() {
               gtsam::Symbol('C', penultimateElementIter->second.sensors
                                      .at(SensorStates::Camera)
                                      .at(i)
-                                     .at(okvis::Estimator::CameraSensorStates::T_SCi)
+                                     .at(okvis::Estimator::CameraSensorStates::T_XCi)
                                      .id),
               gtsam::Symbol(
                   'C', lastElementIter->second.sensors.at(SensorStates::Camera)
                            .at(i)
-                           .at(okvis::Estimator::CameraSensorStates::T_SCi)
+                           .at(okvis::Estimator::CameraSensorStates::T_XCi)
                            .id),
               from_id_Pose_to_id, betweenNoise_));
     }
@@ -494,7 +494,7 @@ bool SlidingWindowSmoother::addStates(
   // cameras:
   for (size_t i = 0; i < extrinsicsEstimationParametersVec_.size(); ++i) {
     okvis::Estimator::SpecificSensorStatesContainer cameraInfos(2);
-    cameraInfos.at(okvis::Estimator::CameraSensorStates::T_SCi).exists = true;
+    cameraInfos.at(okvis::Estimator::CameraSensorStates::T_XCi).exists = true;
     cameraInfos.at(okvis::Estimator::CameraSensorStates::Intrinsics).exists = false;
     if (((extrinsicsEstimationParametersVec_.at(i)
               .sigma_c_relative_translation < 1e-12) ||
@@ -502,10 +502,10 @@ bool SlidingWindowSmoother::addStates(
               .sigma_c_relative_orientation < 1e-12)) &&
         (statesMap_.size() > 1)) {
       // use the same block...
-      cameraInfos.at(okvis::Estimator::CameraSensorStates::T_SCi).id =
+      cameraInfos.at(okvis::Estimator::CameraSensorStates::T_XCi).id =
           lastElementIterator->second.sensors.at(SensorStates::Camera)
               .at(i)
-              .at(okvis::Estimator::CameraSensorStates::T_SCi)
+              .at(okvis::Estimator::CameraSensorStates::T_XCi)
               .id;
     } else {
       const okvis::kinematics::Transformation T_SC = *multiFrame->T_SC(i);
@@ -517,7 +517,7 @@ bool SlidingWindowSmoother::addStates(
                                       okvis::ceres::Map::Pose6d)) {
         return false;
       }
-      cameraInfos.at(okvis::Estimator::CameraSensorStates::T_SCi).id = id;
+      cameraInfos.at(okvis::Estimator::CameraSensorStates::T_XCi).id = id;
     }
     // update the states info
     statesMap_.rbegin()
@@ -712,15 +712,15 @@ bool SlidingWindowSmoother::applyMarginalizationStrategy(okvis::MapPointVector& 
       if (iter->first < minValidStateId) {
         if (iter->second.sensors.at(SensorStates::Camera)
                 .at(i)
-                .at(okvis::Estimator::CameraSensorStates::T_SCi)
+                .at(okvis::Estimator::CameraSensorStates::T_XCi)
                 .id != nextIter->second.sensors.at(SensorStates::Camera)
                            .at(i)
-                           .at(okvis::Estimator::CameraSensorStates::T_SCi)
+                           .at(okvis::Estimator::CameraSensorStates::T_XCi)
                            .id) {
           mapPtr_->removeParameterBlock(
               it->second.sensors.at(SensorStates::Camera)
                   .at(i)
-                  .at(okvis::Estimator::CameraSensorStates::T_SCi)
+                  .at(okvis::Estimator::CameraSensorStates::T_XCi)
                   .id);
           // The associated residual will be removed by ceres solver.
         }  // else pass

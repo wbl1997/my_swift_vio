@@ -151,8 +151,8 @@ void HybridFilter::usePreviousCameraParamBlocks(
   // the following will point to the last states:
   const okvis::Estimator::SpecificSensorStatesContainer& prevCameraInfo =
       prevStateRevIter->second.sensors.at(SensorStates::Camera).at(cameraIndex);
-  cameraInfos->at(okvis::Estimator::CameraSensorStates::T_SCi).id =
-      prevCameraInfo.at(okvis::Estimator::CameraSensorStates::T_SCi).id;
+  cameraInfos->at(okvis::Estimator::CameraSensorStates::T_XCi).id =
+      prevCameraInfo.at(okvis::Estimator::CameraSensorStates::T_XCi).id;
   cameraInfos->at(okvis::Estimator::CameraSensorStates::Intrinsics).exists =
       prevCameraInfo.at(okvis::Estimator::CameraSensorStates::Intrinsics).exists;
   cameraInfos->at(okvis::Estimator::CameraSensorStates::Intrinsics).id =
@@ -164,8 +164,8 @@ void HybridFilter::usePreviousCameraParamBlocks(
   cameraInfos->at(okvis::Estimator::CameraSensorStates::TR).id =
       prevCameraInfo.at(okvis::Estimator::CameraSensorStates::TR).id;
 
-  cameraInfos->at(okvis::Estimator::CameraSensorStates::T_SCi).startIndexInCov =
-      prevCameraInfo.at(okvis::Estimator::CameraSensorStates::T_SCi).startIndexInCov;
+  cameraInfos->at(okvis::Estimator::CameraSensorStates::T_XCi).startIndexInCov =
+      prevCameraInfo.at(okvis::Estimator::CameraSensorStates::T_XCi).startIndexInCov;
   cameraInfos->at(okvis::Estimator::CameraSensorStates::Intrinsics).startIndexInCov =
       prevCameraInfo.at(okvis::Estimator::CameraSensorStates::Intrinsics).startIndexInCov;
   cameraInfos->at(okvis::Estimator::CameraSensorStates::Distortion).startIndexInCov =
@@ -197,7 +197,7 @@ void HybridFilter::initializeCameraParamBlocks(
       break;
   }
   mapPtr_->addParameterBlock(extrinsicsParameterBlockPtr, okvis::ceres::Map::Pose6d);
-  cameraInfos->at(okvis::Estimator::CameraSensorStates::T_SCi).id = id;
+  cameraInfos->at(okvis::Estimator::CameraSensorStates::T_XCi).id = id;
 
   Eigen::VectorXd allIntrinsics;
   cameraRig_.getCameraGeometry(cameraIndex)->getIntrinsics(allIntrinsics);
@@ -427,7 +427,7 @@ bool HybridFilter::addStates(okvis::MultiFramePtr multiFrame,
   // cameras:
   for (size_t i = 0; i < extrinsicsEstimationParametersVec_.size(); ++i) {
     okvis::Estimator::SpecificSensorStatesContainer cameraInfos(5);
-    cameraInfos.at(okvis::Estimator::CameraSensorStates::T_SCi).exists = true;
+    cameraInfos.at(okvis::Estimator::CameraSensorStates::T_XCi).exists = true;
     cameraInfos.at(okvis::Estimator::CameraSensorStates::Intrinsics).exists = true;
     cameraInfos.at(okvis::Estimator::CameraSensorStates::Distortion).exists = true;
     cameraInfos.at(okvis::Estimator::CameraSensorStates::TD).exists = true;
@@ -560,7 +560,7 @@ void HybridFilter::initCameraParamCovariance(int camIdx) {
   okvis::Estimator::SpecificSensorStatesContainer& cameraInfos =
       statesMap_.rbegin()->second.sensors.at(SensorStates::Camera).at(camIdx);
 
-  cameraInfos.at(okvis::Estimator::CameraSensorStates::T_SCi).startIndexInCov = camParamIndex;
+  cameraInfos.at(okvis::Estimator::CameraSensorStates::T_XCi).startIndexInCov = camParamIndex;
   if (!fixCameraExtrinsicParams_[camIdx]) {
     covExtrinsic =
         ExtrinsicModelInitCov(cameraRig_.getExtrinsicOptMode(camIdx),
@@ -933,7 +933,7 @@ void HybridFilter::changeAnchors(
       okvis::kinematics::Transformation T_WBa;
       get_T_WS(mapPoint.anchorStateId, T_WBa);
       okvis::kinematics::Transformation T_BCa;
-      getCameraSensorStates(newAnchorFrameId, mapPoint.anchorCameraId, T_BCa);
+      getCameraSensorExtrinsics(newAnchorFrameId, mapPoint.anchorCameraId, T_BCa);
       okvis::kinematics::Transformation T_WCa = T_WBa * T_BCa;
 
       // use the camera with the minimum index as the anchor camera.
@@ -951,7 +951,7 @@ void HybridFilter::changeAnchors(
       okvis::kinematics::Transformation T_WBj;
       get_T_WS(newAnchorFrameId, T_WBj);
       okvis::kinematics::Transformation T_BCj;
-      getCameraSensorStates(newAnchorFrameId, newAnchorCameraId, T_BCj);
+      getCameraSensorExtrinsics(newAnchorFrameId, newAnchorCameraId, T_BCj);
       okvis::kinematics::Transformation T_WCj = T_WBj * T_BCj;
 
       uint64_t toFind = mapPoint.id;
@@ -1932,7 +1932,7 @@ void HybridFilter::updateCameraSensorStates(const States& stateInQuestion,
     if (!fixCameraExtrinsicParams_[camIdx]) {
       uint64_t extrinsicId = stateInQuestion.sensors.at(SensorStates::Camera)
                                  .at(camIdx)
-                                 .at(okvis::Estimator::CameraSensorStates::T_SCi)
+                                 .at(okvis::Estimator::CameraSensorStates::T_XCi)
                                  .id;
       std::shared_ptr<okvis::ceres::PoseParameterBlock> extrinsicParamBlockPtr =
           std::static_pointer_cast<okvis::ceres::PoseParameterBlock>(
@@ -2008,7 +2008,7 @@ void HybridFilter::cloneCameraParameterStates(
   if (!fixCameraExtrinsicParams_[camIdx]) {
     uint64_t extrinsicId = stateInQuestion.sensors.at(SensorStates::Camera)
                                .at(camIdx)
-                               .at(okvis::Estimator::CameraSensorStates::T_SCi)
+                               .at(okvis::Estimator::CameraSensorStates::T_XCi)
                                .id;
     std::shared_ptr<const okvis::ceres::ParameterBlock> extrinsicBlockPtr =
             mapPtr_->parameterBlockPtr(extrinsicId);
@@ -3006,35 +3006,19 @@ swift_vio::TriangulationStatus HybridFilter::triangulateAMapPoint(
 
 bool HybridFilter::printStatesAndStdevs(std::ostream& stream) const {
   printNavStateAndBiases(stream, statesMap_.rbegin()->first);
-  const States& stateInQuestion = statesMap_.rbegin()->second;
   Eigen::Matrix<double, Eigen::Dynamic, 1> extraParams;
   getImuAugmentedStatesEstimate(&extraParams);
   stream << " " << extraParams.transpose().format(kSpaceInitFmt);
 
   size_t numCameras = cameraRig_.numberCameras();
   for (size_t camIdx = 0u; camIdx < numCameras; ++camIdx) {
-    if (!fixCameraExtrinsicParams_[camIdx]) {
-      uint64_t extrinsicId =
-          stateInQuestion.sensors.at(SensorStates::Camera)
-              .at(camIdx)
-              .at(okvis::Estimator::CameraSensorStates::T_SCi)
-              .id;
-      std::shared_ptr<okvis::ceres::PoseParameterBlock> extrinsicParamBlockPtr =
-          std::static_pointer_cast<okvis::ceres::PoseParameterBlock>(
-              mapPtr_->parameterBlockPtr(extrinsicId));
-      okvis::kinematics::Transformation T_XC =
-          extrinsicParamBlockPtr->estimate();
-      Eigen::VectorXd extrinsicValues;
-      ExtrinsicModelToParamValues(cameraRig_.getExtrinsicOptMode(camIdx), T_XC,
-                                  &extrinsicValues);
-      stream << " " << extrinsicValues.transpose().format(kSpaceInitFmt);
-    }
+    Eigen::VectorXd extrinsicParams;
+    getVariableCameraExtrinsics(&extrinsicParams, camIdx);
+    stream << " " << extrinsicParams.transpose().format(kSpaceInitFmt);
 
-    if (!fixCameraIntrinsicParams_[camIdx]) {
-      Eigen::VectorXd cameraParams;
-      getEstimatedCameraIntrinsics(&cameraParams, camIdx);
-      stream << " " << cameraParams.transpose().format(kSpaceInitFmt);
-    }
+    Eigen::VectorXd cameraParams;
+    getVariableCameraIntrinsics(&cameraParams, camIdx);
+    stream << " " << cameraParams.transpose().format(kSpaceInitFmt);
   }
 
   const int stateDim = startIndexOfClonedStatesFast();
@@ -3084,32 +3068,35 @@ void HybridFilter::printTrackLengthHistogram(std::ostream &stream) const {
   stream << std::endl;
 }
 
-void HybridFilter::getEstimatedCameraIntrinsics(
+void HybridFilter::getVariableCameraIntrinsics(
     Eigen::Matrix<double, Eigen::Dynamic, 1> *cameraParams,
     size_t camIdx) const {
-  const uint64_t poseId = statesMap_.rbegin()->first;
-  Eigen::VectorXd projectionIntrinsics;
-  getSensorStateEstimateAs<okvis::ceres::EuclideanParamBlock>(
-      poseId, camIdx, SensorStates::Camera,
-      okvis::Estimator::CameraSensorStates::Intrinsics, projectionIntrinsics);
-  Eigen::VectorXd distortionCoeffs;
-  getSensorStateEstimateAs<okvis::ceres::EuclideanParamBlock>(
-      poseId, camIdx, SensorStates::Camera,
-      okvis::Estimator::CameraSensorStates::Distortion, distortionCoeffs);
-
-  cameraParams->resize(
-      projectionIntrinsics.size() + distortionCoeffs.size() + 2, 1);
-  cameraParams->head(projectionIntrinsics.size()) = projectionIntrinsics;
-  cameraParams->segment(projectionIntrinsics.size(), distortionCoeffs.size()) =
-      distortionCoeffs;
-  double tdEstimate(0), trEstimate(0);
-  getSensorStateEstimateAs<okvis::ceres::CameraTimeParamBlock>(
-      poseId, camIdx, SensorStates::Camera,
-      okvis::Estimator::CameraSensorStates::TD, tdEstimate);
-  getSensorStateEstimateAs<okvis::ceres::CameraTimeParamBlock>(
-      poseId, camIdx, SensorStates::Camera,
-      okvis::Estimator::CameraSensorStates::TR, trEstimate);
-  cameraParams->tail<2>() = Eigen::Vector2d(tdEstimate, trEstimate);
+  if (!fixCameraIntrinsicParams_[camIdx]) {
+    const uint64_t poseId = statesMap_.rbegin()->first;
+    Eigen::VectorXd projectionIntrinsics;
+    getSensorStateEstimateAs<okvis::ceres::EuclideanParamBlock>(
+        poseId, camIdx, SensorStates::Camera,
+        okvis::Estimator::CameraSensorStates::Intrinsics, projectionIntrinsics);
+    Eigen::VectorXd distortionCoeffs;
+    getSensorStateEstimateAs<okvis::ceres::EuclideanParamBlock>(
+        poseId, camIdx, SensorStates::Camera,
+        okvis::Estimator::CameraSensorStates::Distortion, distortionCoeffs);
+    cameraParams->resize(
+        projectionIntrinsics.size() + distortionCoeffs.size() + 2, 1);
+    cameraParams->head(projectionIntrinsics.size()) = projectionIntrinsics;
+    cameraParams->segment(projectionIntrinsics.size(),
+                          distortionCoeffs.size()) = distortionCoeffs;
+    double tdEstimate(0), trEstimate(0);
+    getSensorStateEstimateAs<okvis::ceres::CameraTimeParamBlock>(
+        poseId, camIdx, SensorStates::Camera,
+        okvis::Estimator::CameraSensorStates::TD, tdEstimate);
+    getSensorStateEstimateAs<okvis::ceres::CameraTimeParamBlock>(
+        poseId, camIdx, SensorStates::Camera,
+        okvis::Estimator::CameraSensorStates::TR, trEstimate);
+    cameraParams->tail<2>() = Eigen::Vector2d(tdEstimate, trEstimate);
+  } else {
+    cameraParams->resize(0);
+  }
 }
 
 void HybridFilter::getCameraTimeParameterPtrs(
@@ -3351,7 +3338,7 @@ Eigen::VectorXd HybridFilter::computeCameraParamsError(
       uint64_t extrinsicId =
           stateInQuestion.sensors.at(SensorStates::Camera)
               .at(camIdx)
-              .at(okvis::Estimator::CameraSensorStates::T_SCi)
+              .at(okvis::Estimator::CameraSensorStates::T_XCi)
               .id;
       std::shared_ptr<okvis::ceres::PoseParameterBlock> extrinsicParamBlockPtr =
           std::static_pointer_cast<okvis::ceres::PoseParameterBlock>(
