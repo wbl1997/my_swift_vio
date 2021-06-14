@@ -151,9 +151,6 @@ if __name__ == '__main__':
                           "extrinsic_opt_mode_other_camera": "p_C0C_q_C0C"}
     }
 
-    # 'MSCKF_i': AlgoConfig.create_algo_config(['MSCKF', '--use_IEKF=true', 10, 3]),
-    # 'MSCKF_async': AlgoConfig.create_algo_config(['MSCKF', '', 10, 3])}
-
     # rpg eval tool supports evaluating 6 algorithms at the same time, see len(PALLETE)
     MAX_ALGORITHMS_TO_EVALUATE = 6
     algoname_to_options = utility_functions.resize_dict(algoname_to_options,

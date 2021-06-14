@@ -108,7 +108,7 @@ void HybridFilter::addImuAugmentedStates(const okvis::Time stateTime,
         prevImuInfo.at(ImuSensorStates::TA).startIndexInCov;
   } else {
     Eigen::VectorXd imuAugmentedParams =
-        imuRig_.getImuAugmentedEuclideanParams();
+        imuRig_.getImuAugmentedParams();
     int imuModelId = imuRig_.getModelId(0);
     switch (imuModelId) {
       case Imu_BG_BA_TG_TS_TA::kModelId: {
@@ -323,7 +323,7 @@ bool HybridFilter::addStates(okvis::MultiFramePtr multiFrame,
     correctedStateTime = multiFrame->timestamp(kMainCameraIndex) + tdEstimate;
 
     Eigen::VectorXd imuAugmentedParams =
-        imuRig_.getImuAugmentedEuclideanParams(0);
+        imuRig_.getImuAugmentedParams(0);
 
     // propagate pose, speedAndBias, and covariance
     okvis::Time startTime = statesMap_.rbegin()->second.timestamp;
@@ -1235,7 +1235,7 @@ void HybridFilter::decimateCovarianceForLandmarks(const std::vector<uint64_t>& t
 void HybridFilter::updateImuRig() {
   Eigen::VectorXd extraParams;
   getImuAugmentedStatesEstimate(&extraParams);
-  imuRig_.setImuAugmentedEuclideanParams(0, extraParams);
+  imuRig_.setImuAugmentedParams(0, extraParams);
 }
 
 void HybridFilter::updateCovarianceIndex() {
@@ -3167,9 +3167,9 @@ HybridFilter::getImuAugmentedParameterPtrs() const {
 
 void HybridFilter::getImuAugmentedStatesEstimate(
     Eigen::Matrix<double, Eigen::Dynamic, 1>* extraParams) const {
-  std::vector<std::shared_ptr<const okvis::ceres::ParameterBlock>> TgTsTaPtr =
+  std::vector<std::shared_ptr<const okvis::ceres::ParameterBlock>> imuAugmentedParamPtrs =
       getImuAugmentedParameterPtrs();
-  swift_vio::getImuAugmentedStatesEstimate(TgTsTaPtr, extraParams, imuRig_.getModelId(0));
+  swift_vio::getImuAugmentedStatesEstimate(imuAugmentedParamPtrs, extraParams, imuRig_.getModelId(0));
 }
 
 bool HybridFilter::getStateStd(
