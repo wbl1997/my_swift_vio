@@ -190,6 +190,8 @@ int main(int argc, char **argv) {
     LOG(WARNING) << "Default parameters for loop closure will be used as no "
                     "configuration filename is provided!";
   } else {
+    LOG(WARNING) << "The corporeal loop closure module for now is costly and "
+                    "harms accuracy esp. in a stereo setup.";
     lcParams->parseYAML(lcdConfigFilename);
   }
   if (!frontend->isDescriptorBasedMatching()) {

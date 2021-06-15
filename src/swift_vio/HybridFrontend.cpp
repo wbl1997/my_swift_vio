@@ -116,10 +116,13 @@ bool HybridFrontend::dataAssociationAndInitialization(
     }
     matchToLastFrameTimer.stop();
     if (!isInitialized_) {
-      if (!rotationOnly) {
-        isInitialized_ = true;
-        LOG(INFO) << "Initialized frontend with KLT.";
-      }
+      // For now, we immediately initialize the sliding window filter at the
+      // start. This works when the platform is stationary or moving slow.
+      // Otherwise, if the HybridFrontend is not initialized say under only
+      // rotation motion, the filter drifts much when the platform begins to
+      // move after a stationary start.
+      isInitialized_ = true;
+      LOG(INFO) << "Initialized frontend with KLT.";
     }
 
     if (num3dMatches <= requiredMatches) {
@@ -191,10 +194,13 @@ bool HybridFrontend::dataAssociationAndInitialization(
     }
     matchKeyframesTimer.stop();
     if (!isInitialized_) {
-      if (!rotationOnly) {
-        isInitialized_ = true;
-        LOG(INFO) << "Initialized frontend.";
-      }
+      // For now, we immediately initialize the sliding window filter at the
+      // start. This works when the platform is stationary or moving slow.
+      // Otherwise, if the HybridFrontend is not initialized say under only
+      // rotation motion, the filter drifts much when the platform begins to
+      // move after a stationary start.
+      isInitialized_ = true;
+      LOG(INFO) << "Initialized frontend.";
     }
 
     if (num3dMatches <= requiredMatches) {
@@ -247,10 +253,13 @@ bool HybridFrontend::dataAssociationAndInitialization(
     matchToLastFrameTimer.stop();
     if (frontendOptions_.featureTrackingMethod != 0) {
       if (!isInitialized_) {
-        if (!rotationOnly) {
-          isInitialized_ = true;
-          LOG(INFO) << "Initialized frontend.";
-        }
+        // For now, we immediately initialize the sliding window filter at the
+        // start. This works when the platform is stationary or moving slow.
+        // Otherwise, if the HybridFrontend is not initialized say under only
+        // rotation motion, the filter drifts much when the platform begins to
+        // move after a stationary start.
+        isInitialized_ = true;
+        LOG(INFO) << "Initialized frontend.";
       }
       if (num3dMatches <= requiredMatches) {
         LOG(WARNING) << "Tracking last frame failure. Number of 3d2d-matches: " << num3dMatches;
