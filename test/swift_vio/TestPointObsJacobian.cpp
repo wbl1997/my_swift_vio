@@ -99,7 +99,7 @@ class CameraMeasurementJacobianTest {
     Eigen::Quaterniond q_WS = Eigen::Quaterniond(R_WS);
 
     swift_vio::InitialNavState pvstd;
-    pvstd.initWithExternalSource = true;
+    pvstd.initializeToCustomPose = true;
     pvstd.p_WS = p_WS;
     pvstd.q_WS = Eigen::Quaterniond(q_WS);
     pvstd.v_WS = v_WS;

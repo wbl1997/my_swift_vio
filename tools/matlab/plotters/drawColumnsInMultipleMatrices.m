@@ -74,10 +74,17 @@ if subPlot == 1
     linkaxes(axes, 'x');
 else
     for i = 1:length(matrices)
-        label = matrixLabels{i};        
-        lineStyle = matrixColumnStyles{i};
+        label = matrixLabels{i};
+        
+        if i > length(matrixColumnStyles)
+            lineStyle = matrixColumnStyles{end};
+            lineWidth = matrixColumnLineWidths{end};
+        else
+            lineStyle = matrixColumnStyles{i};
+            lineWidth = matrixColumnLineWidths{i};
+        end
         drawColumnsInMatrix(matrices{i}, columnIndices, plot3d, ...
-            dataMultiplier, lineStyle, matrixColumnLineWidths{i}); hold on;
+            dataMultiplier, lineStyle, lineWidth); hold on;
         for j = 1: length(columnLabels)
             legendList((i - 1) * length(columnLabels) + j) = ...
                 {[label, '-', columnLabels{j}]};

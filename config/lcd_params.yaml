@@ -11,6 +11,8 @@ min_matches_per_group: 1
 max_intragroup_gap: 3
 max_distance_between_groups: 3
 max_distance_between_queries: 2
+min_distance_between_queries: 0.1
+min_angle_between_queries: 0.1
 
 lowe_ratio: 0.7
 matcher_type: 4

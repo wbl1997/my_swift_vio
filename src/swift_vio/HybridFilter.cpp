@@ -277,7 +277,7 @@ bool HybridFilter::addStates(okvis::MultiFramePtr multiFrame,
     tdEstimate.fromSec(cameraRig_.getImageDelay(kMainCameraIndex));
     correctedStateTime = multiFrame->timestamp(kMainCameraIndex) + tdEstimate;
 
-    if (initialNavState_.initWithExternalSource) {
+    if (initialNavState_.initializeToCustomPose) {
       T_WS = okvis::kinematics::Transformation(initialNavState_.p_WS, initialNavState_.q_WS);
     } else {
       bool success0 = swift_vio::initPoseFromImu(imuMeasurements, T_WS);
