@@ -975,8 +975,6 @@ void HybridFilter::changeAnchors(
 
       // compute Jacobians.
       Eigen::Vector4d hPointFej = ab1rho;
-      okvis::kinematics::Transformation T_WBa_fej = T_WBa;
-
       swift_vio::MultipleTransformPointJacobian mtpjFej;
       Eigen::AlignedVector<okvis::kinematics::Transformation> transformList{
           T_BCj, T_WBj, T_WBa, T_BCa};
@@ -995,8 +993,8 @@ void HybridFilter::changeAnchors(
                                       T_WBj.q());
         transformFejList.emplace_back(positionVelocityPtr->head<3>(),
                                       T_WBa.q());
-        T_WBa_fej = transformFejList.back();
-
+        // TODO(jhuai): Does hPoint need to be blurred?
+        okvis::kinematics::Transformation T_WBa_fej = transformFejList.back();
         hPointFej = (T_WBa_fej * T_BCa).inverse() * (T_WBa * T_BCa) * ab1rho;
         hPointFej = hPointFej / hPointFej[2];
       } else {
@@ -1393,6 +1391,7 @@ bool HybridFilter::measurementJacobian(
     frameIndices.push_back(pointDataPtr->anchorIds()[0].frameId_);
     T_WBt_list.push_back(T_WBta);
 
+    // TODO(jhuai): Does hPoint need to be blurred?
     homogeneousPointFej = (T_WBta_fej * T_BCa).inverse() * T_WCta * homogeneousPoint;
     homogeneousPointFej /= homogeneousPointFej[2];
 
