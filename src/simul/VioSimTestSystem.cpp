@@ -10,6 +10,8 @@
 #include <simul/CameraSystemCreator.hpp>
 #include <simul/gflags.hpp>
 
+#undef DEBUG_EXCEPTION  // debug exception with customized_terminate().
+
 namespace simul {
 typedef boost::iterator_range<std::vector<std::pair<double, double>>::iterator>
     HistogramType;
@@ -273,7 +275,9 @@ void VioSimTestSystem::run(const simul::TestSetting &testSetting,
     int expectedNumFrames = simData_->expectedNumNFrames();
     neesAccumulator.refreshBuffer(expectedNumFrames);
     rmseAccumulator.refreshBuffer(expectedNumFrames);
+#ifndef DEBUG_EXCEPTION
     try {
+#endif
       do {
         okvis::Time refNFrameTime = simData_->currentTime();
         okvis::kinematics::Transformation T_WS_ref = simData_->currentPose();
@@ -372,17 +376,20 @@ void VioSimTestSystem::run(const simul::TestSetting &testSetting,
       std::ofstream trackStatStream(trackStatFile, std::ios_base::out);
       estimator_->printTrackLengthHistogram(trackStatStream);
       trackStatStream.close();
+#ifndef DEBUG_EXCEPTION
     } catch (std::exception &e) {
       std::stringstream messageStream;
-      messageStream << "Run " << run << " aborts with #processed frames " << frameCount
-                    << " #tracked features in last frame " << trackedFeatures
-                    << " #keyframes " << frontend_->numKeyframes() << " and error: " << e.what();
+      messageStream << "Run " << run << " aborts with #processed frames "
+                    << frameCount << " #tracked features in last frame "
+                    << trackedFeatures << " #keyframes "
+                    << frontend_->numKeyframes() << " and error: " << e.what();
       LOG(INFO) << messageStream.str();
       metaStream << messageStream.str() << std::endl;
       if (debugStream.is_open()) {
         debugStream.close();
       }
     }
+#endif
     double elapsedTime = filterTimer.stop();
     std::stringstream sstream;
     sstream << "Run " << run << " used " << elapsedTime << " seconds.";
