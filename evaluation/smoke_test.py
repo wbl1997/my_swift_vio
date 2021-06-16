@@ -20,11 +20,8 @@ init(autoreset=True)
 if __name__ == '__main__':
     args = parse_args.parse_args()
 
-    euroc_bag_list = dir_utility_functions.find_bags(args.euroc_dir, '.bag', discount_key='calibration')
+    euroc_bag_list = dir_utility_functions.find_bags(args.data_dir, '.bag', discount_key='calibration')
     euroc_gt_list = dir_utility_functions.get_converted_euroc_gt_files(euroc_bag_list)
-
-    advio_bag_list = dir_utility_functions.find_bags(args.advio_dir, '.bag')
-    advio_gt_list = dir_utility_functions.get_gt_file_for_bags(advio_bag_list)
 
     bag_gt_list = sorted(zip(euroc_bag_list, euroc_gt_list))
     bag_list = [bag_gt_list[0][0]]

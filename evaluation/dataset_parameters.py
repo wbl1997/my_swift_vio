@@ -113,7 +113,7 @@ def dataset_code(bagname):
     if "ADVIO" in bagname or "advio" in bagname:
         return "advio"
     else:
-        return "unknown"
+        return "homebrew"
 
 
 def calibration_format(dataset_type):

@@ -196,14 +196,7 @@ import sys
 
 def check_common_args(args):
     assert os.path.isfile(args.vio_config_yaml)
-    dataset_dir_list = [args.euroc_dir, args.uzh_fpv_dir, args.tumvi_dir,
-                        args.advio_dir, args.homebrew_data_dir]
-    dataset_status = list()
-    for dataset_dir in dataset_dir_list:
-        dataset_status.append(os.path.exists(dataset_dir))
-
-    assert True in dataset_status, "None dataset dir exists"
-
+    assert os.path.exists(args.data_dir), "Data_dir does not exist!"
     assert os.path.exists(args.rpg_eval_tool_dir), \
         'rpg_trajectory_evaluation does not exist'
     print('Input args to {}'.format(sys.argv[0]))
@@ -218,31 +211,17 @@ def parse_args():
     parser.add_argument('vio_config_yaml', type=str,
                         help="path to vio template config yaml. Its content "
                              "will NOT be modified in running the program.")
-    parser.add_argument(
-        '--euroc_dir', type=str,
-        help="Folder containing the EUROC dataset with a structure layout "
-             "depicted at the header. You need to extract data.csv for ground "
-             "truth from the zip file beforehand.", default='')
-    parser.add_argument(
-        '--uzh_fpv_dir', type=str,
-        help="Folder containing the UZH-FPV dataset with a structure layout"
-             " depicted at the header. You need to extract ground truth from "
-             "the bag file beforehand. This can be done with extract_uzh_fpv_gt.py",
-             default='')
-    parser.add_argument(
-        '--tumvi_dir', type=str,
-        help="Folder containing the TUM-VI dataset with a structure layout"
-             " depicted at the header. You need to extract ground truth from "
-             "the bag file beforehand. This can be done with extract_tum_vi_gt.py",
-             default='')
-    parser.add_argument(
-        '--advio_dir', type=str,
-        help="Folder containing the ADVIO dataset rosbags and ground truth files."
-             " You need to extract convert ground truth from pose.csv."
-             " This can be done with create_rosbags_for_advio.py",
-             default='')
-    parser.add_argument('--homebrew_data_dir', type=str,
-                        help="Folder containing the homebrew rosbags", default='')
+    parser.add_argument('data_dir', type=str, help=(
+        "rosbag folder,\n"
+        "The EUROC, UZH-FPV, TUM-VI, and ADVIO dataset should a layout structure "
+        "described in the header of this python script.\n"
+        "The ground truth should be prepared too. For EuRoC, extract data.csv for ground truth from the zip files.\n"
+        "For UZH-FPV, extract ground truth from the bag file beforehand with extract_uzh_fpv_gt.py.\n"
+        "For TUM-VI, extract ground truth from the bag file  with extract_tum_vi_gt.py.\n"
+        "For ADVIO, convert ground truth from pose.csv with create_rosbags_for_advio.py.\n"))
+
+    parser.add_argument("dataset_code", type=str,
+                        help="dataset code: euroc, uzh_fpv, tum_vi, tum_rs, advio, homebrew")
 
     default_path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                                 '../../rpg_trajectory_evaluation/results')

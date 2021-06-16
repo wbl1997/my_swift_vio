@@ -561,7 +561,7 @@ def create_config_yaml(config_template, calib_format,
             for key in OKVIS_ADVIO_IMU_PARAMETERS.keys():
                 template_data["imu_params"][key] = OKVIS_ADVIO_IMU_PARAMETERS[key]
 
-    elif calib_format == "unknown":
+    elif calib_format == "homebrew":
         pass
     elif calib_format == 'tum_rs':
         pass

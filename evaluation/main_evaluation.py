@@ -24,31 +24,35 @@ from colorama import init, Fore
 init(autoreset=True)
 
 
-def find_all_bags_with_gt(euroc_dir="", uzh_fpv_dir="", tum_vi_dir="", advio_dir="", homebrew_dir=""):
-    euroc_bag_list = dir_utility_functions.find_bags(euroc_dir, '.bag', discount_key='calibration')
-    euroc_gt_list = dir_utility_functions.get_converted_euroc_gt_files(euroc_bag_list)
-
-    # uzh_fpv_bag_list = dir_utility_functions.find_bags_with_gt(uzh_fpv_dir, 'snapdragon_with_gt.bag')
-    # uzh_fpv_gt_list = dir_utility_functions.get_gt_file_for_bags(uzh_fpv_bag_list)
-
-    # tumvi_bag_list = dir_utility_functions.find_bags(tum_vi_dir, "_512_16.bag", "dataset-calib")
-    # tumvi_gt_list = dir_utility_functions.get_gt_file_for_bags(tumvi_bag_list)
-
-    # advio_bag_list = dir_utility_functions.find_bags(advio_dir, "advio-")
-    # advio_gt_list = dir_utility_functions.get_gt_file_for_bags(advio_bag_list)
-
-    homebrew_bag_list = dir_utility_functions.find_bags(homebrew_dir, "movie")
-    homebrew_gt_list = []
-    
-    # exclude V2_03
+def find_all_bags_with_gt(data_dir, dataset_code):
     bag_list = []
     gt_list = []
-    for index, bagname in enumerate(euroc_bag_list):
-        if 'V2_03_difficult' in bagname:
-            continue
-        else:
-            bag_list.append(bagname)
-            gt_list.append(euroc_gt_list[index])
+    if dataset_code == "euroc":
+        full_bag_list = dir_utility_functions.find_bags(data_dir, '.bag', discount_key='calibration')
+        full_gt_list = dir_utility_functions.get_converted_euroc_gt_files(full_bag_list)
+
+        # exclude V2_03
+        for index, bagname in enumerate(full_bag_list):
+            if 'V2_03_difficult' in bagname:
+                continue
+            else:
+                bag_list.append(bagname)
+                gt_list.append(full_gt_list[index])
+    elif dataset_code == "uzh_fpv":
+        bag_list = dir_utility_functions.find_bags_with_gt(data_dir, 'snapdragon_with_gt.bag')
+        gt_list = dir_utility_functions.get_gt_file_for_bags(bag_list)
+    elif dataset_code == "tum_vi":
+        bag_list = dir_utility_functions.find_bags(data_dir, "_512_16.bag", "dataset-calib")
+        gt_list = dir_utility_functions.get_gt_file_for_bags(bag_list)
+    elif dataset_code == "tum_rs":
+        bag_list = dir_utility_functions.find_bags(data_dir, ".bag")
+        gt_list = dir_utility_functions.get_gt_file_for_bags(bag_list)
+    elif dataset_code == "advio":
+        bag_list = dir_utility_functions.find_bags(data_dir, "advio-")
+        gt_list = dir_utility_functions.get_gt_file_for_bags(bag_list)
+    elif dataset_code == "homebrew":
+        bag_list = dir_utility_functions.find_bags(data_dir, "movie")
+        gt_list = []
 
     print('For evaluation, #bags {} #gtlist {}'.format(len(bag_list), len(gt_list)))
     for index, gt in enumerate(gt_list):
@@ -56,44 +60,60 @@ def find_all_bags_with_gt(euroc_dir="", uzh_fpv_dir="", tum_vi_dir="", advio_dir
     return bag_list, gt_list
 
 
-if __name__ == '__main__':
-    args = parse_args.parse_args()
+def euroc_stasis_test_options():
+    """
+    Select the five MH sessions of EuRoC dataset and examine the drifts of sliding window filters in standstills.
+    :return:
+    """
+    # case 1, KSWF (keyframe-based feature tracking, landmark in state)
+    # case 2, SWF (framewise feature tracking, landmark in state)
+    # case 3: SL-KSWF (keyframe-based feature tracking, landmark not in state)
+    # case 4. SL-SWF (framewise feature tracking, landmark not in state)
+    # case 5. OKVIS (keyframe-based feature tracking, landmark in state)
+    algo_option_templates = {
+        'KSWF': {"algo_code": "HybridFilter",
+                 "extra_gflags": "--publish_via_ros=false",
+                 "displayImages": "false",
+                 "monocular_input": 1,
+                 "numImuFrames": 5,
+                 "sigma_absolute_translation": 0.02,
+                 "sigma_absolute_orientation": 0.01,
+                 "model_type": "BG_BA",
+                 'projection_opt_mode': 'FIXED',
+                 "extrinsic_opt_mode_main_camera": "P_CB",
+                 "extrinsic_opt_mode_other_camera": "P_C0C_Q_C0C",
+                 "loop_closure_method": 0,
+                 'use_nominal_calib_value': False},
+    }
 
-    bag_list, gt_list = find_all_bags_with_gt(
-        args.euroc_dir, args.uzh_fpv_dir, args.tumvi_dir,
-        args.advio_dir, args.homebrew_data_dir)
+    config_name_to_diffs = {
+        ('KSWF', 'KSWF'): {},
+        ('SWF', 'KSWF'): {"featureTrackingMethod": 2, },
+        ('SL-KSWF', "KSWF"): {"algo_code": "MSCKF", },
+        ('SL-SWF', 'KSWF'): {"algo_code": "MSCKF", "featureTrackingMethod": 2, },
+        ('OKVIS', 'KSWF'): {
+            "numImuFrames": 3,
+            "sigma_absolute_translation": 0.02,
+            "sigma_absolute_orientation": 0.01,
+            "sigma_c_relative_translation": 1.0e-6,
+            "sigma_c_relative_orientation": 1.0e-6,
+            "sigma_g_c": 12.0e-4 * 4,
+            "sigma_a_c": 8.0e-3 * 4,
+            "sigma_gw_c": 4.0e-6 * 4,
+            "sigma_aw_c": 4.0e-5 * 4,
+        }
+    }
+    return algo_option_templates, config_name_to_diffs
 
+
+def sample_test_options():
     # python3.7 will remember insertion order of items, see
     # https://stackoverflow.com/questions/39980323/are-dictionaries-ordered-in-python-3-6
     algo_option_templates = {
         'OKVIS': {"algo_code": "OKVIS",
                   "extra_gflags": "--publish_via_ros=false",
                   "displayImages": "false",
-                  "numKeyframes": 5,
-                  "numImuFrames": 3,
                   "monocular_input": 1,
-                  "landmarkModelId": 1,
-                  "model_type": "BG_BA",
-                  'projection_opt_mode': 'FXY_CXY',
-                  "extrinsic_opt_mode_main_camera": "P_BC_Q_BC",
-                  "extrinsic_opt_mode_other_camera": "P_C0C_Q_C0C",
-                  'sigma_TGElement': 0e-3,
-                  'sigma_TSElement': 0e-3,
-                  'sigma_TAElement': 0e-3,
-                  "sigma_g_c": 12.0e-4,
-                  "sigma_a_c": 8.0e-3,
-                  "sigma_gw_c": 4.0e-6,
-                  "sigma_aw_c": 4.0e-5,
-                  "sigma_absolute_translation": 0.0,
-                  "sigma_absolute_orientation": 0.0,
-                  "sigma_td": 5e-3,
-                  "sigma_tr": 0.0,
-                  "sigma_focal_length": 0.0,
-                  "sigma_principal_point": 0.0,
-                  "sigma_distortion": "[0.0, 0.0, 0.0, 0.0]",
-                  "stereoMatchWithEpipolarCheck": 1,
-                  "epipolarDistanceThreshold": 2.5,
-                  "maxOdometryConstraintForAKeyframe": 2,
                   "loop_closure_method": 0,
                   'use_nominal_calib_value': False},
     }
@@ -104,6 +124,10 @@ if __name__ == '__main__':
             "numImuFrames": 5,
             "sigma_absolute_translation": 0.02,
             "sigma_absolute_orientation": 0.01,
+            "model_type": "BG_BA",
+            'projection_opt_mode': 'FIXED',
+            "extrinsic_opt_mode_main_camera": "P_CB",
+            "extrinsic_opt_mode_other_camera": "P_C0C_Q_C0C",
         },
         ('KSWF_n', 'OKVIS'): {
             "algo_code": 'HybridFilter',
@@ -111,12 +135,16 @@ if __name__ == '__main__':
             "monocular_input": 0,
             "sigma_absolute_translation": 0.02,
             "sigma_absolute_orientation": 0.01,
+            "model_type": "BG_BA",
+            'projection_opt_mode': 'FIXED',
+            "extrinsic_opt_mode_main_camera": "P_CB",
+            "extrinsic_opt_mode_other_camera": "P_C0C_Q_C0C",
         },
         ('OKVIS', 'OKVIS'): {
-            "sigma_g_c": 12.0e-4 * 6,
-            "sigma_a_c": 8.0e-3 * 6,
-            "sigma_gw_c": 4.0e-6 * 6,
-            "sigma_aw_c": 4.0e-5 * 6,
+            "sigma_g_c": 12.0e-4 * 4,
+            "sigma_a_c": 8.0e-3 * 4,
+            "sigma_gw_c": 4.0e-6 * 4,
+            "sigma_aw_c": 4.0e-5 * 4,
         },
         ('OKVIS_n', 'OKVIS'): {
             "monocular_input": 0,
@@ -132,6 +160,10 @@ if __name__ == '__main__':
             "numImuFrames": 5,
             "sigma_absolute_translation": 0.02,
             "sigma_absolute_orientation": 0.01,
+            "model_type": "BG_BA",
+            'projection_opt_mode': 'FIXED',
+            "extrinsic_opt_mode_main_camera": "P_CB",
+            "extrinsic_opt_mode_other_camera": "P_C0C_Q_C0C",
         },
         ('KSF_n', 'OKVIS'): {
             "algo_code": 'MSCKF',
@@ -139,6 +171,10 @@ if __name__ == '__main__':
             "monocular_input": 0,
             "sigma_absolute_translation": 0.02,
             "sigma_absolute_orientation": 0.01,
+            "model_type": "BG_BA",
+            'projection_opt_mode': 'FIXED',
+            "extrinsic_opt_mode_main_camera": "P_CB",
+            "extrinsic_opt_mode_other_camera": "P_C0C_Q_C0C",
         },
         ('isam2-fls', 'OKVIS'): {
             "algo_code": "SlidingWindowSmoother",
@@ -153,6 +189,13 @@ if __name__ == '__main__':
             "extra_gflags": "--publish_via_ros=false --rifls_lock_jacobian=false",
         },
     }
+    return algo_option_templates, config_name_to_diffs
+
+if __name__ == '__main__':
+    args = parse_args.parse_args()
+    bag_list, gt_list = find_all_bags_with_gt(args.data_dir, args.dataset_code)
+
+    algo_option_templates, config_name_to_diffs = euroc_stasis_test_options()
 
     algoname_to_options = dict()
     for new_old_code, diffs in config_name_to_diffs.items():
