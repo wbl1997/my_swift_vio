@@ -3070,32 +3070,30 @@ void HybridFilter::printTrackLengthHistogram(std::ostream &stream) const {
 void HybridFilter::getVariableCameraIntrinsics(
     Eigen::Matrix<double, Eigen::Dynamic, 1> *cameraParams,
     size_t camIdx) const {
+  Eigen::VectorXd projectionIntrinsics;
+  Eigen::VectorXd distortionCoeffs;
+  const uint64_t poseId = statesMap_.rbegin()->first;
   if (!fixCameraIntrinsicParams_[camIdx]) {
-    const uint64_t poseId = statesMap_.rbegin()->first;
-    Eigen::VectorXd projectionIntrinsics;
     getSensorStateEstimateAs<okvis::ceres::EuclideanParamBlock>(
         poseId, camIdx, SensorStates::Camera,
         okvis::Estimator::CameraSensorStates::Intrinsics, projectionIntrinsics);
-    Eigen::VectorXd distortionCoeffs;
     getSensorStateEstimateAs<okvis::ceres::EuclideanParamBlock>(
         poseId, camIdx, SensorStates::Camera,
         okvis::Estimator::CameraSensorStates::Distortion, distortionCoeffs);
-    cameraParams->resize(
-        projectionIntrinsics.size() + distortionCoeffs.size() + 2, 1);
-    cameraParams->head(projectionIntrinsics.size()) = projectionIntrinsics;
-    cameraParams->segment(projectionIntrinsics.size(),
-                          distortionCoeffs.size()) = distortionCoeffs;
-    double tdEstimate(0), trEstimate(0);
-    getSensorStateEstimateAs<okvis::ceres::CameraTimeParamBlock>(
-        poseId, camIdx, SensorStates::Camera,
-        okvis::Estimator::CameraSensorStates::TD, tdEstimate);
-    getSensorStateEstimateAs<okvis::ceres::CameraTimeParamBlock>(
-        poseId, camIdx, SensorStates::Camera,
-        okvis::Estimator::CameraSensorStates::TR, trEstimate);
-    cameraParams->tail<2>() = Eigen::Vector2d(tdEstimate, trEstimate);
-  } else {
-    cameraParams->resize(0);
   }
+  cameraParams->resize(
+      projectionIntrinsics.size() + distortionCoeffs.size() + 2, 1);
+  cameraParams->head(projectionIntrinsics.size()) = projectionIntrinsics;
+  cameraParams->segment(projectionIntrinsics.size(), distortionCoeffs.size()) =
+      distortionCoeffs;
+  double tdEstimate(0), trEstimate(0);
+  getSensorStateEstimateAs<okvis::ceres::CameraTimeParamBlock>(
+      poseId, camIdx, SensorStates::Camera,
+      okvis::Estimator::CameraSensorStates::TD, tdEstimate);
+  getSensorStateEstimateAs<okvis::ceres::CameraTimeParamBlock>(
+      poseId, camIdx, SensorStates::Camera,
+      okvis::Estimator::CameraSensorStates::TR, trEstimate);
+  cameraParams->tail<2>() = Eigen::Vector2d(tdEstimate, trEstimate);
 }
 
 void HybridFilter::getCameraTimeParameterPtrs(
