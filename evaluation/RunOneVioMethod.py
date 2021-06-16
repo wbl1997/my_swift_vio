@@ -11,7 +11,7 @@ import rpg_eval_tool_wrap
 import utility_functions
 
 import AlgoConfig
-import OkvisConfigComposer
+import VioConfigComposer
 import RoscoreManager
 
 
@@ -65,7 +65,7 @@ class RunOneVioMethod(object):
             output_dir_mission = self.output_dir_list[bag_index]
             vio_yaml_mission = os.path.join(output_dir_mission, os.path.basename(self.vio_config_template))
 
-            config_composer = OkvisConfigComposer.OkvisConfigComposer(
+            config_composer = VioConfigComposer.VioConfigComposer(
                 self.vio_config_template, bag_fullname, vio_yaml_mission)
 
             # apply sensor calibration parameters
@@ -101,7 +101,7 @@ class RunOneVioMethod(object):
     def create_sync_command(self, custom_vio_config, custom_lcd_config,
                             vio_trial_output_dir, bag_fullname):
         data_type = dataset_parameters.dataset_code(bag_fullname)
-        if data_type in  dataset_parameters.ROS_TOPICS.keys():
+        if data_type in dataset_parameters.ROS_TOPICS.keys():
             arg_topics = r'--camera_topics="{},{}" --imu_topic={}'.format(
                 dataset_parameters.ROS_TOPICS[data_type][0],
                 dataset_parameters.ROS_TOPICS[data_type][1],

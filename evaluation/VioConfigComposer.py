@@ -2,10 +2,10 @@ import os
 import shutil
 
 import dataset_parameters
-import dataset_okvis_config
+import dataset_vio_config
 
 """If the bagname keyword is found in the bag's full path, then the 
-corresponding calibration files will be used in creating okvis config yaml"""
+corresponding calibration files will be used in creating the VIO config yaml"""
 BAGKEY_CALIBRATION = {
     'euroc': ('calibration/euroc/imu0.yaml', 'calibration/euroc/cam0.yaml',
               'calibration/euroc/cam1.yaml'),
@@ -20,8 +20,8 @@ BAGKEY_CALIBRATION = {
 }
 
 
-class OkvisConfigComposer(object):
-    """compose a okvis config yaml for a data mission"""
+class VioConfigComposer(object):
+    """compose a VIO config yaml for a data mission"""
     def __init__(self, vio_config_template, bag_fullname, vio_yaml_mission):
         """
 
@@ -51,7 +51,7 @@ class OkvisConfigComposer(object):
         imu_calib_file, camera_calib_files = self.get_calib_files()
         calib_format = dataset_parameters.calibration_format(dataset_type)
 
-        dataset_okvis_config.create_okvis_config_yaml(
+        dataset_vio_config.create_config_yaml(
             self.vio_config_template, calib_format,
             self.vio_yaml_mission, camera_calib_files,
             imu_calib_file, algo_code, self.bag_fullname, use_nominal_value, monocular)

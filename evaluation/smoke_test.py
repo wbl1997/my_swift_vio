@@ -57,9 +57,6 @@ if __name__ == '__main__':
                                 "extrinsic_opt_mode_other_camera": "p_C0C_q_C0C",
                                 "sigma_absolute_translation": "0.02",
                                 "sigma_absolute_orientation": "0.01", },
-
-        # We disable online extrinsic calibration for OKVIS by zeroing
-        # sigma_absolute_translation and sigma_absolute_orientation.
         'OKVIS': {"algo_code": "OKVIS",
                   "extra_gflags": "--publish_via_ros=false",
                   "numKeyframes": 5,
@@ -76,6 +73,8 @@ if __name__ == '__main__':
                   "sigma_a_c": 8.0e-3 * 4,
                   "sigma_gw_c": 4.0e-6 * 4,
                   "sigma_aw_c": 4.0e-5 * 4},
+        # We disable loop closure for okvis_nframe because loop closure module can noticeably
+        # degrade OKVIS in stereo mode when ceres_options.timeLimit is relatively small.
         'OKVIS_nframe': {"algo_code": "OKVIS",
                          "extra_gflags": "--publish_via_ros=false",
                          "numKeyframes": 5,
@@ -89,7 +88,8 @@ if __name__ == '__main__':
                          "sigma_g_c": 12.0e-4 * 4,
                          "sigma_a_c": 8.0e-3 * 4,
                          "sigma_gw_c": 4.0e-6 * 4,
-                         "sigma_aw_c": 4.0e-5 * 4,},
+                         "sigma_aw_c": 4.0e-5 * 4,
+                         "loop_closure_method": 0, },
         'FLS': {
             "algo_code": "SlidingWindowSmoother",
             "extra_gflags": "--publish_via_ros=false",

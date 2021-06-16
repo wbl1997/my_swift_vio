@@ -6,24 +6,24 @@ import dir_utility_functions
 
 
 def test_get_rpg_est_file_suffix():
-    est_file = "/okvis_ref/laptop/OKVIS/laptop_OKVIS_MH_02/stamped_traj_estimate.txt"
+    est_file = "/laptop/HybridFilter/laptop_HybridFilter_MH_02/stamped_traj_estimate.txt"
     suffix = dir_utility_functions.get_rpg_est_file_suffix(est_file)
     assert suffix == ''
-    est_file = "/okvis_ref/laptop/OKVIS/laptop_OKVIS_MH_02/stamped_traj_estimate2.txt"
+    est_file = "/laptop/HybridFilter/laptop_HybridFilter_MH_02/stamped_traj_estimate2.txt"
     suffix = dir_utility_functions.get_rpg_est_file_suffix(est_file)
     assert suffix == "2"
 
 def test_get_number_suffix():
-    string_number = "OKVIS3"
+    string_number = "HybridFilter3"
     val, string = dir_utility_functions.get_number_suffix(string_number)
     assert val == 3
     assert string == "3"
 
-    string_number = "OKVIS34"
+    string_number = "HybridFilter34"
     val, string = dir_utility_functions.get_number_suffix(string_number)
     assert val == 34
     assert string == "34"
-    string_number = "OKVIS345"
+    string_number = "HybridFilter345"
     val, string = dir_utility_functions.get_number_suffix(string_number)
     assert val == 345
     assert string == "345"

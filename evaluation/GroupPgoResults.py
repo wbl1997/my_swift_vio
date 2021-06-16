@@ -48,6 +48,13 @@ class GroupPgoResults(object):
         self.create_config_yaml(self.original_eval_config_yaml, algo_name, self.eval_config_yaml)
 
     def create_config_yaml(self, original_yaml, algo_name, new_config_yaml):
+        """
+        create a new configuration yaml for rpg trajectory evaluation given the original yaml.
+        :param original_yaml:
+        :param algo_name:
+        :param new_config_yaml: The yaml for three algorithms, algo, algo + online pgo, algo + global pgo.
+        :return:
+        """
         yaml = YAML()
         yaml.version = (1, 2)
         yaml.default_flow_style = None

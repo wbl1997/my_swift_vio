@@ -2,7 +2,7 @@
 
 """
 Generate configuration file to OKVIS for a variety of data.
-The interface is main_okvis_config.py.
+The interface is main_vio_config.py.
 author: Yukai Lin
 author: Jianzhu Huai
 """
@@ -316,7 +316,7 @@ def get_advio_sequence_unmber(bagname):
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument("okvis_config_template",
+    parser.add_argument("config_template",
                         help="Input okvis config template yaml. It will not be modified.")
     parser.add_argument("format",
                         help="Input sensor config yaml format, 'kalibr' or 'euroc'. "
@@ -332,7 +332,7 @@ def parse_args():
                         required=False)
 
     parser.add_argument("--output_okvis_config",
-                        help="Output okvis config yaml accommodating the sensor parameters",
+                        help="Output config yaml accommodating the sensor parameters",
                         required=True)
     parser.add_argument("--algo_code",
                         help="Which algorithm to use, MSCKF or OKVIS. This only affects"
@@ -409,33 +409,34 @@ def printCameraBlock(camConfig):
     return STRING_OUT
 
 
-def create_okvis_config_yaml(okvis_config_template, calib_format,
-                             output_okvis_config, camera_config_yamls=None,
-                             imu_config_yaml="",
-                             algo_code="", bagname="", use_nominal_value=False, 
-                             monocular_input=False):
+def create_config_yaml(config_template, calib_format,
+                       output_config, camera_config_yamls=None,
+                       imu_config_yaml="",
+                       algo_code="", bagname="", use_nominal_value=False,
+                       monocular_input=False):
     """
-
-    :param okvis_config_template:
-    :param calib_format: supported calibration format: uzh-fpv uses kalibr format,
+    create configuration yaml to swift_vio for a dataset.
+    :param config_template:
+    :param calib_format: supported calibration format: uzh_fpv uses kalibr format,
      euroc format, tumvi format, amd advio format.
     :param camera_config_yamls:
     :param imu_config_yaml:
     :param algo_code: MSCKF or OKVIS, only for TUM-VI calibration format.
     :param bagname: only for ADVIO dataset to extract sequence number
-    :param output_okvis_config:
+    :param output_config:
     :return:
     """
-    out_config = open(output_okvis_config, 'w')
+    out_config = open(output_config, 'w')
     yaml = YAML()
     yaml.version = (1, 2)
     yaml.default_flow_style = None
     yaml.indent(mapping=4, sequence=6, offset=4)
 
-    with open(okvis_config_template, 'r') as template_config:
+    with open(config_template, 'r') as template_config:
         template_config.readline()
         template_data = yaml.load(template_config)
 
+    # TODO(jhuai): move the following parameters into the corresponding yaml under swift_vio/config.
     imu_data = None
     if calib_format == 'kalibr':
         with open(camera_config_yamls[0], 'r') as camera_config:
@@ -498,7 +499,7 @@ def create_okvis_config_yaml(okvis_config_template, calib_format,
         else:
             for key in OKVIS_EUROC_IMU_PARAMETERS.keys():
                 template_data["imu_params"][key] = OKVIS_EUROC_IMU_PARAMETERS[key]
-    elif calib_format == "tum-vi":
+    elif calib_format == "tum_vi":
         used_TUMVI_parameters = TUMVI_PARAMETERS
         if use_nominal_value:
             used_TUMVI_parameters = TUMVI_NOMINAL_PARAMETERS
@@ -560,7 +561,9 @@ def create_okvis_config_yaml(okvis_config_template, calib_format,
             for key in OKVIS_ADVIO_IMU_PARAMETERS.keys():
                 template_data["imu_params"][key] = OKVIS_ADVIO_IMU_PARAMETERS[key]
 
-    elif calib_format == "homebrew":
+    elif calib_format == "unknown":
+        pass
+    elif calib_format == 'tum_rs':
         pass
 
     # camera_config_str = printCameraBlock(template_data["cameras"][0])

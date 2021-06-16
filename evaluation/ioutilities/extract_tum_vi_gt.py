@@ -11,7 +11,7 @@ import utility_functions
 
 if __name__ == '__main__':
     if len(sys.argv) < 3:
-        print('Usage: {} <tum-vi-dir containing all bag files immediately>'
+        print('Usage: {} <tum_vi_dir containing all bag files immediately>'
               ' <path/to/bag_to_pose.py>'.
               format(sys.argv[0]))
         sys.exit(1)

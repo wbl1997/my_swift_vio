@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
+Evaluate several VIO method with ONE dataset, e.g., EUROC.
 The evaluation procedure will run synchronously if publish_via_ros is true
 because that case depends on roscore which does not accept nodes with the same name.
 """

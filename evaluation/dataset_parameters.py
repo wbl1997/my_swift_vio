@@ -1,10 +1,10 @@
 
 
 ROS_TOPICS = {"euroc": ["/cam0/image_raw", "/cam1/image_raw", "/imu0"],
-              "tum-vi": ["/cam0/image_raw", "/cam1/image_raw", "/imu0"],
-              "uzh-fpv": ["/snappy_cam/stereo_l", "/snappy_cam/stereo_r", "/snappy_imu"],
+              "tum_vi": ["/cam0/image_raw", "/cam1/image_raw", "/imu0"],
+              "tum_rs": ["/cam0/image_raw", "/cam1/image_raw", "/imu0"],
+              "uzh_fpv": ["/snappy_cam/stereo_l", "/snappy_cam/stereo_r", "/snappy_imu"],
               "advio": ["/cam0/image_raw", "", "/imu0"]}
-
 
 # actual bag filename : data name used in creating result dirs, data label used in plots.
 # Data labels are not supposed to include underscores which causes latex interpretation error,
@@ -103,19 +103,21 @@ BAGNAME_DATANAME_LABEL = {
 
 def dataset_code(bagname):
     if 'snapdragon' in bagname or 'davis' in bagname:
-        return "uzh-fpv"
+        return "uzh_fpv"
     if 'euroc' in bagname:
         return "euroc"
     if 'TUM-VI' in bagname or 'tum-vi' in bagname:
-        return "tum-vi"
+        return "tum_vi"
+    if 'rollingshutter' in bagname:
+        return "tum_rs"
     if "ADVIO" in bagname or "advio" in bagname:
         return "advio"
     else:
-        return "homebrew"
+        return "unknown"
 
 
 def calibration_format(dataset_type):
-    if dataset_type == "uzh-fpv":
+    if dataset_type == "uzh_fpv":
         calib_format = "kalibr"
     else:
         calib_format = dataset_type
