@@ -46,7 +46,7 @@ Eigen::Matrix<double, 4, 4> create_T_BC(CameraOrientation orientationId,
  */
 std::shared_ptr<okvis::cameras::NCameraSystem> createNoisyCameraSystem(
     std::shared_ptr<const okvis::cameras::NCameraSystem> cameraSystem,
-    const okvis::ExtrinsicsEstimationParameters &cameraNoiseParams);
+    const okvis::ExtrinsicsEstimationParameters &cameraNoiseParams, const std::string extrinsicModel);
 
 /**
  * @brief loadCameraSystemYaml

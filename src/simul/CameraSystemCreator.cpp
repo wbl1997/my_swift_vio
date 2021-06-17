@@ -47,7 +47,7 @@ Eigen::Matrix<double, 4, 4> create_T_BC(CameraOrientation orientationId,
 
 std::shared_ptr<okvis::cameras::NCameraSystem> createNoisyCameraSystem(
     std::shared_ptr<const okvis::cameras::NCameraSystem> cameraSystem,
-    const okvis::ExtrinsicsEstimationParameters &cameraNoiseParams) {
+    const okvis::ExtrinsicsEstimationParameters &cameraNoiseParams, const std::string extrinsicModel) {
   Eigen::Matrix<double, 4, 1> fcNoise = vio::Sample::gaussian(1, 4);
   fcNoise.head<2>() *= cameraNoiseParams.sigma_focal_length;
   fcNoise.tail<2>() *= cameraNoiseParams.sigma_principal_point;
@@ -56,17 +56,42 @@ std::shared_ptr<okvis::cameras::NCameraSystem> createNoisyCameraSystem(
     kpNoise[jack] =
         std::fabs(kpNoise[jack]) * cameraNoiseParams.sigma_distortion[jack];
   }
-  Eigen::Vector3d p_CBNoise;
-  for (int jack = 0; jack < 3; ++jack) {
-    p_CBNoise[jack] =
-        vio::gauss_rand(0, cameraNoiseParams.sigma_absolute_translation);
-  }
 
   const size_t camIdx = 0u;
   std::shared_ptr<const okvis::kinematics::Transformation> ref_T_SC = cameraSystem->T_SC(camIdx);
-  std::shared_ptr<okvis::kinematics::Transformation> T_SC_noisy(
-      new okvis::kinematics::Transformation(
-          ref_T_SC->r() - ref_T_SC->C() * p_CBNoise, ref_T_SC->q()));
+
+  std::shared_ptr<okvis::kinematics::Transformation> T_SC_noisy;
+  std::string upperExtrinsicModel = extrinsicModel;
+  std::transform(upperExtrinsicModel.begin(), upperExtrinsicModel.end(),
+                 upperExtrinsicModel.begin(),
+                 [](unsigned char c) { return std::toupper(c); });
+  if (upperExtrinsicModel.compare("P_BC_Q_BC") == 0) {
+    Eigen::Matrix<double, 6, 1> delta;
+    for (int jack = 0; jack < 3; ++jack) {
+      delta[jack] =
+          vio::gauss_rand(0, cameraNoiseParams.sigma_absolute_translation);
+    }
+    for (int jack = 3; jack < 6; ++jack) {
+      delta[jack] =
+          vio::gauss_rand(0, cameraNoiseParams.sigma_absolute_orientation);
+    }
+    okvis::kinematics::Transformation T_SC(*ref_T_SC);
+    T_SC.oplus(delta);
+    T_SC_noisy.reset(new okvis::kinematics::Transformation(T_SC));
+  } else if (upperExtrinsicModel.compare("P_CB") == 0) {
+    Eigen::Vector3d p_CBNoise;
+    for (int jack = 0; jack < 3; ++jack) {
+      p_CBNoise[jack] =
+          vio::gauss_rand(0, cameraNoiseParams.sigma_absolute_translation);
+    }
+
+    T_SC_noisy.reset(new okvis::kinematics::Transformation(
+        ref_T_SC->r() - ref_T_SC->C() * p_CBNoise, ref_T_SC->q()));
+
+  } else {
+    LOG(ERROR) << "We do not support creating noisy " << extrinsicModel << "!";
+  }
+
   std::shared_ptr<const okvis::cameras::CameraBase> refCameraGeometry =
       cameraSystem->cameraGeometry(camIdx);
   Eigen::VectorXd projDistortIntrinsics;

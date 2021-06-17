@@ -469,10 +469,11 @@ int MSCKF::computeStackedJacobianAndResidual(
   // compute and stack Jacobians and Residuals for landmarks observed no more
   int numMarginalizedLandmarks = 0;
   int culledPoints[2] = {0};
-  int featureVariableDimen = minimalDimOfAllCameraParams() +
+  const size_t gravityDimInCov = imuParametersVec_.at(0).estimateGravityDirection ? 2u : 0u;
+  int featureVariableDimen = gravityDimInCov + minimalDimOfAllCameraParams() +
       kClonedStateMinimalDimen * (statesMap_.size() - 1);
   int dimH_o[2] = {0, featureVariableDimen};
-  const int camParamStartIndex = startIndexOfCameraParamsFast(0u);
+  const int camParamStartIndex = navStateAndImuParamsMinimalDim(0u);
   const Eigen::MatrixXd variableCov =
       covariance_.block(camParamStartIndex, camParamStartIndex, dimH_o[1], dimH_o[1]);
   // containers of Jacobians of measurements

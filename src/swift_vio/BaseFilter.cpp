@@ -36,8 +36,8 @@ void BaseFilter::updateIekf(int variableStartIndex, int variableDim,
 
   // Initial condition: $x_k^0 = x_{k|k-1}$
   // in each iteration,
-  // $\Delta x_i = K_k^i(z - h(x_k^i) - H_k^i(x_{k|k-1}\boxminus x_k^i)) +
-  // x_{k|k-1}\boxminus x_k^i$ $x_k^{i+1} =  x_k^i\boxplus \Delta x_i$
+  // $\Delta x_i = K_k^i(z - h(x_k^i) - H_k^i(x_{k|k-1}\boxminus x_k^i)) + x_{k|k-1}\boxminus x_k^i$
+  // $x_k^{i+1} = x_k^i \boxplus \Delta x_i$
 
   // We record the initial states, and update the estimator states in each
   // iteration which are used in computing Jacobians, and initializing

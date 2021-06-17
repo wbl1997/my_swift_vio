@@ -277,9 +277,10 @@ int SimulationFrontend::addMatchToEstimator(
                                   landmarkMatch.landmarkId);
 
         Eigen::Vector4d hP_W = homogeneousPoints_[landmarkMatch.landmarkIdInVector];
-        // Use estimated landmark position because true position does not
-        // affect VIO results much.
-        hP_W = T_WCa * hP_Ca;
+        if (!options_.useTrueLandmarkPosition_) {
+          // Use estimated landmark position as in real scenarios.
+          hP_W = T_WCa * hP_Ca;
+        }
         estimator.addLandmark(landmarkMatch.landmarkId, hP_W);
         estimator.setLandmarkInitialized(landmarkMatch.landmarkId,
                                          canBeInitialized);

@@ -82,12 +82,7 @@ void VioSimTestSystem::createSensorSystem(const TestSetting &testSetting) {
     refCameraSystem_->setExtrinsicOptMode(0, testSetting.visionParams.extrinsicModelName);
   }
 
-  if (testSetting.estimatorParams.estimator_algorithm <
-      swift_vio::EstimatorAlgorithm::HybridFilter) {
-    refImuParameters_.model_type = "BG_BA"; // use BG_BA for smoothers.
-  } else {
-    refImuParameters_.model_type = "BG_BA_TG_TS_TA";
-  }
+  refImuParameters_.model_type = testSetting.imuParams.imuModel;
   simul::initImuNoiseParams(testSetting.imuParams, &refImuParameters_);
 }
 
@@ -109,7 +104,8 @@ void VioSimTestSystem::createEstimator(const TestSetting &testSetting) {
 
   if (testSetting.visionParams.noisyInitialSensorParams) {
     initialCameraSystem_ = createNoisyCameraSystem(
-        refCameraSystem_, refCameraNoiseParameters_);
+        refCameraSystem_, refCameraNoiseParameters_,
+          testSetting.visionParams.extrinsicModelName);
   } else {
     initialCameraSystem_ = refCameraSystem_->deepCopy();
   }
@@ -213,16 +209,18 @@ void VioSimTestSystem::run(const simul::TestSetting &testSetting,
   if (testSetting.simDataDir.empty()) {
     simData_ = std::shared_ptr<SimDataInterface>(
         new CurveData(testSetting.imuParams.trajectoryId, refImuParameters_,
-                      testSetting.visionParams.addImageNoise));
+                      testSetting.visionParams.addImageNoise, testSetting.imuParams.addImuNoise));
   } else {
     simData_ = std::shared_ptr<SimDataInterface>(new SimFromRealData(
-        testSetting.simDataDir, refImuParameters_, testSetting.visionParams.addImageNoise));
+        testSetting.simDataDir, refImuParameters_, testSetting.visionParams.addImageNoise,
+                                                   testSetting.imuParams.addImuNoise));
     refImuParameters_ = simData_->imuParameters();
   }
 
   LOG(INFO) << "IMU rate " << refImuParameters_.rate << " sigma_g_c " << refImuParameters_.sigma_g_c
             << " sigma_gw_c " << refImuParameters_.sigma_gw_c << " sigma_a_c "
-            << refImuParameters_.sigma_a_c << " sigma_aw_c " << refImuParameters_.sigma_aw_c;
+            << refImuParameters_.sigma_a_c << " sigma_aw_c " << refImuParameters_.sigma_aw_c <<
+               "\ngravity in world frame " << refImuParameters_.g * refImuParameters_.gravityDirection().transpose();
 
   simData_->initializeLandmarkGrid(testSetting.visionParams.gridType,
                                    testSetting.visionParams.landmarkRadius);
@@ -253,9 +251,11 @@ void VioSimTestSystem::run(const simul::TestSetting &testSetting,
     std::string outputFile = pathEstimatorTrajectory + "_" + ss.str() + ".txt";
 
     SimFrontendOptions frontendOptions(60, FLAGS_maxMatchKeyframes);
-    frontend_.reset(new SimulationFrontend(simData_->homogeneousPoints(),
-                                           simData_->landmarkIds(),
-                                           refCameraSystem_->numCameras(), frontendOptions));
+    frontendOptions.useTrueLandmarkPosition_ =
+        testSetting.visionParams.useTrueLandmarkPosition;
+    frontend_.reset(new SimulationFrontend(
+        simData_->homogeneousPoints(), simData_->landmarkIds(),
+        refCameraSystem_->numCameras(), frontendOptions));
 
     createEstimator(testSetting);
 

@@ -28,6 +28,7 @@
 #include <swift_vio/BaseFilter.h>
 #include <swift_vio/CameraRig.hpp>
 #include <swift_vio/MotionAndStructureStats.h>
+#include <swift_vio/ParallaxAnglePoint.hpp>
 #include <swift_vio/PointLandmark.hpp>
 #include <swift_vio/PointSharedData.hpp>
 #include <swift_vio/memory.h>
@@ -88,7 +89,7 @@ class HybridFilter : public okvis::Estimator, public BaseFilter {
    */
   bool addStates(okvis::MultiFramePtr multiFrame,
                  const okvis::ImuMeasurementDeque &imuMeasurements,
-                 bool asKeyframe) final;
+                 bool asKeyframe) override;
 
   /**
    * @brief optimize
@@ -215,13 +216,13 @@ class HybridFilter : public okvis::Estimator, public BaseFilter {
    * @param obs image observation in pixels.
    * @param observationIndex index of the observation inside the point's shared data.
    * @param pointDataPtr shared data of the point.
-   * @param J_x Jacobians of the image observation relative to the camera parameters and cloned states.
-   *     It ought to be allocated in advance.
+   * @param J_x Jacobians of the image observation relative to the gravity direction,
+   * camera parameters, and cloned states. It ought to be allocated in advance.
    * @param J_pfi Jacobian of the image observation relative to landmark parameters, e.g., [\alpha, \beta, \rho].
    * @param residual
    * @return true if Jacobians are computed successfully.
    */
-  virtual bool measurementJacobian(
+  bool measurementJacobian(
       const Eigen::Vector4d& homogeneousPoint,
       const Eigen::Vector2d& obs, size_t observationIndex,
       std::shared_ptr<const swift_vio::PointSharedData> pointDataPtr,
@@ -230,12 +231,11 @@ class HybridFilter : public okvis::Estimator, public BaseFilter {
 
   /**
    * @brief slamFeatureJacobian, compute the residual and Jacobians for a SLAM
-   * feature i observed in the current frame which may have multiple cameras.
+   * feature i observed in the current NFrame.
    * We assume that the landmark is well observed including its depth.
    * @param mp mappoint
-   * @param H_x Jacobian w.r.t variables related to camera intrinsics, camera
-   * poses, with e.g. (13+9m) columns where m is the number of cloned nav
-   * states.
+   * @param H_x Jacobian w.r.t variables related to gravity direction, camera extrinsics,
+   * intrinsics, cloned states.
    * @param r_i residual of the observation of the map point in the latest
    * frame.
    * @param R_i covariance matrix of this observation.
@@ -244,6 +244,7 @@ class HybridFilter : public okvis::Estimator, public BaseFilter {
    * @return true if succeeded in computing the residual and Jacobians.
    */
   bool slamFeatureJacobian(const okvis::MapPoint &mp,
+                           Eigen::Vector4d homoPointRep,
                            Eigen::MatrixXd &H_x,
                            Eigen::Matrix<double, -1, 1> &r_i,
                            Eigen::MatrixXd &R_i,
@@ -256,8 +257,7 @@ class HybridFilter : public okvis::Estimator, public BaseFilter {
    * @warning The number of observations of the map points is at least two.
    * @param mp mappoint
    * @param H_oi Jacobians of feature observations w.r.t variables related to
-   * camera intrinsics, camera poses, e.g., (13+9(m-1)), where m is the number
-   * of cloned nav states.
+   * gravity direction, camera extrinsics, intrinsics, and cloned nav states.
    * @param r_oi residuals
    * @param R_oi covariance matrix of these observations.
    * @param pH_fi pointer to the Jacobian of feature observations w.r.t the
@@ -398,22 +398,24 @@ class HybridFilter : public okvis::Estimator, public BaseFilter {
   }
 
   /**
-   * @brief minimal dim of camera parameters and all cloned states including the last
+   * @brief minimal dim of gravity direction, camera parameters, and all cloned states including the last
    * inserted one and all landmarks.
-   * Ex: C_p_B, f_x, f_y, c_x, c_y, k_1, k_2, p_1, p_2, [k_3], t_d, t_r,
+   * Ex: \delta(gW), C_p_B, f_x, f_y, c_x, c_y, k_1, k_2, p_1, p_2, [k_3], t_d, t_r,
    * C0_p_Ci, C0_q_Ci, f_x, f_y, c_x, c_y, k_1, k_2, p_1, p_2, [k_3], t_d, t_r,
    * \pi_{B_i}(=[p_{B_i}^G, q_{B_i}^G, v_{B_i}^G]), l_i
    * @warning call this no earlier than first call of addStates().
    * @return
    */
   inline size_t cameraParamPoseAndLandmarkMinimalDimen() const {
-    return minimalDimOfAllCameraParams() +
+    return (imuParametersVec_.at(0).estimateGravityDirection ? 2u : 0u) +
+           minimalDimOfAllCameraParams() +
            kClonedStateMinimalDimen * statesMap_.size() +
            3 * mInCovLmIds.size();
   }
 
   inline size_t startIndexOfClonedStates() const {
     size_t dim = swift_vio::ode::kNavErrorStateDim + imuRig_.getImuParamsMinimalDim(0);
+    dim += (imuParametersVec_.at(0).estimateGravityDirection ? 2u : 0u);
     for (size_t j = 0; j < cameraRig_.numberCameras(); ++j) {
       dim += cameraParamsMinimalDimen(j);
     }
@@ -436,6 +438,7 @@ class HybridFilter : public okvis::Estimator, public BaseFilter {
 
   inline size_t startIndexOfCameraParams(size_t camIdx = 0u) const {
     size_t dim = swift_vio::ode::kNavErrorStateDim + imuRig_.getImuParamsMinimalDim(0);
+    dim += (imuParametersVec_.at(0).estimateGravityDirection ? 2u : 0u);
     for (size_t i = 0u; i < camIdx; ++i) {
       dim += cameraParamsMinimalDimen(i);
     }
@@ -481,14 +484,19 @@ class HybridFilter : public okvis::Estimator, public BaseFilter {
   }
 
   /**
-   * @brief navStateAndImuParamsMinimalDim
+   * @brief navStateAndImuParamsMinimalDim.
    * @warning assume only one IMU is used.
    * @param imuIdx
    * @return
    */
-  inline size_t navStateAndImuParamsMinimalDim(size_t imuIdx = 0u) {
+  inline size_t navStateAndImuParamsMinimalDim(size_t imuIdx = 0u) const {
+    return swift_vio::ode::kNavErrorStateDim + imuRig_.getImuParamsMinimalDim(imuIdx);
+  }
+
+  inline size_t navStateAndImuParamsGravityMinDim(size_t imuIdx = 0u) const {
     return swift_vio::ode::kNavErrorStateDim +
-           imuRig_.getImuParamsMinimalDim(imuIdx);
+           imuRig_.getImuParamsMinimalDim(imuIdx) +
+           (imuParametersVec_.at(imuIdx).estimateGravityDirection ? 2u : 0u);
   }
 
   // error state: \delta p, \alpha for q, \delta v
@@ -685,6 +693,10 @@ class HybridFilter : public okvis::Estimator, public BaseFilter {
   // see Sun 2017 Robust stereo appendix D
   size_t minCulledFrames_;
 
+  // for each point in the state vector/covariance,
+  // its landmark id which points to the parameter block
+  Eigen::AlignedDeque<okvis::ceres::HomogeneousPointParameterBlock> mInCovLmIds;
+
 private:
   bool hasLandmarkParameterBlock(uint64_t landmarkId) const;
 
@@ -692,9 +704,6 @@ private:
 
   void decimateCovarianceForLandmarks(const std::vector<uint64_t>& toRemoveLmIds);
 
-  // for each point in the state vector/covariance,
-  // its landmark id which points to the parameter block
-  Eigen::AlignedDeque<okvis::ceres::HomogeneousPointParameterBlock> mInCovLmIds;
 
 };
 

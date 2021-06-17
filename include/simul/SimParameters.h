@@ -39,6 +39,7 @@ struct SimImuParameters {
   //  Multiply the accelerometer and gyro BIAS noise root PSD by this
   //  reduction factor in generating noise.
   double sim_ga_bias_noise_factor;
+  std::string imuModel;
 
   SimImuParameters(std::string _trajLabel = "WavyCircle",
                    bool _addImuNoise = true,
@@ -51,7 +52,8 @@ struct SimImuParameters {
                    double _sigma_gw_c = 2e-5, double _sigma_a_c = 8e-3,
                    double _sigma_aw_c = 5.5e-5,
                    double _sim_ga_noise_factor = 1.0,
-                   double _sim_ga_bias_noise_factor = 1.0)
+                   double _sim_ga_bias_noise_factor = 1.0,
+                   std::string _imuModel = "BG_BA")
       : trajLabel(_trajLabel),
         trajectoryId(simul::trajectoryLabelToId.find(trajLabel)->second),
         addImuNoise(_addImuNoise),
@@ -62,7 +64,8 @@ struct SimImuParameters {
         Ta_std(_Ta_std), sigma_g_c(_sigma_g_c), sigma_gw_c(_sigma_gw_c),
         sigma_a_c(_sigma_a_c), sigma_aw_c(_sigma_aw_c),
         sim_ga_noise_factor(_sim_ga_noise_factor),
-        sim_ga_bias_noise_factor(_sim_ga_bias_noise_factor) {}
+        sim_ga_bias_noise_factor(_sim_ga_bias_noise_factor),
+        imuModel(_imuModel) {}
 
   std::string toString() const {
     std::stringstream ss;
@@ -71,7 +74,8 @@ struct SimImuParameters {
        << " noisyInitialSensorParams " << noisyInitialSensorParams
        << "\nfixImuIntrinsicParams " << fixImuIntrinsicParams
        << " sim_ga_noise_factor " << sim_ga_noise_factor
-       << " sim_ga_bias_noise_factor " << sim_ga_bias_noise_factor;
+       << " sim_ga_bias_noise_factor " << sim_ga_bias_noise_factor
+       << " IMU model " << imuModel;
     return ss.str();
   }
 };
@@ -97,6 +101,7 @@ struct SimVisionParameters {
   LandmarkGridType gridType;
   double landmarkRadius; // radius of the cylinder on whose surface the
                          // landmarks are distributed.
+  bool useTrueLandmarkPosition;
 
   SimVisionParameters(bool _addImageNoise = true, bool _useImageObservs = true,
                       simul::SimCameraModelType _cameraModelId =
@@ -110,7 +115,8 @@ struct SimVisionParameters {
                       double _timeOffset = 0.0, double _readoutTime = 0.0,
                       bool _noisyInitialSensorParams = false,
                       LandmarkGridType _gridType = LandmarkGridType::FourWalls,
-                      double _landmarkRadius = 5)
+                      double _landmarkRadius = 5,
+                      bool _useTrueLandmarkPosition = false)
       : addImageNoise(_addImageNoise), useImageObservs(_useImageObservs),
         cameraModelId(_cameraModelId),
         cameraOrientationId(_cameraOrientationId),
@@ -119,7 +125,8 @@ struct SimVisionParameters {
         sigma_abs_position(_sigma_abs_position), sigma_abs_orientation(_sigma_abs_orientation),
         timeOffset(_timeOffset), readoutTime(_readoutTime),
         noisyInitialSensorParams(_noisyInitialSensorParams),
-        gridType(_gridType), landmarkRadius(_landmarkRadius) {}
+        gridType(_gridType), landmarkRadius(_landmarkRadius),
+        useTrueLandmarkPosition(_useTrueLandmarkPosition) {}
 
   std::string toString() const {
     std::stringstream ss;

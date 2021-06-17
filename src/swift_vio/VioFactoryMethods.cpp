@@ -1,5 +1,6 @@
 #include <swift_vio/VioFactoryMethods.hpp>
 
+#include <swift_vio/CalibrationFilter.hpp>
 #include <swift_vio/HybridFrontend.hpp>
 #include <swift_vio/MSCKF.hpp>
 #include <gtsam/RiSlidingWindowSmoother.hpp>
@@ -43,6 +44,9 @@ std::shared_ptr<okvis::Estimator> createBackend(
 
     case EstimatorAlgorithm::HybridFilter:
       return std::shared_ptr<okvis::Estimator>(new HybridFilter(mapPtr));
+
+    case EstimatorAlgorithm::CalibrationFilter:
+      return std::shared_ptr<okvis::Estimator>(new CalibrationFilter(mapPtr));
 
     case EstimatorAlgorithm::MSCKF:
       return std::shared_ptr<okvis::Estimator>(new MSCKF(mapPtr));

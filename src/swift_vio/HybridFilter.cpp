@@ -26,6 +26,7 @@
 #include <swift_vio/IoUtil.hpp>
 #include <swift_vio/MultipleTransformPointJacobian.hpp>
 #include <swift_vio/imu/ImuOdometry.h>
+#include <swift_vio/ParallaxAnglePoint.hpp>
 #include <swift_vio/PointLandmark.hpp>
 #include <swift_vio/PointLandmarkModels.hpp>
 #include <swift_vio/PointSharedData.hpp>
@@ -327,7 +328,7 @@ bool HybridFilter::addStates(okvis::MultiFramePtr multiFrame,
 
     // propagate pose, speedAndBias, and covariance
     okvis::Time startTime = statesMap_.rbegin()->second.timestamp;
-    size_t navAndImuParamsDim = navStateAndImuParamsMinimalDim();
+    size_t navAndImuParamsDim = navStateAndImuParamsGravityMinDim();
     Eigen::MatrixXd Pkm1 =
         covariance_.topLeftCorner(navAndImuParamsDim, navAndImuParamsDim);
     Eigen::MatrixXd F_tot = Eigen::MatrixXd::Identity(navAndImuParamsDim, navAndImuParamsDim);
@@ -472,7 +473,35 @@ bool HybridFilter::addStates(okvis::MultiFramePtr multiFrame,
   // depending on whether or not this is the very beginning, we will construct
   // covariance
   if (statesMap_.size() == 1) {
+    uint64_t id = okvis::IdProvider::instance().newId();
+    std::shared_ptr<okvis::ceres::EuclideanParamBlockSized<3>>
+        gDirectionParamBlock(new okvis::ceres::EuclideanParamBlockSized<3>(
+            imuParametersVec_.at(0).gravityDirection(), id,
+            correctedStateTime));
+   // TODO(jhuai): use NormalVectorElement and localParameterization for the gravity direction.
+    mapPtr_->addParameterBlock(gDirectionParamBlock,
+                               okvis::ceres::Map::Parameterization::Trivial);
+    statesMap_.rbegin()->second.global.at(GlobalStates::GravityDirection).id =
+        id;
+    statesMap_.rbegin()
+        ->second.global.at(GlobalStates::GravityDirection)
+        .exists = true;
+    if (imuParametersVec_.at(0).estimateGravityDirection) {
+      mapPtr_->setParameterBlockVariable(id);
+    } else {
+      mapPtr_->setParameterBlockConstant(id);
+    }
     initCovariance();
+  } else {
+    std::map<uint64_t, States>::const_reverse_iterator lastElementIterator =
+        statesMap_.rbegin();
+    lastElementIterator++;
+    statesMap_.rbegin()->second.global.at(GlobalStates::GravityDirection).id =
+        lastElementIterator->second.global.at(GlobalStates::GravityDirection)
+            .id;
+    statesMap_.rbegin()
+        ->second.global.at(GlobalStates::GravityDirection)
+        .exists = true;
   }
 
   addCovForClonedStates();
@@ -538,6 +567,17 @@ void HybridFilter::initCovariance() {
     default:
       LOG(WARNING) << "Not implemented IMU model " << imuModelId;
       break;
+  }
+
+  if (imuParametersVec_.at(0).estimateGravityDirection) {
+    int gWStartIndex = navStateAndImuParamsMinimalDim();
+    statesMap_.rbegin()
+        ->second.global.at(GlobalStates::GravityDirection)
+        .startIndexInCov = gWStartIndex;
+    covariance_.block<2, 2>(gWStartIndex, gWStartIndex) =
+        imuParametersVec_.at(0).sigmaGravityDirection *
+        imuParametersVec_.at(0).sigmaGravityDirection *
+        Eigen::Matrix2d::Identity();
   }
 
   for (size_t j = 0u; j < cameraRig_.numberCameras(); ++j) {
@@ -690,12 +730,12 @@ int HybridFilter::marginalizeRedundantFrames(size_t numKeyframes, size_t numImuF
   findRedundantCamStates(&rm_cam_state_ids, numImuFrames);
 
   size_t numMsckfLandmarks = 0u;
-  int featureVariableDimen = minimalDimOfAllCameraParams() +
+  const size_t gravityDimInCov = imuParametersVec_.at(0).estimateGravityDirection ? 2u: 0u;
+  int featureVariableDimen = gravityDimInCov + minimalDimOfAllCameraParams() +
       kClonedStateMinimalDimen * (statesMap_.size() - 1);
   int navAndImuParamsDim = navStateAndImuParamsMinimalDim();
-  int startIndexCamParams = startIndexOfCameraParamsFast(0u);
   const Eigen::MatrixXd featureVariableCov =
-      covariance_.block(startIndexCamParams, startIndexCamParams,
+      covariance_.block(navAndImuParamsDim, navAndImuParamsDim,
                         featureVariableDimen, featureVariableDimen);
   int dimH_o[2] = {0, featureVariableDimen};
   // containers of Jacobians of measurements
@@ -923,6 +963,7 @@ void HybridFilter::changeAnchors(
   std::vector<size_t> vCovPtId; // id in covariance of point features to be
                                 // reparameterized, 0 for the first landmark.
   vCovPtId.reserve(10);
+  const size_t gravityDimInCov = imuParametersVec_.at(0).estimateGravityDirection ? 2u : 0u;
   for (auto landmark : mInCovLmIds) {
     okvis::MapPoint &mapPoint = landmarksMap_.at(landmark.id());
     uint64_t newAnchorFrameId =
@@ -1054,7 +1095,7 @@ void HybridFilter::changeAnchors(
           for (auto idx : involvedCameraIndices) {
             size_t extrinsicStartIndex = intraStartIndexOfCameraParams(idx);
             size_t extrinsicDim = cameraRig_.getMinimalExtrinsicDimen(idx);
-            startIndexToMinDim.emplace_back(extrinsicStartIndex, extrinsicDim);
+            startIndexToMinDim.emplace_back(gravityDimInCov + extrinsicStartIndex, extrinsicDim);
             dpoint_dX.emplace_back(dpoint_dT_BC *
                                    dT_BC_dExtrinsics[camParamIdx]);
             ++camParamIdx;
@@ -1065,7 +1106,7 @@ void HybridFilter::changeAnchors(
         Eigen::Matrix<double, 4, 6> dpoint_dT_WBt_fej =
             mtpjFej.dp_dT(mtpjPoseIndices[ja]);
         size_t navStateIndex = startIndices[ja] - startIndexCameraParams;
-        startIndexToMinDim.emplace_back(navStateIndex, 6u);
+        startIndexToMinDim.emplace_back(gravityDimInCov + navStateIndex, 6u);
         dpoint_dX.emplace_back(dpoint_dT_WBt_fej);
       }
 
@@ -1322,7 +1363,7 @@ bool HybridFilter::measurementJacobian(
   okvis::kinematics::Transformation T_WBtj = pointDataPtr->T_WBtij(observationIndex);
   okvis::kinematics::Transformation T_BC0 =
       cameraRig_.getCameraExtrinsic(kMainCameraIndex);
-
+  const size_t gravityDimInCov = imuParametersVec_.at(0).estimateGravityDirection ? 2u : 0u;
   Eigen::AlignedVector<okvis::kinematics::Transformation> transformList;
   std::vector<int> exponentList;
   transformList.reserve(4);
@@ -1426,7 +1467,7 @@ bool HybridFilter::measurementJacobian(
   }
 
   swift_vio::MultipleTransformPointJacobian mtpjFej(transformFejList, exponentList, homogeneousPointFej);
-  std::vector<std::pair<size_t, size_t>> startIndexToMinDim;
+  std::vector<std::pair<size_t, size_t>> startIndexToMinDim;  // start index of sub Jacobians within J_x and its columns.
   Eigen::AlignedVector<Eigen::MatrixXd> dpoint_dX; // drhoxpCtj_dParameters
   // compute drhoxpCtj_dParameters
   size_t startIndexCameraParams = startIndexOfCameraParams(kMainCameraIndex);
@@ -1447,7 +1488,7 @@ bool HybridFilter::measurementJacobian(
       for (auto idx : involvedCameraIndices) {
         size_t extrinsicStartIndex = intraStartIndexOfCameraParams(idx);
         size_t extrinsicDim = cameraRig_.getMinimalExtrinsicDimen(idx);
-        startIndexToMinDim.emplace_back(extrinsicStartIndex, extrinsicDim);
+        startIndexToMinDim.emplace_back(gravityDimInCov + extrinsicStartIndex, extrinsicDim);
         dpoint_dX.emplace_back(dpoint_dT_BC * dT_BC_dExtrinsics[camParamIdx]);
         ++camParamIdx;
       }
@@ -1457,12 +1498,12 @@ bool HybridFilter::measurementJacobian(
     Eigen::Matrix<double, 4, 6> dpoint_dT_WBt_fej = mtpjFej.dp_dT(mtpjPoseIndices[ja]);
     auto stateIter = statesMap_.find(frameIndices[ja]);
     int orderInCov = stateIter->second.global.at(GlobalStates::T_WS).startIndexInCov;
-    size_t navStateIndex = orderInCov - startIndexCameraParams;
-    startIndexToMinDim.emplace_back(navStateIndex, 6u);
+    size_t relativeNavStateIndex = orderInCov - startIndexCameraParams;
+    startIndexToMinDim.emplace_back(gravityDimInCov + relativeNavStateIndex, 6u);
 
-    // Jacobians relative to time parameters and velocity.
+    // Jacobians relative to time parameters, velocity, and gravity.
     if (ja == 1u) {
-      // Because the anchor frame is at state epoch, then the Jacobian of its
+      // Because the anchor frame is at the known state epoch, the Jacobians of its
       // pose relative to time and velocity are zero.
       dpoint_dX.emplace_back(dpoint_dT_WBt_fej);
     } else {
@@ -1470,7 +1511,7 @@ bool HybridFilter::measurementJacobian(
       dpoint_dT_WBt_fej.rightCols(3) += dpoint_dT_WBt_fej.leftCols(3) * Phi_pq_tij_tj;
       dpoint_dX.emplace_back(dpoint_dT_WBt_fej);
       Eigen::Vector3d v_WBt =
-          pointDataPtr->v_WBtij(observationIndices[ja]);
+          pointDataPtr->v_WBtij_ForJacobian(observationIndices[ja]);
       Eigen::Matrix<double, 6, 1> dT_WBt_dt;
       dT_WBt_dt.head<3>() =
           swift_vio::SimpleImuPropagationJacobian::dp_dt(v_WBt);
@@ -1478,18 +1519,30 @@ bool HybridFilter::measurementJacobian(
           pointDataPtr->omega_Btij(observationIndices[ja]);
       dT_WBt_dt.tail<3>() = swift_vio::SimpleImuPropagationJacobian::dtheta_dt(
           omega_Btij, T_WBt_list[ja].q());
+
       Eigen::Vector2d dt_dtdtr(1, 1);
       dt_dtdtr[1] = pointDataPtr->normalizedRow(observationIndices[ja]);
-
       size_t cameraDelayIntraIndex =
           intraStartIndexOfCameraParams(camIndices[ja], okvis::Estimator::CameraSensorStates::TD);
-      startIndexToMinDim.emplace_back(cameraDelayIntraIndex, 2u);
+      startIndexToMinDim.emplace_back(gravityDimInCov + cameraDelayIntraIndex, 2u);
       dpoint_dX.emplace_back(dpoint_dT_WBt_fej * dT_WBt_dt * dt_dtdtr.transpose());
 
       double featureDelay =
           pointDataPtr->normalizedFeatureTime(observationIndices[ja]);
-      startIndexToMinDim.emplace_back(navStateIndex + 6u, 3u);
+      startIndexToMinDim.emplace_back(gravityDimInCov + relativeNavStateIndex + 6u, 3u);
       dpoint_dX.emplace_back(dpoint_dT_WBt_fej.leftCols(3) * featureDelay);
+
+      if (gravityDimInCov > 0u) {
+        Eigen::Matrix<double, 6, 2> dT_WBt_dunitgW;
+        dT_WBt_dunitgW.topRows<3>() =
+            swift_vio::SimpleImuPropagationJacobian::dp_dunitgW(
+                featureDelay, imuParametersVec_.at(0).gravityDirection(),
+                imuParametersVec_.at(0).g);
+        //      dT_WBt_dunitgW.bottomRows<3>().setZero();
+        startIndexToMinDim.emplace_back(0u, gravityDimInCov);
+        dpoint_dX.emplace_back(dpoint_dT_WBt_fej.leftCols(3) *
+                               dT_WBt_dunitgW.topRows<3>());
+      }
     }
   }
   // Accumulate Jacobians relative to nav states.
@@ -1504,8 +1557,12 @@ bool HybridFilter::measurementJacobian(
   if (!fixCameraIntrinsicParams_[camIdx]) {
     int projOptModelId = cameraRig_.getProjectionOptMode(camIdx);
     ProjectionOptKneadIntrinsicJacobian(projOptModelId, &intrinsicsJacobian);
-    size_t startIndex = intraStartIndexOfCameraParams(camIdx, okvis::Estimator::CameraSensorStates::Intrinsics);
-    J_x->block(0, startIndex, 2, intrinsicsJacobian.cols()) = intrinsicsJacobian;
+    size_t startIndex =
+        gravityDimInCov +
+        intraStartIndexOfCameraParams(
+            camIdx, okvis::Estimator::CameraSensorStates::Intrinsics);
+    J_x->block(0, startIndex, 2, intrinsicsJacobian.cols()) =
+        intrinsicsJacobian;
   }
   // Jacobian relative to landmark parameters.
   (*J_pfi) = dz_drhoxpCtj * mtpjFej.dp_dpoint().topRows<3>() * dhPoint_dparams;
@@ -1535,10 +1592,11 @@ bool HybridFilter::featureJacobian(
   }
 
   computeHTimer.start();
+  const size_t gravityDimInCov = imuParametersVec_.at(0).estimateGravityDirection ? 2u : 0u;
   // dimension of variables used in computing feature Jacobians, including
-  // camera intrinsics and all cloned states except the most recent one
+  // gravity direction, camera intrinsics and cloned states except the most recent one
   // in which an observation should never occur for a MSCKF feature.
-  int featureVariableDimen = minimalDimOfAllCameraParams() +
+  int featureVariableDimen = gravityDimInCov + minimalDimOfAllCameraParams() +
                              kClonedStateMinimalDimen * (statesMap_.size() - 1);
   if (pH_fi == NULL) {
     CHECK_NE(statesMap_.rbegin()->first, pointDataPtr->lastFrameId())
@@ -1632,10 +1690,12 @@ bool HybridFilter::featureJacobian(
   return true;
 }
 
-bool HybridFilter::slamFeatureJacobian(const okvis::MapPoint &mp, Eigen::MatrixXd &H_x,
+bool HybridFilter::slamFeatureJacobian(const okvis::MapPoint &mp,
+                                       Eigen::Vector4d homoPointRep,
+                                       Eigen::MatrixXd &H_x,
                                        Eigen::Matrix<double, -1, 1> &r_i,
                                        Eigen::MatrixXd &R_i,
-                                       Eigen::MatrixXd &H_f) const {
+                                       Eigen::MatrixXd &subH_f) const {
   std::shared_ptr<swift_vio::PointSharedData> pointDataPtr(new swift_vio::PointSharedData());
 
   std::vector<Eigen::Vector2d, Eigen::aligned_allocator<Eigen::Vector2d>> obsInPixel;
@@ -1741,43 +1801,33 @@ bool HybridFilter::slamFeatureJacobian(const okvis::MapPoint &mp, Eigen::MatrixX
   propagatePoseAndVelocityForMapPoint(pointDataPtr.get());
 
   computeHTimer.start();
+  const size_t gravityDimInCov = imuParametersVec_.at(0).estimateGravityDirection ? 2u : 0u;
   // dimension of variables used in computing feature Jacobians, including
-  // camera intrinsics and all cloned states.
-  int featureVariableDimen = minimalDimOfAllCameraParams() +
+  // gravity direction, camera intrinsics, and all cloned states.
+  int featureVariableDimen = gravityDimInCov + minimalDimOfAllCameraParams() +
                              kClonedStateMinimalDimen * statesMap_.size();
 
   pointDataPtr->computePoseAndVelocityForJacobians(FLAGS_use_first_estimate);
   pointDataPtr->computeSharedJacobians(optimizationOptions_.cameraObservationModelId);
 
-  // get the landmark parameters.
-  uint64_t hpbid = mp.id;
-  auto idPos = std::find_if(
-      mInCovLmIds.begin(), mInCovLmIds.end(),
-      [hpbid](const okvis::ceres::HomogeneousPointParameterBlock &x) {
-        return x.id() == hpbid;
-      });
-  OKVIS_ASSERT_TRUE(Exception, idPos != mInCovLmIds.end(),
-                    "The tracked landmark " << hpbid << " is not in the state vector.");
-  size_t covPtId = std::distance(mInCovLmIds.begin(), idPos);
-  Eigen::Vector4d homogeneousPoint = idPos->estimate();
   if (pointLandmarkOptions_.landmarkModelId ==
       swift_vio::InverseDepthParameterization::kModelId) {
-    if (homogeneousPoint[2] < 1e-6) {
+    if (homoPointRep[2] < 1e-6) {
       LOG(WARNING) << "Negative depth in anchor camera frame point: "
-                   << homogeneousPoint.transpose();
+                   << homoPointRep.transpose();
       computeHTimer.stop();
       return false;
     }
     //[\alpha = X/Z, \beta= Y/Z, 1, \rho=1/Z] in anchor camera frame.
-    homogeneousPoint /= homogeneousPoint[2];
+    homoPointRep /= homoPointRep[2];
   } else {
-    if (homogeneousPoint[3] < 1e-6) {
+    if (homoPointRep[3] < 1e-6) {
       LOG(WARNING) << "Point at infinity in world frame: "
-                   << homogeneousPoint.transpose();
+                   << homoPointRep.transpose();
       computeHTimer.stop();
       return false;
     }
-    homogeneousPoint /= homogeneousPoint[3];  //[X, Y, Z, 1] in world frame.
+    homoPointRep /= homoPointRep[3];  //[X, Y, Z, 1] in world frame.
   }
 
   size_t numObservations = pointDataPtr->numObservations();
@@ -1802,7 +1852,7 @@ bool HybridFilter::slamFeatureJacobian(const okvis::MapPoint &mp, Eigen::MatrixX
     // use its first estimate in computing Jacobians for consistency.
     // The first estimate is not needed for anchored inverse depth parameterization.
     bool validJacobian = measurementJacobian(
-        homogeneousPoint, obsInPixel[observationIndex],
+        homoPointRep, obsInPixel[observationIndex],
         observationIndex, pointDataPtr, &J_x, &J_pfi, &residual);
     if (!validJacobian) {
         ++observationIter;
@@ -1820,14 +1870,13 @@ bool HybridFilter::slamFeatureJacobian(const okvis::MapPoint &mp, Eigen::MatrixX
   }
 
   H_x.resize(2 * numValidObs, featureVariableDimen);
-  H_f.resize(2 * numValidObs, 3 * mInCovLmIds.size());
-  H_f.setZero();
+  subH_f.resize(2 * numValidObs, 3);
   r_i.resize(2 * numValidObs, 1);
   R_i = Eigen::MatrixXd::Identity(2 * numValidObs, 2 * numValidObs);
   for (size_t saga = 0; saga < numValidObs; ++saga) {
     size_t saga2 = saga * 2;
     H_x.block(saga2, 0, 2, featureVariableDimen) = vJ_X[saga];
-    H_f.block<2, 3>(saga2, covPtId * 3) = vJ_pfi[saga];
+    subH_f.block<2, 3>(saga2, 0) = vJ_pfi[saga];
     r_i.segment<2>(saga2) = vri[saga];
     R_i(saga2, saga2) = imageNoiseStd[saga2] * imageNoiseStd[saga2];
     R_i(saga2 + 1, saga2 + 1) = imageNoiseStd[saga2 + 1] * imageNoiseStd[saga2 + 1];
@@ -1886,37 +1935,45 @@ void HybridFilter::updateImuAugmentedStates(
 }
 
 void HybridFilter::cloneImuAugmentedStates(
-    const States& stateInQuestion,
-    StatePointerAndEstimateList*
-        currentStates) const {
-  // TODO(jhuai): make it work with alternative IMU models.
+    const States &stateInQuestion,
+    StatePointerAndEstimateList *currentStates) const {
   const int imuIdx = 0;
-  uint64_t TGId = stateInQuestion.sensors.at(SensorStates::Imu)
-                      .at(imuIdx)
-                      .at(ImuSensorStates::TG)
-                      .id;
-  std::shared_ptr<const okvis::ceres::ShapeMatrixParamBlock> tgParamBlockPtr =
-      std::static_pointer_cast<const okvis::ceres::ShapeMatrixParamBlock>(
-          mapPtr_->parameterBlockPtr(TGId));
-  currentStates->emplace_back(tgParamBlockPtr, tgParamBlockPtr->estimate());
-
-  uint64_t TSId = stateInQuestion.sensors.at(SensorStates::Imu)
-                      .at(imuIdx)
-                      .at(ImuSensorStates::TS)
-                      .id;
-  std::shared_ptr<const okvis::ceres::ShapeMatrixParamBlock> tsParamBlockPtr =
-      std::static_pointer_cast<const okvis::ceres::ShapeMatrixParamBlock>(
-          mapPtr_->parameterBlockPtr(TSId));
-  currentStates->emplace_back(tsParamBlockPtr, tsParamBlockPtr->estimate());
-
-  uint64_t TAId = stateInQuestion.sensors.at(SensorStates::Imu)
-                      .at(imuIdx)
-                      .at(ImuSensorStates::TA)
-                      .id;
-  std::shared_ptr<const okvis::ceres::ShapeMatrixParamBlock> taParamBlockPtr =
-      std::static_pointer_cast<const okvis::ceres::ShapeMatrixParamBlock>(
-          mapPtr_->parameterBlockPtr(TAId));
-  currentStates->emplace_back(taParamBlockPtr, taParamBlockPtr->estimate());
+  int imuModelId = imuRig_.getModelId(imuIdx);
+  switch (imuModelId) {
+  case Imu_BG_BA::kModelId:
+    break;
+  case Imu_BG_BA_TG_TS_TA::kModelId: {
+    uint64_t TGId = stateInQuestion.sensors.at(SensorStates::Imu)
+                        .at(imuIdx)
+                        .at(ImuSensorStates::TG)
+                        .id;
+    std::shared_ptr<const okvis::ceres::ShapeMatrixParamBlock> tgParamBlockPtr =
+        std::static_pointer_cast<const okvis::ceres::ShapeMatrixParamBlock>(
+            mapPtr_->parameterBlockPtr(TGId));
+    currentStates->emplace_back(tgParamBlockPtr, tgParamBlockPtr->estimate());
+    uint64_t TSId = stateInQuestion.sensors.at(SensorStates::Imu)
+                        .at(imuIdx)
+                        .at(ImuSensorStates::TS)
+                        .id;
+    std::shared_ptr<const okvis::ceres::ShapeMatrixParamBlock> tsParamBlockPtr =
+        std::static_pointer_cast<const okvis::ceres::ShapeMatrixParamBlock>(
+            mapPtr_->parameterBlockPtr(TSId));
+    currentStates->emplace_back(tsParamBlockPtr, tsParamBlockPtr->estimate());
+    uint64_t TAId = stateInQuestion.sensors.at(SensorStates::Imu)
+                        .at(imuIdx)
+                        .at(ImuSensorStates::TA)
+                        .id;
+    std::shared_ptr<const okvis::ceres::ShapeMatrixParamBlock> taParamBlockPtr =
+        std::static_pointer_cast<const okvis::ceres::ShapeMatrixParamBlock>(
+            mapPtr_->parameterBlockPtr(TAId));
+    currentStates->emplace_back(taParamBlockPtr, taParamBlockPtr->estimate());
+    break;
+  }
+  default:
+    OKVIS_ASSERT_TRUE(Exception, 0,
+                      "boxminus not implemented for IMU model " << imuModelId);
+    break;
+  }
 }
 
 void HybridFilter::updateCameraSensorStates(const States& stateInQuestion,
@@ -2079,6 +2136,17 @@ void HybridFilter::cloneFilterStates(
   currentStates->emplace_back(sbParamBlockPtr, sbParamBlockPtr->estimate());
 
   cloneImuAugmentedStates(stateInQuestion, currentStates);
+
+  if (imuParametersVec_.at(0).estimateGravityDirection) {
+    uint64_t gWId =
+        stateInQuestion.global.at(GlobalStates::GravityDirection).id;
+    std::shared_ptr<const okvis::ceres::EuclideanParamBlockSized<3>>
+        paramBlockPtr = std::static_pointer_cast<
+            const okvis::ceres::EuclideanParamBlockSized<3>>(
+            mapPtr_->parameterBlockPtr(gWId));
+    currentStates->emplace_back(paramBlockPtr, paramBlockPtr->estimate());
+  }
+
   for (size_t j = 0u; j < cameraRig_.numberCameras(); ++j) {
     cloneCameraParameterStates(stateInQuestion, currentStates, j);
   }
@@ -2124,15 +2192,40 @@ void HybridFilter::boxminusFromInput(
 
   // IMU augmented parameters
   int covStateIndex = 15;
-  // TODO(jhuai): make it work with alternative IMU models.
-  for (int j = 0; j < 3; ++j) {
-    Eigen::Map<const Eigen::Matrix<double, 9, 1>> sm(
-        refStates.at(j + 2).parameterBlockPtr->parameters());
-    deltaX->segment<9>(covStateIndex + j * 9) =
-        refStates.at(j + 2).parameterEstimate - sm;
+  int stateBlockIndex = 2;
+
+  int imuModelId = imuRig_.getModelId(0u);
+  switch (imuModelId) {
+  case Imu_BG_BA::kModelId:
+    break;
+  case Imu_BG_BA_TG_TS_TA::kModelId:
+    for (int j = 0; j < 3; ++j) {
+      Eigen::Map<const Eigen::Matrix<double, 9, 1>> sm(
+          refStates.at(j + stateBlockIndex).parameterBlockPtr->parameters());
+      deltaX->segment<9>(covStateIndex + j * 9) =
+          refStates.at(j + stateBlockIndex).parameterEstimate - sm;
+    }
+    covStateIndex += 3 * 9;
+    stateBlockIndex += 3;
+    break;
+  default:
+    OKVIS_ASSERT_TRUE(Exception, 0,
+                      "boxminus not implemented for IMU model " << imuModelId);
+    break;
   }
-  covStateIndex += 3 * 9;
-  int stateBlockIndex = 5;
+
+  if (imuParametersVec_.at(0).estimateGravityDirection) {
+    Eigen::Map<const Eigen::Matrix<double, 3, 1>> gWNew(
+        refStates.at(stateBlockIndex).parameterBlockPtr->parameters());
+    Eigen::VectorXd gWOld =
+        refStates.at(stateBlockIndex).parameterEstimate;
+    Eigen::Vector2d diffVec;
+    NormalVectorElement ngWOld(gWOld);
+    ngWOld.boxMinus(NormalVectorElement(gWNew), diffVec);
+    deltaX->segment<2>(covStateIndex) = diffVec;
+    covStateIndex += 2;
+    stateBlockIndex++;
+  }
 
   // camera related parameters
   for (size_t camIdx = 0u; camIdx < cameraRig_.numberCameras(); ++camIdx) {
@@ -2248,8 +2341,23 @@ void HybridFilter::updateStates(
   okvis::SpeedAndBiases sb = sbParamBlockPtr->estimate();
   sbParamBlockPtr->setEstimate(sb + deltaX.segment<9>(6));
 
-  updateImuAugmentedStates(
-      stateInQuestion, deltaX.segment(15, imuRig_.getAugmentedMinimalDim(0)));
+  int imuIntrinsicDim = imuRig_.getAugmentedMinimalDim(0);
+  updateImuAugmentedStates(stateInQuestion, deltaX.segment(15, imuIntrinsicDim));
+
+  if (imuParametersVec_.at(0).estimateGravityDirection) {
+    uint64_t gWId = stateInQuestion.global.at(GlobalStates::GravityDirection).id;
+    std::shared_ptr<okvis::ceres::EuclideanParamBlockSized<3>>
+        paramBlockPtr = std::static_pointer_cast<
+            okvis::ceres::EuclideanParamBlockSized<3>>(
+            mapPtr_->parameterBlockPtr(gWId));
+    Eigen::Matrix<double, 3, 1> oldEstimate = paramBlockPtr->estimate();
+    NormalVectorElement nOldEstimate(oldEstimate);
+    NormalVectorElement newEstimate;
+    nOldEstimate.boxPlus(deltaX.segment<2>(15 + imuIntrinsicDim), newEstimate);
+    paramBlockPtr->setEstimate(newEstimate.getVec());
+    // also update the IMU sensor.
+    imuParametersVec_.at(0).setGravityDirection(newEstimate.getVec());
+  }
 
   updateCameraSensorStates(stateInQuestion, deltaX);
 
@@ -2347,7 +2455,7 @@ void HybridFilter::optimize(size_t /*numIter*/, size_t /*numThreads*/,
 
   // containers of Jacobians of measurements of points in the states
   Eigen::AlignedVector<Eigen::VectorXd> vr_i;
-  Eigen::AlignedVector<Eigen::MatrixXd> vH_x;  // each entry has a size say 2j x(13 + 9m)
+  Eigen::AlignedVector<Eigen::MatrixXd> vH_x;  // each entry has a size say 2j x(2 + 13 + 9m), 2 for gravity, 13 for camera extrinsics, intrinsics, td, tr.
   Eigen::AlignedVector<Eigen::MatrixXd> vH_f;  // each entry has a size 2j x 3k where j is the number of observing cameras, k is the number of landmarks in state.
   Eigen::AlignedVector<Eigen::MatrixXd> vR_i;
 
@@ -2439,12 +2547,32 @@ void HybridFilter::optimize(size_t /*numIter*/, size_t /*numThreads*/,
     Eigen::MatrixXd H_x;
     Eigen::MatrixXd H_f;
     Eigen::MatrixXd R_i;
-    bool isValidJacobian = slamFeatureJacobian(mapPoint, H_x, r_i, R_i, H_f);
+
+    Eigen::MatrixXd subH_f;
+
+    // get the landmark parameters.
+    uint64_t hpbid = mapPoint.id;
+    auto idPos = std::find_if(
+        mInCovLmIds.begin(), mInCovLmIds.end(),
+        [hpbid](const okvis::ceres::HomogeneousPointParameterBlock &x) {
+          return x.id() == hpbid;
+        });
+    OKVIS_ASSERT_TRUE(Exception, idPos != mInCovLmIds.end(),
+                      "The tracked landmark " << hpbid << " is not in the state vector.");
+    size_t covPtId = std::distance(mInCovLmIds.begin(), idPos);
+    Eigen::Vector4d homoPointRep = idPos->estimate();
+
+    bool isValidJacobian = slamFeatureJacobian(mapPoint, homoPointRep, H_x, r_i, R_i, subH_f);
     if (!isValidJacobian) {
       mapPoint.setMeasurementFate(
           FeatureTrackStatus::kComputingJacobiansFailed);
       continue;
     }
+
+    H_f.resize(subH_f.rows(), 3 * mInCovLmIds.size());
+    H_f.setZero();
+    H_f.block(0, covPtId * 3, subH_f.rows(), subH_f.cols()) = subH_f;
+
     Eigen::MatrixXd H_xf(H_x.rows(), H_x.cols() + H_f.cols());
     H_xf.leftCols(H_x.cols()) = H_x;
     H_xf.rightCols(H_f.cols()) = H_f;
@@ -3303,10 +3431,10 @@ bool HybridFilter::computeErrors(
   Eigen::VectorXd cameraParamsError = computeCameraParamsError(currentState, refCameraSystem);
 
   errors->conservativeResize(startIndexOfClonedStates(), 1);
-  OKVIS_ASSERT_EQ(Exception, 15 + imuIntrinsicsError.size() + cameraParamsError.size(),
+  OKVIS_ASSERT_EQ(Exception, (int)navStateAndImuParamsGravityMinDim() + cameraParamsError.size(),
                   errors->size(), "Wrong error vector dimension!");
   errors->segment(15, imuIntrinsicsError.size()) = imuIntrinsicsError;
-  errors->segment(15 + imuIntrinsicsError.size(), cameraParamsError.size()) = cameraParamsError;
+  errors->segment(navStateAndImuParamsGravityMinDim(), cameraParamsError.size()) = cameraParamsError;
   return true;
 }
 

@@ -53,6 +53,10 @@ public:
   boxminusFromInput(const StatePointerAndEstimateList &refState,
                     Eigen::Matrix<double, Eigen::Dynamic, 1> *deltaX) const = 0;
 
+  /**
+   * @brief updateStates
+   * @param deltaX currentState <-- currentState \boxplus deltaX.
+   */
   virtual void
   updateStates(const Eigen::Matrix<double, Eigen::Dynamic, 1> &deltaX) = 0;
 

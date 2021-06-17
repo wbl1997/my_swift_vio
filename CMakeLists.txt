@@ -187,6 +187,7 @@ LIST(APPEND SOURCEFILES
     src/loop_closure/LoopClosureDetectorParams.cpp
 
     src/swift_vio/BaseFilter.cpp
+    src/swift_vio/CalibrationFilter.cpp
     src/swift_vio/EkfUpdater.cpp
     src/swift_vio/FeatureTriangulation.cpp
     src/swift_vio/FilterHelper.cpp

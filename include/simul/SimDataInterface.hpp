@@ -50,8 +50,8 @@ class SimDataInterface {
   okvis::Time lastRefNFrameTime_;
 
 public:
-  SimDataInterface(const okvis::ImuParameters& imuParams, bool addImageNoise) :
-    addImageNoise_(addImageNoise), imuParameters_(imuParams) {}
+  SimDataInterface(const okvis::ImuParameters& imuParams, bool addImageNoise, bool addImuNoise) :
+    addImageNoise_(addImageNoise), addImuNoise_(addImuNoise), imuParameters_(imuParams) {}
 
   virtual ~SimDataInterface() {}
 
@@ -124,7 +124,8 @@ public:
 
 class SimFromRealData : public SimDataInterface {
 public:
-  SimFromRealData(const std::string& dataDir, const okvis::ImuParameters& imuParameters, bool addImageNoise);
+  SimFromRealData(const std::string& dataDir, const okvis::ImuParameters& imuParameters,
+                  bool addImageNoise, bool addImuNoise);
 
   virtual ~SimFromRealData() {}
 
@@ -162,7 +163,7 @@ private:
 public:
 
   CurveData(SimulatedTrajectoryType trajectoryType,
-            const okvis::ImuParameters &imuParameters, bool addImageNoise);
+            const okvis::ImuParameters &imuParameters, bool addImageNoise, bool addImuNoise);
 
   virtual ~CurveData() {}
 

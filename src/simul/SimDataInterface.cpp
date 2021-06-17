@@ -51,6 +51,7 @@ void loadImuYaml(const std::string &imuYaml,
     (*g_W)[i] = gravityNode[i];
   }
   imuParameters->g = g_W->norm();
+  imuParameters->setGravityDirection(g_W->normalized());
   file.release();
 }
 
@@ -161,8 +162,9 @@ void saveCameraParameters(
   stream.close();
 }
 
-SimFromRealData::SimFromRealData(const std::string &dataDir, const okvis::ImuParameters& imuParameters, bool addImageNoise)
-    : SimDataInterface(imuParameters, addImageNoise) {
+SimFromRealData::SimFromRealData(const std::string &dataDir, const okvis::ImuParameters& imuParameters,
+                                 bool addImageNoise, bool addImuNoise)
+    : SimDataInterface(imuParameters, addImageNoise, addImuNoise) {
   vimap_.loadVimapFromFolder(dataDir);
   const auto& imuData = vimap_.imuData();
 
@@ -202,14 +204,18 @@ SimFromRealData::SimFromRealData(const std::string &dataDir, const okvis::ImuPar
   // a new world frame with z along negative gravity.
   std::string imuYaml = dataDir + "/imu.yaml";
   loadImuYaml(imuYaml, &imuParameters_, &g_oldW_);
-  Eigen::Quaterniond q_newW_oldW;
-  swift_vio::alignZ(-g_oldW_, &q_newW_oldW);
-  T_newW_oldW_ = okvis::kinematics::Transformation(Eigen::Vector3d::Zero(), q_newW_oldW);
-  for (auto& T_WS : ref_T_WS_list_) {
-    T_WS = T_newW_oldW_ * T_WS;
-  }
-  for (auto &v_W : ref_v_WS_list_) {
-    v_W = q_newW_oldW._transformVector(v_W);
+//  Eigen::Quaterniond q_newW_oldW;
+//  swift_vio::alignZ(-g_oldW_, &q_newW_oldW);
+//  T_newW_oldW_ = okvis::kinematics::Transformation(Eigen::Vector3d::Zero(), q_newW_oldW);
+//  for (auto& T_WS : ref_T_WS_list_) {
+//    T_WS = T_newW_oldW_ * T_WS;
+//  }
+//  for (auto &v_W : ref_v_WS_list_) {
+//    v_W = q_newW_oldW._transformVector(v_W);
+//  }
+  if ((g_oldW_ - Eigen::Vector3d(0, 0, -9.80665)).norm() > 1.0) {
+    imuParameters_.estimateGravityDirection = true;
+    LOG(INFO) << "Estimate gravity direction because of unconventional gravity vector " << g_oldW_.transpose();
   }
 }
 
@@ -356,8 +362,8 @@ void SimFromRealData::navStateAtStart(swift_vio::InitialNavState* initialStateAn
 
 CurveData::CurveData(SimulatedTrajectoryType trajectoryType,
                      const okvis::ImuParameters& imuParameters,
-                     bool addImageNoise) :
-  SimDataInterface(imuParameters, addImageNoise) {
+                     bool addImageNoise, bool addImuNoise) :
+  SimDataInterface(imuParameters, addImageNoise, addImuNoise) {
   startTime_ = okvis::Time(100);
   finishTime_ =  startTime_ + okvis::Duration(kDuration);
 

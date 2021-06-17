@@ -102,7 +102,7 @@ int TFVIO::computeStackedJacobianAndResidual(
     Eigen::MatrixXd* R_q) {
   // compute and stack Jacobians and Residuals for landmarks observed in current
   // frame
-  const int camParamStartIndex = startIndexOfCameraParamsFast(0u);
+  const int camParamStartIndex = navStateAndImuParamsMinimalDim(0u);
   int featureVariableDimen = covariance_.rows() - camParamStartIndex;
   int dimH[2] = {0, featureVariableDimen};
   const Eigen::MatrixXd variableCov = covariance_.block(

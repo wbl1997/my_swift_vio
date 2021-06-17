@@ -126,6 +126,8 @@ class CircularSinusoidalTrajectory {
   // compute $v_{WB}^W$ with numerical differentiation.
   Eigen::Vector3d
   computeGlobalLinearVelocityNumeric(const okvis::Time time) const;
+
+  Eigen::Vector3d gravityVector() const { return gw; }
 };
 
 // Yarn torus

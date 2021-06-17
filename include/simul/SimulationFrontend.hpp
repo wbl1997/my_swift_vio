@@ -42,13 +42,16 @@ struct SimFrontendOptions {
   int maxMatchKeyframes_;
   double minKeyframeDistance_;
   double minKeyframeAngle_;
+  bool useTrueLandmarkPosition_;
 
   SimFrontendOptions(int maxTrackLength = 10, int maxMatchKeyframes = 3,
                      double minKeyframeDistance = 0.4,
-                     double minKeyframeAngle = 10 * M_PI / 180)
+                     double minKeyframeAngle = 10 * M_PI / 180,
+                     bool useTrueLandmarkPosition = false)
       : maxTrackLength_(maxTrackLength), maxMatchKeyframes_(maxMatchKeyframes),
         minKeyframeDistance_(minKeyframeDistance),
-        minKeyframeAngle_(minKeyframeAngle) {}
+        minKeyframeAngle_(minKeyframeAngle),
+        useTrueLandmarkPosition_(useTrueLandmarkPosition) {}
 };
 
 /**

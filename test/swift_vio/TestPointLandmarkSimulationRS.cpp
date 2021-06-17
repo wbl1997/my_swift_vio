@@ -34,8 +34,8 @@ class PointLandmarkSimulationRSTest : public ::testing::Test {
       extrinsicsEstimationParameters.sigma_distortion =
           std::vector<double>{0.05, 0.01, 0.001, 0.001, 0.0001};
       csc.createNominalCameraSystem(&cameraSystem);
-      cameraSystem = simul::createNoisyCameraSystem(cameraSystem,
-                                                    extrinsicsEstimationParameters);
+      cameraSystem = simul::createNoisyCameraSystem(
+          cameraSystem, extrinsicsEstimationParameters, "P_CB");
     } else {
       csc.createNominalCameraSystem(&cameraSystem);
     }
