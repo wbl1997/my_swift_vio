@@ -1705,8 +1705,7 @@ bool HybridFilter::slamFeatureJacobian(const okvis::MapPoint &mp,
 
   if (pointLandmarkOptions_.landmarkModelId ==
       swift_vio::InverseDepthParameterization::kModelId) {
-    // add the observation for anchor camera frame which is only needed for
-    // computing Jacobians.
+    // add the observation for anchor camera frame to simplify computing Jacobians.
     okvis::KeypointIdentifier anchorFrameId(mp.anchorStateId, mp.anchorCameraId, 0u);
     auto itObs = std::find_if(
         mp.observations.begin(), mp.observations.end(),
@@ -1810,6 +1809,10 @@ bool HybridFilter::slamFeatureJacobian(const okvis::MapPoint &mp,
   pointDataPtr->computePoseAndVelocityForJacobians(FLAGS_use_first_estimate);
   pointDataPtr->computeSharedJacobians(optimizationOptions_.cameraObservationModelId);
 
+  auto observationIter = pointDataPtr->begin();
+  auto imageNoiseIter = imageNoiseStd.begin();
+  size_t observationIndex = 0u;
+
   if (pointLandmarkOptions_.landmarkModelId ==
       swift_vio::InverseDepthParameterization::kModelId) {
     if (homoPointRep[2] < 1e-6) {
@@ -1820,6 +1823,11 @@ bool HybridFilter::slamFeatureJacobian(const okvis::MapPoint &mp,
     }
     //[\alpha = X/Z, \beta= Y/Z, 1, \rho=1/Z] in anchor camera frame.
     homoPointRep /= homoPointRep[2];
+
+    // skip the anchor frame observation.
+    ++observationIter;
+    imageNoiseIter += 2;
+    ++observationIndex;
   } else {
     if (homoPointRep[3] < 1e-6) {
       LOG(WARNING) << "Point at infinity in world frame: "
@@ -1841,10 +1849,7 @@ bool HybridFilter::slamFeatureJacobian(const okvis::MapPoint &mp,
 
   size_t numValidObs = 0u;
 
-  auto observationIter = pointDataPtr->begin();
-  ++observationIter;  // skip the anchor frame observation.
-  auto imageNoiseIter = imageNoiseStd.begin() + 2;
-  for (size_t observationIndex = 1u; observationIndex < numObservations; ++observationIndex) {
+  for (; observationIndex < numObservations; ++observationIndex) {
     Eigen::Matrix<double, 2, Eigen::Dynamic> J_x(2, featureVariableDimen);
     Eigen::Matrix<double, 2, 3> J_pfi;
     Eigen::Vector2d residual;

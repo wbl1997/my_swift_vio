@@ -30,8 +30,7 @@ void CalibrationFilter::optimize(size_t /*numIter*/, size_t /*numThreads*/,
                             bool /*verbose*/) {
   // containers of Jacobians of measurements of points in the states
   Eigen::AlignedVector<Eigen::VectorXd> vr_i;
-  Eigen::AlignedVector<Eigen::MatrixXd> vH_x;  // each entry has a size say 2j x(13 + 9m)
-  Eigen::AlignedVector<Eigen::MatrixXd> vH_f;  // each entry has a size 2j x 3k where j is the number of observing cameras, k is the number of landmarks in state.
+  Eigen::AlignedVector<Eigen::MatrixXd> vH_x;  // each entry has a size say 2j x(2 + 13 + 9m)
   Eigen::AlignedVector<Eigen::MatrixXd> vR_i;
 
   OKVIS_ASSERT_EQ_DBG(
@@ -62,20 +61,6 @@ void CalibrationFilter::optimize(size_t /*numIter*/, size_t /*numThreads*/,
       slamLandmarks.emplace_back(it->first, it->second.observations.size());
     }
   }
-
-  // ensure all landmarks are in mInCovLmkIds
-//  for (const auto &landmarkSigniture : slamLandmarks) {
-//    uint64_t toFind = landmarkSigniture.first;
-//    Eigen::AlignedDeque<okvis::ceres::HomogeneousPointParameterBlock>::iterator
-//        landmarkIter = std::find_if(
-//            mInCovLmIds.begin(), mInCovLmIds.end(),
-//            [toFind](const okvis::ceres::HomogeneousPointParameterBlock &x) {
-//              return x.id() == toFind;
-//            });
-//    if (landmarkIter == mInCovLmIds.end()) {
-//      mInCovLmIds.emplace_back(landmarksMap_.at(toFind).pointHomog, toFind);
-//    }
-//  }
 
   std::sort(slamLandmarks.begin(), slamLandmarks.end(),
             [](const std::pair<uint64_t, int> &a,
