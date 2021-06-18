@@ -648,7 +648,7 @@ void HybridFilter::initCameraParamCovariance(int camIdx) {
 void HybridFilter::addCovForClonedStates() {
   // augment states in the propagated covariance matrix
   int oldCovDim = covariance_.rows();
-  const size_t numPointStates = 3 * mInCovLmIds.size();
+  const size_t numPointStates = 3 * orderedLandmarks_.size();
   const size_t numOldNavImuCamPoseStates = oldCovDim - numPointStates;
   statesMap_.rbegin()->second.global.at(GlobalStates::T_WS).startIndexInCov =
       numOldNavImuCamPoseStates;
@@ -917,7 +917,7 @@ void HybridFilter::removeAnchorlessLandmarks(
   // remove them.
   std::vector<uint64_t> toRemoveLmIds;
   toRemoveLmIds.reserve(10);
-  for (auto landmark : mInCovLmIds) {
+  for (auto landmark : orderedLandmarks_) {
     okvis::MapPoint &mapPoint = landmarksMap_.at(landmark.id());
     uint64_t newAnchorFrameId =
         mapPoint.shouldChangeAnchor(sortedRemovedStateIds);
@@ -964,7 +964,7 @@ void HybridFilter::changeAnchors(
                                 // reparameterized, 0 for the first landmark.
   vCovPtId.reserve(10);
   const size_t gravityDimInCov = imuParametersVec_.at(0).estimateGravityDirection ? 2u : 0u;
-  for (auto landmark : mInCovLmIds) {
+  for (auto landmark : orderedLandmarks_) {
     okvis::MapPoint &mapPoint = landmarksMap_.at(landmark.id());
     uint64_t newAnchorFrameId =
         mapPoint.shouldChangeAnchor(sortedRemovedStateIds);
@@ -999,12 +999,12 @@ void HybridFilter::changeAnchors(
       Eigen::AlignedDeque<
           okvis::ceres::HomogeneousPointParameterBlock>::iterator landmarkIter =
           std::find_if(
-              mInCovLmIds.begin(), mInCovLmIds.end(),
+              orderedLandmarks_.begin(), orderedLandmarks_.end(),
               [toFind](const okvis::ceres::HomogeneousPointParameterBlock &x) {
                 return x.id() == toFind;
               });
-      OKVIS_ASSERT_TRUE(Exception, landmarkIter != mInCovLmIds.end(),
-                        "The tracked landmark is not in mInCovLmIds ");
+      OKVIS_ASSERT_TRUE(Exception, landmarkIter != orderedLandmarks_.end(),
+                        "The tracked landmark is not in orderedLandmarks_ ");
 
       OKVIS_ASSERT_EQ(Exception, pointLandmarkOptions_.landmarkModelId,
                       swift_vio::InverseDepthParameterization::kModelId,
@@ -1121,7 +1121,7 @@ void HybridFilter::changeAnchors(
       }
 
       // Jacobian relative to landmark parameters.
-      size_t covPtId = std::distance(mInCovLmIds.begin(), landmarkIter);
+      size_t covPtId = std::distance(orderedLandmarks_.begin(), landmarkIter);
       vCovPtId.push_back(covPtId);
       Eigen::Matrix<double, 4, 3> dhPoint_dparams;
       dhPoint_dparams.setZero();
@@ -1201,26 +1201,26 @@ bool HybridFilter::applyMarginalizationStrategy(okvis::MapPointVector& removedLa
 
 bool HybridFilter::removeLandmarkParameterBlock(uint64_t landmarkId) {
   auto idPos = std::find_if(
-      mInCovLmIds.begin(), mInCovLmIds.end(),
+      orderedLandmarks_.begin(), orderedLandmarks_.end(),
       [landmarkId](const okvis::ceres::HomogeneousPointParameterBlock &x) {
         return x.id() == landmarkId;
       });
-  bool miss = (idPos == mInCovLmIds.end());
+  bool miss = (idPos == orderedLandmarks_.end());
   if (miss) {
     return false;
   } else {
-    mInCovLmIds.erase(idPos);
+    orderedLandmarks_.erase(idPos);
     return true;
   }
 }
 
 bool HybridFilter::hasLandmarkParameterBlock(uint64_t landmarkId) const {
   auto idPos = std::find_if(
-      mInCovLmIds.begin(), mInCovLmIds.end(),
+      orderedLandmarks_.begin(), orderedLandmarks_.end(),
       [landmarkId](const okvis::ceres::HomogeneousPointParameterBlock &x) {
         return x.id() == landmarkId;
       });
-  return idPos != mInCovLmIds.end();
+  return idPos != orderedLandmarks_.end();
 }
 
 void HybridFilter::decimateCovarianceForLandmarks(const std::vector<uint64_t>& toRemoveLmIds) {
@@ -1238,14 +1238,14 @@ void HybridFilter::decimateCovarianceForLandmarks(const std::vector<uint64_t>& t
        it != itEnd; ++it) {
     uint64_t toFind = *it;
     auto idPos = std::find_if(
-        mInCovLmIds.begin(), mInCovLmIds.end(),
+        orderedLandmarks_.begin(), orderedLandmarks_.end(),
         [toFind](const okvis::ceres::HomogeneousPointParameterBlock &x) {
           return x.id() == toFind;
         });
-    OKVIS_ASSERT_TRUE(Exception, idPos != mInCovLmIds.end(),
-                      "The landmark in state is not in mInCovLmIds!");
+    OKVIS_ASSERT_TRUE(Exception, idPos != orderedLandmarks_.end(),
+                      "The landmark in state is not in orderedLandmarks_!");
 
-    int startIndex = numNavImuCamPoseStates + 3 * std::distance(mInCovLmIds.begin(), idPos);
+    int startIndex = numNavImuCamPoseStates + 3 * std::distance(orderedLandmarks_.begin(), idPos);
     toRemoveIndices.push_back(startIndex);
   }
   std::sort(toRemoveIndices.begin(), toRemoveIndices.end());
@@ -2355,13 +2355,11 @@ void HybridFilter::updateStates(
         paramBlockPtr = std::static_pointer_cast<
             okvis::ceres::EuclideanParamBlockSized<3>>(
             mapPtr_->parameterBlockPtr(gWId));
-    Eigen::Matrix<double, 3, 1> oldEstimate = paramBlockPtr->estimate();
-    NormalVectorElement nOldEstimate(oldEstimate);
-    NormalVectorElement newEstimate;
-    nOldEstimate.boxPlus(deltaX.segment<2>(15 + imuIntrinsicDim), newEstimate);
-    paramBlockPtr->setEstimate(newEstimate.getVec());
+    Eigen::Vector3d newEstimate = NormalVectorElement::boxPlus(
+        paramBlockPtr->estimate(), deltaX.segment<2>(15 + imuIntrinsicDim));
+    paramBlockPtr->setEstimate(newEstimate);
     // also update the IMU sensor.
-    imuParametersVec_.at(0).setGravityDirection(newEstimate.getVec());
+    imuParametersVec_.at(0).setGravityDirection(newEstimate);
   }
 
   updateCameraSensorStates(stateInQuestion, deltaX);
@@ -2403,7 +2401,7 @@ void HybridFilter::updateStates(
   int numberLandmarks = 0;
   size_t lkStart = startIndexOfClonedStatesFast() + kClonedStateMinimalDimen * statesMap_.size();
   size_t aStart = lkStart - 3;  // a dummy initialization.
-  for (auto iter = mInCovLmIds.begin(), iterEnd = mInCovLmIds.end();
+  for (auto iter = orderedLandmarks_.begin(), iterEnd = orderedLandmarks_.end();
        iter != iterEnd; ++iter, ++numberLandmarks) {
     Eigen::Vector4d homogeneousPoint = iter->estimate();
     aStart = lkStart + 3 * numberLandmarks;
@@ -2467,11 +2465,11 @@ void HybridFilter::optimize(size_t /*numIter*/, size_t /*numThreads*/,
   OKVIS_ASSERT_EQ_DBG(
       Exception, (size_t)covariance_.rows(),
       startIndexOfClonedStatesFast() +
-          kClonedStateMinimalDimen * statesMap_.size() + 3 * mInCovLmIds.size(),
+          kClonedStateMinimalDimen * statesMap_.size() + 3 * orderedLandmarks_.size(),
       "Inconsistent rows of covariance matrix and number of states");
 
   int numCamPosePointStates = cameraParamPoseAndLandmarkMinimalDimen();
-  size_t dimH_o[2] = {0, numCamPosePointStates - 3 * mInCovLmIds.size() - kClonedStateMinimalDimen};
+  size_t dimH_o[2] = {0, numCamPosePointStates - 3 * orderedLandmarks_.size() - kClonedStateMinimalDimen};
   int numMsckfLandmarks = 0;  // number of landmarks not in state and not tracked in current frame.
   size_t numSlamObservations = 0u;  // number of observations for landmarks in state and tracked now
 
@@ -2558,13 +2556,13 @@ void HybridFilter::optimize(size_t /*numIter*/, size_t /*numThreads*/,
     // get the landmark parameters.
     uint64_t hpbid = mapPoint.id;
     auto idPos = std::find_if(
-        mInCovLmIds.begin(), mInCovLmIds.end(),
+        orderedLandmarks_.begin(), orderedLandmarks_.end(),
         [hpbid](const okvis::ceres::HomogeneousPointParameterBlock &x) {
           return x.id() == hpbid;
         });
-    OKVIS_ASSERT_TRUE(Exception, idPos != mInCovLmIds.end(),
+    OKVIS_ASSERT_TRUE(Exception, idPos != orderedLandmarks_.end(),
                       "The tracked landmark " << hpbid << " is not in the state vector.");
-    size_t covPtId = std::distance(mInCovLmIds.begin(), idPos);
+    size_t covPtId = std::distance(orderedLandmarks_.begin(), idPos);
     Eigen::Vector4d homoPointRep = idPos->estimate();
 
     bool isValidJacobian = slamFeatureJacobian(mapPoint, homoPointRep, H_x, r_i, R_i, subH_f);
@@ -2574,7 +2572,7 @@ void HybridFilter::optimize(size_t /*numIter*/, size_t /*numThreads*/,
       continue;
     }
 
-    H_f.resize(subH_f.rows(), 3 * mInCovLmIds.size());
+    H_f.resize(subH_f.rows(), 3 * orderedLandmarks_.size());
     H_f.setZero();
     H_f.block(0, covPtId * 3, subH_f.rows(), subH_f.cols()) = subH_f;
 
@@ -2621,7 +2619,7 @@ void HybridFilter::optimize(size_t /*numIter*/, size_t /*numThreads*/,
 
   // update with SLAM features
   if (numSlamObservations) {
-    const size_t numPointStates = 3 * mInCovLmIds.size();
+    const size_t numPointStates = 3 * orderedLandmarks_.size();
     Eigen::MatrixXd H_all(numSlamObservations, numCamPosePointStates);
     H_all.block(0, numCamPosePointStates - numPointStates, numSlamObservations, numPointStates).setZero();
     Eigen::VectorXd r_all(numSlamObservations);
@@ -2663,7 +2661,7 @@ void HybridFilter::optimize(size_t /*numIter*/, size_t /*numThreads*/,
       it->second.quality = 1.0;
       uint64_t toFind = it->first;
       auto landmarkIter = std::find_if(
-          mInCovLmIds.begin(), mInCovLmIds.end(),
+          orderedLandmarks_.begin(), orderedLandmarks_.end(),
           [toFind](const okvis::ceres::HomogeneousPointParameterBlock &x) {
             return x.id() == toFind;
           });
@@ -2710,12 +2708,12 @@ void HybridFilter::initializeLandmarksInFilter() {
   const uint64_t currFrameId = currentFrameId();
   size_t navAndImuParamsDim = navStateAndImuParamsMinimalDim();
   size_t numCamPosePointStates = cameraParamPoseAndLandmarkMinimalDimen();
-  const size_t numCamPoseStates = numCamPosePointStates - 3 * mInCovLmIds.size();
+  const size_t numCamPoseStates = numCamPosePointStates - 3 * orderedLandmarks_.size();
   Eigen::MatrixXd variableCov = covariance_.block(
       navAndImuParamsDim, navAndImuParamsDim, numCamPoseStates,
       numCamPoseStates); // covariance of camera and pose copy states
 
-  int capacity = pointLandmarkOptions_.maxInStateLandmarks - (int)(mInCovLmIds.size());
+  int capacity = pointLandmarkOptions_.maxInStateLandmarks - (int)(orderedLandmarks_.size());
   int numQualified = 0;
   Eigen::AlignedVector<okvis::ceres::HomogeneousPointParameterBlock> landmarksToAdd;
   landmarksToAdd.reserve(16);
@@ -2784,7 +2782,7 @@ void HybridFilter::initializeLandmarksInFilter() {
   // augment and update the covariance matrix.
   size_t nNewFeatures = landmarksToAdd.size();
 //  LOG(INFO) << "Initializing " << nNewFeatures << " landmarks into the state vector of "
-//            << mInCovLmIds.size() << " landmarks!";
+//            << orderedLandmarks_.size() << " landmarks!";
   if (nNewFeatures) {
     Eigen::MatrixXd H_o(totalObsDim - 3 * nNewFeatures, numCamPoseStates);
     Eigen::MatrixXd H_1(3 * nNewFeatures, numCamPoseStates);
@@ -2859,7 +2857,7 @@ void HybridFilter::initializeLandmarksInFilter() {
         break;
     }
 
-    mInCovLmIds.insert(mInCovLmIds.end(), landmarksToAdd.begin(),
+    orderedLandmarks_.insert(orderedLandmarks_.end(), landmarksToAdd.begin(),
                        landmarksToAdd.end());
 
     // TODO(jhuai): For now, we add homogeneous point parameter block to satisfy setLandmark
@@ -3140,7 +3138,20 @@ bool HybridFilter::printStatesAndStdevs(std::ostream& stream) const {
   printNavStateAndBiases(stream, statesMap_.rbegin()->first);
   Eigen::Matrix<double, Eigen::Dynamic, 1> extraParams;
   getImuAugmentedStatesEstimate(&extraParams);
-  stream << " " << extraParams.transpose().format(kSpaceInitFmt);
+  if (extraParams.size() > 0) {
+    stream << " " << extraParams.transpose().format(kSpaceInitFmt);
+  }
+  if (imuParametersVec_.at(0).estimateGravityDirection) {
+    uint64_t id = statesMap_.rbegin()
+                      ->second.global.at(GlobalStates::GravityDirection)
+                      .id;
+    Eigen::Vector3d gravity =
+        std::static_pointer_cast<okvis::ceres::EuclideanParamBlockSized<3>>(
+            mapPtr_->parameterBlockPtr(id))
+            ->estimate();
+    gravity *= imuParametersVec_.at(0).g;
+    stream << " " << gravity.transpose().format(kSpaceInitFmt);
+  }
 
   size_t numCameras = cameraRig_.numberCameras();
   for (size_t camIdx = 0u; camIdx < numCameras; ++camIdx) {
@@ -3160,31 +3171,52 @@ bool HybridFilter::printStatesAndStdevs(std::ostream& stream) const {
   return true;
 }
 
-std::string HybridFilter::headerLine(const std::string delimiter) const {
+std::vector<std::string> HybridFilter::variableLabels() const {
   std::vector<std::string> variableList{
-      "timestamp(sec)", "frameId",       "p_WB_W_x(m)",   "p_WB_W_y(m)",
-      "p_WB_W_z(m)",    "q_WB_x",        "q_WB_y",        "q_WB_z",
-      "q_WB_w",         "v_WB_W_x(m/s)", "v_WB_W_y(m/s)", "v_WB_W_z(m/s)",
-      "b_g_x(rad/s)",   "b_g_y(rad/s)",  "b_g_z(rad/s)",  "b_a_x(m/s^2)",
-      "b_a_y(m/s^2)",   "b_a_z(m/s^2)"};
-  std::stringstream stream;
-  for (auto variable : variableList) {
-    stream << variable << delimiter;
-  }
+      "p_WB_W_x(m)",   "p_WB_W_y(m)",   "p_WB_W_z(m)",  "q_WB_x",
+      "q_WB_y",        "q_WB_z",        "q_WB_w",       "v_WB_W_x(m/s)",
+      "v_WB_W_y(m/s)", "v_WB_W_z(m/s)", "b_g_x(rad/s)", "b_g_y(rad/s)",
+      "b_g_z(rad/s)",  "b_a_x(m/s^2)",  "b_a_y(m/s^2)", "b_a_z(m/s^2)"};
 
   std::vector<std::string> imuParameterNames;
   ImuModelToAugmentedDimensionLabels(
       ImuModelNameToId(imuParametersVec_.at(0).model_type), &imuParameterNames);
-
-  for (auto parameter : imuParameterNames) {
-    stream << parameter << delimiter;
+  variableList.insert(variableList.end(), imuParameterNames.begin(),
+                      imuParameterNames.end());
+  if (imuParametersVec_.at(0).estimateGravityDirection) {
+    variableList.push_back("Gravity_x");
+    variableList.push_back("Gravity_y");
+    variableList.push_back("Gravity_z");
   }
 
   std::vector<std::string> camParameterNames = getCameraParamLabels();
-  for (auto parameter : camParameterNames) {
-    stream << parameter << delimiter;
+  variableList.insert(variableList.end(), camParameterNames.begin(),
+                      camParameterNames.end());
+  return variableList;
+}
+
+std::vector<std::string> HybridFilter::perturbationLabels() const {
+  std::vector<std::string> minVarList{
+      "timestamp(sec)", "p_WB_W_x(m)",   "p_WB_W_y(m)",
+      "p_WB_W_z(m)",    "theta_WB_x",        "theta_WB_y",        "theta_WB_z",
+      "v_WB_W_x(m/s)", "v_WB_W_y(m/s)", "v_WB_W_z(m/s)",
+      "b_g_x(rad/s)",   "b_g_y(rad/s)",  "b_g_z(rad/s)",  "b_a_x(m/s^2)",
+      "b_a_y(m/s^2)",   "b_a_z(m/s^2)"};
+
+  std::vector<std::string> imuParameterNames;
+  ImuModelToAugmentedDimensionLabels(
+      ImuModelNameToId(imuParametersVec_.at(0).model_type), &imuParameterNames);
+  minVarList.insert(minVarList.end(), imuParameterNames.begin(),
+                      imuParameterNames.end());
+  if (imuParametersVec_.at(0).estimateGravityDirection) {
+    minVarList.push_back("delta_gx");
+    minVarList.push_back("delta_gy");
   }
-  return stream.str();
+
+  std::vector<std::string> camParameterNames = getCameraParamLabels(true);
+  minVarList.insert(minVarList.end(), camParameterNames.begin(),
+                    camParameterNames.end());
+  return minVarList;
 }
 
 void HybridFilter::printTrackLengthHistogram(std::ostream &stream) const {
@@ -3356,14 +3388,19 @@ Eigen::VectorXd HybridFilter::getDesiredCameraParamStdevs() const {
   return desiredCameraParamStdevs;
 }
 
-std::vector<std::string> HybridFilter::getCameraParamLabels() const {
+std::vector<std::string> HybridFilter::getCameraParamLabels(bool minimal) const {
   std::vector<std::string> cameraParamLabels;
   size_t numCameras = extrinsicsEstimationParametersVec_.size();
   for (size_t j = 0u; j < numCameras; ++j) {
     if (!fixCameraExtrinsicParams_[j]) {
       std::vector<std::string> camExtrinsicLabels;
-      ExtrinsicModelToDimensionLabels(cameraRig_.getExtrinsicOptMode(j),
-                                      &camExtrinsicLabels);
+      if (minimal) {
+        ExtrinsicModelToMinDimensionLabels(cameraRig_.getExtrinsicOptMode(j),
+                                           &camExtrinsicLabels);
+      } else {
+        ExtrinsicModelToDimensionLabels(cameraRig_.getExtrinsicOptMode(j),
+                                        &camExtrinsicLabels);
+      }
       cameraParamLabels.insert(cameraParamLabels.end(),
                                camExtrinsicLabels.begin(),
                                camExtrinsicLabels.end());
@@ -3389,33 +3426,24 @@ std::vector<std::string> HybridFilter::getCameraParamLabels() const {
   return cameraParamLabels;
 }
 
-bool HybridFilter::getDesiredStdevs(
-    Eigen::VectorXd *desiredStdevs,
-    std::vector<std::string> *dimensionLabels) const {
-  Estimator::getDesiredStdevs(desiredStdevs, dimensionLabels);
-  desiredStdevs->conservativeResize(startIndexOfClonedStates());
+bool HybridFilter::getDesiredStdevs(Eigen::VectorXd *desiredStdevs) const {
+  Estimator::getDesiredStdevs(desiredStdevs);
 
+  desiredStdevs->conservativeResize(startIndexOfClonedStates());
   Eigen::VectorXd desiredImuIntrinsicStdevs =
       getDesiredImuAugmentedParamStdevs();
   Eigen::VectorXd desiredCameraParamStdevs = getDesiredCameraParamStdevs();
-
-  std::vector<std::string> imuParamLabels;
-  ImuModelToMinimalAugmentedDimensionLabels(
-      ImuModelNameToId(imuParametersVec_.at(0).model_type), &imuParamLabels);
-
-  std::vector<std::string> cameraParamLabels = getCameraParamLabels();
-  dimensionLabels->insert(dimensionLabels->end(), imuParamLabels.begin(),
-                          imuParamLabels.end());
-  dimensionLabels->insert(dimensionLabels->end(), cameraParamLabels.begin(),
-                          cameraParamLabels.end());
-
   OKVIS_ASSERT_EQ(Exception,
-                  15 + desiredImuIntrinsicStdevs.size() +
+                  (int)navStateAndImuParamsGravityMinDim() +
                       desiredCameraParamStdevs.size(),
                   desiredStdevs->size(), "Wrong stdev vector dimension!");
   desiredStdevs->segment(15, desiredImuIntrinsicStdevs.size()) =
       desiredImuIntrinsicStdevs;
-  desiredStdevs->segment(15 + desiredImuIntrinsicStdevs.size(),
+  if (imuParametersVec_.at(0).estimateGravityDirection) {
+    desiredStdevs->segment<2>(navStateAndImuParamsMinimalDim())
+        .setConstant(0.01);
+  }
+  desiredStdevs->segment(navStateAndImuParamsGravityMinDim(),
                          desiredCameraParamStdevs.size()) =
       desiredCameraParamStdevs;
   return true;
@@ -3423,10 +3451,10 @@ bool HybridFilter::getDesiredStdevs(
 
 bool HybridFilter::computeErrors(
     const okvis::kinematics::Transformation &ref_T_WS,
-    const Eigen::Vector3d &ref_v_WS, const okvis::ImuSensorReadings &refBiases,
+    const Eigen::Vector3d &ref_v_WS, const okvis::ImuParameters &refImuParams,
     std::shared_ptr<const okvis::cameras::NCameraSystem> refCameraSystem,
     Eigen::VectorXd *errors) const {
-  Estimator::computeErrors(ref_T_WS, ref_v_WS, refBiases, refCameraSystem, errors);
+  Estimator::computeErrors(ref_T_WS, ref_v_WS, refImuParams, refCameraSystem, errors);
 
   Eigen::VectorXd imuIntrinsicsError = computeImuAugmentedParamsError();
 
@@ -3439,7 +3467,22 @@ bool HybridFilter::computeErrors(
   OKVIS_ASSERT_EQ(Exception, (int)navStateAndImuParamsGravityMinDim() + cameraParamsError.size(),
                   errors->size(), "Wrong error vector dimension!");
   errors->segment(15, imuIntrinsicsError.size()) = imuIntrinsicsError;
-  errors->segment(navStateAndImuParamsGravityMinDim(), cameraParamsError.size()) = cameraParamsError;
+  if (imuParametersVec_.at(0).estimateGravityDirection) {
+    uint64_t gWId = statesMap_.rbegin()
+                        ->second.global.at(GlobalStates::GravityDirection)
+                        .id;
+    std::shared_ptr<const okvis::ceres::EuclideanParamBlockSized<3>>
+        paramBlockPtr = std::static_pointer_cast<
+            const okvis::ceres::EuclideanParamBlockSized<3>>(
+            mapPtr_->parameterBlockPtr(gWId));
+    errors->segment<2>(navStateAndImuParamsMinimalDim()) =
+        NormalVectorElement::boxMinus(refImuParams.gravityDirection(),
+                                      paramBlockPtr->estimate()) *
+        imuParametersVec_.at(0).g;
+  }
+
+  errors->segment(navStateAndImuParamsGravityMinDim(),
+                  cameraParamsError.size()) = cameraParamsError;
   return true;
 }
 

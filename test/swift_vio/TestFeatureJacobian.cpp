@@ -8,31 +8,6 @@
 
 
 namespace {
-void computeNavErrors(
-    const okvis::Estimator* estimator,
-    const okvis::kinematics::Transformation& T_WS,
-    const Eigen::Vector3d& v_WS_true,
-    Eigen::VectorXd* navError) {
-  okvis::kinematics::Transformation T_WS_est;
-  uint64_t currFrameId = estimator->currentFrameId();
-  estimator->get_T_WS(currFrameId, T_WS_est);
-  Eigen::Vector3d delta = T_WS.r() - T_WS_est.r();
-  Eigen::Matrix3d dR = T_WS.C() * T_WS_est.C().transpose();
-  Eigen::Vector3d alpha = okvis::kinematics::vee(dR);
-  Eigen::Matrix<double, 6, 1> deltaPose;
-  deltaPose << delta, alpha;
-
-  int index = 0;
-  navError->head<3>() = delta;
-  index += 3;
-  navError->segment<3>(index) = alpha;
-  index += 3;
-  okvis::SpeedAndBias speedAndBias_est;
-  estimator->getSpeedAndBias(currFrameId, 0, speedAndBias_est);
-  Eigen::Vector3d deltaV = speedAndBias_est.head<3>() - v_WS_true;
-  navError->segment<3>(index) = deltaV;
-}
-
 int examinLandmarkStackedJacobian(const okvis::MapPoint& mapPoint,
                                    std::shared_ptr<swift_vio::MSCKF> estimator) {
   swift_vio::PointLandmark pointLandmark;

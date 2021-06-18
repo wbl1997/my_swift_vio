@@ -135,6 +135,12 @@ void VioSimTestSystem::createEstimator(const TestSetting &testSetting) {
         vio::Sample::gaussian(refImuParameters_.sigma_TAElement, 9);
   }
 
+  if (testSetting.imuParams.noisyInitialGravityDirection) {
+    Eigen::Vector3d refGravity = initialImuParameters_.gravityDirection();
+    Eigen::Vector3d noisyGravity = refGravity;
+    initialImuParameters_.setGravityDirection(noisyGravity);
+  }
+
   if (testSetting.imuParams.fixImuIntrinsicParams) {
     initialImuParameters_.sigma_TGElement = 0;
     initialImuParameters_.sigma_TSElement = 0;
@@ -199,6 +205,7 @@ void VioSimTestSystem::run(const simul::TestSetting &testSetting,
   std::string rmseFile = pathEstimatorTrajectory + "_RMSE.txt";
   std::string metadataFile = pathEstimatorTrajectory + "_metadata.txt";
   std::string headerLine;
+  std::string rmseHeaderLine;
   std::ofstream metaStream;
   metaStream.open(metadataFile, std::ofstream::out);
 
@@ -262,6 +269,10 @@ void VioSimTestSystem::run(const simul::TestSetting &testSetting,
     std::ofstream debugStream;
     debugStream.open(outputFile, std::ofstream::out);
     headerLine = estimator_->headerLine();
+    rmseHeaderLine = estimator_->rmseHeaderLine();
+
+    std::vector<std::string> perturbationLabels = estimator_->perturbationLabels();
+
     debugStream << headerLine << std::endl;
 
     bool hasStarted = false;
@@ -282,7 +293,8 @@ void VioSimTestSystem::run(const simul::TestSetting &testSetting,
         okvis::Time refNFrameTime = simData_->currentTime();
         okvis::kinematics::Transformation T_WS_ref = simData_->currentPose();
         Eigen::Vector3d v_WS_ref = simData_->currentVelocity();
-        okvis::ImuSensorReadings refBiases = simData_->currentBiases();
+        okvis::ImuParameters refImuParams = simData_->referenceImuParameters();
+
         okvis::ImuMeasurementDeque imuSegment =
             simData_->imuMeasurementsSinceLastNFrame();
 
@@ -338,7 +350,7 @@ void VioSimTestSystem::run(const simul::TestSetting &testSetting,
         Eigen::MatrixXd covariance;
         estimator_->computeCovariance(&covariance);
         Eigen::VectorXd errors;
-        estimator_->computeErrors(T_WS_ref, v_WS_ref, refBiases, refCameraSystem_,
+        estimator_->computeErrors(T_WS_ref, v_WS_ref, refImuParams, refCameraSystem_,
                                   &errors);
         Eigen::VectorXd squaredError = errors.cwiseAbs2();
         Eigen::VectorXd normalizedSquaredError =
@@ -353,9 +365,8 @@ void VioSimTestSystem::run(const simul::TestSetting &testSetting,
       } while (simData_->nextNFrame());
 
       Eigen::VectorXd desiredStdevs;
-      std::vector<std::string> dimensionLabels;
-      estimator_->getDesiredStdevs(&desiredStdevs, &dimensionLabels);
-      checkMseCallback_(rmseAccumulator.lastValue(), desiredStdevs, dimensionLabels);
+      estimator_->getDesiredStdevs(&desiredStdevs);
+      checkMseCallback_(rmseAccumulator.lastValue(), desiredStdevs, perturbationLabels);
       checkNeesCallback_(neesAccumulator.lastValue());
 
       if (runSuccessful) {
@@ -411,7 +422,7 @@ void VioSimTestSystem::run(const simul::TestSetting &testSetting,
   neesAccumulator.dump(neesFile, neesHeaderLine);
 
   rmseAccumulator.computeRootMean();
-  rmseAccumulator.dump(rmseFile, headerLine);
+  rmseAccumulator.dump(rmseFile, rmseHeaderLine);
 
   LOG(INFO) << message.str();
   metaStream << message.str() << std::endl;

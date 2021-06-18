@@ -309,7 +309,9 @@ class HybridFilter : public okvis::Estimator, public BaseFilter {
   /// results is to save in the publisher loop
   bool printStatesAndStdevs(std::ostream &stream) const final;
 
-  std::string headerLine(const std::string delimiter=" ") const final;
+  std::vector<std::string> variableLabels() const override;
+
+  std::vector<std::string> perturbationLabels() const override;
 
   void printTrackLengthHistogram(std::ostream &stream) const final;
 
@@ -334,14 +336,14 @@ class HybridFilter : public okvis::Estimator, public BaseFilter {
 
   Eigen::VectorXd getDesiredCameraParamStdevs() const;
 
-  std::vector<std::string> getCameraParamLabels() const;
+  std::vector<std::string> getCameraParamLabels(bool minimal = false) const;
 
-  bool getDesiredStdevs(Eigen::VectorXd* desiredStdevs, std::vector<std::string>* dimensionLabels) const override;
+  bool getDesiredStdevs(Eigen::VectorXd *desiredStdevs) const override;
 
   bool computeErrors(
       const okvis::kinematics::Transformation &ref_T_WS,
       const Eigen::Vector3d &ref_v_WS,
-      const okvis::ImuSensorReadings &refBiases,
+      const okvis::ImuParameters &refImuParams,
       std::shared_ptr<const okvis::cameras::NCameraSystem> refCameraSystem,
       Eigen::VectorXd *errors) const override;
 
@@ -410,7 +412,7 @@ class HybridFilter : public okvis::Estimator, public BaseFilter {
     return (imuParametersVec_.at(0).estimateGravityDirection ? 2u : 0u) +
            minimalDimOfAllCameraParams() +
            kClonedStateMinimalDimen * statesMap_.size() +
-           3 * mInCovLmIds.size();
+           3 * orderedLandmarks_.size();
   }
 
   inline size_t startIndexOfClonedStates() const {
@@ -693,10 +695,6 @@ class HybridFilter : public okvis::Estimator, public BaseFilter {
   // see Sun 2017 Robust stereo appendix D
   size_t minCulledFrames_;
 
-  // for each point in the state vector/covariance,
-  // its landmark id which points to the parameter block
-  Eigen::AlignedDeque<okvis::ceres::HomogeneousPointParameterBlock> mInCovLmIds;
-
 private:
   bool hasLandmarkParameterBlock(uint64_t landmarkId) const;
 
@@ -704,7 +702,8 @@ private:
 
   void decimateCovarianceForLandmarks(const std::vector<uint64_t>& toRemoveLmIds);
 
-
+  // landmark parameters estimated by the filter, ordered according to the covariance matrix.
+  Eigen::AlignedDeque<okvis::ceres::HomogeneousPointParameterBlock> orderedLandmarks_;
 };
 
 /**

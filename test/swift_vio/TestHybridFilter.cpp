@@ -117,12 +117,12 @@ TEST(CalibrationFilter, TrajectoryLabel) {
   double landmarkRadius = 5;
   ASSERT_TRUE(!FLAGS_sim_real_data_dir.empty()) << "CalibrationFilter must be tested with simulated calibration data!";
   simul::SimImuParameters imuParams(
-      "None", true, FLAGS_noisyInitialSpeedAndBiases, false, true,
+      "None", false, FLAGS_noisyInitialSpeedAndBiases, false, true,
       5e-3, 2e-2, 5e-3, 1e-3, 5e-3, FLAGS_sim_sigma_g_c, FLAGS_sim_sigma_gw_c,
       FLAGS_sim_sigma_a_c, FLAGS_sim_sigma_aw_c,
       FLAGS_sim_imu_noise_factor, FLAGS_sim_imu_bias_noise_factor, "BG_BA");
   simul::SimVisionParameters visionParams(
-      true, true, simul::SimCameraModelType::EUROC,
+      false, true, simul::SimCameraModelType::EUROC,
       simul::CameraOrientation::Forward, "FXY_CXY", "P_BC_Q_BC",
       false, 2e-2, 1e-2, 0.0, 0.0, FLAGS_noisyInitialSensorParams,
       simul::LandmarkGridType::FourWalls, landmarkRadius, true);

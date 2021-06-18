@@ -120,6 +120,14 @@ public:
   const okvis::ImuParameters& imuParameters() const {
     return imuParameters_;
   }
+
+  okvis::ImuParameters referenceImuParameters() const {
+    okvis::ImuParameters imuParams(imuParameters_);
+    okvis::ImuSensorReadings biases = currentBiases();
+    imuParams.g0 = biases.gyroscopes;
+    imuParams.a0 = biases.accelerometers;
+    return imuParams;
+  }
 };
 
 class SimFromRealData : public SimDataInterface {

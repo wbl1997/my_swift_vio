@@ -40,6 +40,7 @@ struct SimImuParameters {
   //  reduction factor in generating noise.
   double sim_ga_bias_noise_factor;
   std::string imuModel;
+  bool noisyInitialGravityDirection;
 
   SimImuParameters(std::string _trajLabel = "WavyCircle",
                    bool _addImuNoise = true,
@@ -65,7 +66,7 @@ struct SimImuParameters {
         sigma_a_c(_sigma_a_c), sigma_aw_c(_sigma_aw_c),
         sim_ga_noise_factor(_sim_ga_noise_factor),
         sim_ga_bias_noise_factor(_sim_ga_bias_noise_factor),
-        imuModel(_imuModel) {}
+        imuModel(_imuModel), noisyInitialGravityDirection(false) {}
 
   std::string toString() const {
     std::stringstream ss;
