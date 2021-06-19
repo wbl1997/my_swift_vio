@@ -20,6 +20,10 @@ import ResultsDirManager
 import RunOneVioMethod
 import utility_functions
 
+import euroc_stasis_options
+import sample_eval_options
+import tumrs_calib_options
+
 from colorama import init, Fore
 init(autoreset=True)
 
@@ -60,142 +64,18 @@ def find_all_bags_with_gt(data_dir, dataset_code):
     return bag_list, gt_list
 
 
-def euroc_stasis_test_options():
-    """
-    Select the five MH sessions of EuRoC dataset and examine the drifts of sliding window filters in standstills.
-    :return:
-    """
-    # case 1, KSWF (keyframe-based feature tracking, landmark in state)
-    # case 2, SWF (framewise feature tracking, landmark in state)
-    # case 3: SL-KSWF (keyframe-based feature tracking, landmark not in state)
-    # case 4. SL-SWF (framewise feature tracking, landmark not in state)
-    # case 5. OKVIS (keyframe-based feature tracking, landmark in state)
-    algo_option_templates = {
-        'KSWF': {"algo_code": "HybridFilter",
-                 "extra_gflags": "--publish_via_ros=false",
-                 "displayImages": "false",
-                 "monocular_input": 1,
-                 "numImuFrames": 4,
-                 "sigma_absolute_translation": 0.02,
-                 "sigma_absolute_orientation": 0.01,
-                 "model_type": "BG_BA",
-                 'projection_opt_mode': 'FIXED',
-                 "extrinsic_opt_mode_main_camera": "P_CB",
-                 "extrinsic_opt_mode_other_camera": "P_C0C_Q_C0C",
-                 "sigma_td": 0.05,
-                 "sigma_g_c": 12.0e-4 * 4,
-                 "sigma_a_c": 8.0e-3 * 4,
-                 "sigma_gw_c": 4.0e-6 * 4,
-                 "sigma_aw_c": 4.0e-5 * 4,
-                 "loop_closure_method": 0,
-                 'use_nominal_calib_value': False},
-    }
-
-    config_name_to_diffs = {
-        ('KSWF', 'KSWF'): {},
-        ('SWF', 'KSWF'): {"featureTrackingMethod": 2, },
-        ('SL-KSWF', "KSWF"): {"algo_code": "MSCKF", },
-        ('SL-SWF', 'KSWF'): {"algo_code": "MSCKF", "featureTrackingMethod": 2, },
-        ('OKVIS', 'KSWF'): {
-            "algo_code": "OKVIS",
-            "numImuFrames": 3,
-            "sigma_c_relative_translation": 1.0e-6,
-            "sigma_c_relative_orientation": 1.0e-6,
-        }
-    }
-    return algo_option_templates, config_name_to_diffs
-
-
-def sample_test_options():
-    # python3.7 will remember insertion order of items, see
-    # https://stackoverflow.com/questions/39980323/are-dictionaries-ordered-in-python-3-6
-    algo_option_templates = {
-        'OKVIS': {"algo_code": "OKVIS",
-                  "extra_gflags": "--publish_via_ros=false",
-                  "displayImages": "false",
-                  "monocular_input": 1,
-                  "loop_closure_method": 0,
-                  'use_nominal_calib_value': False},
-    }
-
-    config_name_to_diffs = {
-        ('KSWF', 'OKVIS'): {
-            "algo_code": 'HybridFilter',
-            "numImuFrames": 5,
-            "sigma_absolute_translation": 0.02,
-            "sigma_absolute_orientation": 0.01,
-            "model_type": "BG_BA",
-            'projection_opt_mode': 'FIXED',
-            "extrinsic_opt_mode_main_camera": "P_CB",
-            "extrinsic_opt_mode_other_camera": "P_C0C_Q_C0C",
-        },
-        ('KSWF_n', 'OKVIS'): {
-            "algo_code": 'HybridFilter',
-            "numImuFrames": 5,
-            "monocular_input": 0,
-            "sigma_absolute_translation": 0.02,
-            "sigma_absolute_orientation": 0.01,
-            "model_type": "BG_BA",
-            'projection_opt_mode': 'FIXED',
-            "extrinsic_opt_mode_main_camera": "P_CB",
-            "extrinsic_opt_mode_other_camera": "P_C0C_Q_C0C",
-        },
-        ('OKVIS', 'OKVIS'): {
-            "sigma_g_c": 12.0e-4 * 4,
-            "sigma_a_c": 8.0e-3 * 4,
-            "sigma_gw_c": 4.0e-6 * 4,
-            "sigma_aw_c": 4.0e-5 * 4,
-        },
-        ('OKVIS_n', 'OKVIS'): {
-            "monocular_input": 0,
-            # We override P_C0C_Q_C0C as it conflicts with okvis estimator.
-            "extrinsic_opt_mode_other_camera": "P_BC_Q_BC",
-            "sigma_g_c": 12.0e-4 * 4,
-            "sigma_a_c": 8.0e-3 * 4,
-            "sigma_gw_c": 4.0e-6 * 4,
-            "sigma_aw_c": 4.0e-5 * 4,
-        },
-        ('KSF', 'OKVIS'): {
-            "algo_code": 'MSCKF',
-            "numImuFrames": 5,
-            "sigma_absolute_translation": 0.02,
-            "sigma_absolute_orientation": 0.01,
-            "model_type": "BG_BA",
-            'projection_opt_mode': 'FIXED',
-            "extrinsic_opt_mode_main_camera": "P_CB",
-            "extrinsic_opt_mode_other_camera": "P_C0C_Q_C0C",
-        },
-        ('KSF_n', 'OKVIS'): {
-            "algo_code": 'MSCKF',
-            "numImuFrames": 5,
-            "monocular_input": 0,
-            "sigma_absolute_translation": 0.02,
-            "sigma_absolute_orientation": 0.01,
-            "model_type": "BG_BA",
-            'projection_opt_mode': 'FIXED',
-            "extrinsic_opt_mode_main_camera": "P_CB",
-            "extrinsic_opt_mode_other_camera": "P_C0C_Q_C0C",
-        },
-        ('isam2-fls', 'OKVIS'): {
-            "algo_code": "SlidingWindowSmoother",
-            "extra_gflags": "--publish_via_ros=false",
-        },
-        ('ri-fls', 'OKVIS'): {
-            "algo_code": "RiSlidingWindowSmoother",
-            "extra_gflags": "--publish_via_ros=false --rifls_lock_jacobian=true",
-        },
-        ('ri-fls-exact', 'OKVIS'): {
-            "algo_code": "RiSlidingWindowSmoother",
-            "extra_gflags": "--publish_via_ros=false --rifls_lock_jacobian=false",
-        },
-    }
-    return algo_option_templates, config_name_to_diffs
-
 if __name__ == '__main__':
     args = parse_args.parse_args()
     bag_list, gt_list = find_all_bags_with_gt(args.data_dir, args.dataset_code)
 
-    algo_option_templates, config_name_to_diffs = euroc_stasis_test_options()
+    if args.test_case == "tumrs_calibrated":
+        algo_option_templates, config_name_to_diffs = tumrs_calib_options.tumrs_calibrated_test_options()
+    elif args.test_case == "tumrs_raw":
+        algo_option_templates, config_name_to_diffs = tumrs_calib_options.tumrs_raw_test_options()
+    elif args.test_case == "euroc_stasis":
+        algo_option_templates, config_name_to_diffs = euroc_stasis_options.euroc_stasis_test_options()
+    else:
+        algo_option_templates, config_name_to_diffs = sample_eval_options.sample_eval_options()
 
     algoname_to_options = dict()
     for new_old_code, diffs in config_name_to_diffs.items():

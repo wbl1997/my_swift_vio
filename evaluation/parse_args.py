@@ -223,6 +223,12 @@ def parse_args():
     parser.add_argument("dataset_code", type=str,
                         help="dataset code: euroc, uzh_fpv, tum_vi, tum_rs, advio, homebrew")
 
+    parser.add_argument("test_case", type=str,
+                        help="test cases: tumrs_calibrated (TUM RS calibrated dataset 640), "
+                             "tumrs_raw (TUM RS raw dataset 640), "
+                             "euroc_stasis (EuRoC MH 5 sessions), "
+                             "others")
+
     default_path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                                 '../../rpg_trajectory_evaluation/results')
     parser.add_argument(

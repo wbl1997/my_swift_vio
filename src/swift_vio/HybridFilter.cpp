@@ -3197,7 +3197,7 @@ std::vector<std::string> HybridFilter::variableLabels() const {
 
 std::vector<std::string> HybridFilter::perturbationLabels() const {
   std::vector<std::string> minVarList{
-      "timestamp(sec)", "p_WB_W_x(m)",   "p_WB_W_y(m)",
+      "p_WB_W_x(m)",   "p_WB_W_y(m)",
       "p_WB_W_z(m)",    "theta_WB_x",        "theta_WB_y",        "theta_WB_z",
       "v_WB_W_x(m/s)", "v_WB_W_y(m/s)", "v_WB_W_z(m/s)",
       "b_g_x(rad/s)",   "b_g_y(rad/s)",  "b_g_z(rad/s)",  "b_a_x(m/s^2)",

@@ -1,77 +1,57 @@
 %YAML:1.0
-# This file is based off the okvis configuration file for TUM VI dataset at
-# https://vision.in.tum.de/_media/data/datasets/visual-inertial-dataset/config_okvis_50_20.yaml.tar.gz
 cameras:
      - {T_SC:
-        [0.0, -1.0, 0.0, 0.0,
-        -1.0, 0.0, 0.0,  0.0,
-         0.0, 0.0, -1.0, 0.0,
-         0.0, 0.0, 0.0,  1.0],
+        [ -1.0, 0.0, 0.0, 0.0,
+          0.0, 1.0, 0.0, 0.0,
+          0.0, 0.0, -1.0, 0.0,
+           0.0, 0.0, 0.0, 1.0],
         image_dimension: [1280, 1024],
-        distortion_coefficients: [-0.2, 0.0, 0.0, 0.0],
-        distortion_type: radialtangential,
+        distortion_coefficients: [0.0, 0.0, 0.0, 0.0],
+        distortion_type: equidistant,
         focal_length: [740.0, 740.0],
         principal_point: [640.0, 512.0],
-        down_scale: 2,
         projection_opt_mode: FXY_CXY,
         extrinsic_opt_mode: P_CB,
         image_delay: 0.0,
-        image_readout_time: 0.02}
+        image_readout_time: 0.03}
 
-     - {T_SC:
-        [0.0, -1.0,  0.0, 0.0,
-        -1.0,  0.0,  0.0, 0.0,
-         0.0,  0.0, -1.0, 0.0,
-         0.0,  0.0,  0.0, 1.0],
-        image_dimension: [1280, 1024],
-        distortion_coefficients: [-0.2, 0.0, 0.0, 0.0],
-        distortion_type: radialtangential,
-        focal_length: [740.0, 740.0],
-        principal_point: [640.0, 512.0],
-        down_scale: 2,
-        projection_opt_mode: FXY_CXY,
-        extrinsic_opt_mode: P_C0C_Q_C0C,
-        image_delay: 0.0,
-        image_readout_time: 0.02}
-
-monocular_input: false
+monocular_input: true
 
 camera_params:
     camera_rate: 20 # just to manage the expectations of when there should be frames arriving
     sigma_absolute_translation: 0.03 # The standard deviation of the camera extrinsics translation, e.g. 1.0e-10 for online-calib [m].
     sigma_absolute_orientation: 0.02 # The standard deviation of the camera extrinsics orientation, e.g. 1.0e-3 for online-calib [rad].
-    sigma_c_relative_translation: 1.0e-6 # The std. dev. of the cam. extr. transl. change between frames, e.g. 1.0e-6 for adaptive online calib (not less for numerics) [m].
-    sigma_c_relative_orientation: 1.0e-6 # The std. dev. of the cam. extr. orient. change between frames, e.g. 1.0e-6 for adaptive online calib (not less for numerics) [rad].
+    sigma_c_relative_translation: 0.0 # The std. dev. of the cam. extr. transl. change between frames, e.g. 1.0e-6 for adaptive online calib (not less for numerics) [m].
+    sigma_c_relative_orientation: 0.0 # The std. dev. of the cam. extr. orient. change between frames, e.g. 1.0e-6 for adaptive online calib (not less for numerics) [rad].
     timestamp_tolerance: 0.005 # [s] stereo frame out-of-sync tolerance
     sigma_focal_length: 5.0
     sigma_principal_point: 5.0
-    sigma_distortion: [0.1, 0.01, 0.01, 0.01, 0.0]
-    sigma_td: 0.1
-    sigma_tr: 0.05
+    sigma_distortion: [0.05, 0.01, 0.01, 0.01, 0.01]
+    sigma_td: 2e-2
+    sigma_tr: 5e-3
 
 imu_params:
     a_max: 176.0 # acceleration saturation [m/s^2]
     g_max: 7.8 # gyro saturation [rad/s]
-    sigma_g_c: 0.004  # gyro noise density [rad/s/sqrt(Hz)]
-    sigma_a_c: 0.07  # accelerometer noise density [m/s^2/sqrt(Hz)]
+    sigma_g_c: 5e-4 # gyro noise density [rad/s/sqrt(Hz)]
+    sigma_a_c: 4.5e-3 # accelerometer noise density [m/s^2/sqrt(Hz)]
     sigma_bg: 0.03 # gyro bias prior [rad/s]
     sigma_ba: 0.1 # accelerometer bias prior [m/s^2]
-    sigma_gw_c: 0.000044 # gyro drift noise density [rad/s^s/sqrt(Hz)]
-    sigma_aw_c: 0.00172 # accelerometer drift noise density [m/s^2/sqrt(Hz)]
+    sigma_gw_c: 4.0e-6 # gyro drift noise density [rad/s^s/sqrt(Hz)]
+    sigma_aw_c: 6.5e-5 # accelerometer drift noise density [m/s^2/sqrt(Hz)]
     tau: 3600.0 # reversion time constant, currently not in use [s]
-    # Local gravity at 85748 Garching, Germany (latitude: 48.262768, elevation: 481m), according to https://www.sensorsone.com/local-gravity-calculator/
-    g: 9.80766 # Earth's acceleration due to gravity [m/s^2]
+    g: 9.8100 # Earth's acceleration due to gravity [m/s^2]
     a0: [ 0.0, 0.0, 0.0 ] # Accelerometer bias [m/s^2]
-    imu_rate: 200
+    imu_rate: 230
     # tranform Body-Sensor (IMU)
     T_BS:
         [1.0000, 0.0000, 0.0000, 0.0000,
          0.0000, 1.0000, 0.0000, 0.0000,
          0.0000, 0.0000, 1.0000, 0.0000,
          0.0000, 0.0000, 0.0000, 1.0000]
-    sigma_TGElement: 5.0e-3
-    sigma_TSElement: 2.0e-3
-    sigma_TAElement: 5.0e-3
+    sigma_TGElement: 5e-3
+    sigma_TSElement: 1e-3
+    sigma_TAElement: 5e-3
     model_type: BG_BA_TG_TS_TA
 
 initial_state:
@@ -108,7 +88,7 @@ pose_graph:
 ceres_options:
     minIterations: 3   # minimum number of iterations always performed
     maxIterations: 10  # never do more than these, even if not converged
-    timeLimit: -1      # [s] negative values will set the an unlimited time limit
+    timeLimit: 0.035   # [s] negative values will set the an unlimited time limit
 
 # detection
 detection_options:
@@ -120,7 +100,7 @@ detection_options:
 imageDelay: 0.0  # in case you are using a custom setup, you will have to calibrate this. 0 for the VISensor.
 
 # display debug images?
-displayImages: false  # displays debug video and keyframe matches. May be slow.
+displayImages: true  # displays debug video and keyframe matches. May be slow.
 
 # use direct driver
 useDriver: false
@@ -128,7 +108,7 @@ useDriver: false
 # some options for how and what to publish -- optional in ROS-free version
 publishing_options:
     publish_rate: 200                  # rate at which odometry updates are published only works properly if imu_rate/publish_rate is an integer!!
-    publishLandmarks: false            # select, if you want to publish landmarks at all
+    publishLandmarks: true             # select, if you want to publish landmarks at all
     landmarkQualityThreshold: 1.0e-2   # landmark with lower quality will not be published
     maximumLandmarkQuality: 0.05       # landmark with higher quality will be published with the maximum colour intensity
     maxPathLength: 20                  # maximum length of the published path
