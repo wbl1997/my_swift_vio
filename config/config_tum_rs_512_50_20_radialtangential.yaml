@@ -88,6 +88,9 @@ optimization:
     algorithm: "HybridFilter"
     useEpipolarConstraint: false
     cameraObservationModelId: 0
+    computeOkvisNees: 0
+    useMahalanobisGating: 1
+    maxProjectionErrorTol: 7
 
 frontend:
     stereoMatchWithEpipolarCheck: true

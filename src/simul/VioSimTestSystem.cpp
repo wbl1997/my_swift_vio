@@ -162,7 +162,7 @@ void VioSimTestSystem::createEstimator(const TestSetting &testSetting) {
   optimOptions.numKeyframes = 5;
   optimOptions.numImuFrames = 3;
   if (testSetting.simDataDir.empty()) {
-    optimOptions.useMahalanobisGating = FLAGS_useMahalanobis;
+    optimOptions.useMahalanobisGating = FLAGS_simUseMahalanobis;
   } else {
     optimOptions.useMahalanobisGating = false;
   }

@@ -44,7 +44,7 @@ DECLARE_int32(maxMatchKeyframes);
 
 DECLARE_bool(allKeyframe);
 
-DECLARE_bool(useMahalanobis);
+DECLARE_bool(simUseMahalanobis);
 
 DECLARE_double(maxPositionRmse);
 

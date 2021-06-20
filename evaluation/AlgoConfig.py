@@ -58,6 +58,9 @@ def apply_config_to_yaml(config_dict, vio_yaml, debug_output_dir):
 
     padding = " " * 4
     sed_cmd += sed_line_with_parameter(config_dict, "landmarkModelId", padding, vio_yaml)
+    sed_cmd += sed_line_with_parameter(config_dict, "cameraObservationModelId", padding, vio_yaml)
+    sed_cmd += sed_line_with_parameter(config_dict, "useMahalanobisGating", padding, vio_yaml)
+    sed_cmd += sed_line_with_parameter(config_dict, "maxProjectionErrorTol", padding, vio_yaml)
 
     # the fields for extrinsic_opt_mode will become scrabbled in the generated vio config file,
     # so we look for the string combination of extrinsic_opt_mode + default value.

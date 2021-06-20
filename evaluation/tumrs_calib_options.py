@@ -12,29 +12,30 @@ def tumrs_calibrated_test_options():
                  "extra_gflags": "--publish_via_ros=false",
                  "displayImages": "false",
                  "monocular_input": 0,
+                 "numImuFrames": 5,
                  "loop_closure_method": 0,
                  'use_nominal_calib_value': False},
     }
 
     config_name_to_diffs = {
-        # ('KSWF', 'KSWF'): {},
         ('KSWF_01', 'KSWF'): {
             "sigma_g_c": 0.004 * 0.1,
             "sigma_a_c": 0.07 * 0.1,
             "sigma_gw_c": 0.000044,
             "sigma_aw_c": 0.00172,},
-        # ('KSWF_03', 'KSWF'): {"sigma_g_c": 0.004 * 0.3,
-        #                       "sigma_a_c": 0.07 * 0.3,
-        #                       "sigma_gw_c": 0.000044,
-        #                       "sigma_aw_c": 0.00172, },
-        # ('KSWF_3', "KSWF"): {"sigma_g_c": 0.004 * 3,
-        #                      "sigma_a_c": 0.07 * 3,
-        #                      "sigma_gw_c": 0.000044,
-        #                      "sigma_aw_c": 0.00172, },
-        # ('KSWF_10', 'KSWF'): {"sigma_g_c": 0.004 * 10,
-        #                       "sigma_a_c": 0.07 * 10,
-        #                       "sigma_gw_c": 0.000044,
-        #                       "sigma_aw_c": 0.00172,},
+        ('KSWF_03', 'KSWF'): {"sigma_g_c": 0.004 * 0.3,
+                              "sigma_a_c": 0.07 * 0.3,
+                              "sigma_gw_c": 0.000044,
+                              "sigma_aw_c": 0.00172, },
+        ('KSWF', 'KSWF'): {},
+        ('KSWF_3', "KSWF"): {"sigma_g_c": 0.004 * 3,
+                             "sigma_a_c": 0.07 * 3,
+                             "sigma_gw_c": 0.000044,
+                             "sigma_aw_c": 0.00172, },
+        ('KSWF_10', 'KSWF'): {"sigma_g_c": 0.004 * 10,
+                              "sigma_a_c": 0.07 * 10,
+                              "sigma_gw_c": 0.000044,
+                              "sigma_aw_c": 0.00172,},
         ('OKVIS_01', 'KSWF'): {
             "algo_code": "OKVIS",
             "numImuFrames": 3,
@@ -91,23 +92,33 @@ def tumrs_raw_test_options():
     }
 
     config_name_to_diffs = {
-        ('KSWF', 'KSWF'): {
+        ('KSWF_01', 'KSWF'): {
             "sigma_g_c": 0.004 * 0.1,
             "sigma_a_c": 0.07 * 0.1,
             "sigma_gw_c": 0.000044,
+            "sigma_aw_c": 0.00172, },
+        ('KSWF_03', 'KSWF'): {
+            "sigma_g_c": 0.004 * 0.3,
+            "sigma_a_c": 0.07 * 0.3,
+            "sigma_gw_c": 0.000044,
             "sigma_aw_c": 0.00172,},
-        ('KSWF_cal_cam', 'KSWF'): {
-            "sigma_g_c": 0.004 * 0.1,
-            "sigma_a_c": 0.07 * 0.1,
+        ('KSWF', 'KSWF'): {
+            "sigma_g_c": 0.004,
+            "sigma_a_c": 0.07,
+            "sigma_gw_c": 0.000044,
+            "sigma_aw_c": 0.00172, },
+        ('KSWF_03_cal_cam', 'KSWF'): {
+            "sigma_g_c": 0.004 * 0.3,
+            "sigma_a_c": 0.07 * 0.3,
             "sigma_gw_c": 0.000044,
             "sigma_aw_c": 0.00172,
             "sigma_TGElement": 0.0,
             "sigma_TSElement": 0.0,
             "sigma_TAElement": 0.0,
         },
-        ('KSWF_cal_imu', 'KSWF'): {
-            "sigma_g_c": 0.004 * 0.1,
-            "sigma_a_c": 0.07 * 0.1,
+        ('KSWF_03_cal_imu', 'KSWF'): {
+            "sigma_g_c": 0.004 * 0.3,
+            "sigma_a_c": 0.07 * 0.3,
             "sigma_gw_c": 0.000044,
             "sigma_aw_c": 0.00172,
 
@@ -121,9 +132,9 @@ def tumrs_raw_test_options():
             "sigma_principal_point": 0.0,
             "sigma_distortion": [0.0, 0.0, 0.0, 0.0, 0.0],
         },
-        ('KSWF_fix_all', "KSWF"): {
-            "sigma_g_c": 0.004 * 0.1,
-            "sigma_a_c": 0.07 * 0.1,
+        ('KSWF_03_fix_all', "KSWF"): {
+            "sigma_g_c": 0.004 * 0.3,
+            "sigma_a_c": 0.07 * 0.3,
             "sigma_gw_c": 0.000044,
             "sigma_aw_c": 0.00172,
 
@@ -145,10 +156,9 @@ def tumrs_raw_test_options():
             "algo_code": "OKVIS",
             "numImuFrames": 3,
             "timeLimit": -1,
-            "sigma_g_c": 0.004 * 0.1,
-            "sigma_a_c": 0.07 * 0.1,
-            "sigma_gw_c": 0.000044,
-            "sigma_aw_c": 0.00172,
+            "landmarkModelId": 0,
+            "extrinsic_opt_mode_main_camera": "p_BC_q_BC",
+            "extrinsic_opt_mode_other_camera": "p_BC_q_BC",
         }
     }
     return algo_option_templates, config_name_to_diffs
