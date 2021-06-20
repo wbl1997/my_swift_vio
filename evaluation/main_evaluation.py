@@ -23,6 +23,7 @@ import utility_functions
 import euroc_stasis_options
 import sample_eval_options
 import tumrs_calib_options
+import tumvi_calib_options
 
 from colorama import init, Fore
 init(autoreset=True)
@@ -72,6 +73,10 @@ if __name__ == '__main__':
         algo_option_templates, config_name_to_diffs = tumrs_calib_options.tumrs_calibrated_test_options()
     elif args.test_case == "tumrs_raw":
         algo_option_templates, config_name_to_diffs = tumrs_calib_options.tumrs_raw_test_options()
+    elif args.test_case == "tumvi_calibrated":
+        algo_option_templates, config_name_to_diffs = tumvi_calib_options.tumvi_calibrated_test_options()
+    elif args.test_case == "tumvi_raw":
+        algo_option_templates, config_name_to_diffs = tumvi_calib_options.tumvi_raw_test_options()
     elif args.test_case == "euroc_stasis":
         algo_option_templates, config_name_to_diffs = euroc_stasis_options.euroc_stasis_test_options()
     else:
@@ -113,7 +118,7 @@ if __name__ == '__main__':
                 results_dir_manager.get_all_result_dirs(name),
                 args.extra_lib_path, args.lcd_config_yaml,
                 args.voc_file)
-            rc = runner.run_method(name, args.pose_conversion_script, args.align_type, True)
+            rc = runner.run_method(name, args.pose_conversion_script, args.align_type, True, args.dataset_code)
             if rc != 0:
                 returncode = rc
         # evaluate all VIO methods.

@@ -102,7 +102,7 @@ if __name__ == '__main__':
             results_dir_manager.get_all_result_dirs(name),
             args.extra_lib_path, args.lcd_config_yaml,
             args.voc_file)
-        rc = runner.run_method(name, args.pose_conversion_script)
+        rc = runner.run_method(name, args.pose_conversion_script, "uzh_fpv")
         if rc != 0:
             returncode = rc
 

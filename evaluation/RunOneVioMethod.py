@@ -58,7 +58,7 @@ class RunOneVioMethod(object):
     def get_async_launch_file(self):
         return os.path.join(self.catkin_ws, "src/swift_vio/launch/swift_vio_node_rosbag.launch")
 
-    def create_vio_config_yaml(self):
+    def create_vio_config_yaml(self, dataset_code):
         """for each data mission, create a vio config yaml"""
         vio_yaml_list = []
         for bag_index, bag_fullname in enumerate(self.bag_list):
@@ -71,12 +71,13 @@ class RunOneVioMethod(object):
             # apply sensor calibration parameters
             if "use_nominal_calib_value" in self.algo_code_flags:
                 config_composer.create_config_for_mission(
-                    self.algo_code_flags["algo_code"], 
+                    self.algo_code_flags["algo_code"], dataset_code,
                     self.algo_code_flags["use_nominal_calib_value"], 
                     self.algo_code_flags["monocular_input"])
             else:
                 config_composer.create_config_for_mission(
-                    self.algo_code_flags["algo_code"], False,
+                    self.algo_code_flags["algo_code"], dataset_code,
+                    False,
                     self.algo_code_flags["monocular_input"])
 
             # apply algorithm parameters
@@ -99,13 +100,12 @@ class RunOneVioMethod(object):
         self.custom_lcd_config_list = lcd_yaml_list
 
     def create_sync_command(self, custom_vio_config, custom_lcd_config,
-                            vio_trial_output_dir, bag_fullname):
-        data_type = dataset_parameters.dataset_code(bag_fullname)
-        if data_type in dataset_parameters.ROS_TOPICS.keys():
+                            vio_trial_output_dir, bag_fullname, dataset_code):
+        if dataset_code in dataset_parameters.ROS_TOPICS.keys():
             arg_topics = r'--camera_topics="{},{}" --imu_topic={}'.format(
-                dataset_parameters.ROS_TOPICS[data_type][0],
-                dataset_parameters.ROS_TOPICS[data_type][1],
-                dataset_parameters.ROS_TOPICS[data_type][2])
+                dataset_parameters.ROS_TOPICS[dataset_code][0],
+                dataset_parameters.ROS_TOPICS[dataset_code][1],
+                dataset_parameters.ROS_TOPICS[dataset_code][2])
         else:
             arg_topics = r'--camera_topics="/cam0/image_raw" --imu_topic=/imu0'
 
@@ -127,15 +127,14 @@ class RunOneVioMethod(object):
 
     def create_async_command(self, custom_vio_config,
                              custom_lcd_config,
-                             vio_trial_output_dir, bag_fullname):
+                             vio_trial_output_dir, bag_fullname, dataset_code):
         launch_file = "swift_vio_node_rosbag.launch"
         setup_bash_file = os.path.join(self.catkin_ws, "devel/setup.bash")
 
-        data_type = dataset_parameters.dataset_code(bag_fullname)
         arg_topics = "image_topic:={} image_topic1:={} imu_topic:={}".format(
-            dataset_parameters.ROS_TOPICS[data_type][0],
-            dataset_parameters.ROS_TOPICS[data_type][1],
-            dataset_parameters.ROS_TOPICS[data_type][2])
+            dataset_parameters.ROS_TOPICS[dataset_code][0],
+            dataset_parameters.ROS_TOPICS[dataset_code][1],
+            dataset_parameters.ROS_TOPICS[dataset_code][2])
 
         src_cmd = "cd {}\nsource {}\n".format(self.catkin_ws, setup_bash_file)
         export_lib_cmd = "export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:{}\n".\
@@ -153,12 +152,12 @@ class RunOneVioMethod(object):
         return time_out
 
     def run_method(self, algo_name, pose_conversion_script,
-                   gt_align_type='posyaw', log_vio=True):
+                   gt_align_type='posyaw', log_vio=True, dataset_code="euroc"):
         '''
         run a method
         :return:
         '''
-        self.create_vio_config_yaml()
+        self.create_vio_config_yaml(dataset_code)
         self.create_lcd_config_yaml()
 
         mock = 'async' in algo_name or (not AlgoConfig.doWePublishViaRos(self.algo_code_flags))
@@ -191,7 +190,7 @@ class RunOneVioMethod(object):
 
                 if 'async' in algo_name:
                     cmd = self.create_async_command(custom_vio_config, custom_lcd_config,
-                                                    output_dir_trial, bag_fullname)
+                                                    output_dir_trial, bag_fullname, dataset_code)
                     # We put all commands in a bash script because source
                     # command is unavailable when running in python subprocess.
                     src_wrap = os.path.join(output_dir_trial, "source_wrap.sh")
@@ -201,7 +200,7 @@ class RunOneVioMethod(object):
                     cmd = "chmod +x {wrap};{wrap}".format(wrap=src_wrap)
                 else:
                     cmd = self.create_sync_command(custom_vio_config, custom_lcd_config,
-                                                   output_dir_trial, bag_fullname)
+                                                   output_dir_trial, bag_fullname, dataset_code)
 
                 user_msg = 'Running vio method with cmd\n{}\n'.format(cmd)
                 print(textwrap.fill(user_msg, 120))

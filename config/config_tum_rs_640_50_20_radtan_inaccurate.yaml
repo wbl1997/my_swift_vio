@@ -13,7 +13,7 @@ cameras:
         focal_length: [740.0, 740.0],
         principal_point: [640.0, 512.0],
         down_scale: 2,
-        projection_opt_mode: FXY_CXY,
+        projection_opt_mode: FX_CXY,
         extrinsic_opt_mode: P_CB,
         image_delay: 0.0,
         image_readout_time: 0.02}
@@ -29,7 +29,7 @@ cameras:
         focal_length: [740.0, 740.0],
         principal_point: [640.0, 512.0],
         down_scale: 2,
-        projection_opt_mode: FXY_CXY,
+        projection_opt_mode: FX_CXY,
         extrinsic_opt_mode: P_C0C_Q_C0C,
         image_delay: 0.0,
         image_readout_time: 0.02}

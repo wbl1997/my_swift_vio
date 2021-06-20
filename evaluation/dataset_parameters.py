@@ -100,22 +100,6 @@ BAGNAME_DATANAME_LABEL = {
     'advio-23': ('advio23', 'ad23')
 }
 
-
-def dataset_code(bagname):
-    if 'snapdragon' in bagname or 'davis' in bagname:
-        return "uzh_fpv"
-    if 'euroc' in bagname:
-        return "euroc"
-    if 'TUM-VI' in bagname or 'tum-vi' in bagname:
-        return "tum_vi"
-    if 'rollingshutter' in bagname:
-        return "tum_rs"
-    if "ADVIO" in bagname or "advio" in bagname:
-        return "advio"
-    else:
-        return "homebrew"
-
-
 def calibration_format(dataset_type):
     if dataset_type == "uzh_fpv":
         calib_format = "kalibr"

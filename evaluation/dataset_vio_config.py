@@ -34,31 +34,6 @@ OKVIS_MONO_EUROC_IMU_PARAMETERS = {
     "sigma_aw_c": 4.0e-5 * 4,
 }
 
-# The best IMU parameters for stereo MSCKF on TUM VI are found by a search.
-#       &      Translation (\%) &  Rotation (deg/meter)
-# KSF_n_01_01 &     31.934 &  0.135
-# KSF_n_02_025 &     41.982 &  0.120
-# KSF_n_0025_005 &     84470.155 &  0.313
-# KSF_n_005_005 &     786.133 &  0.260
-# KSF_n_005_01 &     42.373 &  0.151
-MSCKF_TUMVI_IMU_PARAMETERS = {"sigma_g_c": 0.004 * 0.1,
-                              "sigma_a_c": 0.07 * 0.1,
-                              "sigma_gw_c": 4.4e-5 * 0.1,
-                              "sigma_aw_c": 1.72e-3 * 0.1}
-
-# The best IMU parameters for monocular MSCKF on TUM VI are found by a search.
-#       &      Translation (\%) &  Rotation (deg/meter)
-# KSF_005_01 &     37578.149 &  0.258
-# KSF_01_01 &     70.471 &  0.186
-# KSF_01_025 &     47.796 &  0.117
-# KSF_02_025 &     42.107 &  0.118
-MSCKF_TUMVI_MONO_IMU_PARAMETERS = {
-    "sigma_g_c": 0.004 * 0.2,
-    "sigma_a_c": 0.07 * 0.2,
-    "sigma_gw_c": 4.4e-5 * 0.25,
-    "sigma_aw_c": 1.72e-3 * 0.25
-}
-
 TUMVI_PARAMETERS = {
     "cameras": [
         {"T_SC": [-0.99953071, 0.00744168, -0.02971511, 0.04536566,
@@ -500,23 +475,7 @@ def create_config_yaml(config_template, calib_format,
             for key in OKVIS_EUROC_IMU_PARAMETERS.keys():
                 template_data["imu_params"][key] = OKVIS_EUROC_IMU_PARAMETERS[key]
     elif calib_format == "tum_vi":
-        used_TUMVI_parameters = TUMVI_PARAMETERS
-        if use_nominal_value:
-            used_TUMVI_parameters = TUMVI_NOMINAL_PARAMETERS
-        for cameraid in range(0, 2):
-            for key in used_TUMVI_parameters['cameras'][cameraid].keys():
-                template_data['cameras'][cameraid][key] = used_TUMVI_parameters['cameras'][cameraid][key]
-        for group in ["imu_params", "ceres_options", "publishing_options"]:
-            for key in used_TUMVI_parameters[group].keys():
-                template_data[group][key] = used_TUMVI_parameters[group][key]
-        template_data["displayImages"] = used_TUMVI_parameters["displayImages"]
-        if algo_code == "MSCKF" or algo_code == "HybridFilter":
-            if monocular_input:
-                for key in MSCKF_TUMVI_MONO_IMU_PARAMETERS.keys():
-                    template_data["imu_params"][key] = MSCKF_TUMVI_MONO_IMU_PARAMETERS[key]
-            else:
-                for key in MSCKF_TUMVI_IMU_PARAMETERS.keys():
-                    template_data["imu_params"][key] = MSCKF_TUMVI_IMU_PARAMETERS[key]
+        pass
     elif calib_format == 'advio':
         swapped_parameters, swapped_intrinsics = advio_transform_C_Cp_and_halve(use_nominal_value)
         cameraid = 0
