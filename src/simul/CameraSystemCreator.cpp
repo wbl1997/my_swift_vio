@@ -10,7 +10,7 @@
 
 namespace simul {
 
-const std::string CameraSystemCreator::distortName_ = "RadialTangentialDistortion";
+const std::map<SimCameraModelType, CameraProjectionIntrinsics> CameraSystemCreator::cameraModels_ = CameraSystemCreator::initCameraModels();
 
 Eigen::Matrix<double, 4, 4> create_T_BC(CameraOrientation orientationId,
                                         int /*camIdx*/) {
@@ -361,7 +361,9 @@ CameraSystemCreator::CameraSystemCreator(SimCameraModelType cameraModelId,
       timeOffset_(td),
       readoutTime_(tr) {}
 
-std::shared_ptr<okvis::cameras::CameraBase> CameraSystemCreator::createNominalCameraSystem(
+std::shared_ptr<okvis::cameras::CameraBase>
+CameraSystemCreator::createNominalCameraSystem(
+    okvis::cameras::NCameraSystem::DistortionType distortionType,
     std::shared_ptr<okvis::cameras::NCameraSystem> *cameraSystem) {
   Eigen::Matrix<double, 4, 4> matT_SC0 =
       create_T_BC(cameraOrientationId_, camIdx_);
@@ -369,35 +371,75 @@ std::shared_ptr<okvis::cameras::CameraBase> CameraSystemCreator::createNominalCa
       new okvis::kinematics::Transformation(matT_SC0));
 
   std::shared_ptr<okvis::cameras::CameraBase> cameraGeometry0 =
-      createCameraGeometry(cameraModelId_);
+      createCameraGeometry(cameraModelId_, distortionType);
   cameraSystem->reset(new okvis::cameras::NCameraSystem);
   (*cameraSystem)
-      ->addCamera(
-          T_SC_0, cameraGeometry0,
-          okvis::cameras::NCameraSystem::DistortionType::RadialTangential,
-          projIntrinsicRep_, extrinsicRep_);
+      ->addCamera(T_SC_0, cameraGeometry0, distortionType, projIntrinsicRep_,
+                  extrinsicRep_);
   return cameraGeometry0;
 }
 
-std::shared_ptr<okvis::cameras::CameraBase> CameraSystemCreator::createCameraGeometry(
-    SimCameraModelType cameraModelId) {
+std::shared_ptr<okvis::cameras::CameraBase>
+CameraSystemCreator::createCameraGeometry(
+    SimCameraModelType cameraModelId,
+    okvis::cameras::NCameraSystem::DistortionType distortionType) {
   std::shared_ptr<okvis::cameras::CameraBase> cameraGeometry;
-  switch (cameraModelId) {
-    case SimCameraModelType::VGA:
-      cameraGeometry.reset(new okvis::cameras::PinholeCamera<
-                           okvis::cameras::RadialTangentialDistortion>(
-          640, 480, 350, 350, 322, 238,
-          okvis::cameras::RadialTangentialDistortion(0, 0, 0, 0),
-                             timeOffset_, readoutTime_));
-      break;
-    case SimCameraModelType::EUROC:
-    default:
-      cameraGeometry.reset(new okvis::cameras::PinholeCamera<
-                           okvis::cameras::RadialTangentialDistortion>(
-          752, 480, 350, 360, 378, 238,
-          okvis::cameras::RadialTangentialDistortion(0.00, 0.00, 0.000,
-                                                     0.000), timeOffset_, readoutTime_));
-      break;
+  switch (distortionType) {
+  case okvis::cameras::NCameraSystem::RadialTangential: {
+    cameraGeometry.reset(new okvis::cameras::PinholeCamera<
+                         okvis::cameras::RadialTangentialDistortion>(
+        cameraModels_.at(cameraModelId).imageWidth,
+        cameraModels_.at(cameraModelId).imageHeight,
+        cameraModels_.at(cameraModelId).focalLengthU,
+        cameraModels_.at(cameraModelId).focalLengthV,
+        cameraModels_.at(cameraModelId).imageCenterU,
+        cameraModels_.at(cameraModelId).imageCenterV,
+        okvis::cameras::RadialTangentialDistortion(0.0, 0.0, 0.0, 0.0),
+        timeOffset_, readoutTime_));
+    break;
+  }
+  case okvis::cameras::NCameraSystem::Equidistant: {
+    cameraGeometry.reset(new okvis::cameras::PinholeCamera<
+                         okvis::cameras::EquidistantDistortion>(
+        cameraModels_.at(cameraModelId).imageWidth,
+        cameraModels_.at(cameraModelId).imageHeight,
+        cameraModels_.at(cameraModelId).focalLengthU,
+        cameraModels_.at(cameraModelId).focalLengthV,
+        cameraModels_.at(cameraModelId).imageCenterU,
+        cameraModels_.at(cameraModelId).imageCenterV,
+        okvis::cameras::EquidistantDistortion(0.0, 0.0, 0.0, 0.0), timeOffset_,
+        readoutTime_));
+    break;
+  }
+  case okvis::cameras::NCameraSystem::RadialTangential8: {
+    cameraGeometry.reset(new okvis::cameras::PinholeCamera<
+                         okvis::cameras::RadialTangentialDistortion8>(
+        cameraModels_.at(cameraModelId).imageWidth,
+        cameraModels_.at(cameraModelId).imageHeight,
+        cameraModels_.at(cameraModelId).focalLengthU,
+        cameraModels_.at(cameraModelId).focalLengthV,
+        cameraModels_.at(cameraModelId).imageCenterU,
+        cameraModels_.at(cameraModelId).imageCenterV,
+        okvis::cameras::RadialTangentialDistortion8(0.0, 0.0, 0.0, 0.0, 0.0,
+                                                    0.0, 0.0, 0.0),
+        timeOffset_, readoutTime_));
+    break;
+  }
+  case okvis::cameras::NCameraSystem::FOV: {
+    cameraGeometry.reset(
+        new okvis::cameras::PinholeCamera<okvis::cameras::FovDistortion>(
+            cameraModels_.at(cameraModelId).imageWidth,
+            cameraModels_.at(cameraModelId).imageHeight,
+            cameraModels_.at(cameraModelId).focalLengthU,
+            cameraModels_.at(cameraModelId).focalLengthV,
+            cameraModels_.at(cameraModelId).imageCenterU,
+            cameraModels_.at(cameraModelId).imageCenterV,
+            okvis::cameras::FovDistortion(0.0), timeOffset_, readoutTime_));
+    break;
+  }
+  default:
+    OKVIS_THROW(std::runtime_error, "Unsupported distortion type.")
+    break;
   }
   return cameraGeometry;
 }

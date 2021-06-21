@@ -74,3 +74,8 @@ DEFINE_bool(simUseMahalanobis, false,
             "Use Mahalanobis gating test to remove outliers.");
 
 DEFINE_double(maxPositionRmse, 100, "If the final position RMSE is greater, then the run will be considered failed.");
+
+DEFINE_string(
+    sim_distortion_type, "RadialTangentialDistortion",
+    "Distortion type for the simulated camera model when external sim data are "
+    "not used. Candidate examples: RadialTangentialDistortion, EquidistantDistortion, FovDistortion");

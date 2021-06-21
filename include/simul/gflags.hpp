@@ -36,6 +36,10 @@ DECLARE_string(sim_trajectory_label);
 
 DECLARE_int32(sim_landmark_model);
 
+DECLARE_string(sim_distortion_type);
+
+DECLARE_bool(simUseMahalanobis);
+
 DECLARE_int32(minTrackLengthForSlam);
 
 DECLARE_int32(maxHibernationFrames);
@@ -43,8 +47,6 @@ DECLARE_int32(maxHibernationFrames);
 DECLARE_int32(maxMatchKeyframes);
 
 DECLARE_bool(allKeyframe);
-
-DECLARE_bool(simUseMahalanobis);
 
 DECLARE_double(maxPositionRmse);
 

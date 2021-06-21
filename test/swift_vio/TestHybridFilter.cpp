@@ -43,10 +43,9 @@ TEST(DeadreckoningM, TrajectoryLabel) {
       FLAGS_sim_imu_bias_noise_factor, "BG_BA");
   simul::SimVisionParameters visionParams(
       true, false, simul::SimCameraModelType::EUROC,
-      simul::CameraOrientation::Forward, "FIXED", "FIXED",
-      FLAGS_fixCameraInternalParams, 0.0, 0.0,
-      FLAGS_sim_camera_time_offset_sec,
-      FLAGS_sim_frame_readout_time_sec,
+      simul::CameraOrientation::Forward, "RadialTangentialDistortion", "FIXED",
+      "FIXED", FLAGS_fixCameraInternalParams, 0.0, 0.0,
+      FLAGS_sim_camera_time_offset_sec, FLAGS_sim_frame_readout_time_sec,
       FLAGS_noisyInitialSensorParams, simul::LandmarkGridType::FourWalls,
       landmarkRadius);
   simul::SimEstimatorParameters estimatorParams(
@@ -71,7 +70,7 @@ TEST(DeadreckoningO, TrajectoryLabel) {
       FLAGS_sim_imu_noise_factor, FLAGS_sim_imu_bias_noise_factor, "BG_BA");
   simul::SimVisionParameters visionParams(
       true, false, simul::SimCameraModelType::EUROC,
-      simul::CameraOrientation::Forward, "FIXED", "FIXED",
+      simul::CameraOrientation::Forward, "RadialTangentialDistortion", "FIXED", "FIXED",
       FLAGS_fixCameraInternalParams, 0.0, 0.0, FLAGS_sim_camera_time_offset_sec,
       FLAGS_sim_frame_readout_time_sec, FLAGS_noisyInitialSensorParams,
       simul::LandmarkGridType::FourWalls, landmarkRadius);
@@ -97,7 +96,7 @@ TEST(HybridFilter, TrajectoryLabel) {
       FLAGS_sim_imu_noise_factor, FLAGS_sim_imu_bias_noise_factor, "BG_BA_TG_TS_TA");
   simul::SimVisionParameters visionParams(
       true, true, simul::SimCameraModelType::EUROC,
-      simul::CameraOrientation::Forward, "FXY_CXY", "P_CB",
+      simul::CameraOrientation::Forward, FLAGS_sim_distortion_type, "FXY_CXY", "P_CB",
       FLAGS_fixCameraInternalParams, 2e-2, 0.0, FLAGS_sim_camera_time_offset_sec,
       FLAGS_sim_frame_readout_time_sec, FLAGS_noisyInitialSensorParams,
       simul::LandmarkGridType::FourWalls, landmarkRadius);
@@ -123,7 +122,7 @@ TEST(CalibrationFilter, TrajectoryLabel) {
       FLAGS_sim_imu_noise_factor, FLAGS_sim_imu_bias_noise_factor, "BG_BA");
   simul::SimVisionParameters visionParams(
       false, true, simul::SimCameraModelType::EUROC,
-      simul::CameraOrientation::Forward, "FXY_CXY", "P_BC_Q_BC",
+      simul::CameraOrientation::Forward, "RadialTangentialDistortion", "FXY_CXY", "P_BC_Q_BC",
       false, 2e-2, 1e-2, 0.0, 0.0, FLAGS_noisyInitialSensorParams,
       simul::LandmarkGridType::FourWalls, landmarkRadius, true);
   simul::SimEstimatorParameters estimatorParams(
@@ -149,7 +148,7 @@ TEST(MSCKF, TrajectoryLabel) {
       FLAGS_sim_imu_noise_factor, FLAGS_sim_imu_bias_noise_factor, "BG_BA_TG_TS_TA");
   simul::SimVisionParameters visionParams(
       true, true, simul::SimCameraModelType::EUROC,
-      simul::CameraOrientation::Forward, "FXY_CXY", "P_CB",
+      simul::CameraOrientation::Forward, FLAGS_sim_distortion_type, "FXY_CXY", "P_CB",
       FLAGS_fixCameraInternalParams, 2e-2, 0.0, FLAGS_sim_camera_time_offset_sec,
       FLAGS_sim_frame_readout_time_sec, FLAGS_noisyInitialSensorParams,
       simul::LandmarkGridType::FourWalls, landmarkRadius);
@@ -175,7 +174,7 @@ TEST(MSCKF, HuaiThesis) {
       FLAGS_sim_imu_noise_factor, FLAGS_sim_imu_bias_noise_factor, "BG_BA_TG_TS_TA");
   simul::SimVisionParameters visionParams(
       true, true, simul::SimCameraModelType::EUROC,
-      simul::CameraOrientation::Forward, "FXY_CXY", "P_CB",
+      simul::CameraOrientation::Forward, "RadialTangentialDistortion", "FXY_CXY", "P_CB",
       FLAGS_fixCameraInternalParams, 2e-2, 0.0, FLAGS_sim_camera_time_offset_sec,
       FLAGS_sim_frame_readout_time_sec, FLAGS_noisyInitialSensorParams,
       simul::LandmarkGridType::FourWalls, landmarkRadius);
@@ -201,7 +200,7 @@ TEST(MSCKF, CircleFarPoints) {
       FLAGS_sim_imu_noise_factor, FLAGS_sim_imu_bias_noise_factor, "BG_BA_TG_TS_TA");
   simul::SimVisionParameters visionParams(
       true, true, simul::SimCameraModelType::EUROC,
-      simul::CameraOrientation::Forward, "FXY_CXY", "P_CB",
+      simul::CameraOrientation::Forward, "RadialTangentialDistortion", "FXY_CXY", "P_CB",
       FLAGS_fixCameraInternalParams, 2e-2, 0.0, FLAGS_sim_camera_time_offset_sec,
       FLAGS_sim_frame_readout_time_sec, FLAGS_noisyInitialSensorParams,
       simul::LandmarkGridType::Cylinder, landmarkRadius);
@@ -228,7 +227,7 @@ TEST(OKVIS, TrajectoryLabel) {
       FLAGS_sim_imu_noise_factor, FLAGS_sim_imu_bias_noise_factor, "BG_BA");
   simul::SimVisionParameters visionParams(
       true, true, simul::SimCameraModelType::EUROC,
-      simul::CameraOrientation::Forward, "FIXED", "FIXED",
+      simul::CameraOrientation::Forward, FLAGS_sim_distortion_type, "FIXED", "FIXED",
       true, 2e-2, 0.0, 0.0, 0.0, FLAGS_noisyInitialSensorParams,
       simul::LandmarkGridType::FourWalls, landmarkRadius);
 
@@ -254,7 +253,7 @@ TEST(SlidingWindowSmoother, TrajectoryLabel) {
       FLAGS_sim_imu_noise_factor, FLAGS_sim_imu_bias_noise_factor, "BG_BA");
   simul::SimVisionParameters visionParams(
       true, true, simul::SimCameraModelType::EUROC,
-      simul::CameraOrientation::Forward, "FIXED", "FIXED",
+      simul::CameraOrientation::Forward, "RadialTangentialDistortion", "FIXED", "FIXED",
       FLAGS_fixCameraInternalParams, 0.0, 0.0, FLAGS_sim_camera_time_offset_sec,
       FLAGS_sim_frame_readout_time_sec, FLAGS_noisyInitialSensorParams,
       simul::LandmarkGridType::FourWalls, landmarkRadius);
@@ -280,7 +279,7 @@ TEST(RiSlidingWindowSmoother, TrajectoryLabel) {
       FLAGS_sim_imu_noise_factor, FLAGS_sim_imu_bias_noise_factor, "BG_BA");
   simul::SimVisionParameters visionParams(
       true, true, simul::SimCameraModelType::EUROC,
-      simul::CameraOrientation::Forward, "FIXED", "FIXED",
+      simul::CameraOrientation::Forward, "RadialTangentialDistortion", "FIXED", "FIXED",
       FLAGS_fixCameraInternalParams, 0.0, 0.0, FLAGS_sim_camera_time_offset_sec,
       FLAGS_sim_frame_readout_time_sec, FLAGS_noisyInitialSensorParams,
       simul::LandmarkGridType::FourWalls, landmarkRadius);
@@ -307,7 +306,7 @@ TEST(TFVIO, TrajectoryLabel) {
       FLAGS_sim_imu_noise_factor, FLAGS_sim_imu_bias_noise_factor, "BG_BA_TG_TS_TA");
   simul::SimVisionParameters visionParams(
       true, true, simul::SimCameraModelType::EUROC,
-      simul::CameraOrientation::Forward, "FXY_CXY", "P_CB",
+      simul::CameraOrientation::Forward, "RadialTangentialDistortion", "FXY_CXY", "P_CB",
       FLAGS_fixCameraInternalParams, 2e-2, 0.0, FLAGS_sim_camera_time_offset_sec,
       FLAGS_sim_frame_readout_time_sec, FLAGS_noisyInitialSensorParams,
       simul::LandmarkGridType::FourWalls, landmarkRadius);
@@ -333,7 +332,7 @@ TEST(MSCKFWithEuclidean, TrajectoryLabel) {
       FLAGS_sim_imu_noise_factor, FLAGS_sim_imu_bias_noise_factor, "BG_BA_TG_TS_TA");
   simul::SimVisionParameters visionParams(
       true, true, simul::SimCameraModelType::EUROC,
-      simul::CameraOrientation::Forward, "FXY_CXY", "P_CB",
+      simul::CameraOrientation::Forward, "RadialTangentialDistortion", "FXY_CXY", "P_CB",
       FLAGS_fixCameraInternalParams, 2e-2, 0.0, FLAGS_sim_camera_time_offset_sec,
       FLAGS_sim_frame_readout_time_sec, FLAGS_noisyInitialSensorParams,
       simul::LandmarkGridType::FourWalls, landmarkRadius);
@@ -359,7 +358,7 @@ TEST(MSCKFWithPAP, TrajectoryLabel) {
       FLAGS_sim_imu_noise_factor, FLAGS_sim_imu_bias_noise_factor, "BG_BA_TG_TS_TA");
   simul::SimVisionParameters visionParams(
       true, true, simul::SimCameraModelType::EUROC,
-      simul::CameraOrientation::Forward, "FXY_CXY", "P_CB",
+      simul::CameraOrientation::Forward, "RadialTangentialDistortion", "FXY_CXY", "P_CB",
       FLAGS_fixCameraInternalParams, 2e-2, 0.0, FLAGS_sim_camera_time_offset_sec,
       FLAGS_sim_frame_readout_time_sec, FLAGS_noisyInitialSensorParams,
       simul::LandmarkGridType::FourWalls, landmarkRadius);
@@ -385,7 +384,7 @@ TEST(MSCKFWithReprojectionErrorPAP, TrajectoryLabel) {
       FLAGS_sim_imu_noise_factor, FLAGS_sim_imu_bias_noise_factor, "BG_BA_TG_TS_TA");
   simul::SimVisionParameters visionParams(
       true, true, simul::SimCameraModelType::EUROC,
-      simul::CameraOrientation::Forward, "FXY_CXY", "P_CB",
+      simul::CameraOrientation::Forward, "RadialTangentialDistortion", "FXY_CXY", "P_CB",
       FLAGS_fixCameraInternalParams, 2e-2, 0.0, FLAGS_sim_camera_time_offset_sec,
       FLAGS_sim_frame_readout_time_sec, FLAGS_noisyInitialSensorParams,
       simul::LandmarkGridType::FourWalls, landmarkRadius);
@@ -411,7 +410,7 @@ TEST(MSCKFWithPAP, SquircleBackward) {
       FLAGS_sim_imu_noise_factor, FLAGS_sim_imu_bias_noise_factor, "BG_BA_TG_TS_TA");
   simul::SimVisionParameters visionParams(
       true, true, simul::SimCameraModelType::EUROC,
-      simul::CameraOrientation::Forward, "FXY_CXY", "P_CB",
+      simul::CameraOrientation::Forward, "RadialTangentialDistortion", "FXY_CXY", "P_CB",
       FLAGS_fixCameraInternalParams, 2e-2, 0.0, FLAGS_sim_camera_time_offset_sec,
       FLAGS_sim_frame_readout_time_sec, FLAGS_noisyInitialSensorParams,
       simul::LandmarkGridType::FourWalls, landmarkRadius);
@@ -437,7 +436,7 @@ TEST(MSCKFWithPAP, SquircleSideways) {
       FLAGS_sim_imu_noise_factor, FLAGS_sim_imu_bias_noise_factor, "BG_BA_TG_TS_TA");
   simul::SimVisionParameters visionParams(
       true, true, simul::SimCameraModelType::EUROC,
-      simul::CameraOrientation::Right, "FXY_CXY", "P_CB",
+      simul::CameraOrientation::Right, "RadialTangentialDistortion", "FXY_CXY", "P_CB",
       FLAGS_fixCameraInternalParams, 2e-2, 0.0, FLAGS_sim_camera_time_offset_sec,
       FLAGS_sim_frame_readout_time_sec, FLAGS_noisyInitialSensorParams,
       simul::LandmarkGridType::FourWalls, landmarkRadius);
@@ -463,7 +462,7 @@ TEST(MSCKFWithEpipolarConstraint, TrajectoryLabel) {
       FLAGS_sim_imu_noise_factor, FLAGS_sim_imu_bias_noise_factor, "BG_BA_TG_TS_TA");
   simul::SimVisionParameters visionParams(
       true, true, simul::SimCameraModelType::EUROC,
-      simul::CameraOrientation::Forward, "FXY_CXY", "P_CB",
+      simul::CameraOrientation::Forward, "RadialTangentialDistortion", "FXY_CXY", "P_CB",
       FLAGS_fixCameraInternalParams, 2e-2, 0.0, FLAGS_sim_camera_time_offset_sec,
       FLAGS_sim_frame_readout_time_sec, FLAGS_noisyInitialSensorParams,
       simul::LandmarkGridType::FourWalls, landmarkRadius);
@@ -489,7 +488,7 @@ TEST(MSCKFWithEpipolarConstraint, CircleFarPoints) {
       FLAGS_sim_imu_noise_factor, FLAGS_sim_imu_bias_noise_factor, "BG_BA_TG_TS_TA");
   simul::SimVisionParameters visionParams(
       true, true, simul::SimCameraModelType::EUROC,
-      simul::CameraOrientation::Forward, "FXY_CXY", "P_CB",
+      simul::CameraOrientation::Forward, "RadialTangentialDistortion", "FXY_CXY", "P_CB",
       FLAGS_fixCameraInternalParams,
       2e-2, 0.0, FLAGS_sim_camera_time_offset_sec,
       FLAGS_sim_frame_readout_time_sec, FLAGS_noisyInitialSensorParams,

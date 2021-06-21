@@ -137,11 +137,10 @@ public:
         2e-2, 5e-3, 1e-3, 5e-3, 1.2e-3, 2e-5, 8e-3, 5.5e-5, noise_factor,
         noise_factor);
     simul::SimVisionParameters visionParams(
-        true, true, cameraModelId,
-        cameraOrientationId, "FXY_CXY", "P_CB",
-        true, 0.02, 0.0, timeOffset,
-        readoutTime, false,
-        simul::LandmarkGridType::FourWalls, landmarkRadius);
+        true, true, cameraModelId, cameraOrientationId,
+        "RadialTangentialDistortion", "FXY_CXY", "P_CB", true, 0.02, 0.0,
+        timeOffset, readoutTime, false, simul::LandmarkGridType::FourWalls,
+        landmarkRadius);
     simul::SimEstimatorParameters estimatorParams(
         "MSCKF", algorithm, 1,
         cameraObservationModelId, landmarkModelId, useEpipolarConstraint);

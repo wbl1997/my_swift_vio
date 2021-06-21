@@ -73,7 +73,8 @@ void VioSimTestSystem::createSensorSystem(const TestSetting &testSetting) {
                                    testSetting.visionParams.extrinsicModelName,
                                    testSetting.visionParams.timeOffset,
                                    testSetting.visionParams.readoutTime);
-    csc.createNominalCameraSystem(&refCameraSystem_);
+    csc.createNominalCameraSystem(swift_vio::cameras::DistortionNameToTypeId(testSetting.visionParams.distortionType),
+                                  &refCameraSystem_);
   } else {
     std::string cameraImuYaml =
         testSetting.simDataDir + "/camchain_imucam.yaml";
@@ -209,8 +210,6 @@ void VioSimTestSystem::run(const simul::TestSetting &testSetting,
   std::ofstream metaStream;
   metaStream.open(metadataFile, std::ofstream::out);
 
-  bool verbose = false;
-
   createSensorSystem(testSetting);
 
   if (testSetting.simDataDir.empty()) {
@@ -245,7 +244,7 @@ void VioSimTestSystem::run(const simul::TestSetting &testSetting,
   saveCameraParameters(refCameraSystem_, cameraFile);
 
   for (int run = 0; run < testSetting.estimatorParams.numRuns; ++run) {
-    verbose = neesAccumulator.succeededRuns() == 0;
+//    bool verbose = neesAccumulator.succeededRuns() == 0;
     filterTimer.start();
 
     srand((unsigned int)time(0)); // comment out to make tests deterministic.

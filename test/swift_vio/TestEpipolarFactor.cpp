@@ -71,7 +71,9 @@ TEST(EpipolarFactor, Jacobians) {
 
   // reference camera system
   std::shared_ptr<okvis::cameras::NCameraSystem> cameraSystem0;
-  std::shared_ptr<okvis::cameras::CameraBase> cameraGeometry0 = csc.createNominalCameraSystem(&cameraSystem0);
+  std::shared_ptr<okvis::cameras::CameraBase> cameraGeometry0 =
+      csc.createNominalCameraSystem(
+          okvis::cameras::NCameraSystem::DistortionType::RadialTangential, &cameraSystem0);
 
   // create the camera visible landmarks, compute their observations in two
   // views

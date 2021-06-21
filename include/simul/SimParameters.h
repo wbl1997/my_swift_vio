@@ -87,6 +87,7 @@ struct SimVisionParameters {
 
   simul::SimCameraModelType cameraModelId;
   simul::CameraOrientation cameraOrientationId;
+  std::string distortionType;
   std::string projOptModelName;
   std::string extrinsicModelName;
 
@@ -104,43 +105,46 @@ struct SimVisionParameters {
                          // landmarks are distributed.
   bool useTrueLandmarkPosition;
 
-  SimVisionParameters(bool _addImageNoise = true, bool _useImageObservs = true,
-                      simul::SimCameraModelType _cameraModelId =
-                          simul::SimCameraModelType::EUROC,
-                      simul::CameraOrientation _cameraOrientationId =
-                          simul::CameraOrientation::Forward,
-                      std::string _projOptModelName="FIXED",
-                      std::string _extrinsicModelName="FIXED",
-                      bool _fixCameraInternalParams = true,
-                      double _sigma_abs_position = 2e-2, double _sigma_abs_orientation = 1e-2,
-                      double _timeOffset = 0.0, double _readoutTime = 0.0,
-                      bool _noisyInitialSensorParams = false,
-                      LandmarkGridType _gridType = LandmarkGridType::FourWalls,
-                      double _landmarkRadius = 5,
-                      bool _useTrueLandmarkPosition = false)
+  SimVisionParameters(
+      bool _addImageNoise = true, bool _useImageObservs = true,
+      simul::SimCameraModelType _cameraModelId =
+          simul::SimCameraModelType::EUROC,
+      simul::CameraOrientation _cameraOrientationId =
+          simul::CameraOrientation::Forward,
+      std::string _distortionType = "RadialTangentialDistortion",
+      std::string _projOptModelName = "FIXED",
+      std::string _extrinsicModelName = "FIXED",
+      bool _fixCameraInternalParams = true, double _sigma_abs_position = 2e-2,
+      double _sigma_abs_orientation = 1e-2, double _timeOffset = 0.0,
+      double _readoutTime = 0.0, bool _noisyInitialSensorParams = false,
+      LandmarkGridType _gridType = LandmarkGridType::FourWalls,
+      double _landmarkRadius = 5, bool _useTrueLandmarkPosition = false)
       : addImageNoise(_addImageNoise), useImageObservs(_useImageObservs),
         cameraModelId(_cameraModelId),
         cameraOrientationId(_cameraOrientationId),
-        projOptModelName(_projOptModelName), extrinsicModelName(_extrinsicModelName),
+        distortionType(_distortionType), projOptModelName(_projOptModelName),
+        extrinsicModelName(_extrinsicModelName),
         fixCameraInternalParams(_fixCameraInternalParams),
-        sigma_abs_position(_sigma_abs_position), sigma_abs_orientation(_sigma_abs_orientation),
-        timeOffset(_timeOffset), readoutTime(_readoutTime),
+        sigma_abs_position(_sigma_abs_position),
+        sigma_abs_orientation(_sigma_abs_orientation), timeOffset(_timeOffset),
+        readoutTime(_readoutTime),
         noisyInitialSensorParams(_noisyInitialSensorParams),
         gridType(_gridType), landmarkRadius(_landmarkRadius),
         useTrueLandmarkPosition(_useTrueLandmarkPosition) {}
 
   std::string toString() const {
     std::stringstream ss;
-    ss << "addImageNoise " << addImageNoise << " useImageObservs "
-       << useImageObservs << " camera geometry type "
-       << static_cast<int>(cameraModelId) << " camera orientation type "
-       << static_cast<int>(cameraOrientationId) << "\nprojOptModelName "
-       << projOptModelName << " extrinsicModelName " << extrinsicModelName
+    ss << "addImageNoise " << addImageNoise << ", useImageObservs "
+       << useImageObservs << ", camera geometry type "
+       << static_cast<int>(cameraModelId) << ", camera orientation type "
+       << static_cast<int>(cameraOrientationId) << "\ndistortion type "
+       << distortionType << ", projOptModelName " << projOptModelName
+       << ", extrinsicModelName " << extrinsicModelName
        << "\nfixCameraInternalParams " << fixCameraInternalParams
-       << " timeOffset " << timeOffset << " readoutTime " << readoutTime
-       << " noisyInitialSensorParams " << noisyInitialSensorParams
+       << ", timeOffset " << timeOffset << ", readoutTime " << readoutTime
+       << ", noisyInitialSensorParams " << noisyInitialSensorParams
        << "\nlandmark grid type " << static_cast<int>(gridType)
-       << " landmark radius " << landmarkRadius;
+       << ", landmark radius " << landmarkRadius;
     return ss.str();
   }
 };

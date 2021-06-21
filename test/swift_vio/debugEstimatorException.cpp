@@ -49,10 +49,12 @@ int main(int argc, char ** argv) {
       FLAGS_sim_imu_noise_factor, FLAGS_sim_imu_bias_noise_factor);
   simul::SimVisionParameters visionParams(
       true, true, simul::SimCameraModelType::EUROC,
-      simul::CameraOrientation::Forward, "FXY_CXY", "P_CB",
-      FLAGS_fixCameraInternalParams, 2e-2, 0.0, FLAGS_sim_camera_time_offset_sec,
-      FLAGS_sim_frame_readout_time_sec, FLAGS_noisyInitialSensorParams,
-      simul::LandmarkGridType::FourWalls, landmarkRadius);
+      simul::CameraOrientation::Forward,
+      "RadialTangentialDistortion", "FXY_CXY", "P_CB",
+      FLAGS_fixCameraInternalParams, 2e-2, 0.0,
+      FLAGS_sim_camera_time_offset_sec, FLAGS_sim_frame_readout_time_sec,
+      FLAGS_noisyInitialSensorParams, simul::LandmarkGridType::FourWalls,
+      landmarkRadius);
   simul::SimEstimatorParameters estimatorParams(
       "MSCKF", swift_vio::EstimatorAlgorithm::MSCKF, FLAGS_num_runs,
       cameraObservationModelId, landmarkModelId, false);

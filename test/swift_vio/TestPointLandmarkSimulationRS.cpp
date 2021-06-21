@@ -33,11 +33,15 @@ class PointLandmarkSimulationRSTest : public ::testing::Test {
       okvis::ExtrinsicsEstimationParameters extrinsicsEstimationParameters;
       extrinsicsEstimationParameters.sigma_distortion =
           std::vector<double>{0.05, 0.01, 0.001, 0.001, 0.0001};
-      csc.createNominalCameraSystem(&cameraSystem);
+      csc.createNominalCameraSystem(
+          okvis::cameras::NCameraSystem::DistortionType::RadialTangential,
+          &cameraSystem);
       cameraSystem = simul::createNoisyCameraSystem(
           cameraSystem, extrinsicsEstimationParameters, "P_CB");
     } else {
-      csc.createNominalCameraSystem(&cameraSystem);
+      csc.createNominalCameraSystem(
+          okvis::cameras::NCameraSystem::DistortionType::RadialTangential,
+          &cameraSystem);
     }
     cameraGeometry0 = cameraSystem->cameraGeometry(0);
 

@@ -56,6 +56,22 @@ std::shared_ptr<okvis::cameras::NCameraSystem> createNoisyCameraSystem(
 std::shared_ptr<okvis::cameras::NCameraSystem>
 loadCameraSystemYaml(const std::string &camImuChainYaml);
 
+struct CameraProjectionIntrinsics {
+  int imageWidth;
+  int imageHeight;
+  double focalLengthU;
+  double focalLengthV;
+  double imageCenterU;
+  double imageCenterV;
+
+  CameraProjectionIntrinsics() {}
+
+  CameraProjectionIntrinsics(int w, int h, double fx, double fy, double cx,
+                             double cy)
+      : imageWidth(w), imageHeight(h), focalLengthU(fx), focalLengthV(fy),
+        imageCenterU(cx), imageCenterV(cy) {}
+};
+
 class CameraSystemCreator {
  public:
   CameraSystemCreator(SimCameraModelType cameraModelId,
@@ -64,16 +80,28 @@ class CameraSystemCreator {
                       const std::string extrinsicRep, double td, double tr);
 
   std::shared_ptr<okvis::cameras::CameraBase> createNominalCameraSystem(
+      okvis::cameras::NCameraSystem::DistortionType distortionType,
       std::shared_ptr<okvis::cameras::NCameraSystem> *cameraSystem);
 
  private:
-  std::shared_ptr<okvis::cameras::CameraBase> createCameraGeometry(
-      SimCameraModelType cameraModelId);
+   std::shared_ptr<okvis::cameras::CameraBase> createCameraGeometry(
+       SimCameraModelType cameraModelId,
+       okvis::cameras::NCameraSystem::DistortionType distortionType);
 
-  static const okvis::cameras::NCameraSystem::DistortionType distortType_ =
-      okvis::cameras::NCameraSystem::DistortionType::RadialTangential;
-  static const std::string distortName_;
-  static const int camIdx_ = 0;
+   static const int camIdx_ = 0;
+
+   static const std::map<SimCameraModelType, CameraProjectionIntrinsics>
+       cameraModels_;
+
+   static std::map<SimCameraModelType, CameraProjectionIntrinsics>
+   initCameraModels() {
+     std::map<SimCameraModelType, CameraProjectionIntrinsics> models;
+     models[SimCameraModelType::VGA] =
+         CameraProjectionIntrinsics(640, 480, 350, 350, 322, 238);
+     models[SimCameraModelType::EUROC] =
+         CameraProjectionIntrinsics(752, 480, 350, 360, 378, 238);
+     return models;
+  }
 
   const SimCameraModelType cameraModelId_;
   const CameraOrientation cameraOrientationId_;
