@@ -90,7 +90,7 @@ StreamPublisher::~StreamPublisher() {
                            << FLAGS_datafile_separator << landmark[2]
                            << FLAGS_datafile_separator << landmark[3]
                            << FLAGS_datafile_separator
-                           << pointsMatched2_.at(l).quality << std::endl;
+                           << pointsMatched2_.at(l).quality << "\n";
       }
     }
     csvLandmarksFile_->close();
@@ -186,7 +186,7 @@ void Publisher::setNodeHandle(ros::NodeHandle& nh)
 bool StreamPublisher::writeCsvDescription(const std::string& headerLine) {
   if (!csvFile_) return false;
   if (!csvFile_->good()) return false;
-  *csvFile_ << headerLine << std::endl;
+  *csvFile_ << headerLine << "\n";
   return true;
 }
 
@@ -200,7 +200,7 @@ bool StreamPublisher::writeLandmarksCsvDescription() {
                      << FLAGS_datafile_separator << "l_z"
                      << FLAGS_datafile_separator << "l_w"
                      << FLAGS_datafile_separator << "quality"
-                     << FLAGS_datafile_separator << "distance" << std::endl;
+                     << FLAGS_datafile_separator << "distance" << "\n";
   return true;
 }
 
@@ -576,7 +576,7 @@ void Publisher::setPoints(const okvis::MapPointVector& pointsMatched,
     pointsTransferred_.back().g = 255 * intensity;
     pointsTransferred_.back().b = 255 * intensity;
 
-    //_omfile << point[0] << " " << point[1] << " " << point[2] << ";" <<std::endl;
+    //_omfile << point[0] << " " << point[1] << " " << point[2] << ";" << "\n";
 #else
     pointsTransferred_.points.push_back(geometry_msgs::Point());
     const Eigen::Vector4d point = pointsTransferred[i].pointHomog;
@@ -709,7 +709,7 @@ void StreamPublisher::csvSaveFullStateAsCallback(
                 << FLAGS_datafile_separator << speedAndBiases[5]
                 << FLAGS_datafile_separator << speedAndBiases[6]
                 << FLAGS_datafile_separator << speedAndBiases[7]
-                << FLAGS_datafile_separator << speedAndBiases[8] << std::endl;
+                << FLAGS_datafile_separator << speedAndBiases[8] << "\n";
     }
   }
 }
@@ -771,7 +771,7 @@ void StreamPublisher::csvSaveFullStateWithExtrinsicsAsCallback(
                   << FLAGS_datafile_separator << q_BCi.w();
       }
 
-      *csvFile_ << std::endl;
+      *csvFile_ << "\n";
     }
   }
 }
@@ -837,7 +837,7 @@ void StreamPublisher::csvSaveFullStateWithAllCalibrationAsCallback(
       for (int jack = 0; jack < stateStd.size(); ++jack)
         *csvFile_ << FLAGS_datafile_separator << stateStd[jack];
 
-      *csvFile_ << std::endl;
+      *csvFile_ << "\n";
     }
   }
 }
@@ -880,7 +880,7 @@ void StreamPublisher::csvSaveLandmarksAsCallback(
             << FLAGS_datafile_separator
             << actualLandmarks.at(l).quality
             // << FLAGS_datafile_separator << actualLandmarks.at(l).distance
-            << std::endl;
+            << "\n";
       }
     }
   }
