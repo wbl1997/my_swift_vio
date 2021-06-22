@@ -78,4 +78,4 @@ DEFINE_double(maxPositionRmse, 100, "If the final position RMSE is greater, then
 DEFINE_string(
     sim_distortion_type, "RadialTangentialDistortion",
     "Distortion type for the simulated camera model when external sim data are "
-    "not used. Candidate examples: RadialTangentialDistortion, EquidistantDistortion, FovDistortion");
+    "not used. Candidate examples: RadialTangentialDistortion, EquidistantDistortion, FovDistortion, EUCM");

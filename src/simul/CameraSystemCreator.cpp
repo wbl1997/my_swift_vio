@@ -1,6 +1,7 @@
 #include <simul/CameraSystemCreator.hpp>
 
 #include <okvis/cameras/EquidistantDistortion.hpp>
+#include <okvis/cameras/EUCM.hpp>
 #include <okvis/cameras/FovDistortion.hpp>
 #include <okvis/cameras/NoDistortion.hpp>
 #include <okvis/cameras/RadialTangentialDistortion8.hpp>
@@ -145,6 +146,20 @@ std::shared_ptr<okvis::cameras::NCameraSystem> createNoisyCameraSystem(
                             cameraNoiseParams.sigma_td),
             std::fabs(vio::gauss_rand(refCameraGeometry->readoutTime(),
                                       cameraNoiseParams.sigma_tr))));
+    break;
+  case okvis::cameras::NCameraSystem::EUCM:
+    cameraGeometry.reset(new okvis::cameras::EUCM(
+        refCameraGeometry->imageWidth(), refCameraGeometry->imageHeight(),
+        projDistortIntrinsics[0] + fcNoise[0],
+        projDistortIntrinsics[1] + fcNoise[1],
+        projDistortIntrinsics[2] + fcNoise[2],
+        projDistortIntrinsics[3] + fcNoise[3],
+        projDistortIntrinsics[4] + kpNoise[0],
+        projDistortIntrinsics[5] + kpNoise[1],
+        vio::gauss_rand(refCameraGeometry->imageDelay(),
+                        cameraNoiseParams.sigma_td),
+        std::fabs(vio::gauss_rand(refCameraGeometry->readoutTime(),
+                                  cameraNoiseParams.sigma_tr))));
     break;
   case okvis::cameras::NCameraSystem::RadialTangential:
   default:
@@ -342,6 +357,24 @@ loadCameraSystemYaml(const std::string &camImuChainYaml) {
       LOG(INFO) << "FOV pinhole camera " << camIdx << " with Omega "
                 << distortionCoeffs[0] << " with T_SC=\n"
                 << s.str();
+    } else if (strcmp(distortionType.c_str(), "EUCM") == 0 || strcmp(distortionType.c_str(), "eucm") == 0) {
+      std::shared_ptr<okvis::cameras::CameraBase> camPtr(
+          new okvis::cameras::EUCM(
+              imageDimension[0], imageDimension[1], projectionIntrinsics[0],
+              projectionIntrinsics[1], projectionIntrinsics[2],
+              projectionIntrinsics[3],
+              distortionCoeffs[0], distortionCoeffs[1],
+              imageDelaySecs, readoutTimeSecs
+              /*, id ?*/));
+      cameraSystem->addCamera(T_SC_ptr, camPtr,
+                              okvis::cameras::NCameraSystem::EUCM,
+                              projectionOptMode, extrinsicOptMode
+                              /*, computeOverlaps ?*/);
+      std::stringstream s;
+      s << T_SC.T();
+      LOG(INFO) << "Extended unified camera " << camIdx << " with alpah "
+                << distortionCoeffs[0] << " beta " << distortionCoeffs[1]
+                << " with T_SC=\n" << s.str();
     } else {
       LOG(ERROR) << "unrecognized distortion type " << distortionType;
     }
@@ -435,6 +468,17 @@ CameraSystemCreator::createCameraGeometry(
             cameraModels_.at(cameraModelId).imageCenterU,
             cameraModels_.at(cameraModelId).imageCenterV,
             okvis::cameras::FovDistortion(0.0), timeOffset_, readoutTime_));
+    break;
+  }
+  case okvis::cameras::NCameraSystem::EUCM: {
+    cameraGeometry.reset(
+        new okvis::cameras::EUCM(cameraModels_.at(cameraModelId).imageWidth,
+                                 cameraModels_.at(cameraModelId).imageHeight,
+                                 cameraModels_.at(cameraModelId).focalLengthU,
+                                 cameraModels_.at(cameraModelId).focalLengthV,
+                                 cameraModels_.at(cameraModelId).imageCenterU,
+                                 cameraModels_.at(cameraModelId).imageCenterV,
+                                 0.6, 1.0, timeOffset_, readoutTime_));
     break;
   }
   default:

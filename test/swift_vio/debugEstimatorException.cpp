@@ -5,12 +5,13 @@
 #include "../customized_terminate.hpp"
 
 namespace {
-void checkMSE(const Eigen::VectorXd &mse, const Eigen::VectorXd &desiredStdevs,
-              const std::vector<std::string> &dimensionLabels) {
+void checkMSE(const Eigen::VectorXd &/*mse*/, const Eigen::VectorXd &/*desiredStdevs*/,
+              const std::vector<std::string> &/*dimensionLabels*/) {
 }
 
-void checkNEES(const Eigen::Vector3d &nees) {
+void checkNEES(const Eigen::Vector3d &/*nees*/) {
 }
+
 // invoke set_terminate as part of global constant initialization
 static const bool SET_TERMINATE = std::set_terminate(customized_terminate);
 
@@ -46,17 +47,17 @@ int main(int argc, char ** argv) {
       FLAGS_noisyInitialSensorParams, FLAGS_fixImuIntrinsicParams,
       5e-3, 2e-2, 5e-3, 1e-3, 5e-3, FLAGS_sim_sigma_g_c, FLAGS_sim_sigma_gw_c,
       FLAGS_sim_sigma_a_c, FLAGS_sim_sigma_aw_c,
-      FLAGS_sim_imu_noise_factor, FLAGS_sim_imu_bias_noise_factor);
+      FLAGS_sim_imu_noise_factor, FLAGS_sim_imu_bias_noise_factor, "BG_BA_TG_TS_TA");
   simul::SimVisionParameters visionParams(
       true, true, simul::SimCameraModelType::EUROC,
       simul::CameraOrientation::Forward,
-      "RadialTangentialDistortion", "FXY_CXY", "P_CB",
+      FLAGS_sim_distortion_type, "FXY_CXY", "P_CB",
       FLAGS_fixCameraInternalParams, 2e-2, 0.0,
       FLAGS_sim_camera_time_offset_sec, FLAGS_sim_frame_readout_time_sec,
       FLAGS_noisyInitialSensorParams, simul::LandmarkGridType::FourWalls,
       landmarkRadius);
   simul::SimEstimatorParameters estimatorParams(
-      "MSCKF", swift_vio::EstimatorAlgorithm::MSCKF, FLAGS_num_runs,
+      "HybridFilter", swift_vio::EstimatorAlgorithm::HybridFilter, FLAGS_num_runs,
       cameraObservationModelId, landmarkModelId, false);
   swift_vio::BackendParams backendParams;
   simul::TestSetting testSetting(imuParams, visionParams,

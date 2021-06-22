@@ -14,7 +14,9 @@
 #include <okvis/IdProvider.hpp>
 
 // cameras and distortions
+#include <okvis/CameraModelSwitch.hpp>
 #include <okvis/cameras/EquidistantDistortion.hpp>
+#include <okvis/cameras/EUCM.hpp>
 #include <okvis/cameras/PinholeCamera.hpp>
 #include <okvis/cameras/FovDistortion.hpp>
 #include <okvis/cameras/RadialTangentialDistortion.hpp>
@@ -61,35 +63,15 @@ int SimulationFrontend::dataAssociationAndInitialization(
       }
       matchToFrame(rit->keypointIndices_, keypointIndices, rit->nframe_->id(),
                    nframes->id(), &landmarkKeyframeMatches);
-      switch (distortionType) {
-      case okvis::cameras::NCameraSystem::RadialTangential: {
-        trackedFeatures += addMatchToEstimator<okvis::cameras::PinholeCamera<
-            okvis::cameras::RadialTangentialDistortion>>(
-            estimator, rit->nframe_, nframes, landmarkKeyframeMatches);
-        break;
-      }
-      case okvis::cameras::NCameraSystem::Equidistant: {
-        trackedFeatures += addMatchToEstimator<okvis::cameras::PinholeCamera<
-            okvis::cameras::EquidistantDistortion>>(
-            estimator, rit->nframe_, nframes, landmarkKeyframeMatches);
-        break;
-      }
-      case okvis::cameras::NCameraSystem::RadialTangential8: {
-        trackedFeatures += addMatchToEstimator<okvis::cameras::PinholeCamera<
-            okvis::cameras::RadialTangentialDistortion8>>(
-            estimator, rit->nframe_, nframes, landmarkKeyframeMatches);
-        break;
-      }
-      case okvis::cameras::NCameraSystem::FOV: {
-        trackedFeatures += addMatchToEstimator<
-            okvis::cameras::PinholeCamera<okvis::cameras::FovDistortion>>(
-            estimator, rit->nframe_, nframes, landmarkKeyframeMatches);
-        break;
-      }
-      default:
-        OKVIS_THROW(Exception, "Unsupported distortion type.")
-        break;
-      }
+
+#define DISTORTION_MODEL_CASE(camera_geometry_t)                               \
+  trackedFeatures += addMatchToEstimator<camera_geometry_t>(                   \
+      estimator, rit->nframe_, nframes, landmarkKeyframeMatches);
+
+      switch (distortionType) { DISTORTION_MODEL_NO_NODISTORTION_SWITCH_CASES }
+
+#undef DISTORTION_MODEL_CASE
+
       ++numKeyframes;
 
       if (numKeyframes >= options_.maxMatchKeyframes_) {
@@ -107,35 +89,14 @@ int SimulationFrontend::dataAssociationAndInitialization(
       matchToFrame(lastNFrame->keypointIndices_, keypointIndices,
                    lastNFrame->nframe_->id(), nframes->id(),
                    &landmarkFrameMatches);
-      switch (distortionType) {
-      case okvis::cameras::NCameraSystem::RadialTangential: {
-        trackedFeatures += addMatchToEstimator<okvis::cameras::PinholeCamera<
-            okvis::cameras::RadialTangentialDistortion>>(
-            estimator, lastNFrame->nframe_, nframes, landmarkFrameMatches);
-        break;
-      }
-      case okvis::cameras::NCameraSystem::Equidistant: {
-        trackedFeatures += addMatchToEstimator<okvis::cameras::PinholeCamera<
-            okvis::cameras::EquidistantDistortion>>(
-            estimator, lastNFrame->nframe_, nframes, landmarkFrameMatches);
-        break;
-      }
-      case okvis::cameras::NCameraSystem::RadialTangential8: {
-        trackedFeatures += addMatchToEstimator<okvis::cameras::PinholeCamera<
-            okvis::cameras::RadialTangentialDistortion8>>(
-            estimator, lastNFrame->nframe_, nframes, landmarkFrameMatches);
-        break;
-      }
-      case okvis::cameras::NCameraSystem::FOV: {
-        trackedFeatures += addMatchToEstimator<
-            okvis::cameras::PinholeCamera<okvis::cameras::FovDistortion>>(
-            estimator, lastNFrame->nframe_, nframes, landmarkFrameMatches);
-        break;
-      }
-      default:
-        OKVIS_THROW(Exception, "Unsupported distortion type.")
-        break;
-      }
+
+#define DISTORTION_MODEL_CASE(camera_geometry_t)                               \
+  trackedFeatures += addMatchToEstimator<camera_geometry_t>(                   \
+      estimator, lastNFrame->nframe_, nframes, landmarkFrameMatches);
+
+      switch (distortionType) { DISTORTION_MODEL_NO_NODISTORTION_SWITCH_CASES }
+
+#undef DISTORTION_MODEL_CASE
     }
     if (trackedFeatures <= requiredMatches) {
       LOG(WARNING) << "Tracking landmarks failure. Number of 3d2d-matches: "
