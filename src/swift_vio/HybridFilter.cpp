@@ -3101,6 +3101,11 @@ swift_vio::TriangulationStatus HybridFilter::triangulateAMapPoint(
 
   if (orderedCulledFrameIds) {
     swift_vio::eraseBadObservations(badObservationIdentifiers, orderedCulledFrameIds);
+    if (orderedCulledFrameIds->size() < minCulledFrames_) {
+      triangulateTimer.stop();
+      status.lackObservations = true;
+      return status;
+    }
     swift_vio::decideAnchors(frameIds, *orderedCulledFrameIds, pointLandmark.modelId(),
                          &anchorIds);
   } else {
