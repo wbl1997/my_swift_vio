@@ -49,7 +49,7 @@ int main(int argc, char ** argv) {
       FLAGS_sim_sigma_a_c, FLAGS_sim_sigma_aw_c,
       FLAGS_sim_imu_noise_factor, FLAGS_sim_imu_bias_noise_factor, "BG_BA_TG_TS_TA");
   simul::SimVisionParameters visionParams(
-      true, true, simul::SimCameraModelType::EUROC,
+      true, true, simul::SimCameraModelType::TUMVI512,
       simul::CameraOrientation::Forward,
       FLAGS_sim_distortion_type, "FXY_CXY", "P_CB",
       FLAGS_fixCameraInternalParams, 2e-2, 0.0,

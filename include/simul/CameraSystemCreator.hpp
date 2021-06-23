@@ -24,7 +24,8 @@ enum class CameraOrientation {
 
 enum class SimCameraModelType {
   EUROC = 0,
-  VGA,
+  EUROC88,
+  TUMVI512,
 };
 
 /**
@@ -96,19 +97,21 @@ class CameraSystemCreator {
    static std::map<SimCameraModelType, CameraProjectionIntrinsics>
    initCameraModels() {
      std::map<SimCameraModelType, CameraProjectionIntrinsics> models;
-     models[SimCameraModelType::VGA] =
-         CameraProjectionIntrinsics(640, 480, 350, 350, 322, 238);
+     models[SimCameraModelType::TUMVI512] =
+         CameraProjectionIntrinsics(512, 512, 190, 190, 256, 256); // diagonal FOV 125 deg.
+     models[SimCameraModelType::EUROC88] =
+         CameraProjectionIntrinsics(752, 480, 460, 460, 376, 240); // diagonal FOV 88 deg.
      models[SimCameraModelType::EUROC] =
-         CameraProjectionIntrinsics(752, 480, 350, 360, 378, 238);
+         CameraProjectionIntrinsics(752, 480, 350, 350, 376, 240); // diagonal FOV 103 deg.
      return models;
-  }
+   }
 
-  const SimCameraModelType cameraModelId_;
-  const CameraOrientation cameraOrientationId_;
-  const std::string projIntrinsicRep_;
-  const std::string extrinsicRep_;
-  const double timeOffset_;
-  const double readoutTime_;
+   const SimCameraModelType cameraModelId_;
+   const CameraOrientation cameraOrientationId_;
+   const std::string projIntrinsicRep_;
+   const std::string extrinsicRep_;
+   const double timeOffset_;
+   const double readoutTime_;
 };
 } // namespace simul
 
