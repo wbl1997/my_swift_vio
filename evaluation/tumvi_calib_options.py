@@ -39,7 +39,7 @@ SWF_TUMVI_MONO_IMU_PARAMETERS = {
 }
 
 
-def tumvi_calibrated_test_options():
+def tumvi_calibrated_swiftvio_options():
     """
     Compare okvis and KSWF on TUM VI calibrated 512 dataset
     Self-calibration should be disabled by default according to the passed configuration file.
@@ -71,7 +71,8 @@ def tumvi_calibrated_test_options():
     return algo_option_templates, config_name_to_diffs
 
 
-def tumvi_raw_test_options():
+
+def tumvi_raw_swiftvio_options():
     """
     Compare okvis and KSWF on TUM VI raw 512 dataset
     Full self-calibration should be enabled by default according to the passed configuration file.
@@ -174,5 +175,117 @@ def tumvi_raw_test_options():
             "sigma_TAElement": 0.0,
             "model_type": "BG_BA",
         },
+    }
+    return algo_option_templates, config_name_to_diffs
+
+
+def tumvi_calibrated_vinsmono_options():
+    algo_option_templates = {
+        'VINS': {"algo_code": "VINSMono",
+                 "acc_n": 0.04,
+                 "gyr_n": 0.004,
+                 "acc_w": 0.0004,
+                 "gyr_w": 2.0e-5,
+                 "loop_closure": 0,
+                 "output_path": "",
+                 "estimate_extrinsic": 0,
+                 "estimate_td": 0},
+    }
+
+    config_name_to_diffs = {
+        ('VINS', 'VINS'): {},
+    }
+    return algo_option_templates, config_name_to_diffs
+
+
+def tumvi_raw_vinsmono_options():
+    algo_option_templates = {
+        'VINS': {"algo_code": "VINSMono",
+                 "acc_n": 0.04,
+                 "gyr_n": 0.004,
+                 "acc_w": 0.0004,
+                 "gyr_w": 2.0e-5,
+                 "loop_closure": 0,
+                 "output_path": "",
+                 "estimate_extrinsic": 1,
+                 "estimate_td": 1},
+    }
+
+    config_name_to_diffs = {
+        ('VINS', 'VINS'): {},
+        ('VINS_1_2', 'VINS'): {
+            "acc_n": 0.04,
+            "gyr_n": 0.004,
+            "acc_w": 0.0004 * 2,
+            "gyr_w": 2.0e-5 * 2,
+        },
+        ('VINS_2_1', 'VINS'): {
+            "acc_n": 0.04 * 2,
+            "gyr_n": 0.004 * 2,
+            "acc_w": 0.0004,
+            "gyr_w": 2.0e-5,
+        },
+        ('VINS_2_2', 'VINS'): {
+            "acc_n": 0.04 * 2,
+            "gyr_n": 0.004 * 2,
+            "acc_w": 0.0004 * 2,
+            "gyr_w": 2.0e-5 * 2,
+        },
+        ('VINS_5_2', 'VINS'): {
+            "acc_n": 0.04 * 5,
+            "gyr_n": 0.004 * 5,
+            "acc_w": 0.0004 * 2,
+            "gyr_w": 2.0e-5 * 2,
+        },
+        ('VINS_5_5', 'VINS'): {
+            "acc_n": 0.04 * 5,
+            "gyr_n": 0.004 * 5,
+            "acc_w": 0.0004 * 5,
+            "gyr_w": 2.0e-5 * 5,
+        },
+        ('VINS_2_5', 'VINS'): {
+            "acc_n": 0.04 * 2,
+            "gyr_n": 0.004 * 2,
+            "acc_w": 0.0004 * 5,
+            "gyr_w": 2.0e-5 * 5,
+        },
+    }
+    return algo_option_templates, config_name_to_diffs
+
+
+def tumvi_calibrated_openvins_options():
+    algo_option_templates = {
+        'VINS': {"algo_code": "VINSMono",
+                 "acc_n": 0.04,
+                 "gyr_n": 0.004,
+                 "acc_w": 0.0004,
+                 "gyr_w": 2.0e-5,
+                 "loop_closure": 0,
+                 "output_path": "",
+                 "estimate_extrinsic": 0,
+                 "estimate_td": 0},
+    }
+
+    config_name_to_diffs = {
+        ('VINS', 'VINS'): {},
+    }
+    return algo_option_templates, config_name_to_diffs
+
+
+def tumvi_raw_openvins_options():
+    algo_option_templates = {
+        'VINS': {"algo_code": "VINSMono",
+                 "acc_n": 0.04,
+                 "gyr_n": 0.004,
+                 "acc_w": 0.0004,
+                 "gyr_w": 2.0e-5,
+                 "loop_closure": 0,
+                 "output_path": "",
+                 "estimate_extrinsic": 0,
+                 "estimate_td": 0},
+    }
+
+    config_name_to_diffs = {
+        ('VINS', 'VINS'): {},
     }
     return algo_option_templates, config_name_to_diffs

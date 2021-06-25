@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 
-def tumrs_calibrated_test_options():
+def tumrs_calibrated_swiftvio_options():
     """
     Compare okvis and KSWF on TUM RS calibrated 640 dataset.
     Self-calibration should be disabled by default according to the passed configuration yaml.
@@ -32,7 +32,7 @@ def tumrs_calibrated_test_options():
     return algo_option_templates, config_name_to_diffs
 
 
-def tumrs_raw_test_options():
+def tumrs_raw_swiftvio_options():
     """
     Compare okvis and KSWF on TUM RS raw 640 dataset
     Full self-calibration should be enabled by default according to the passed configuration yaml.

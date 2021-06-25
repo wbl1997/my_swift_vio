@@ -46,8 +46,6 @@ class RunOneVioMethod(object):
         self.gt_list = gt_list
         self.output_dir_list = vio_output_dir_list
         self.algo_dir = os.path.dirname(vio_output_dir_list[0].rstrip('/'))
-        self.custom_vio_config_list = []
-        self.custom_lcd_config_list = []
         self.eval_cfg_template = os.path.join(
             os.path.dirname(os.path.abspath(__file__)), "config/eval_cfg.yaml")
         self.extra_lib_path = extra_library_path
@@ -58,40 +56,27 @@ class RunOneVioMethod(object):
     def get_async_launch_file(self):
         return os.path.join(self.catkin_ws, "src/swift_vio/launch/swift_vio_node_rosbag.launch")
 
-    def create_vio_config_yaml(self, dataset_code):
+    def create_vio_config_yaml(self, dataset_code, bag_fullname, output_dir_mission):
         """for each data mission, create a vio config yaml"""
-        vio_yaml_list = []
-        for bag_index, bag_fullname in enumerate(self.bag_list):
-            output_dir_mission = self.output_dir_list[bag_index]
-            vio_yaml_mission = os.path.join(output_dir_mission, os.path.basename(self.vio_config_template))
+        vio_yaml_mission = os.path.join(output_dir_mission, os.path.basename(self.vio_config_template))
+        config_composer = VioConfigComposer.VioConfigComposer(
+            self.vio_config_template, bag_fullname, vio_yaml_mission)
+        # apply sensor calibration parameters
+        config_composer.create_config_for_mission(self.algo_code_flags["algo_code"], dataset_code)
+        # apply algorithm parameters
+        AlgoConfig.apply_config_to_yaml(self.algo_code_flags, vio_yaml_mission, output_dir_mission)
+        return vio_yaml_mission
 
-            config_composer = VioConfigComposer.VioConfigComposer(
-                self.vio_config_template, bag_fullname, vio_yaml_mission)
-
-            # apply sensor calibration parameters
-            config_composer.create_config_for_mission(self.algo_code_flags["algo_code"], dataset_code)
-
-            # apply algorithm parameters
-            AlgoConfig.apply_config_to_yaml(self.algo_code_flags, vio_yaml_mission, output_dir_mission)
-
-            vio_yaml_list.append(vio_yaml_mission)
-        self.custom_vio_config_list = vio_yaml_list
-
-    def create_lcd_config_yaml(self):
+    def create_lcd_config_yaml(self, output_dir_mission):
         """for each data mission, create a lcd config yaml"""
-        lcd_yaml_list = []
         if self.lcd_config_template:
-            for bag_index, bag_fullname in enumerate(self.bag_list):
-                output_dir_mission = self.output_dir_list[bag_index]
-                lcd_yaml_mission = os.path.join(output_dir_mission, os.path.basename(self.lcd_config_template))
-                shutil.copy2(self.lcd_config_template, lcd_yaml_mission)
-                AlgoConfig.apply_config_to_lcd_yaml(
-                    self.algo_code_flags, lcd_yaml_mission, output_dir_mission)
-                lcd_yaml_list.append(lcd_yaml_mission)
+            lcd_yaml_mission = os.path.join(output_dir_mission, os.path.basename(self.lcd_config_template))
+            shutil.copy2(self.lcd_config_template, lcd_yaml_mission)
+            AlgoConfig.apply_config_to_lcd_yaml(
+                self.algo_code_flags, lcd_yaml_mission, output_dir_mission)
+            return lcd_yaml_mission
         else:
-            for _ in self.bag_list:
-                lcd_yaml_list.append(None)
-        self.custom_lcd_config_list = lcd_yaml_list
+            return None
 
     def create_sync_command(self, custom_vio_config, custom_lcd_config,
                             vio_trial_output_dir, bag_fullname, dataset_code):
@@ -138,7 +123,15 @@ class RunOneVioMethod(object):
                      "output_dir:={} {} bag_file:={} start_into_bag:=3 play_rate:=1.0".format(
             launch_file, custom_vio_config, custom_lcd_config, vio_trial_output_dir,
             arg_topics, bag_fullname)
-        return src_cmd + export_lib_cmd + launch_cmd
+        cmd = src_cmd + export_lib_cmd + launch_cmd
+
+        # We put all commands in a bash script because source
+        # command is unavailable when running in python subprocess.
+        src_wrap = os.path.join(vio_trial_output_dir, "source_wrap.sh")
+        with open(src_wrap, 'w') as stream:
+            stream.write('#!/bin/bash\n')
+            stream.write('{}\n'.format(cmd))
+        return "chmod +x {wrap};{wrap}".format(wrap=src_wrap)
 
     def timeout(self, bag_fullname):
         bag_duration = rosbag_utility_functions.get_rosbag_duration(bag_fullname)
@@ -146,30 +139,30 @@ class RunOneVioMethod(object):
         time_out = max(60 * 5, time_out)
         return time_out
 
-    def create_vio_command(self, algo_name, dataset_code, bag_fullname, custom_vio_config, custom_lcd_config, output_dir_trial):
-        if algo_name == "VINSMono":
+    def create_vio_command(self, algo_name, dataset_code, bag_fullname,
+                           custom_vio_config, custom_lcd_config, output_dir_trial):
+        if self.algo_code_flags["algo_code"] == "VINSMono":
             setup_bash_file = os.path.join(self.catkin_ws, "devel/setup.bash")
             src_cmd = "cd {}\nsource {}\n".format(self.catkin_ws, setup_bash_file)
             exe_cmd = "roslaunch vins_estimator tum.launch config_path:={} output_dir:={} " \
                       "bag_file:={} bag_start:=0 bag_duration:=10000 " \
-                      "rviz_file:={}/src/VINS-Mono/config/vins_rviz_config.rviz".format(custom_vio_config, output_dir_trial, bag_fullname, self.catkin_ws)
+                      "rviz_file:={}/src/VINS-Mono/config/vins_rviz_config.rviz".format(
+                          custom_vio_config, output_dir_trial, bag_fullname, self.catkin_ws)
             cmd = src_cmd + exe_cmd
 
-        elif 'async' in algo_name:
-            cmd = self.create_async_command(custom_vio_config, custom_lcd_config,
-                                            output_dir_trial, bag_fullname, dataset_code)
             # We put all commands in a bash script because source
             # command is unavailable when running in python subprocess.
             src_wrap = os.path.join(output_dir_trial, "source_wrap.sh")
             with open(src_wrap, 'w') as stream:
                 stream.write('#!/bin/bash\n')
                 stream.write('{}\n'.format(cmd))
-            cmd = "chmod +x {wrap};{wrap}".format(wrap=src_wrap)
+            return "chmod +x {wrap};{wrap}".format(wrap=src_wrap)
+        elif 'async' in algo_name:
+            return self.create_async_command(custom_vio_config, custom_lcd_config,
+                                             output_dir_trial, bag_fullname, dataset_code)
         else:
-            cmd = self.create_sync_command(custom_vio_config, custom_lcd_config,
-                                           output_dir_trial, bag_fullname, dataset_code)
-
-        return cmd
+            return self.create_sync_command(custom_vio_config, custom_lcd_config,
+                                            output_dir_trial, bag_fullname, dataset_code)
 
     def run_vio_command(self, cmd, bag_fullname, log_vio, out_stream, err_stream):
         user_msg = 'Running vio method with cmd\n{}\n'.format(cmd)
@@ -182,12 +175,12 @@ class RunOneVioMethod(object):
             rc, msg = utility_functions.subprocess_cmd(cmd, None, None, time_out)
         return rc, msg
 
-    def create_convert_command(self, output_dir_mission, output_dir_trial, index_str, pose_conversion_script=None):
-        if pose_conversion_script:
+    def create_convert_command(self, output_dir_mission, output_dir_trial, index_str, pose_conversion_script):
+        if self.algo_code_flags["algo_code"] == "VINSMono":
             vio_estimate_csv = os.path.join(output_dir_trial, 'vins_result_no_loop.csv')
             converted_vio_file = os.path.join(
                 output_dir_mission, "stamped_traj_estimate{}.txt".format(index_str))
-            cmd = "cp {} {}".format(vio_estimate_csv, converted_vio_file)
+            cmd = "{} {} {}".format(pose_conversion_script, vio_estimate_csv, converted_vio_file)
         else:
             vio_estimate_csv = os.path.join(output_dir_trial, 'swift_vio.csv')
             converted_vio_file = os.path.join(
@@ -210,9 +203,6 @@ class RunOneVioMethod(object):
         run a method
         :return:
         '''
-        self.create_vio_config_yaml(dataset_code)
-        self.create_lcd_config_yaml()
-
         # if algo_name has async, then the async script will start roscore, and no need to start it here.
         mock = 'async' in algo_name or (not AlgoConfig.doWePublishViaRos(self.algo_code_flags))
         roscore_manager = RoscoreManager.RosCoreManager(mock)
@@ -227,8 +217,9 @@ class RunOneVioMethod(object):
             shutil.copy2(self.eval_cfg_template, eval_config_file)
             rpg_eval_tool_wrap.change_eval_cfg(eval_config_file, gt_align_type, -1)
 
-            custom_vio_config = self.custom_vio_config_list[bag_index]
-            custom_lcd_config = self.custom_lcd_config_list[bag_index]
+            custom_vio_config = self.create_vio_config_yaml(dataset_code, bag_fullname, output_dir_mission)
+            custom_lcd_config = self.create_lcd_config_yaml(output_dir_mission)
+
             for trial_index in range(self.num_trials):
                 if self.num_trials == 1:
                     index_str = ''
@@ -252,7 +243,8 @@ class RunOneVioMethod(object):
                     warnings.warn(textwrap.fill(err_msg, 120))
                     return_code = rc
 
-                cmd = self.create_convert_command(output_dir_mission, output_dir_trial, index_str, pose_conversion_script)
+                cmd = self.create_convert_command(output_dir_mission, output_dir_trial,
+                                                  index_str, pose_conversion_script)
 
                 self.run_convert_command(cmd, out_stream, err_stream)
 

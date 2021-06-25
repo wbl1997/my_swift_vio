@@ -1,5 +1,5 @@
 
-def sample_eval_options():
+def sample_swiftvio_options():
     # python3.7 will remember insertion order of items, see
     # https://stackoverflow.com/questions/39980323/are-dictionaries-ordered-in-python-3-6
     algo_option_templates = {

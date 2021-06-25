@@ -257,7 +257,9 @@ def parse_args():
                                                   '../../vio_common/python/convert_pose_format.py')
     parser.add_argument(
         '--pose_conversion_script',
-        help="Script to convert vio output csv to TUM RGBD format",
+        help="Script to convert vio output csv to TUM RGBD format.\n"
+             "For SwiftVio, use convert_pose_format.py. "
+             "For VINS Mono, use csv_to_txt.py.",
         default=pose_conversion_script_default)
 
     catkin_ws_default = os.path.join(os.path.dirname(os.path.abspath(__file__)),

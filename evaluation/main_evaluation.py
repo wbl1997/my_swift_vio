@@ -70,17 +70,27 @@ if __name__ == '__main__':
     bag_list, gt_list = find_all_bags_with_gt(args.data_dir, args.dataset_code)
 
     if args.test_case == "tumrs_calibrated":
-        algo_option_templates, config_name_to_diffs = tumrs_calib_options.tumrs_calibrated_test_options()
+        algo_option_templates, config_name_to_diffs = tumrs_calib_options.tumrs_calibrated_swiftvio_options()
     elif args.test_case == "tumrs_raw":
-        algo_option_templates, config_name_to_diffs = tumrs_calib_options.tumrs_raw_test_options()
+        algo_option_templates, config_name_to_diffs = tumrs_calib_options.tumrs_raw_swiftvio_options()
     elif args.test_case == "tumvi_calibrated":
-        algo_option_templates, config_name_to_diffs = tumvi_calib_options.tumvi_calibrated_test_options()
+        algo_option_templates, config_name_to_diffs = tumvi_calib_options.tumvi_calibrated_swiftvio_options()
+    elif args.test_case == "tumvi_calibrated_vinsmono":
+        algo_option_templates, config_name_to_diffs = tumvi_calib_options.tumvi_calibrated_vinsmono_options()
+    elif args.test_case == "tumvi_calibrated_openvins":
+        algo_option_templates, config_name_to_diffs = tumvi_calib_options.tumvi_calibrated_openvins_options()
     elif args.test_case == "tumvi_raw":
-        algo_option_templates, config_name_to_diffs = tumvi_calib_options.tumvi_raw_test_options()
+        algo_option_templates, config_name_to_diffs = tumvi_calib_options.tumvi_raw_swiftvio_options()
+    elif args.text_case == "tumvi_raw_vinsmono":
+        algo_option_templates, config_name_to_diffs = tumvi_calib_options.tumvi_raw_vinsmono_options()
+    elif args.text_case == "tumvi_raw_openvins":
+        algo_option_templates, config_name_to_diffs = tumvi_calib_options.tumvi_raw_openvins_options()
     elif args.test_case == "euroc_stasis":
-        algo_option_templates, config_name_to_diffs = euroc_stasis_options.euroc_stasis_test_options()
+        algo_option_templates, config_name_to_diffs = euroc_stasis_options.euroc_stasis_swiftvio_options()
+    elif args.test_case == "euroc_stasis_openvins":
+        algo_option_templates, config_name_to_diffs = euroc_stasis_options.euroc_stasis_openvins_options()
     else:
-        algo_option_templates, config_name_to_diffs = sample_eval_options.sample_eval_options()
+        algo_option_templates, config_name_to_diffs = sample_eval_options.sample_swiftvio_options()
 
     algoname_to_options = dict()
     for new_old_code, diffs in config_name_to_diffs.items():
@@ -136,7 +146,7 @@ if __name__ == '__main__':
 
         # also evaluate PGO results for every VIO method.
         for method_name, options in minibatch.items():
-            if options["loop_closure_method"] == 0:
+            if "loop_closure_method" not in options or options["loop_closure_method"] == 0:
                 continue
             method_results_dir = os.path.join(minibatch_output_dir, method_name + "_pgo")
             method_eval_output_dir = os.path.join(minibatch_output_dir, method_name + "_pgo_eval")

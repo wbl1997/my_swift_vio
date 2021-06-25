@@ -156,6 +156,7 @@ def apply_config_to_vinsmono_yaml(config_dict, vio_yaml, debug_output_dir):
 
 
 def doWePublishViaRos(config_dict):
-    return "--publish_via_ros" in config_dict["extra_gflags"] or \
-           "--publish_via_ros=true" in config_dict["extra_gflags"] or \
-           "--publish_via_ros=1" in config_dict["extra_gflags"]
+    return "extra_gflags" in config_dict and \
+           ("--publish_via_ros" in config_dict["extra_gflags"] or \
+            "--publish_via_ros=true" in config_dict["extra_gflags"] or \
+            "--publish_via_ros=1" in config_dict["extra_gflags"])
