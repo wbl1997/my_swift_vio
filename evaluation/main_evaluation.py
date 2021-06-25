@@ -81,9 +81,9 @@ if __name__ == '__main__':
         algo_option_templates, config_name_to_diffs = tumvi_calib_options.tumvi_calibrated_openvins_options()
     elif args.test_case == "tumvi_raw":
         algo_option_templates, config_name_to_diffs = tumvi_calib_options.tumvi_raw_swiftvio_options()
-    elif args.text_case == "tumvi_raw_vinsmono":
+    elif args.test_case == "tumvi_raw_vinsmono":
         algo_option_templates, config_name_to_diffs = tumvi_calib_options.tumvi_raw_vinsmono_options()
-    elif args.text_case == "tumvi_raw_openvins":
+    elif args.test_case == "tumvi_raw_openvins":
         algo_option_templates, config_name_to_diffs = tumvi_calib_options.tumvi_raw_openvins_options()
     elif args.test_case == "euroc_stasis":
         algo_option_templates, config_name_to_diffs = euroc_stasis_options.euroc_stasis_swiftvio_options()

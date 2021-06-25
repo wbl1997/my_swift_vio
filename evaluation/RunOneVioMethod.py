@@ -15,6 +15,20 @@ import VioConfigComposer
 import RoscoreManager
 
 
+def timeout(bag_fullname):
+    bag_duration = rosbag_utility_functions.get_rosbag_duration(bag_fullname)
+    time_out = bag_duration * 4
+    time_out = max(60 * 5, time_out)
+    return time_out
+
+
+def append_ros_arg_if_exist(config_dict, parameter):
+    if parameter in config_dict:
+        return " {}:={}".format(parameter, config_dict[parameter])
+    else:
+        return ""
+
+
 class RunOneVioMethod(object):
     """Run one vio method on a number of data missions"""
     def __init__(self, catkin_ws, vio_config_template,
@@ -27,7 +41,7 @@ class RunOneVioMethod(object):
         :param catkin_ws: workspace containing executables
         :param vio_config_template: the template config yaml for running this algorithm.
             New config yaml will be created for each data mission considering the
-            sensor calibration parameters.
+            sensor calibration parameters. It can be an empty string if not needed.
         :param algo_code_flags: {algo_code, algo_cmd_flags, numkeyframes, numImuFrames, }
         :param num_trials:
         :param bag_list:
@@ -58,6 +72,8 @@ class RunOneVioMethod(object):
 
     def create_vio_config_yaml(self, dataset_code, bag_fullname, output_dir_mission):
         """for each data mission, create a vio config yaml"""
+        if not self.vio_config_template:
+            return ""
         vio_yaml_mission = os.path.join(output_dir_mission, os.path.basename(self.vio_config_template))
         config_composer = VioConfigComposer.VioConfigComposer(
             self.vio_config_template, bag_fullname, vio_yaml_mission)
@@ -133,23 +149,46 @@ class RunOneVioMethod(object):
             stream.write('{}\n'.format(cmd))
         return "chmod +x {wrap};{wrap}".format(wrap=src_wrap)
 
-    def timeout(self, bag_fullname):
-        bag_duration = rosbag_utility_functions.get_rosbag_duration(bag_fullname)
-        time_out = bag_duration * 4
-        time_out = max(60 * 5, time_out)
-        return time_out
-
     def create_vio_command(self, algo_name, dataset_code, bag_fullname,
                            custom_vio_config, custom_lcd_config, output_dir_trial):
         if self.algo_code_flags["algo_code"] == "VINSMono":
             setup_bash_file = os.path.join(self.catkin_ws, "devel/setup.bash")
             src_cmd = "cd {}\nsource {}\n".format(self.catkin_ws, setup_bash_file)
-            exe_cmd = "roslaunch vins_estimator tum.launch config_path:={} output_dir:={} " \
+            exe_cmd = "roslaunch vins_estimator {} config_path:={} output_dir:={} " \
                       "bag_file:={} bag_start:=0 bag_duration:=10000 " \
                       "rviz_file:={}/src/VINS-Mono/config/vins_rviz_config.rviz".format(
-                          custom_vio_config, output_dir_trial, bag_fullname, self.catkin_ws)
+                          self.algo_code_flags["launch_file"], custom_vio_config,
+                          output_dir_trial, bag_fullname, self.catkin_ws)
             cmd = src_cmd + exe_cmd
 
+            # We put all commands in a bash script because source
+            # command is unavailable when running in python subprocess.
+            src_wrap = os.path.join(output_dir_trial, "source_wrap.sh")
+            with open(src_wrap, 'w') as stream:
+                stream.write('#!/bin/bash\n')
+                stream.write('{}\n'.format(cmd))
+            return "chmod +x {wrap};{wrap}".format(wrap=src_wrap)
+        elif self.algo_code_flags["algo_code"] == "OpenVINS":
+            setup_bash_file = os.path.join(self.catkin_ws, "devel/setup.bash")
+            src_cmd = "cd {}\nsource {}\n".format(self.catkin_ws, setup_bash_file)
+            if "bag_start" in self.algo_code_flags:
+                bag_start = self.algo_code_flags["bag_start"]
+            else:
+                bag_start = dataset_parameters.decide_bag_start(self.algo_code_flags["algo_code"], bag_fullname)
+            init_imu_thresh = dataset_parameters.decide_initial_imu_threshold(
+                self.algo_code_flags["algo_code"], bag_fullname)
+            result_file = os.path.join(output_dir_trial, 'stamped_traj_estimate.txt')
+            exe_cmd = "roslaunch ov_msckf {} max_cameras:={} use_stereo:={} bag:={} " \
+                      "bag_start:={} init_imu_thresh:={} dosave:=true path_est:={}".format(
+                          self.algo_code_flags["launch_file"], self.algo_code_flags["max_cameras"],
+                          self.algo_code_flags["use_stereo"], bag_fullname,
+                          bag_start, init_imu_thresh, result_file)
+            exe_cmd += append_ros_arg_if_exist(self.algo_code_flags, "gyroscope_noise_density")
+            exe_cmd += append_ros_arg_if_exist(self.algo_code_flags, "gyroscope_random_walk")
+            exe_cmd += append_ros_arg_if_exist(self.algo_code_flags, "accelerometer_noise_density")
+            exe_cmd += append_ros_arg_if_exist(self.algo_code_flags, "accelerometer_random_walk")
+
+            cmd = src_cmd + exe_cmd
             # We put all commands in a bash script because source
             # command is unavailable when running in python subprocess.
             src_wrap = os.path.join(output_dir_trial, "source_wrap.sh")
@@ -164,11 +203,12 @@ class RunOneVioMethod(object):
             return self.create_sync_command(custom_vio_config, custom_lcd_config,
                                             output_dir_trial, bag_fullname, dataset_code)
 
-    def run_vio_command(self, cmd, bag_fullname, log_vio, out_stream, err_stream):
+    @staticmethod
+    def run_vio_command(cmd, bag_fullname, log_vio, out_stream, err_stream):
         user_msg = 'Running vio method with cmd\n{}\n'.format(cmd)
         print(textwrap.fill(user_msg, 120))
         out_stream.write(user_msg)
-        time_out = self.timeout(bag_fullname)
+        time_out = timeout(bag_fullname)
         if log_vio:
             rc, msg = utility_functions.subprocess_cmd(cmd, out_stream, err_stream, time_out)
         else:
@@ -180,7 +220,14 @@ class RunOneVioMethod(object):
             vio_estimate_csv = os.path.join(output_dir_trial, 'vins_result_no_loop.csv')
             converted_vio_file = os.path.join(
                 output_dir_mission, "stamped_traj_estimate{}.txt".format(index_str))
-            cmd = "{} {} {}".format(pose_conversion_script, vio_estimate_csv, converted_vio_file)
+            cmd = "chmod +x {};python3 {} {} {}".format(pose_conversion_script, pose_conversion_script,
+                                                        vio_estimate_csv, converted_vio_file)
+        elif self.algo_code_flags["algo_code"] == "OpenVINS":
+            result_file = os.path.join(output_dir_trial, 'stamped_traj_estimate.txt')
+            converted_vio_file = os.path.join(
+                output_dir_mission, "stamped_traj_estimate{}.txt".format(index_str))
+            cmd = "chmod +x {};python3 {} {} {}".format(pose_conversion_script, pose_conversion_script,
+                                                        result_file, converted_vio_file)
         else:
             vio_estimate_csv = os.path.join(output_dir_trial, 'swift_vio.csv')
             converted_vio_file = os.path.join(
@@ -189,7 +236,8 @@ class RunOneVioMethod(object):
                 format(pose_conversion_script, vio_estimate_csv, converted_vio_file)
         return cmd
 
-    def run_convert_command(self, cmd, out_stream, err_stream):
+    @staticmethod
+    def run_convert_command(cmd, out_stream, err_stream):
         user_msg = 'Converting pose file with cmd\n{}\n'.format(cmd)
         print(textwrap.fill(user_msg, 120))
         out_stream.write(user_msg)
@@ -236,7 +284,7 @@ class RunOneVioMethod(object):
                 cmd = self.create_vio_command(algo_name, dataset_code, bag_fullname,
                                               custom_vio_config, custom_lcd_config, output_dir_trial)
 
-                rc, msg = self.run_vio_command(cmd, bag_fullname, log_vio, out_stream, err_stream)
+                rc, msg = RunOneVioMethod.run_vio_command(cmd, bag_fullname, log_vio, out_stream, err_stream)
                 if rc != 0:
                     err_msg = "Return error code {} and msg {} in running vio method with cmd:\n{}". \
                         format(rc, msg, cmd)
@@ -246,7 +294,7 @@ class RunOneVioMethod(object):
                 cmd = self.create_convert_command(output_dir_mission, output_dir_trial,
                                                   index_str, pose_conversion_script)
 
-                self.run_convert_command(cmd, out_stream, err_stream)
+                RunOneVioMethod.run_convert_command(cmd, out_stream, err_stream)
 
         roscore_manager.stop_roscore()
         return return_code

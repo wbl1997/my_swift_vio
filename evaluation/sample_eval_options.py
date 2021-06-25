@@ -1,4 +1,5 @@
 
+# algo_code options: OKVIS, HybridFilter, MSCKF, OpenVINS, VINSMono
 def sample_swiftvio_options():
     # python3.7 will remember insertion order of items, see
     # https://stackoverflow.com/questions/39980323/are-dictionaries-ordered-in-python-3-6

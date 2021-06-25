@@ -195,7 +195,7 @@ import os
 import sys
 
 def check_common_args(args):
-    assert os.path.isfile(args.vio_config_yaml)
+    assert len(args.vio_config_yaml) == 0 or os.path.isfile(args.vio_config_yaml)
     assert os.path.exists(args.data_dir), "Data_dir does not exist!"
     assert os.path.exists(args.rpg_eval_tool_dir), \
         'rpg_trajectory_evaluation does not exist'
@@ -208,9 +208,6 @@ def parse_args():
     parser = argparse.ArgumentParser(
         description='''Evaluate algorithms inside swift_vio project on EUROC 
         and UZH-FPV missions with ground truth.''')
-    parser.add_argument('vio_config_yaml', type=str,
-                        help="path to vio template config yaml. Its content "
-                             "will NOT be modified in running the program.")
     parser.add_argument('data_dir', type=str, help=(
         "rosbag folder,\n"
         "The EUROC, UZH-FPV, TUM-VI, and ADVIO dataset should a layout structure "
@@ -228,7 +225,9 @@ def parse_args():
                              "tumrs_raw (TUM RS raw dataset 640), "
                              "euroc_stasis (EuRoC MH 5 sessions), "
                              "others")
-
+    parser.add_argument('--vio_config_yaml', type=str, default="",
+                        help="path to vio template config yaml. Its content "
+                             "will NOT be modified in running the program.")
     default_path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                                 '../../rpg_trajectory_evaluation/results')
     parser.add_argument(

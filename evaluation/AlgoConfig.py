@@ -13,21 +13,6 @@ def create_algo_config(val_list):
     return d
 
 
-def default_algo_config():
-    d = {"algo_code": "HybridFilter",
-         "extra_gflags": "",
-         "numKeyframes": 5,
-         "numImuFrames": 5,
-         "monocular_input": 0,
-         "landmarkModelId": 1,
-         "extrinsic_opt_mode_main_camera" : "p_CB",
-         "extrinsic_opt_mode_other_camera": "p_C0C_q_C0C",
-         "sigma_absolute_translation": "0.0",
-         "sigma_absolute_orientation": "0.0",
-         }
-    return d
-
-
 def sed_line_with_parameter(config_dict, param_name, padding, config_yaml):
     """
 
@@ -45,7 +30,7 @@ def sed_line_with_parameter(config_dict, param_name, padding, config_yaml):
         return ""
 
 
-def apply_config_to_yaml(config_dict, vio_yaml, debug_output_dir):
+def apply_config_to_swiftvio_yaml(config_dict, vio_yaml, debug_output_dir):
     algo_code = config_dict["algo_code"]
     sed_cmd = r'sed -i "/algorithm/c\    algorithm: {}" {};'. \
         format(algo_code, vio_yaml)
@@ -121,20 +106,6 @@ def apply_config_to_yaml(config_dict, vio_yaml, debug_output_dir):
     err_stream.close()
 
 
-def apply_config_to_lcd_yaml(config_dict, lcd_yaml, debug_output_dir):
-    sed_cmd = ""
-    if "loop_closure_method" in config_dict.keys():
-        sed_algo = r'sed -i "/loop_closure_method/c\loop_closure_method: {}" {};'. \
-            format(config_dict["loop_closure_method"], lcd_yaml)
-        sed_cmd = sed_algo
-
-    out_stream = open(os.path.join(debug_output_dir, "sed_out.log"), 'w')
-    err_stream = open(os.path.join(debug_output_dir, "sed_err.log"), 'w')
-    utility_functions.subprocess_cmd(sed_cmd, out_stream, err_stream)
-    out_stream.close()
-    err_stream.close()
-
-
 def apply_config_to_vinsmono_yaml(config_dict, vio_yaml, debug_output_dir):
     padding = ''
     sed_cmd = ""
@@ -147,6 +118,27 @@ def apply_config_to_vinsmono_yaml(config_dict, vio_yaml, debug_output_dir):
     sed_cmd += sed_line_with_parameter(config_dict, "vins_output_dir", padding, vio_yaml)
     sed_cmd += sed_line_with_parameter(config_dict, "estimate_extrinsic", padding, vio_yaml)
     sed_cmd += sed_line_with_parameter(config_dict, "estimate_td", padding, vio_yaml)
+
+    out_stream = open(os.path.join(debug_output_dir, "sed_out.log"), 'w')
+    err_stream = open(os.path.join(debug_output_dir, "sed_err.log"), 'w')
+    utility_functions.subprocess_cmd(sed_cmd, out_stream, err_stream)
+    out_stream.close()
+    err_stream.close()
+
+
+def apply_config_to_yaml(config_dict, vio_yaml, debug_output_dir):
+    if config_dict["algo_code"] == "VINSMono":
+        return apply_config_to_vinsmono_yaml(config_dict, vio_yaml, debug_output_dir)
+    elif config_dict["algo_code"] in ["HybridFilter", "MSCKF", "OKVIS"]:
+        return apply_config_to_swiftvio_yaml(config_dict, vio_yaml, debug_output_dir)
+
+
+def apply_config_to_lcd_yaml(config_dict, lcd_yaml, debug_output_dir):
+    sed_cmd = ""
+    if "loop_closure_method" in config_dict.keys():
+        sed_algo = r'sed -i "/loop_closure_method/c\loop_closure_method: {}" {};'. \
+            format(config_dict["loop_closure_method"], lcd_yaml)
+        sed_cmd = sed_algo
 
     out_stream = open(os.path.join(debug_output_dir, "sed_out.log"), 'w')
     err_stream = open(os.path.join(debug_output_dir, "sed_err.log"), 'w')

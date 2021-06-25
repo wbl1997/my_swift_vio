@@ -1,4 +1,6 @@
 
+# the keys are dataset_codes.
+import os
 
 ROS_TOPICS = {"euroc": ["/cam0/image_raw", "/cam1/image_raw", "/imu0"],
               "tum_vi": ["/cam0/image_raw", "/cam1/image_raw", "/imu0"],
@@ -100,9 +102,85 @@ BAGNAME_DATANAME_LABEL = {
     'advio-23': ('advio23', 'ad23')
 }
 
-def calibration_format(dataset_type):
-    if dataset_type == "uzh_fpv":
+def calibration_format(dataset_code):
+    if dataset_code == "uzh_fpv":
         calib_format = "kalibr"
     else:
-        calib_format = dataset_type
+        calib_format = dataset_code
     return calib_format
+
+# The init IMU threshold for room session are copied from OpenVINS commit
+# c6f7e947e82485873495123a1841bd57f8041a33. For the sessions, the thresholds are
+# tuned with openvins v2.0 commit 930fb925f80f7bbfad517cccedc7315af1379235
+OPENVINS_INIT_IMU_THRESH = {
+    "dataset-room1_512_16": "0.60",
+    "dataset-room2_512_16": "0.60",
+    "dataset-room3_512_16": "0.60",
+    "dataset-room4_512_16": "0.60",
+    "dataset-room5_512_16": "0.60",
+    "dataset-room6_512_16": "0.45",
+    "dataset-corridor1_512_16": "0.70",
+    "dataset-corridor2_512_16": "0.50",
+    "dataset-corridor3_512_16": "0.70",
+    "dataset-corridor4_512_16": "1.00",
+    "dataset-corridor5_512_16": "0.70",
+    "dataset-magistrale1_512_16": "0.50",
+    "dataset-magistrale2_512_16": "0.70",
+    "dataset-magistrale3_512_16": "0.70",
+    "dataset-magistrale4_512_16": "0.50",
+    "dataset-magistrale5_512_16": "1.00",
+    "dataset-magistrale6_512_16": "0.70",
+    "dataset-slides1_512_16": "0.50",
+    "dataset-slides2_512_16": "0.50",
+    "dataset-slides3_512_16": "0.70",
+    "dataset-outdoors1_512_16": "0.50",
+    "dataset-outdoors2_512_16": "0.70",
+    "dataset-outdoors3_512_16": "0.75",
+    "dataset-outdoors4_512_16": "0.70",
+    "dataset-outdoors5_512_16": "0.75",
+    "dataset-outdoors6_512_16": "0.75",
+    "dataset-outdoors7_512_16": "0.75",
+    "dataset-outdoors8_512_16": "0.50",
+    'MH_01_easy': "1.5",
+    'MH_02_easy': "1.5",
+    'MH_03_medium': "1.5",
+    'MH_04_difficult': "1.5",
+    'MH_05_difficult': "1.5",
+    'V1_01_easy': "1.5",
+    'V1_02_medium': "1.5",
+    'V1_03_difficult': "1.5",
+    'V2_01_easy': "1.5",
+    'V2_02_medium': "1.5",
+    'V2_03_difficult': "1.5",
+}
+
+# Copied from openvins commit c6f7e947e82485873495123a1841bd57f8041a33
+OPENVINS_BAG_START = {
+    'MH_01_easy': "40",
+    'MH_02_easy': "35",
+    'MH_03_medium': "10",
+    'MH_04_difficult': "17",
+    'MH_05_difficult': "18",
+}
+
+
+def decide_bag_start(algo_code, bag_fullname):
+    if algo_code == "OpenVINS":
+        bagname = os.path.basename(os.path.splitext(bag_fullname)[0])
+        if bagname in OPENVINS_BAG_START.keys():
+            return OPENVINS_BAG_START[bagname]
+        else:
+            return 0
+    else:
+        return 0
+
+
+def decide_initial_imu_threshold(algo_code, bag_fullname):
+    if algo_code == "OpenVINS":
+        bagname = os.path.basename(os.path.splitext(bag_fullname)[0])
+        if bagname in OPENVINS_INIT_IMU_THRESH.keys():
+            return OPENVINS_INIT_IMU_THRESH[bagname]
+        else:
+            return 1.5
+    else:
+        raise ValueError("Algorithms other than OpenVINS do not need init_imu_thresh!")

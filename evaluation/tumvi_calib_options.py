@@ -188,6 +188,7 @@ def tumvi_calibrated_vinsmono_options():
                  "gyr_w": 2.0e-5,
                  "loop_closure": 0,
                  "output_path": "",
+                 "launch_file": "tum.launch",
                  "estimate_extrinsic": 0,
                  "estimate_td": 0},
     }
@@ -207,6 +208,7 @@ def tumvi_raw_vinsmono_options():
                  "gyr_w": 2.0e-5,
                  "loop_closure": 0,
                  "output_path": "",
+                 "launch_file": "tum.launch",
                  "estimate_extrinsic": 1,
                  "estimate_td": 1},
     }
@@ -255,37 +257,47 @@ def tumvi_raw_vinsmono_options():
 
 def tumvi_calibrated_openvins_options():
     algo_option_templates = {
-        'VINS': {"algo_code": "VINSMono",
-                 "acc_n": 0.04,
-                 "gyr_n": 0.004,
-                 "acc_w": 0.0004,
-                 "gyr_w": 2.0e-5,
-                 "loop_closure": 0,
-                 "output_path": "",
-                 "estimate_extrinsic": 0,
-                 "estimate_td": 0},
+        'OpenVINS': {"algo_code": "OpenVINS",
+                     "launch_file": "pgeneva_serial_eth.launch",
+                     "gyroscope_noise_density": "0.00016",
+                     "gyroscope_random_walk": "0.000022",
+                     "accelerometer_noise_density": "0.0028",
+                     "accelerometer_random_walk": "0.00086"
+                     },
     }
 
     config_name_to_diffs = {
-        ('VINS', 'VINS'): {},
+        ('OpenVINS-Mono', 'OpenVINS'): {
+            "max_cameras": 1,
+            "use_stereo": 'false'
+        },
+        ('OpenVINS-Stereo', 'OpenVINS'): {
+            "max_cameras": 2,
+            "use_stereo": 'true'
+        },
     }
     return algo_option_templates, config_name_to_diffs
 
 
 def tumvi_raw_openvins_options():
     algo_option_templates = {
-        'VINS': {"algo_code": "VINSMono",
-                 "acc_n": 0.04,
-                 "gyr_n": 0.004,
-                 "acc_w": 0.0004,
-                 "gyr_w": 2.0e-5,
-                 "loop_closure": 0,
-                 "output_path": "",
-                 "estimate_extrinsic": 0,
-                 "estimate_td": 0},
+        'OpenVINS': {"algo_code": "OpenVINS",
+                     "launch_file": "pgeneva_serial_tum.launch",
+                     "gyroscope_noise_density": "0.00016",
+                     "gyroscope_random_walk": "0.000022",
+                     "accelerometer_noise_density": "0.0028",
+                     "accelerometer_random_walk": "0.00086"
+                     },
     }
 
     config_name_to_diffs = {
-        ('VINS', 'VINS'): {},
+        ('OpenVINS-Mono', 'OpenVINS'): {
+            "max_cameras": 1,
+            "use_stereo": 'false'
+        },
+        ('OpenVINS-Stereo', 'OpenVINS'): {
+            "max_cameras": 2,
+            "use_stereo": 'true'
+        },
     }
     return algo_option_templates, config_name_to_diffs
