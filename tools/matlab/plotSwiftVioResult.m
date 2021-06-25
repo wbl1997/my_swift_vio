@@ -180,9 +180,14 @@ end
 export_fig(outputfig);
 
 if options.v_std(1) > size(data, 2)
-    return;
-end
+figure;
+plot(data(:,1), data(:, options.v(1)), '-r');
+hold on;
+plot(data(:,1), data(:, options.v(2)), '-g');
+plot(data(:,1), data(:, options.v(3)), '-b');
+ylabel('v_{GB}[m/s]');
 
+else
 figure;
 drawMeanAndStdBound(data, options.v, options.v_std);
 if(~isempty(gt))
@@ -198,6 +203,7 @@ if exist(outputfig, 'file')==2
     delete(outputfig);
 end
 export_fig(outputfig);
+end
 
 plotImuBiases(data, options, outputPath);
 
@@ -225,6 +231,22 @@ averageSwiftVioVariableEstimates(original_data, options, ...
 end
 
 function plotImuBiases(data, options, outputPath)
+if options.b_g_std(end) > size(data, 2)
+figure;
+plot(data(:,1), data(:, options.b_g(1)) * 180 / pi, '-r');
+hold on;
+plot(data(:,1), data(:, options.b_g(2)) * 180 / pi, '-g');
+plot(data(:,1), data(:, options.b_g(3)) * 180 / pi, '-b');
+ylabel('b_g [deg/s]');
+
+figure;
+plot(data(:,1), data(:, options.b_a(1)), '-r');
+hold on;
+plot(data(:,1), data(:, options.b_a(2)), '-g');
+plot(data(:,1), data(:, options.b_a(3)), '-b');
+ylabel('b_a[m/s^2]');
+
+else
 figure;
 drawMeanAndStdBound(data, options.b_g, options.b_g_std, 180/pi);
 ylabel(['b_g[' char(176) '/s]']);
@@ -242,6 +264,7 @@ if exist(outputfig, 'file')==2
     delete(outputfig);
 end
 export_fig(outputfig);
+end
 end
 
 function plotCameraIntrinsics(data, options, outputPath)

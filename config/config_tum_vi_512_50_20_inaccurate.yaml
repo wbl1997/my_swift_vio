@@ -43,7 +43,7 @@ camera_params:
     timestamp_tolerance: 0.005 # [s] stereo frame out-of-sync tolerance
     sigma_focal_length: 5.0
     sigma_principal_point: 5.0
-    sigma_distortion: [0.05, 0.01, 0.01, 0.01, 0.0]
+    sigma_distortion: [0.02, 0.02, 0.0, 0.0, 0.0]
     sigma_td: 0.1
     sigma_tr: 0.05
 
@@ -100,7 +100,7 @@ point_landmark:
     minTrackLengthForSlam: 7
     maxHibernationFrames: 3
     maxInStateLandmarks: 50
-    maxMarginalizedLandmarks: 50
+    maxMarginalizedLandmarks: 80
 
 pose_graph:
     maxOdometryConstraintForAKeyframe: 2
