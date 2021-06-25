@@ -135,7 +135,27 @@ def apply_config_to_lcd_yaml(config_dict, lcd_yaml, debug_output_dir):
     err_stream.close()
 
 
+def apply_config_to_vinsmono_yaml(config_dict, vio_yaml, debug_output_dir):
+    padding = ''
+    sed_cmd = ""
+    sed_cmd += sed_line_with_parameter(config_dict, "acc_n", padding, vio_yaml)
+    sed_cmd += sed_line_with_parameter(config_dict, "gyr_n", padding, vio_yaml)
+    sed_cmd += sed_line_with_parameter(config_dict, "acc_w", padding, vio_yaml)
+    sed_cmd += sed_line_with_parameter(config_dict, "gyr_w", padding, vio_yaml)
+    sed_cmd += sed_line_with_parameter(config_dict, "loop_closure", padding, vio_yaml)
+
+    sed_cmd += sed_line_with_parameter(config_dict, "vins_output_dir", padding, vio_yaml)
+    sed_cmd += sed_line_with_parameter(config_dict, "estimate_extrinsic", padding, vio_yaml)
+    sed_cmd += sed_line_with_parameter(config_dict, "estimate_td", padding, vio_yaml)
+
+    out_stream = open(os.path.join(debug_output_dir, "sed_out.log"), 'w')
+    err_stream = open(os.path.join(debug_output_dir, "sed_err.log"), 'w')
+    utility_functions.subprocess_cmd(sed_cmd, out_stream, err_stream)
+    out_stream.close()
+    err_stream.close()
+
+
 def doWePublishViaRos(config_dict):
-    return "--publish_via_ros" not in config_dict["extra_gflags"] or \
+    return "--publish_via_ros" in config_dict["extra_gflags"] or \
            "--publish_via_ros=true" in config_dict["extra_gflags"] or \
            "--publish_via_ros=1" in config_dict["extra_gflags"]

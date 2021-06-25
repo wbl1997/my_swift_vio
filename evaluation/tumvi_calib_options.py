@@ -50,8 +50,7 @@ def tumvi_calibrated_test_options():
                  "displayImages": "false",
                  "monocular_input": 0,
                  "numImuFrames": 5,
-                 "loop_closure_method": 0,
-                 'use_nominal_calib_value': False},
+                 "loop_closure_method": 0},
     }
 
     config_name_to_diffs = {
@@ -85,8 +84,7 @@ def tumvi_raw_test_options():
                  "numImuFrames": 5,
                  "extrinsic_opt_mode_main_camera": "p_CB",
                  "extrinsic_opt_mode_other_camera": "p_BC_q_BC",
-                 "loop_closure_method": 0,
-                 'use_nominal_calib_value': False},
+                 "loop_closure_method": 0},
     }
 
     config_name_to_diffs = {

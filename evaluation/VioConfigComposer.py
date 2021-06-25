@@ -46,11 +46,11 @@ class VioConfigComposer(object):
                 break
         return imu_calib_file, camera_calib_files
 
-    def create_config_for_mission(self, algo_code, dataset_code, use_nominal_value, monocular):
+    def create_config_for_mission(self, algo_code, dataset_code):
         imu_calib_file, camera_calib_files = self.get_calib_files()
         calib_format = dataset_parameters.calibration_format(dataset_code)
 
         dataset_vio_config.create_config_yaml(
             self.vio_config_template, calib_format,
             self.vio_yaml_mission, camera_calib_files,
-            imu_calib_file, algo_code, self.bag_fullname, use_nominal_value, monocular)
+            imu_calib_file, algo_code, self.bag_fullname)

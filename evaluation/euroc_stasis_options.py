@@ -28,8 +28,7 @@ def euroc_stasis_test_options():
                  "sigma_a_c": 8.0e-3 * 4,
                  "sigma_gw_c": 4.0e-6 * 4,
                  "sigma_aw_c": 4.0e-5 * 4,
-                 "loop_closure_method": 0,
-                 'use_nominal_calib_value': False},
+                 "loop_closure_method": 0},
     }
 
     config_name_to_diffs = {

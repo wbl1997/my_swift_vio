@@ -13,27 +13,6 @@ from ruamel.yaml import YAML
 
 import numpy as np
 
-# The suitable IMU parameters for stereo OKVIS, monocular MSCKF, and stereo MSCKF.
-# We did not tune for these methods with a grid search.
-# https://github.com/ethz-asl/okvis/blob/master/config/config_fpga_p2_euroc.yaml
-OKVIS_EUROC_IMU_PARAMETERS = {"sigma_g_c": 12.0e-4,
-                              "sigma_a_c": 8.0e-3,
-                              "sigma_gw_c": 4.0e-6,
-                              "sigma_aw_c": 4.0e-5}
-
-# The best IMU parameters for monocular OKVIS on EUROC are found by a search.
-#       &      Translation (\%) &  Rotation (deg/meter)
-# OKVIS_1_1 &     135.089 &  0.138
-# OKVIS_2_2 &     33.327 &  0.175
-# OKVIS_2_4 &     6.651 &  0.054
-# OKVIS_4_4 &     0.656 &  0.024
-OKVIS_MONO_EUROC_IMU_PARAMETERS = {
-    "sigma_g_c": 12.0e-4 * 4,
-    "sigma_a_c": 8.0e-3 * 4,
-    "sigma_gw_c": 4.0e-6 * 4,
-    "sigma_aw_c": 4.0e-5 * 4,
-}
-
 TUMVI_PARAMETERS = {
     "cameras": [
         {"T_SC": [-0.99953071, 0.00744168, -0.02971511, 0.04536566,
@@ -177,10 +156,6 @@ ADVIO_CAMERA_INTRINSIC_PARAMETERS = {
     range(20, 24): [1081.1, 1082.1, 359.59, 640.79, 0.0556, -0.0454, 0.0009, -0.0018],
 }
 
-ADVIO_NOMINAL_CAMERA_INTRINSIC_PARAMETERS = {
-    range(1, 24): [1080.0, 1080.0, 360.0, 640.0, 0.0, 0.0, 0.0, 0.0],
-}
-
 ADVIO_PARAMETERS = {
     "cameras":
         {"T_CpS": [0.9999763379093255, -0.004079205042965442, -0.005539287650170447, -0.008977668364731128,
@@ -215,41 +190,7 @@ ADVIO_PARAMETERS = {
         'publishLandmarks': "false", }
 }
 
-ADVIO_NOMINAL_PARAMETERS = {
-    "cameras":
-        {"T_CpS": [1.0, 0.0, 0.0, 0.0,
-                   0.0, -1.0, 0.0, 0.0,
-                   0.0, 0.0, -1.0, 0.0,
-                  0.0, 0.0, 0.0, 1.0],
-         "image_dimension": [720, 1280],
-         "distortion_coefficients": [],
-         "distortion_type": "radial-tangential",
-         "focal_length": [],
-         "principal_point": [],
-         "projection_opt_mode": "FX_CXY",
-         "extrinsic_opt_mode": "P_CB",
-         "image_delay": 0.0,
-         "image_readout_time": 0.015},
-    "imu_params": {
-        "imu_rate": 100,
-        'g_max': 7.8,
-        'sigma_g_c': 2.4e-3,
-        'sigma_a_c': 4.8e-2,  # 4.8e-3 is the value provided by advio.
-        'sigma_gw_c': 5.1e-5,
-        'sigma_aw_c': 2.1e-4,
-        'g': 9.819,  # at Helsinki according to https://units.fandom.com/wiki/Gravity_of_Earth
-        'sigma_TGElement': 5e-3,
-        'sigma_TSElement': 1e-3,
-        'sigma_TAElement': 5e-3, },
-    'ceres_options': {
-        'timeLimit': 1,
-    },
-    "displayImages": "false",
-    "publishing_options": {
-        'publishLandmarks': "false", }
-}
-
-def advio_transform_C_Cp_and_halve(use_nominal_value):
+def advio_transform_C_Cp_and_halve():
     """
     The given advio params are in Cp frame, this function applies
      T_CCp = [R_CCp, 0; 0, 1] on relevant quantities, and halve the camera size.
@@ -257,12 +198,8 @@ def advio_transform_C_Cp_and_halve(use_nominal_value):
     :return:
     """
     coeff = 0.5
-    if use_nominal_value:
-        swapped_intrinsics = copy.deepcopy(ADVIO_NOMINAL_CAMERA_INTRINSIC_PARAMETERS)
-        swapped_parameters = copy.deepcopy(ADVIO_NOMINAL_PARAMETERS)
-    else:
-        swapped_intrinsics = copy.deepcopy(ADVIO_CAMERA_INTRINSIC_PARAMETERS)
-        swapped_parameters = copy.deepcopy(ADVIO_PARAMETERS)
+    swapped_intrinsics = copy.deepcopy(ADVIO_CAMERA_INTRINSIC_PARAMETERS)
+    swapped_parameters = copy.deepcopy(ADVIO_PARAMETERS)
 
     for key in swapped_intrinsics.keys():
         oldvalue = swapped_intrinsics[key]
@@ -320,14 +257,6 @@ def parse_args():
                              "Only needed for advio to extract sequence number.",
                         default="",
                         required=False)
-
-    parser.add_argument("--use_nominal_value",
-                        help='Use nominal values to fill the config yaml?',
-                        action='store_true')
-
-    parser.add_argument("--monocular_input",
-                        help='Use monocular input?',
-                        action='store_true')
 
     args = parser.parse_args()
     return args
@@ -387,8 +316,7 @@ def printCameraBlock(camConfig):
 def create_config_yaml(config_template, calib_format,
                        output_config, camera_config_yamls=None,
                        imu_config_yaml="",
-                       algo_code="", bagname="", use_nominal_value=False,
-                       monocular_input=False):
+                       algo_code="", bagname=""):
     """
     create configuration yaml to swift_vio for a dataset.
     :param config_template:
@@ -468,16 +396,9 @@ def create_config_yaml(config_template, calib_format,
             imu_data = yaml.load(imu_config)
         template_data['imu_params']['T_BS'] = imu_data['T_BS']['data']
         template_data['imu_params']['imu_rate'] = int(imu_data['rate_hz'])
-        if monocular_input and algo_code == "OKVIS":
-            for key in OKVIS_MONO_EUROC_IMU_PARAMETERS.keys():
-                template_data["imu_params"][key] = OKVIS_MONO_EUROC_IMU_PARAMETERS[key]
-        else:
-            for key in OKVIS_EUROC_IMU_PARAMETERS.keys():
-                template_data["imu_params"][key] = OKVIS_EUROC_IMU_PARAMETERS[key]
-    elif calib_format == "tum_vi":
-        pass
+
     elif calib_format == 'advio':
-        swapped_parameters, swapped_intrinsics = advio_transform_C_Cp_and_halve(use_nominal_value)
+        swapped_parameters, swapped_intrinsics = advio_transform_C_Cp_and_halve()
         cameraid = 0
         template_data['cameras'][cameraid]['T_SC'] = \
             swapped_parameters["cameras"]['T_SC']
@@ -523,6 +444,8 @@ def create_config_yaml(config_template, calib_format,
     elif calib_format == "homebrew":
         pass
     elif calib_format == 'tum_rs':
+        pass
+    elif calib_format == "tum_vi":
         pass
 
     # camera_config_str = printCameraBlock(template_data["cameras"][0])

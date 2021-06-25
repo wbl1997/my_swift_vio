@@ -7,8 +7,7 @@ def sample_eval_options():
                   "extra_gflags": "--publish_via_ros=false",
                   "displayImages": "false",
                   "monocular_input": 1,
-                  "loop_closure_method": 0,
-                  'use_nominal_calib_value': False},
+                  "loop_closure_method": 0},
     }
 
     config_name_to_diffs = {

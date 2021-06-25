@@ -13,8 +13,7 @@ def tumrs_calibrated_test_options():
                  "displayImages": "false",
                  "monocular_input": 0,
                  "numImuFrames": 5,
-                 "loop_closure_method": 0,
-                 'use_nominal_calib_value': False},
+                 "loop_closure_method": 0},
     }
 
     config_name_to_diffs = {
@@ -43,8 +42,7 @@ def tumrs_raw_test_options():
                  "extra_gflags": "--publish_via_ros=false",
                  "displayImages": "false",
                  "monocular_input": 0,
-                 "loop_closure_method": 0,
-                 'use_nominal_calib_value': False},
+                 "loop_closure_method": 0},
     }
 
     config_name_to_diffs = {
