@@ -149,6 +149,5 @@ def apply_config_to_lcd_yaml(config_dict, lcd_yaml, debug_output_dir):
 
 def doWePublishViaRos(config_dict):
     return "extra_gflags" in config_dict and \
-           ("--publish_via_ros" in config_dict["extra_gflags"] or \
-            "--publish_via_ros=true" in config_dict["extra_gflags"] or \
+           ("--publish_via_ros=true" in config_dict["extra_gflags"] or \
             "--publish_via_ros=1" in config_dict["extra_gflags"])

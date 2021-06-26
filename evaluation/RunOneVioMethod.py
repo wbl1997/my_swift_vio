@@ -175,8 +175,11 @@ class RunOneVioMethod(object):
                 bag_start = self.algo_code_flags["bag_start"]
             else:
                 bag_start = dataset_parameters.decide_bag_start(self.algo_code_flags["algo_code"], bag_fullname)
-            init_imu_thresh = dataset_parameters.decide_initial_imu_threshold(
-                self.algo_code_flags["algo_code"], bag_fullname)
+            if "init_imu_thresh" in self.algo_code_flags:
+                init_imu_thresh = self.algo_code_flags["init_imu_thresh"]
+            else:
+                init_imu_thresh = dataset_parameters.decide_initial_imu_threshold(
+                    self.algo_code_flags["algo_code"], bag_fullname)
             result_file = os.path.join(output_dir_trial, 'stamped_traj_estimate.txt')
             exe_cmd = "roslaunch ov_msckf {} max_cameras:={} use_stereo:={} bag:={} " \
                       "bag_start:={} init_imu_thresh:={} dosave:=true path_est:={}".format(
@@ -187,6 +190,11 @@ class RunOneVioMethod(object):
             exe_cmd += append_ros_arg_if_exist(self.algo_code_flags, "gyroscope_random_walk")
             exe_cmd += append_ros_arg_if_exist(self.algo_code_flags, "accelerometer_noise_density")
             exe_cmd += append_ros_arg_if_exist(self.algo_code_flags, "accelerometer_random_walk")
+            exe_cmd += append_ros_arg_if_exist(self.algo_code_flags, "calib_cam_extrinsics")
+            exe_cmd += append_ros_arg_if_exist(self.algo_code_flags, "calib_cam_intrinsics")
+            exe_cmd += append_ros_arg_if_exist(self.algo_code_flags, "calib_cam_timeoffset")
+            exe_cmd += append_ros_arg_if_exist(self.algo_code_flags, "max_slam")
+            exe_cmd += append_ros_arg_if_exist(self.algo_code_flags, "max_slam_in_update")
 
             cmd = src_cmd + exe_cmd
             # We put all commands in a bash script because source
