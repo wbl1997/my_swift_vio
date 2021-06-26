@@ -76,3 +76,16 @@ def euroc_stasis_openvins_options():
         },
     }
     return algo_option_templates, config_name_to_diffs
+
+
+def euroc_stasis_msckfmono_options():
+    algo_option_templates = {
+        'MSCKFMono': {"algo_code": "MSCKFMono",
+                      "launch_file": "euroc.launch",
+                      },
+    }
+
+    config_name_to_diffs = {
+        ('MSCKFMono', 'MSCKFMono'): {},
+    }
+    return algo_option_templates, config_name_to_diffs

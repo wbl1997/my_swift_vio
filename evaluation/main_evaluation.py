@@ -86,6 +86,8 @@ if __name__ == '__main__':
         algo_option_templates, config_name_to_diffs = euroc_stasis_options.euroc_stasis_swiftvio_options()
     elif args.test_case == "euroc_stasis_openvins":
         algo_option_templates, config_name_to_diffs = euroc_stasis_options.euroc_stasis_openvins_options()
+    elif args.test_case == "euroc_stasis_msckfmono":
+        algo_option_templates, config_name_to_diffs = euroc_stasis_options.euroc_stasis_msckfmono_options()
     else:
         algo_option_templates, config_name_to_diffs = sample_eval_options.sample_swiftvio_options()
 

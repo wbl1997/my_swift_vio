@@ -184,3 +184,48 @@ def decide_initial_imu_threshold(algo_code, bag_fullname):
             return 1.5
     else:
         raise ValueError("Algorithms other than OpenVINS do not need init_imu_thresh!")
+
+
+MSCKF_MONO_EUROC_CONFIGS = {
+    'MH_01_easy': {"stand_still_end": 6,
+                   "keyframe_transl_dist": 0.5,
+                   "keyframe_rot_dist": 0.5,
+                   "min_track_length": 5,
+                   "max_cam_states": 30,
+                   },
+    'MH_02_easy': {"stand_still_end": 2,
+                   "keyframe_transl_dist": 0.1,
+                   "keyframe_rot_dist": 0.1,
+                   "min_track_length": 4,
+                   "max_cam_states": 10, },
+    'MH_03_medium': {"stand_still_end": 0,
+                     "keyframe_transl_dist": 0.5,
+                     "keyframe_rot_dist": 0.5,
+                     "min_track_length": 5,
+                     "max_cam_states": 30, },
+    'MH_04_difficult': {"stand_still_end": 0,
+                        "keyframe_transl_dist": 0.5,
+                        "keyframe_rot_dist": 0.5,
+                        "min_track_length": 5,
+                        "max_cam_states": 30, },
+    'MH_05_difficult': {"stand_still_end": 1,
+                        "keyframe_transl_dist": 0.5,
+                        "keyframe_rot_dist": 0.5,
+                        "min_track_length": 5,
+                        "max_cam_states": 30, },
+}
+
+
+def dict_to_ros_args(config_dict):
+    args = ""
+    for key in config_dict:
+        args += " {}:={}".format(key, config_dict[key])
+    return args
+
+
+def msckf_mono_arg_of_dataset(bag_fullname):
+    bagname = os.path.basename(os.path.splitext(bag_fullname)[0])
+    if bagname in MSCKF_MONO_EUROC_CONFIGS:
+        return dict_to_ros_args(MSCKF_MONO_EUROC_CONFIGS[bagname])
+    else:
+        return ""

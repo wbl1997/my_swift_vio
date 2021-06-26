@@ -96,6 +96,7 @@ class RunOneVioMethod(object):
 
     def create_sync_command(self, custom_vio_config, custom_lcd_config,
                             vio_trial_output_dir, bag_fullname, dataset_code):
+        """create synchronous commands for estimators in swift vio."""
         if dataset_code in dataset_parameters.ROS_TOPICS.keys():
             arg_topics = r'--camera_topics="{},{}" --imu_topic={}'.format(
                 dataset_parameters.ROS_TOPICS[dataset_code][0],
@@ -123,7 +124,7 @@ class RunOneVioMethod(object):
     def create_async_command(self, custom_vio_config,
                              custom_lcd_config,
                              vio_trial_output_dir, bag_fullname, dataset_code):
-
+        """create asynchronous commands for estimators in swift vio."""
         setup_bash_file = os.path.join(self.catkin_ws, "devel/setup.bash")
         src_cmd = "cd {}\nsource {}\n".format(self.catkin_ws, setup_bash_file)
 
@@ -151,6 +152,7 @@ class RunOneVioMethod(object):
 
     def create_vio_command(self, algo_name, dataset_code, bag_fullname,
                            custom_vio_config, custom_lcd_config, output_dir_trial):
+        """create vio command for a variety of estimator depending on the algo_code"""
         if self.algo_code_flags["algo_code"] == "VINSMono":
             setup_bash_file = os.path.join(self.catkin_ws, "devel/setup.bash")
             src_cmd = "cd {}\nsource {}\n".format(self.catkin_ws, setup_bash_file)
@@ -204,6 +206,21 @@ class RunOneVioMethod(object):
                 stream.write('#!/bin/bash\n')
                 stream.write('{}\n'.format(cmd))
             return "chmod +x {wrap};{wrap}".format(wrap=src_wrap)
+        elif self.algo_code_flags["algo_code"] == "MSCKFMono":
+            setup_bash_file = os.path.join(self.catkin_ws, "devel/setup.bash")
+            src_cmd = "cd {}\nsource {}\n".format(self.catkin_ws, setup_bash_file)
+            result_file = os.path.join(output_dir_trial, 'stamped_traj_estimate.txt')
+
+            exe_cmd = "roslaunch msckf_mono {}  bagname:={} dosave:=true path_est:={} show_rviz:=true".format(
+                self.algo_code_flags["launch_file"], bag_fullname, result_file)
+            exe_cmd += dataset_parameters.msckf_mono_arg_of_dataset(bag_fullname)
+
+            cmd = src_cmd + exe_cmd
+            src_wrap = os.path.join(output_dir_trial, "source_wrap.sh")
+            with open(src_wrap, 'w') as stream:
+                stream.write('#!/bin/bash\n')
+                stream.write('{}\n'.format(cmd))
+            return "chmod +x {wrap};{wrap}".format(wrap=src_wrap)
         elif 'async' in algo_name:
             return self.create_async_command(custom_vio_config, custom_lcd_config,
                                              output_dir_trial, bag_fullname, dataset_code)
@@ -230,7 +247,7 @@ class RunOneVioMethod(object):
                 output_dir_mission, "stamped_traj_estimate{}.txt".format(index_str))
             cmd = "chmod +x {};python3 {} {} {}".format(pose_conversion_script, pose_conversion_script,
                                                         vio_estimate_csv, converted_vio_file)
-        elif self.algo_code_flags["algo_code"] == "OpenVINS":
+        elif self.algo_code_flags["algo_code"] in ["OpenVINS", "MSCKFMono"]:
             result_file = os.path.join(output_dir_trial, 'stamped_traj_estimate.txt')
             converted_vio_file = os.path.join(
                 output_dir_mission, "stamped_traj_estimate{}.txt".format(index_str))
