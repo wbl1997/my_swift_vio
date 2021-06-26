@@ -14,9 +14,6 @@ import utility_functions
 import ResultsDirManager
 import RunOneVioMethod
 
-from colorama import init, Fore
-init(autoreset=True)
-
 if __name__ == '__main__':
     args = parse_args.parse_args()
 
@@ -180,7 +177,7 @@ if __name__ == '__main__':
         args.rpg_eval_tool_dir, results_dir_manager.get_eval_config_yaml(),
         args.num_trials, results_dir, eval_output_dir)
     if rc != 0:
-        print(Fore.RED + "Error code {} in run_rpg_evaluation: {}".format(rc, streamdata))
+        print("Error code {} in run_rpg_evaluation: {}".format(rc, streamdata))
         sys.exit(1)
 
     rpg_eval_tool_wrap.check_eval_result(eval_output_dir, args.cmp_eval_output_dir)

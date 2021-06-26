@@ -9,7 +9,6 @@ author: Jianzhu Huai
 import argparse
 import copy
 import os
-from ruamel.yaml import YAML
 
 import numpy as np
 
@@ -330,6 +329,7 @@ def create_config_yaml(config_template, calib_format,
     :return:
     """
     out_config = open(output_config, 'w')
+    from ruamel.yaml import YAML
     yaml = YAML()
     yaml.version = (1, 2)
     yaml.default_flow_style = None

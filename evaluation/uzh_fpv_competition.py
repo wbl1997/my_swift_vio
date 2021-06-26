@@ -4,15 +4,9 @@ import sys
 
 import dir_utility_functions
 import parse_args
-import rpg_eval_tool_wrap
 
 import ResultsDirManager
 import RunOneVioMethod
-import AlgoConfig
-
-from colorama import init, Fore
-init(autoreset=True)
-
 
 def find_test_bags(uzh_fpv_dir):
     session_list = {
@@ -107,7 +101,7 @@ if __name__ == '__main__':
             returncode = rc
 
     if returncode != 0:
-        print(Fore.RED + "Error code {} in run_uzh_fpv_competition".format(returncode))
+        print("Error code {} in run_uzh_fpv_competition".format(returncode))
     else:
         print('Successfully finished processing uzh fpv competition dataset!')
     sys.exit(returncode)

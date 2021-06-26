@@ -3,8 +3,6 @@ import textwrap
 import yaml
 
 import utility_functions
-from colorama import init, Fore
-init(autoreset=True)
 
 def run_rpg_evaluation(rpg_eval_dir, eval_config_yaml, num_trials,
                        results_dir, eval_output_dir):
@@ -74,8 +72,8 @@ def check_eval_result(eval_result_dir, cmp_eval_output_dir):
                 trans_rot_err = rel_stats[algo_name]
                 if trans_rot_err[0] > cmp_trans_rot_err[0] + trans_rot_tolerance[0] or \
                         trans_rot_err[1] > cmp_trans_rot_err[1] + trans_rot_tolerance[1]:
-                    print(Fore.RED + "current rel trans rot error of algo "
-                                     "{} {} {} is greater than that for comparison {} {}".format(
+                    print("current rel trans rot error of algo "
+                          "{} {} {} is greater than that for comparison {} {}".format(
                         algo_name, trans_rot_err[0], trans_rot_err[1], cmp_trans_rot_err[0], cmp_trans_rot_err[1]
                     ))
                     returncode = 1
@@ -93,7 +91,7 @@ def change_eval_cfg(eval_cfg_fn, align_type, align_n=-1):
     :return:
     """
     with open(eval_cfg_fn, 'r') as f:
-        eval_cfg = yaml.load(f, Loader=yaml.FullLoader)
+        eval_cfg = yaml.load(f, Loader=yaml.SafeLoader)
         eval_cfg['align_type'] = align_type
         eval_cfg['align_num_frames'] = align_n
     with open(eval_cfg_fn, 'w') as f:

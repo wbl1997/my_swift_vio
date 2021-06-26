@@ -25,9 +25,6 @@ import sample_eval_options
 import tumrs_calib_options
 import tumvi_calib_options
 
-from colorama import init, Fore
-init(autoreset=True)
-
 
 def find_all_bags_with_gt(data_dir, dataset_code):
     bag_list = []
@@ -140,7 +137,7 @@ if __name__ == '__main__':
             rc = 1
             streamdata = "Skip trajectory evaluation because ground truth is unavailable."
         if rc != 0:
-            print(Fore.RED + "Error code {} in run_rpg_evaluation: {}".format(rc, streamdata))
+            print("Error code {} in run_rpg_evaluation: {}".format(rc, streamdata))
 
         rpg_eval_tool_wrap.check_eval_result(eval_output_dir, args.cmp_eval_output_dir)
 
@@ -159,7 +156,7 @@ if __name__ == '__main__':
                 args.rpg_eval_tool_dir, gpr.get_eval_config_yaml(),
                 args.num_trials, method_results_dir, method_eval_output_dir)
             if rc != 0:
-                print(Fore.RED + "Error code {} in run_rpg_evaluation for method {}: {}".format(
+                print("Error code {} in run_rpg_evaluation for method {}: {}".format(
                     rc, method_name, streamdata))
 
     print('Successfully finished testing methods in swift_vio project!')

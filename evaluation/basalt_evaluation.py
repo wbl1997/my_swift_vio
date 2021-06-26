@@ -199,13 +199,8 @@ import dir_utility_functions
 import parse_args
 import rpg_eval_tool_wrap
 
-import GroupPgoResults
 import ResultsDirManager
-import RunOneVioMethod
 import utility_functions
-
-from colorama import init, Fore
-init(autoreset=True)
 
 
 def find_all_bags_with_gt(euroc_dir="", uzh_fpv_dir="", tum_vi_dir="", advio_dir=""):
@@ -229,9 +224,9 @@ def find_all_bags_with_gt(euroc_dir="", uzh_fpv_dir="", tum_vi_dir="", advio_dir
     for gt_file in all_gt_list:
         if not os.path.isfile(gt_file):
             raise Exception(
-                Fore.RED + "Ground truth file {} does not exist. Do you "
-                           "forget to convert data.csv to data.txt or "
-                           "extract ground truth from rosbags?".format(gt_file))
+                "Ground truth file {} does not exist. Do you "
+                "forget to convert data.csv to data.txt or "
+                "extract ground truth from rosbags?".format(gt_file))
 
     if euroc_bags!=[]:
         dataset = "euroc"
@@ -345,7 +340,7 @@ if __name__ == '__main__':
         args.rpg_eval_tool_dir, results_dir_manager.get_eval_config_yaml(),
         args.num_trials, results_dir, eval_output_dir)
     if rc != 0:
-        print(Fore.RED + "Error code {} in run_rpg_evaluation: {}".format(rc, streamdata))
+        print("Error code {} in run_rpg_evaluation: {}".format(rc, streamdata))
         sys.exit(1)
 
     rpg_eval_tool_wrap.check_eval_result(eval_output_dir, args.cmp_eval_output_dir)

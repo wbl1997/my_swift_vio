@@ -2,8 +2,6 @@ import errno
 import os
 import shutil
 
-from colorama import init, Fore
-init(autoreset=True)
 
 def find_bags_with_gt(uzh_fpv_dir, bagname_key, discount_key='.orig.bag'):
     """This function finds ros bags named like 'xxx_with_gt.bag',
@@ -51,9 +49,9 @@ def get_gt_file_for_bags(bag_list):
     for gt_file in gt_list:
         if not os.path.isfile(gt_file):
             raise Exception(
-                Fore.RED + "Ground truth file {} does not exist. Do you "
-                           "forget to convert data.csv to data.txt or "
-                           "extract ground truth from rosbags?".format(gt_file))
+                "Ground truth file {} does not exist. Do you "
+                "forget to convert data.csv to data.txt or "
+                "extract ground truth from rosbags?".format(gt_file))
     return gt_list
 
 
@@ -71,8 +69,8 @@ def get_converted_euroc_gt_files(euroc_bag_list):
     for gt_file in gt_list:
         if not os.path.isfile(gt_file):
             raise Exception(
-                Fore.RED + "Ground truth file {} does not exist. Do you "
-                           "forget to convert data.csv to data.txt".format(gt_file))
+                "Ground truth file {} does not exist. Do you "
+                "forget to convert data.csv to data.txt".format(gt_file))
     return gt_list
 
 

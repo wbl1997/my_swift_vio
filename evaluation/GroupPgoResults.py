@@ -2,7 +2,6 @@ import copy
 import os
 import shutil
 import warnings
-from ruamel.yaml import YAML
 
 import dir_utility_functions
 
@@ -55,6 +54,7 @@ class GroupPgoResults(object):
         :param new_config_yaml: The yaml for three algorithms, algo, algo + online pgo, algo + global pgo.
         :return:
         """
+        from ruamel.yaml import YAML
         yaml = YAML()
         yaml.version = (1, 2)
         yaml.default_flow_style = None
