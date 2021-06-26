@@ -152,6 +152,7 @@ if exist(outputfig, 'file')==2
 end
 export_fig(outputfig);
 
+if ~shouldTerminate(matrices, 17)
 figure;
 indices = 17 + (0:8);
 scale = 1000;
@@ -305,6 +306,7 @@ if exist(outputfig, 'file')==2
   delete(outputfig);
 end
 export_fig(outputfig);
+end
 
 % record the rmse at several epochs.
 rmseOutputFile = [result_dir, '/', 'rmse_at_epochs.txt'];
@@ -318,6 +320,7 @@ end
 fprintf(fid, '\n');
 
 for i = 1:length(rmseList)
+    fprintf(fid, '%s\n', dataFiles{i});
     for k = 1 : size(rmseList{i}, 1)
         fprintf(fid, ['%.1f', delimiter], probeEpochs(k));
         for j = logRmseStartIndex : componentIndex
@@ -352,3 +355,13 @@ for j = 1:length(matrices)
 end
 end
 
+function quit = shouldTerminate(matrices, nextIndex)
+quit = 0;
+for i = 1:length(matrices)
+    cols = size(matrices, 2);
+    if cols < nextIndex
+        quit = 1;
+        return;
+    end
+end
+end

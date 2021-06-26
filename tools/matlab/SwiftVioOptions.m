@@ -30,8 +30,14 @@ end
 options.export_fig_path = '';
 options.avg_since_start = 10;
 options.avg_trim_end = 10;
-options.trueCameraIntrinsics = zeros(1, projectionIntrinsicDim);
+options.trueCamProjectionIntrinsics = zeros(1, projectionIntrinsicDim);
+options.trueCamDistortionIntrinsics = zeros(1, distortionIntrinsicDim);
+options.truep_camera = [0, 0, 0];
+options.trueq_XC = [1, 0, 0, 0];
+options.trueTimeOffset = 0;
+options.trueReadoutTime = 0;
 
+options.timeAxisPadding = 5; % time axis starts from -timeAxisPadding, and ends with extension timeAxisPadding.
 
 padding = 2;
 options.r = padding + (1:3);

@@ -60,9 +60,15 @@ if subPlot == 1
         axes(p) = subplot(numPanels, 1, p);
         for i = 1:length(matrices)
             label = matrixLabels{i};
-            lineStyle = matrixColumnStyles{i};
+            if i > length(matrixColumnStyles)
+                lineStyle = matrixColumnStyles{randi(length(matrixColumnStyles), 1, 1)};
+                lineWidth = matrixColumnLineWidths{randi(length(matrixColumnStyles), 1, 1)};
+            else
+                lineStyle = matrixColumnStyles{i};
+                lineWidth = matrixColumnLineWidths{i};
+            end
             drawColumnsInMatrix(matrices{i}, columnIndices(p), plot3d, ...
-                dataMultiplier, lineStyle, matrixColumnLineWidths{i});
+                dataMultiplier, lineStyle, lineWidth);
             
             legendList((p - 1) * length(matrices) + i) = {label};
         end
@@ -77,8 +83,8 @@ else
         label = matrixLabels{i};
         
         if i > length(matrixColumnStyles)
-            lineStyle = matrixColumnStyles{end};
-            lineWidth = matrixColumnLineWidths{end};
+            lineStyle = matrixColumnStyles{randi(length(matrixColumnStyles), 1, 1)};
+            lineWidth = matrixColumnLineWidths{randi(length(matrixColumnStyles), 1, 1)};
         else
             lineStyle = matrixColumnStyles{i};
             lineWidth = matrixColumnLineWidths{i};

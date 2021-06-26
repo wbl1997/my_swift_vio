@@ -1,4 +1,5 @@
-function drawNees(est_files, labels, export_fig_path, num_runs, drawOnlyPose)
+function drawNees(est_files, labels, export_fig_path, num_runs, ...
+    drawOnlyPose, maxYLimit, xPadding)
 % This function requires Matlab signal processing toolbox for downsample()
 
 % Example use:
@@ -7,6 +8,12 @@ function drawNees(est_files, labels, export_fig_path, num_runs, drawOnlyPose)
 % [sim_dir, 'simul_wave/MSCKF_WavyCircle_NEES.txt'], ...
 % [sim_dir, 'simul_ball/MSCKF_Ball_NEES.txt']}, ...
 % {'Naive', 'Wave', 'Torus'}, '/tools/export_fig', 100);
+if nargin < 7
+    xPadding = 5;
+end
+if nargin < 6
+    maxYLimit = 50;
+end
 if nargin < 5
     drawOnlyPose = 1;  % 0 draw position, orientation, and pose.
 end
@@ -55,15 +62,14 @@ for i = 1:length(est_files)
     disp(['average of position, ori., pose, in the last 10 secs: ', num2str(avg)]);
 end
 
-xlim([-10, est_data(end, 1) + 10]);
-ylim([0, 20]);
+xlim([-xPadding, est_data(end, 1) + xPadding]);
+ylim([0, maxYLimit]);
 xlabel('time (sec)');
 ylabel('NEES (1)');
 
 if drawOnlyPose == 1
     label_list = cell(1, length(est_files));
     for i = 1:length(est_files)
-        
         label_list(1, i) = {labels{i}};
     end
 else
@@ -73,7 +79,11 @@ else
             [labels{i}, ' Orientation'], [labels{i}, ' Pose']};
     end
 end
-leg = legend(label_list, 'Location', 'Best');
+plot(est_data(:, 1), ones(size(est_data, 1), 1) * 6, 'k--');
+labelListWithRef = cell(1, length(label_list) + 1);
+labelListWithRef(1:end-1) = label_list;
+labelListWithRef{end} = 'reference';
+leg = legend(labelListWithRef, 'Location', 'Best');
 set(leg,'Interpreter', 'none');
 set(gcf, 'Color', backgroundColor);
 grid on;
