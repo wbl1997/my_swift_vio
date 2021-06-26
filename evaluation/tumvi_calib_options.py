@@ -258,7 +258,7 @@ def tumvi_raw_vinsmono_options():
 def tumvi_calibrated_openvins_options():
     algo_option_templates = {
         'OpenVINS': {"algo_code": "OpenVINS",
-                     "launch_file": "pgeneva_serial_eth.launch",
+                     "launch_file": "pgeneva_serial_tum.launch",
                      "gyroscope_noise_density": "0.00016",
                      "gyroscope_random_walk": "0.000022",
                      "accelerometer_noise_density": "0.0028",
@@ -282,22 +282,78 @@ def tumvi_calibrated_openvins_options():
 def tumvi_raw_openvins_options():
     algo_option_templates = {
         'OpenVINS': {"algo_code": "OpenVINS",
-                     "launch_file": "pgeneva_serial_tum.launch",
-                     "gyroscope_noise_density": "0.00016",
-                     "gyroscope_random_walk": "0.000022",
-                     "accelerometer_noise_density": "0.0028",
-                     "accelerometer_random_walk": "0.00086"
+                     "launch_file": "pgeneva_serial_tum_inaccurate.launch",
+                     "gyroscope_noise_density": 0.00016,
+                     "accelerometer_noise_density": 0.0028,
+                     "gyroscope_random_walk": 0.000022,
+                     "accelerometer_random_walk": 0.00086
                      },
     }
 
     config_name_to_diffs = {
+        ('OpenVINS', 'OpenVINS'): {
+            "max_cameras": 2,
+            "use_stereo": 'true',
+        },
+        ('OpenVINS_2_1', 'OpenVINS'): {
+            "max_cameras": 2,
+            "use_stereo": 'true',
+            "gyroscope_noise_density": 0.00016 * 2,
+            "accelerometer_noise_density": 0.0028 * 2,
+            "gyroscope_random_walk": 0.000022,
+            "accelerometer_random_walk": 0.00086
+        },
+        ('OpenVINS_2_2', 'OpenVINS'): {
+            "max_cameras": 2,
+            "use_stereo": 'true',
+            "gyroscope_noise_density": 0.00016 * 2,
+            "accelerometer_noise_density": 0.0028 * 2,
+            "gyroscope_random_walk": 0.000022 * 2,
+            "accelerometer_random_walk": 0.00086 * 2
+        },
+        ('OpenVINS_2_5', 'OpenVINS'): {
+            "max_cameras": 2,
+            "use_stereo": 'true',
+            "gyroscope_noise_density": 0.00016 * 2,
+            "accelerometer_noise_density": 0.0028 * 2,
+            "gyroscope_random_walk": 0.000022 * 5,
+            "accelerometer_random_walk": 0.00086 * 5
+        },
+        ('OpenVINS_5_2', 'OpenVINS'): {
+            "max_cameras": 2,
+            "use_stereo": 'true',
+            "gyroscope_noise_density": 0.00016 * 5,
+            "accelerometer_noise_density": 0.0028 * 5,
+            "gyroscope_random_walk": 0.000022 * 2,
+            "accelerometer_random_walk": 0.00086 * 2
+        },
+        ('OpenVINS_5_5', 'OpenVINS'): {
+            "max_cameras": 2,
+            "use_stereo": 'true',
+            "gyroscope_noise_density": 0.00016 * 5,
+            "accelerometer_noise_density": 0.0028 * 5,
+            "gyroscope_random_walk": 0.000022 * 5,
+            "accelerometer_random_walk": 0.00086 * 5
+        },
+        ('OpenVINS_10_5', 'OpenVINS'): {
+            "max_cameras": 2,
+            "use_stereo": 'true',
+            "gyroscope_noise_density": 0.00016 * 10,
+            "accelerometer_noise_density": 0.0028 * 10,
+            "gyroscope_random_walk": 0.000022 * 5,
+            "accelerometer_random_walk": 0.00086 * 5
+        },
+        ('OpenVINS_10_10', 'OpenVINS'): {
+            "max_cameras": 2,
+            "use_stereo": 'true',
+            "gyroscope_noise_density": 0.00016 * 10,
+            "accelerometer_noise_density": 0.0028 * 10,
+            "gyroscope_random_walk": 0.000022 * 10,
+            "accelerometer_random_walk": 0.00086 * 10
+        },
         ('OpenVINS-Mono', 'OpenVINS'): {
             "max_cameras": 1,
             "use_stereo": 'false'
-        },
-        ('OpenVINS-Stereo', 'OpenVINS'): {
-            "max_cameras": 2,
-            "use_stereo": 'true'
         },
     }
     return algo_option_templates, config_name_to_diffs

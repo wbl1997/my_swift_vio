@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+# OBSOLETE. No longer maintained.
+
 """
 The evaluation procedure will run synchronously if publish_via_ros is true
 because it depends on roscore which does not accept nodes with the same name.

@@ -51,8 +51,6 @@ def euroc_stasis_openvins_options():
     algo_option_templates = {
         'OpenVINS': {"algo_code": "OpenVINS",
                      "launch_file": "pgeneva_serial_eth.launch",
-                     "bag_start": 0,
-                     "init_imu_thresh": 0.7,
                      "gyroscope_noise_density": 1.6968e-04,
                      "gyroscope_random_walk": 1.9393e-05,
                      "accelerometer_noise_density": 2.0000e-3,
@@ -60,20 +58,21 @@ def euroc_stasis_openvins_options():
                      "calib_cam_extrinsics": "false",
                      "calib_cam_intrinsics": "false",
                      "calib_cam_timeoffset": "false",
-                     "max_slam": "0",
-                     "max_slam_in_update": "0",
                      },
     }
 
     config_name_to_diffs = {
-        ('OpenVINS-Mono', 'OpenVINS'): {
+        ('MSCKF-Mono', 'OpenVINS'): {
             "max_cameras": 1,
             "use_stereo": 'false',
-
+            "max_slam": "0",
+            "max_slam_in_update": "0",
         },
-        ('OpenVINS-Stereo', 'OpenVINS'): {
-            "max_cameras": 2,
-            "use_stereo": 'true'
+        ('SLAM-Mono', 'OpenVINS'): {
+            "max_cameras": 1,
+            "use_stereo": 'false',
+            "max_slam": "75",
+            "max_slam_in_update": "25",
         },
     }
     return algo_option_templates, config_name_to_diffs
