@@ -221,6 +221,20 @@ class RunOneVioMethod(object):
                 stream.write('#!/bin/bash\n')
                 stream.write('{}\n'.format(cmd))
             return "chmod +x {wrap};{wrap}".format(wrap=src_wrap)
+        elif self.algo_code_flags["algo_code"] == "ROVIO":
+            setup_bash_file = os.path.join(self.catkin_ws, "devel/setup.bash")
+            src_cmd = "cd {}\nsource {}\n".format(self.catkin_ws, setup_bash_file)
+            result_basename = os.path.join(output_dir_trial, 'stamped_traj_estimate')
+
+            exe_cmd = "roslaunch rovio {}  bagname:={} numcameras:={} filename_out:={}".format(
+                self.algo_code_flags["launch_file"], bag_fullname, self.algo_code_flags["numcameras"], result_basename)
+
+            cmd = src_cmd + exe_cmd
+            src_wrap = os.path.join(output_dir_trial, "source_wrap.sh")
+            with open(src_wrap, 'w') as stream:
+                stream.write('#!/bin/bash\n')
+                stream.write('{}\n'.format(cmd))
+            return "chmod +x {wrap};{wrap}".format(wrap=src_wrap)
         elif 'async' in algo_name:
             return self.create_async_command(custom_vio_config, custom_lcd_config,
                                              output_dir_trial, bag_fullname, dataset_code)
@@ -253,6 +267,13 @@ class RunOneVioMethod(object):
                 output_dir_mission, "stamped_traj_estimate{}.txt".format(index_str))
             cmd = "chmod +x {};python3 {} {} {}".format(pose_conversion_script, pose_conversion_script,
                                                         result_file, converted_vio_file)
+        elif self.algo_code_flags["algo_code"] == "ROVIO":
+            result_file = os.path.join(output_dir_trial, 'stamped_traj_estimate.bag')
+            converted_vio_file = os.path.join(
+                output_dir_mission, "stamped_traj_estimate{}.txt".format(index_str))
+            cmd = "chmod +x {};python {} {} /rovio/odometry --msg_type Odometry --output {}".format(
+                pose_conversion_script, pose_conversion_script,
+                result_file, converted_vio_file)
         else:
             vio_estimate_csv = os.path.join(output_dir_trial, 'swift_vio.csv')
             converted_vio_file = os.path.join(

@@ -89,3 +89,16 @@ def euroc_stasis_msckfmono_options():
         ('MSCKFMono', 'MSCKFMono'): {},
     }
     return algo_option_templates, config_name_to_diffs
+
+
+def euroc_stasis_rovio_options():
+    algo_option_templates = {
+        'ROVIO': {"algo_code": "ROVIO",
+                  "launch_file": "rovio_rosbag_node.launch",
+                  },
+    }
+
+    config_name_to_diffs = {
+        ('ROVIOMono', 'ROVIO'): { "numcameras": 1},
+    }
+    return algo_option_templates, config_name_to_diffs
