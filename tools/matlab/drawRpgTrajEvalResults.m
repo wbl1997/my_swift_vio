@@ -12,10 +12,12 @@ numfigures=0;
 success = 0;
 missing = 0;
 trials = 5;
-rooms = 6;
+sessions = {'room1', 'room2', 'room3', 'room4', 'room5', 'room6'};
+numsessions = length(sessions);
 
-for r = 1:rooms
-    session=['room', num2str(r)];
+
+for r = 1:numsessions
+    session = sessions{r};
     folder=[rootfolder, '/laptop/', method, '/laptop_', method, '_', session];
     gtdata = readmatrix([folder, '/stamped_groundtruth.txt'], 'NumHeaderLines', 1);
     ratio = 1.0;
@@ -45,5 +47,5 @@ for r = 1:rooms
         end        
     end
 end
-fprintf('Success %d, aborted %d, out of %d trials.\n', success, missing, trials * rooms);
+fprintf('Success %d, aborted %d, out of %d trials.\n', success, missing, trials * numsessions);
 end
