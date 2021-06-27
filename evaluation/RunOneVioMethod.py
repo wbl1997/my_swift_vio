@@ -228,6 +228,7 @@ class RunOneVioMethod(object):
 
             exe_cmd = "roslaunch rovio {}  bagname:={} numcameras:={} filename_out:={}".format(
                 self.algo_code_flags["launch_file"], bag_fullname, self.algo_code_flags["numcameras"], result_basename)
+            exe_cmd += dataset_parameters.rovio_mono_arg_of_dataset(bag_fullname)
 
             cmd = src_cmd + exe_cmd
             src_wrap = os.path.join(output_dir_trial, "source_wrap.sh")

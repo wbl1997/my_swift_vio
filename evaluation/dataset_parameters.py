@@ -229,3 +229,20 @@ def msckf_mono_arg_of_dataset(bag_fullname):
         return dict_to_ros_args(MSCKF_MONO_EUROC_CONFIGS[bagname])
     else:
         return ""
+
+
+ROVIO_MONO_EUROC_CONFIGS = {
+    'MH_01_easy': {"skip_start_seconds": 0, },
+    'MH_02_easy': {"skip_start_seconds": 3, },
+    'MH_03_medium': {"skip_start_seconds": 0, },
+    'MH_04_difficult': {"skip_start_seconds": 0, },
+    'MH_05_difficult': {"skip_start_seconds": 0, },
+}
+
+
+def rovio_mono_arg_of_dataset(bag_fullname):
+    bagname = os.path.basename(os.path.splitext(bag_fullname)[0])
+    if bagname in ROVIO_MONO_EUROC_CONFIGS:
+        return dict_to_ros_args(ROVIO_MONO_EUROC_CONFIGS[bagname])
+    else:
+        return ""
