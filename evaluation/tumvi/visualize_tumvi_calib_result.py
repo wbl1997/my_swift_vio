@@ -15,13 +15,16 @@ import os
 import sys
 
 import numpy as np
-
+import matplotlib.lines as mlines
 import matplotlib.pyplot as plt
 
 import dataset_vio_config
 
 FORMAT = '.pdf'
-PALLETE = ['b', 'g', 'r', 'c', 'k', 'y', 'm']
+PALETTE = plt.rcParams['axes.prop_cycle'].by_key()['color']
+
+# ['b', 'g', 'r', 'c', 'k', 'y', 'm', 'YlOrBr', 'YlOrRd', 'OrRd', 'PuRd', 'RdPu', 'BuPu',
+#             'GnBu', 'PuBu', 'YlGnBu', 'PuBuGn', 'BuGn', 'YlGn', 'Purples', 'Oranges',]
 
 # How to relate the IMU intrinsic parameters used by TUMVI (eq(1,2) in the
 # TUMVI dataset paper) to KSF IMU parameters?
@@ -225,54 +228,52 @@ def color_box(bp, color):
          for idx in range(len(bp[elem]))]
     return
 
-# copied from rpg trajectory evaluation toolbox plot_utils.py so as to use it in python3
 def boxplot_compare(ax, xlabels,
-                    data, data_labels, data_colors,
-                    legend=True):
+                    data, data_colors):
     n_data = 1
     n_xlabel = len(xlabels)
-    leg_handles = []
-    leg_labels = []
     idx = 0
-    d = data
-    # print("idx and d: {0} and {1}".format(idx, d))
     w = 1 / (1.5 * n_data + 1.5)
     widths = [w for pos in np.arange(n_xlabel)]
     positions = [pos - 0.5 + 1.5 * w + idx * w
                  for pos in np.arange(n_xlabel)]
     # print("Positions: {0}".format(positions))
-    bp = ax.boxplot(d, 0, '', positions=positions, widths=widths)
+    bp = ax.boxplot(data, 0, '', positions=positions, widths=widths)
     color_box(bp, data_colors[idx])
-    # tmp, = plt.plot([1, 1], data_colors[idx])
-    # leg_handles.append(tmp)
-    leg_labels.append(data_labels[idx])
-    idx += 1
+
     ax.set_xticks(np.arange(n_xlabel))
     ax.set_xticklabels(xlabels)
     xlims = ax.get_xlim()
     ax.set_xlim([xlims[0]-0.1, xlims[1]-0.1])
-    if legend:
-        # ax.legend(leg_handles, leg_labels, bbox_to_anchor=(
-            # 1.05, 1), loc=2, borderaxespad=0.)
-        ax.legend(leg_handles, leg_labels)
-    map(lambda x: x.set_visible(False), leg_handles)
 
 
 def boxplot_block_and_save(data_array, column_indices, xlabels, out_file,
                            ref_values, component_label, unit_label):
+    """boxplot for parameters in a block and save the figure"""
     fig = plt.figure(figsize=(12, 3))
     ax = fig.add_subplot(
         111, xlabel=component_label, ylabel='(' + unit_label + ')')
-    config_colors = ['k']
-    legend_labels = list(column_indices)
+    config_colors = ['k', 'g']
+    leg_labels = ['est - nominal', 'ref - nominal']
     boxplot_compare(ax, xlabels, data_array[:, column_indices],
-                       legend_labels, config_colors, legend=False)
+                    config_colors)
+
     locs = ax.get_xticks()
     w = 1/3.0
     for index, loc in enumerate(locs):
         left_right = [loc- 0.5 * w, loc+0.5 * w]
         yvalues =  [ref_values[index],  ref_values[index]]
-        ax.plot(left_right, yvalues, 'g-')
+        ax.plot(left_right, yvalues, config_colors[1])
+    leg_handles = []
+    leg_line = mlines.Line2D([], [], color=config_colors[0])
+    leg_handles.append(leg_line)
+    leg_line = mlines.Line2D([], [], color=config_colors[1])
+    leg_handles.append(leg_line)
+
+    # ax.legend(leg_handles, leg_labels, bbox_to_anchor=(
+        # 1.05, 1), loc=2, borderaxespad=0.)
+    ax.legend(leg_handles, leg_labels)
+    map(lambda x: x.set_visible(False), leg_handles)
 
     fig.tight_layout()
     # plt.show()
@@ -280,33 +281,127 @@ def boxplot_block_and_save(data_array, column_indices, xlabels, out_file,
     plt.close(fig)
 
 
+def barplot_block_and_save(data_array, value_indices, sigma_indices, xlabels, out_file,
+                           ref_values, component_label, component_label_code, unit_label):
+    """
+    draw the 3 sigma bounds for each column of the data_array, and also draw the reference value.
+    :param data_array:
+    :param value_indices: indices of values into the data array.
+    :param sigma_indices: indices of sigmas into the data array.
+    :param xlabels:
+    :param out_file:
+    :param ref_values: reference value array of the same length as value_indices.
+    :param component_label:
+    :param unit_label:
+    :return:
+    """
+    print('{}: indices: {}, sigmas indices: {}.'.format(component_label, value_indices, sigma_indices))
+    samples = data_array.shape[0]
+    dimension = len(value_indices)
+
+    xlist = []
+    ylist = []
+    yerrlist = []
+    xticklist = []
+
+    gap = 1.0
+    xscale = 0.2
+    for i in range(dimension):
+        start = (gap + (samples + 1)* xscale) * i  # plus one for the reference values
+        x = start + np.arange(0, samples, 1) * xscale
+        y = data_array[:, value_indices[i]]
+        yerr = data_array[:, sigma_indices[i]] * 3
+
+        xlist.append(x)
+        if samples % 2 == 0:
+            xticklist.append(start + ((samples + 1) // 2 - 0.5) * xscale)
+        else:
+            xticklist.append(start + ((samples + 1) // 2) * xscale)
+        ylist.append(y)
+        yerrlist.append(yerr)
+
+    fig, ax = plt.subplots()
+    for i in range(dimension):
+        ax.errorbar(xlist[i], ylist[i], yerr=yerrlist[i], ls='', ecolor=PALETTE[i],
+                    capsize=2, elinewidth=2, markeredgewidth=2)
+        ax.plot(xlist[i][-1] + xscale, ref_values[i], color=PALETTE[i], marker='x')
+
+    ax.set_xticks(xticklist)
+    ax.set_xticklabels(xlabels)
+    ax.set_ylabel(component_label_code + ' (' + unit_label + ')')
+
+    fig.tight_layout()
+    # plt.show()
+    fig.savefig(out_file, bbox_inches="tight", dpi=300)
+    plt.close(fig)
+
+
+def draw_barplot_together(blockAIndex, blockBIndex, blockADim, blockBDim,
+                          index_ranges, std_index_ranges, segment_list,
+                          estimate_errors, out_file):
+    error_indices = list(index_ranges[blockAIndex][:blockADim])
+    error_indices.extend(index_ranges[blockBIndex][:blockBDim])
+
+    std_indices = list(std_index_ranges[blockAIndex][:blockADim])
+    std_indices.extend(std_index_ranges[blockBIndex][:blockBDim])
+
+    labels = copy.deepcopy(segment_list[blockAIndex][kcolumn_labels][:blockADim])
+    labels.extend(segment_list[blockBIndex][kcolumn_labels][:blockBDim])
+    referrors = []
+    dims = [blockADim, blockBDim]
+    for index, block in enumerate([blockAIndex, blockBIndex]):
+        refvalues = copy.deepcopy(segment_list[block][ktum_reference_value])
+        nominal_value = segment_list[block][knominal_value]
+        referror = compute_deviation_from_nominal_value(
+            segment_list[block][kcomponent_label], refvalues, nominal_value)
+        if isinstance(segment_list[block][kscale], list):
+            for coeff_index, coeff in enumerate(segment_list[block][kscale]):
+                referror[coeff_index] *= coeff
+        else:
+            referror *= segment_list[block][kscale]
+        referrors.extend(referror[:dims[index]])
+
+    component_label = segment_list[blockAIndex][kcomponent_label] + segment_list[blockBIndex][kcomponent_label]
+    barplot_block_and_save(estimate_errors, error_indices, std_indices,
+                           labels, out_file, referrors, component_label, '',
+                           segment_list[blockAIndex][kerror_unit])
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         description="Extract the state vectors at the end of each output file of KSF, then"
                     "compute mean and std dev of estimated sensor parameters \nand compare"
                     " to the values provided by TUM VI.")
-    parser.add_argument("output_dir",
+    parser.add_argument("vio_output_dir",
                         help="Output dir of KSF inside which the output csv files will be searched for.")
+    parser.add_argument("plot_dir", help="Output dir of plots.")
+    parser.add_argument("--seconds_to_end", type=float, default=0,
+                        help="compute estimates at the time of seconds to end.")
+
     args = parser.parse_args()
-    output_dir = args.output_dir
     estimate_file_list = []
-    for dir_name, subdir_list, file_list in os.walk(output_dir):
+    for dir_name, subdir_list, file_list in os.walk(args.vio_output_dir):
         for fname in file_list:
             if 'swift_vio.csv' in fname:
                 estimate_file_list.append(os.path.join(dir_name, fname))
-    print("Found {} calibration result files: {}".format(len(estimate_file_list), '\n'.join(estimate_file_list)))
+    estimate_file_list.sort()
+    print("Found {} calibration result files".format(len(estimate_file_list)))
+    for index, fn in enumerate(estimate_file_list):
+        print("{} {}".format(index, fn))
+
     data_list = list()
+    frame_rate = 20
+    estimate_index = int(args.seconds_to_end * frame_rate + 1)
     for estimate_file in estimate_file_list:
         data = np.loadtxt(estimate_file, delimiter=",", skiprows=1)
-        data_list.append(data[-1])
-
+        data_list.append(data[-estimate_index])
     data_array = np.array(data_list)
 
     bg_index = 12
     ksf_params = get_ksf_model_parameters(TUMVI_IMU_INTRINSICS)
     # each element: component label, column label for each dimension of the component, scale,
     # tum reference value, unit, number of digits after dot to display, minimal dimension, nominal value
-    kcomponent_label = 0
+    kcomponent_label_code = 0
     kcolumn_labels = 1
     kscale = 2
     ktum_reference_value = 3
@@ -314,36 +409,54 @@ if __name__ == '__main__':
     ksignificant_digits = 5
     kminimal_dim = 6
     knominal_value = 7
+    kcomponent_label = 8
+    kindex_list = 9
+    kstd_index_list = 10
 
-    segment_list = [('bg', ['x', 'y', 'z'], 180 / math.pi, ksf_params['bg'], 'deg/s', 3, 3, np.array([0, 0, 0])),
-                    ('ba', ['x', 'y', 'z'], 1.0, ksf_params['ba'], 'm/s^2', 3, 3, np.array([0, 0, 0])),
-                    ('Tg', [1, 2, 3, 4, 5, 6, 7, 8, 9], 1000.0, ksf_params['Tg'], '0.001', 2, 9,
-                     np.array([1, 0, 0, 0, 1, 0, 0, 0, 1])),
-                    ('Ts', [1, 2, 3, 4, 5, 6, 7, 8, 9], 1000.0, ksf_params['Ts'], '0.001 rad/s/(m/s^2)', 2, 9,
-                     np.array([0, 0, 0, 0, 0, 0, 0, 0, 0])),
-                    ('Ta', [1, 2, 3, 4, 5, 6, 7, 8, 9], 1000.0, ksf_params['Ta'], '0.001', 2, 9,
-                     np.array([1, 0, 0, 0, 1, 0, 0, 0, 1])),
-                    ('p_C0B', ['x', 'y', 'z'], 100, ksf_params['p_C0B'], 'cm', 2, 3, np.array([0, 0, 0])),
-                    ('p_BC1', ['x', 'y', 'z'], 100, ksf_params['p_BC1'], 'cm', 2, 3, np.array([0, 0, 0])),
-                    ('q_BC1', ['x', 'y', 'z', 'w'],
-                     180 / math.pi, ksf_params['q_BC1'], 'deg', 3, 3, dcm2quat(Nominal_R_SC)),
-                    ('fc0', ['f', 'cx', 'cy'], 1, ksf_params['fc0'], 'px', 2, 3, [190, 256, 256]),
-                    ('distort0', ['k1', 'k2', 'k3', 'k4'], 1000, ksf_params['distort0'], '0.001', 2, 4,
-                     np.array([0, 0, 0, 0])),
-                    ('tdtr0', ['td', 'tr'], 1000, ksf_params['tdtr0'], 'ms', 2, 2, np.array([0, 0])),
-                    ('fc1', ['f', 'cx', 'cy'], 1, ksf_params['fc1'], 'px', 2, 3, np.array([190, 256, 256])),
-                    ('distort1', ['k1', 'k2', 'k3', 'k4'], 1000, ksf_params['distort1'], '0.001', 2, 4,
-                     np.array([0, 0, 0, 0])),
-                    ('tdtr1', ['td', 'tr'], 1000, ksf_params['tdtr1'], 'ms', 2, 2, np.array([0, 0]))]
+    segment_list = [(r'$\mathbf{b}_g$', [r'$x$', r'$y$', r'$z$'], 180 / math.pi, ksf_params['bg'], r'$^\circ/s$', 3, 3,
+                     np.array([0, 0, 0]), 'bg'),
+                    (r'$\mathbf{b}_a$', [r'$x$', r'$y$', r'$z$'], 1.0, ksf_params['ba'], r'$m/s^2$', 3, 3,
+                     np.array([0, 0, 0]), 'ba'),
+                    (r'$\mathbf{T}_g$',
+                     [r'$1,1$', r'$1,2$', r'$1,3$', r'$2,1$', r'$2,2$', r'$2,3$', r'$3,1$', r'$3,2$', r'$3,3$'],
+                     1000.0, ksf_params['Tg'], '0.001', 2, 9, np.array([1, 0, 0, 0, 1, 0, 0, 0, 1]), 'Tg'),
+                    (r'$\mathbf{T}_s$',
+                     [r'$1,1$', r'$1,2$', r'$1,3$', r'$2,1$', r'$2,2$', r'$2,3$', r'$3,1$', r'$3,2$', r'$3,3$'],
+                     1000.0, ksf_params['Ts'], r'$0.001 \frac{rad/s}{m/s^2}$', 2, 9,
+                     np.array([0, 0, 0, 0, 0, 0, 0, 0, 0]), 'Ts'),
+                    (r'$\mathbf{T}_a$',
+                     [r'$1,1$', r'$1,2$', r'$1,3$', r'$2,1$', r'$2,2$', r'$2,3$', r'$3,1$', r'$3,2$', r'$3,3$'],
+                     1000.0, ksf_params['Ta'], '0.001', 2, 9, np.array([1, 0, 0, 0, 1, 0, 0, 0, 1]), 'Ta'),
+                    ('', [r'$\mathbf{p}_{C0B}(1)$', r'$\mathbf{p}_{C0B}(2)$', r'$\mathbf{p}_{C0B}(3)$'], 100,
+                     ksf_params['p_C0B'], r'$cm$', 2, 3, np.array([0, 0, 0]), 'p_C0B'),
+                    ('', [r'$f^0$', r'$c_x^0$', r'$c_y^0$'], 1, ksf_params['fc0'], r'$px$', 2, 3, [190, 256, 256],
+                     'fc0'),
+                    ('', [r'$k_1^0$', r'$k_2^0$', r'$k_3^0$', r'$k_4^0$'], 1000, ksf_params['distort0'], '0.001', 2, 4,
+                     np.array([0, 0, 0, 0]), 'distort0'),
+                    ('', [r'$t_d^0$', r'$t_r^0$'], 1000, ksf_params['tdtr0'], r'$ms$', 2, 2, np.array([0, 0]), 'tdtr0'),
+                    ('', [r'$\mathbf{p}_{BC1}(1)$', r'$\mathbf{p}_{BC1}(2)$', r'$\mathbf{p}_{BC1}$(3)'], 100,
+                     ksf_params['p_BC1'], r'$cm$', 2, 3, np.array([0, 0, 0]), 'p_BC1'),
+                    (r'$\mathbf{R}_{BC1}$', ['roll', 'pitch', 'yaw', 'w'],
+                     180 / math.pi, ksf_params['q_BC1'], r'$^\circ$', 3, 3, dcm2quat(Nominal_R_SC), 'q_BC1'),
+                    ('', [r'$f^1$', r'$c_x^1$', r'$c_y^1$'], 1, ksf_params['fc1'], r'$px$', 2, 3,
+                     np.array([190, 256, 256]), 'fc1'),
+                    ('', [r'$k_1^1$', r'$k_2^1$', r'$k_3^1$', r'$k_4^1$'], 1000, ksf_params['distort1'], '0.001', 2, 4,
+                     np.array([0, 0, 0, 0]), 'distort1'),
+                    ('', [r'$t_d^1$', r'$t_r^1$'], 1000, ksf_params['tdtr1'], r'$ms$', 2, 2, np.array([0, 0]), 'tdtr1')]
 
     index_ranges = list()
+    start_index = bg_index
     for segment in segment_list:
-        if len(index_ranges):
-            start = index_ranges[-1][-1] + 1
-            index_ranges.append(range(start, start + len(segment[kcolumn_labels])))
-        else:
-            index_ranges.append(range(bg_index, bg_index + len(segment[kcolumn_labels])))
+        index_ranges.append(range(start_index, start_index + len(segment[kcolumn_labels])))
+        start_index = index_ranges[-1][-1] + 1
+    std_index_ranges = list()
+    std_padding = 3 + 3 + 3 # pose and velocity
+    std_start_index = index_ranges[-1][-1] + std_padding + 1
+    for segment in segment_list:
+        std_index_ranges.append(range(std_start_index, std_start_index + segment[kminimal_dim]))
+        std_start_index = std_index_ranges[-1][-1] + 1
 
+    # compute the difference between reference values and nominal values
     for index, segment in enumerate(segment_list):
         refvalues = copy.deepcopy(segment[ktum_reference_value])
         nominal_value = np.array(segment[knominal_value])
@@ -359,14 +472,24 @@ if __name__ == '__main__':
         for j in range(len(referrors)):
             print(format_str.format(referrors[j]))
 
+    # compute and visualize the differences between estimated values and nominal values.
+    # The boxplot also visualizes the difference of the reference values to the nominal values.
+    estimate_errors = copy.deepcopy(data_array)
+    selected_indices = [4, 0, 1, 0, 3, 0]
+    success_trials = [0, 5, 4, 3, 5, 5, 5]
+    cum_indices = np.cumsum(success_trials)
+    cum_chosen_indices = [cum_indices[i] + index for i, index in enumerate(selected_indices)]
+    # cum_chosen_indices = range(0, len(estimate_file_list))
+    print('chosen indices\n')
+    for i, index in enumerate(cum_chosen_indices):
+        print("{} {}".format(i, estimate_file_list[index]))
     for index, segment in enumerate(segment_list):
         refvalues = copy.deepcopy(segment[ktum_reference_value])
         nominal_value = segment[knominal_value]
         error_indices = index_ranges[index][0:segment[kminimal_dim]]
-        # we put the estimate deviation from nominal value directly into the estimates data array.
 
-        for j in range(data_array.shape[0]):
-            data_array[j, error_indices] = compute_deviation_from_nominal_value(
+        for j in range(estimate_errors.shape[0]):
+            estimate_errors[j, error_indices] = compute_deviation_from_nominal_value(
                 segment[kcomponent_label], data_array[j, index_ranges[index]], nominal_value)
 
         referrors = compute_deviation_from_nominal_value(
@@ -374,15 +497,41 @@ if __name__ == '__main__':
 
         if isinstance(segment[kscale], list):
             for coeff_index, coeff in enumerate(segment[kscale]):
-                data_array[:, error_indices[coeff_index]] *= coeff
+                estimate_errors[:, error_indices[coeff_index]] *= coeff
                 referrors[coeff_index] *= coeff
+                estimate_errors[:, std_index_ranges[index][coeff_index]] *= coeff
         else:
-            data_array[:, error_indices] *= segment[kscale]
+            estimate_errors[:, error_indices] *= segment[kscale]
             referrors *= segment[kscale]
-        out_file = output_dir + '/' + segment[kcomponent_label] + FORMAT
-        compute_mean_and_std(segment[kcomponent_label], data_array, error_indices, segment[kerror_unit],
+            estimate_errors[:, std_index_ranges[index]] *= segment[kscale]
+        out_file = args.plot_dir + '/' + segment[kcomponent_label] + FORMAT
+        compute_mean_and_std(segment[kcomponent_label], estimate_errors, error_indices, segment[kerror_unit],
                              segment[ksignificant_digits])
-        boxplot_block_and_save(data_array, error_indices,
+        boxplot_block_and_save(estimate_errors, error_indices,
                                segment[kcolumn_labels][0:segment[kminimal_dim]],
                                out_file, referrors, segment[kcomponent_label],
                                segment[kerror_unit])
+
+        # draw the 3\sigma bounds for estimated parameter values and (reference values - nominal values).
+        out_file = args.plot_dir + '/std_' + segment[kcomponent_label] + FORMAT
+        barplot_block_and_save(estimate_errors[cum_chosen_indices, :], error_indices, std_index_ranges[index],
+                               segment[kcolumn_labels][0:segment[kminimal_dim]],
+                               out_file, referrors, segment[kcomponent_label], segment[kcomponent_label_code],
+                               segment[kerror_unit])
+
+    # draw p_C0B and p_BC1 together
+    out_file = args.plot_dir + '/std_p_C0B_p_BC1' + FORMAT
+    draw_barplot_together(5, 9, 3, 3, index_ranges, std_index_ranges, segment_list,
+                          estimate_errors[cum_chosen_indices, :], out_file)
+    # draw fc0 fc1 together
+    out_file = args.plot_dir + '/std_fc0_fc1' + FORMAT
+    draw_barplot_together(6, 11, 3, 3, index_ranges, std_index_ranges, segment_list,
+                          estimate_errors[cum_chosen_indices, :], out_file)
+    # draw distort0 and distort1 together
+    out_file = args.plot_dir + '/std_dist0_dist1' + FORMAT
+    draw_barplot_together(7, 12, 2, 2, index_ranges, std_index_ranges, segment_list,
+                          estimate_errors[cum_chosen_indices, :], out_file)
+    # draw td tr together
+    out_file = args.plot_dir + '/std_tdtr0_tdtr1' + FORMAT
+    draw_barplot_together(8, 13, 2, 2, index_ranges, std_index_ranges, segment_list,
+                          estimate_errors[cum_chosen_indices, :], out_file)

@@ -58,7 +58,6 @@ for i = 1:dimen
 end
 legend(line_handles(1:dimen*2), legendLabels);
 
-xlabel('time (sec)');
 grid on;
 end
 

@@ -34,6 +34,7 @@ for r = 1:numsessions
             xlabel('x'); ylabel('y'); zlabel('z');
             count = floor(size(data, 1) * ratio);
             plot3(data(1:count, 2), data(1:count, 3), data(1:count, 4), 'r');
+            title(files{1}(110:end));
             hold off;
             
             distance = sqrt(data(count, 3:5) * data(count, 3:5)');
@@ -44,7 +45,7 @@ for r = 1:numsessions
         else
             missing = missing + 1;
             warning('missing %s\n', files{1});
-        end        
+        end
     end
 end
 fprintf('Success %d, aborted %d, out of %d trials.\n', success, missing, trials * numsessions);
