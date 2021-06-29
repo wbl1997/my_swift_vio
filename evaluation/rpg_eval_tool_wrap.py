@@ -16,7 +16,7 @@ def run_rpg_evaluation(rpg_eval_dir, eval_config_yaml, num_trials,
     :return:
     """
     analyze_traj_script = os.path.join(rpg_eval_dir, "scripts/analyze_trajectories.py")
-    cmd = "python2 {} {} --output_dir={} --results_dir={} --platform laptop " \
+    cmd = "python3 {} {} --output_dir={} --results_dir={} --platform laptop " \
           "--odometry_error_per_dataset --plot_trajectories --recalculate_errors " \
           "--rmse_table --rmse_boxplot --mul_trials={} --overall_odometry_error". \
         format(analyze_traj_script, eval_config_yaml, eval_output_dir, results_dir, num_trials)
