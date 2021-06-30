@@ -277,7 +277,7 @@ def boxplot_block_and_save(data_array, column_indices, xlabels, out_file,
 
     fig.tight_layout()
     # plt.show()
-    fig.savefig(out_file, bbox_inches="tight", dpi=300)
+    fig.savefig(out_file, bbox_inches="tight", dpi=300, transparent=True)
     plt.close(fig)
 
 
@@ -332,7 +332,7 @@ def barplot_block_and_save(data_array, value_indices, sigma_indices, xlabels, ou
 
     fig.tight_layout()
     # plt.show()
-    fig.savefig(out_file, bbox_inches="tight", dpi=300)
+    fig.savefig(out_file, bbox_inches="tight", dpi=300, transparent=True)
     plt.close(fig)
 
 
@@ -365,6 +365,50 @@ def draw_barplot_together(blockAIndex, blockBIndex, blockADim, blockBDim,
     barplot_block_and_save(estimate_errors, error_indices, std_indices,
                            labels, out_file, referrors, component_label, '',
                            segment_list[blockAIndex][kerror_unit])
+
+
+def select_runs_for_3sigma_bounds_example():
+    """Select the runs with small ATE rot and small ATE trans which will be used to plot the 3sigma bounds"""
+    transerrors = [0.09022562756865582, 0.13114642737489238, 0.25622578793125195, 0.36267676472363924,
+                   0.13306107509360549, 1000, 0.23050848389168876, 0.3218183154650858, 0.6003507083814829,
+                   0.22879267809510662, 0.5719646823836804, 0.24911421900416536, 0.3408112171871047,
+                   87.34580654604498, 644.3724045394401, 0.1332637773118743, 2.3374334160602688,
+                   0.13391120417289787, 0.1044488889419483, 1.535957438210344, 0.10096161195107226,
+                   0.6655764678454069, 0.08360377795799294, 0.10446224966712461, 0.08955341880147774,
+                   0.15536441838692425,
+                   0.1645168781777384, 0.17826573889485225, 0.06815480978239215, 0.34653887754949936]
+    roterrors = [3.502730633663846, 4.042757989950087, 5.410597858239634, 11.017149785882092, 3.4981200002788104, 1000,
+                 10.205941538071434, 11.543153038521977, 26.357714255405615, 8.814572915966675, 5.394925854219783,
+                 4.528571781458833, 6.09258478360548, 148.25187832087994, 105.64793030011404, 4.457533097768242,
+                 22.278626038474375, 3.9906416854988467, 5.13630378830125, 12.906875327849283, 4.967389016486302,
+                 9.333908490980884, 5.095433611284956, 3.964432295162097, 4.244687943017181, 3.7912300430151045,
+                 3.6987893821244606, 4.593540033699874, 3.1289402267398048, 5.723220901478907]
+    dataindices = []
+    for i in range(6):
+        for j in range(5):
+            dataindices.append((i, j))
+
+    assert len(transerrors) == 30
+    assert len(roterrors) == 30
+    assert len(dataindices) == 30
+
+    transindices = [x for _, x in sorted(zip(transerrors, dataindices))]
+    rotindices = [x for _, x in sorted(zip(roterrors, dataindices))]
+    print('Trial indices of ordered trans errors: \n{}\nTrial indices of ordered rot errors:\n{}'.format(transindices, rotindices))
+    print('The candidate runs for plotting 3sigma bounds can be selected from the beginning part.')
+    print('Note you have to deduce the indices in the main plot function which does not count the failed trials.')
+
+
+def selected_runs_for_3sigma_bounds():
+    selected_indices = [0, 3, 1, 3, 2, 3]
+    success_trials = [0, 5, 4, 3, 5, 5, 5]
+    cum_indices = np.cumsum(success_trials)
+    cum_chosen_indices = [cum_indices[i] + index for i, index in enumerate(selected_indices)]
+    # cum_chosen_indices = range(0, len(estimate_file_list))
+    print('chosen indices\n')
+    for i, index in enumerate(cum_chosen_indices):
+        print("{} {}".format(i, estimate_file_list[index]))
+    return cum_chosen_indices
 
 
 if __name__ == '__main__':
@@ -475,14 +519,9 @@ if __name__ == '__main__':
     # compute and visualize the differences between estimated values and nominal values.
     # The boxplot also visualizes the difference of the reference values to the nominal values.
     estimate_errors = copy.deepcopy(data_array)
-    selected_indices = [4, 0, 1, 0, 3, 0]
-    success_trials = [0, 5, 4, 3, 5, 5, 5]
-    cum_indices = np.cumsum(success_trials)
-    cum_chosen_indices = [cum_indices[i] + index for i, index in enumerate(selected_indices)]
-    # cum_chosen_indices = range(0, len(estimate_file_list))
-    print('chosen indices\n')
-    for i, index in enumerate(cum_chosen_indices):
-        print("{} {}".format(i, estimate_file_list[index]))
+
+    chosen_indices = selected_runs_for_3sigma_bounds()
+
     for index, segment in enumerate(segment_list):
         refvalues = copy.deepcopy(segment[ktum_reference_value])
         nominal_value = segment[knominal_value]
@@ -514,7 +553,7 @@ if __name__ == '__main__':
 
         # draw the 3\sigma bounds for estimated parameter values and (reference values - nominal values).
         out_file = args.plot_dir + '/std_' + segment[kcomponent_label] + FORMAT
-        barplot_block_and_save(estimate_errors[cum_chosen_indices, :], error_indices, std_index_ranges[index],
+        barplot_block_and_save(estimate_errors[chosen_indices, :], error_indices, std_index_ranges[index],
                                segment[kcolumn_labels][0:segment[kminimal_dim]],
                                out_file, referrors, segment[kcomponent_label], segment[kcomponent_label_code],
                                segment[kerror_unit])
@@ -522,16 +561,16 @@ if __name__ == '__main__':
     # draw p_C0B and p_BC1 together
     out_file = args.plot_dir + '/std_p_C0B_p_BC1' + FORMAT
     draw_barplot_together(5, 9, 3, 3, index_ranges, std_index_ranges, segment_list,
-                          estimate_errors[cum_chosen_indices, :], out_file)
+                          estimate_errors[chosen_indices, :], out_file)
     # draw fc0 fc1 together
     out_file = args.plot_dir + '/std_fc0_fc1' + FORMAT
     draw_barplot_together(6, 11, 3, 3, index_ranges, std_index_ranges, segment_list,
-                          estimate_errors[cum_chosen_indices, :], out_file)
+                          estimate_errors[chosen_indices, :], out_file)
     # draw distort0 and distort1 together
     out_file = args.plot_dir + '/std_dist0_dist1' + FORMAT
     draw_barplot_together(7, 12, 2, 2, index_ranges, std_index_ranges, segment_list,
-                          estimate_errors[cum_chosen_indices, :], out_file)
+                          estimate_errors[chosen_indices, :], out_file)
     # draw td tr together
     out_file = args.plot_dir + '/std_tdtr0_tdtr1' + FORMAT
     draw_barplot_together(8, 13, 2, 2, index_ranges, std_index_ranges, segment_list,
-                          estimate_errors[cum_chosen_indices, :], out_file)
+                          estimate_errors[chosen_indices, :], out_file)
