@@ -76,6 +76,8 @@ if __name__ == '__main__':
         algo_option_templates, config_name_to_diffs = tumvi_calib_options.tumvi_calibrated_vinsmono_options()
     elif args.test_case == "tumvi_calibrated_openvins":
         algo_option_templates, config_name_to_diffs = tumvi_calib_options.tumvi_calibrated_openvins_options()
+    elif args.test_case == "tumvi_openvins_calib_cam":
+        algo_option_templates, config_name_to_diffs = tumvi_calib_options.tumvi_openvins_calib_cam_options()
     elif args.test_case == "tumvi_raw":
         algo_option_templates, config_name_to_diffs = tumvi_calib_options.tumvi_raw_swiftvio_options()
     elif args.test_case == "tumvi_raw_vinsmono":

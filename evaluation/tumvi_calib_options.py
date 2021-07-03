@@ -279,6 +279,30 @@ def tumvi_calibrated_openvins_options():
     return algo_option_templates, config_name_to_diffs
 
 
+def tumvi_openvins_calib_cam_options():
+    algo_option_templates = {
+        'OpenVINS': {"algo_code": "OpenVINS",
+                     "launch_file": "pgeneva_serial_tum_inaccurate.launch",
+                     "gyroscope_noise_density": "0.00016",
+                     "gyroscope_random_walk": "0.000022",
+                     "accelerometer_noise_density": "0.0028",
+                     "accelerometer_random_walk": "0.00086"
+                     },
+    }
+
+    config_name_to_diffs = {
+        ('OpenVINS-Mono', 'OpenVINS'): {
+            "max_cameras": 1,
+            "use_stereo": 'false'
+        },
+        ('OpenVINS-Stereo', 'OpenVINS'): {
+            "max_cameras": 2,
+            "use_stereo": 'true'
+        },
+    }
+    return algo_option_templates, config_name_to_diffs
+
+
 def tumvi_raw_openvins_options():
     algo_option_templates = {
         'OpenVINS': {"algo_code": "OpenVINS",

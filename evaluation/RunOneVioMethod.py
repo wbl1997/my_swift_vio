@@ -183,11 +183,14 @@ class RunOneVioMethod(object):
                 init_imu_thresh = dataset_parameters.decide_initial_imu_threshold(
                     self.algo_code_flags["algo_code"], bag_fullname)
             result_file = os.path.join(output_dir_trial, 'stamped_traj_estimate.txt')
+            state_file = os.path.join(output_dir_trial, 'state_estimate.txt')
+            std_file = os.path.join(output_dir_trial, 'state_deviation.txt')
             exe_cmd = "roslaunch ov_msckf {} max_cameras:={} use_stereo:={} bag:={} " \
-                      "bag_start:={} init_imu_thresh:={} dosave:=true path_est:={}".format(
+                      "bag_start:={} init_imu_thresh:={} dosave:=true dosave_state:=true " \
+                      "path_est:={} path_state_est:={} path_state_std:={}".format(
                           self.algo_code_flags["launch_file"], self.algo_code_flags["max_cameras"],
                           self.algo_code_flags["use_stereo"], bag_fullname,
-                          bag_start, init_imu_thresh, result_file)
+                          bag_start, init_imu_thresh, result_file, state_file, std_file)
             exe_cmd += append_ros_arg_if_exist(self.algo_code_flags, "gyroscope_noise_density")
             exe_cmd += append_ros_arg_if_exist(self.algo_code_flags, "gyroscope_random_walk")
             exe_cmd += append_ros_arg_if_exist(self.algo_code_flags, "accelerometer_noise_density")
