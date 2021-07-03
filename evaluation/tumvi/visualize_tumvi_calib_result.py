@@ -57,6 +57,7 @@ PALETTE = plt.rcParams['axes.prop_cycle'].by_key()['color']
 # (R_S1C * R_S2C^T)^T * p_S1C1 = p_S2C1
 # (R_S1C * R_S2C^T)^T * R_S1C1 = R_S2C1
 
+# copied from https://vision.in.tum.de/data/datasets/visual-inertial-dataset
 TUMVI_IMU_INTRINSICS = {
     'Ma': np.array([[1.00422, 0, 0],
                     [-7.82123e-05, 1.00136, 0],
@@ -68,11 +69,114 @@ TUMVI_IMU_INTRINSICS = {
     'bg': np.array([0.0283122, 0.00723077, 0.0165292]),
 }
 
+# The camera extrinsics are copied from the okvis config file provided by TUMVI at
+# https://vision.in.tum.de/_media/data/datasets/visual-inertial-dataset/config_okvis_50_20.yaml.tar.gz
+# The camera intrinsic parameters are estimated by running basalt_calibrate on
+# tumvi_calib_data/dataset-calib-cam3_512_16.bag.
+TUMVI_PARAMETERS = {
+    "cameras": [
+        {"T_SC": [-0.99953071, 0.00744168, -0.02971511, 0.04536566,
+                  0.0294408, -0.03459565, -0.99896766, -0.071996,
+                  -0.00846201, -0.99937369, 0.03436032, -0.04478181,
+                  0.0, 0.0, 0.0, 1.0],
+         "image_dimension": [512, 512],
+         "distortion_coefficients": [0.0071903212354232789, -0.004483597406537407, 0.0011164152345498162,
+                                     -0.00042033545473632523],
+         "distortion_type": "equidistant",
+         "focal_length": [191.10360934193845, 191.08897924484246],
+         "principal_point": [254.96090765301757, 256.8868959188778],
+         "projection_opt_mode": "FXY_CXY",
+         "extrinsic_opt_mode": "P_CB",
+         "image_delay": 0.0,
+         "image_readout_time": 0.00},
+        {"T_SC":
+             [-0.99951678, 0.00803569, -0.03002713, -0.05566603,
+              0.03012473, 0.01231336, -0.9994703, -0.07010225,
+              -0.0076617, -0.9998919, -0.01254948, -0.0475471,
+              0., 0., 0., 1.,],
+         "image_dimension": [512, 512],
+         "distortion_coefficients": [0.0076099391727948409, -0.004231474520440184, 0.0010904030371996857,
+                                     -0.00043379644513004217],
+         "distortion_type": "equidistant",
+         "focal_length": [190.4520077890315, 190.4187691410897],
+         "principal_point": [252.56390242046556, 255.0272611597151],
+         "projection_opt_mode": "FXY_CXY",
+         "extrinsic_opt_mode": "P_BC_Q_BC",
+         "image_delay": 0.0,
+         "image_readout_time": 0.00}],
+    "imu_params": {
+        'imu_rate': 200,
+        'g_max': 7.8,
+        'sigma_g_c': 0.004,
+        'sigma_a_c': 0.07,
+        'sigma_gw_c': 4.4e-5,
+        'sigma_aw_c': 1.72e-3,
+        'g': 9.80766,
+        'sigma_TGElement': 5e-3,
+        'sigma_TSElement': 1e-3,
+        'sigma_TAElement': 5e-3, },
+    'ceres_options': {
+        'timeLimit': 1,  # in units of seconds, -1 means no limit.
+    },
+    "displayImages": "false",
+    "publishing_options": {
+        'publishLandmarks': "false", }
+}
+
+TUMVI_NOMINAL_PARAMETERS = {
+    "cameras": [
+        {"T_SC": [-1, 0.0, 0.0, 0.0,
+                  0.0, 0.0, -1.0, 0.0,
+                  0.0, -1.0, 0.0, 0.0,
+                  0.0, 0.0, 0.0, 1.0],
+         "image_dimension": [512, 512],
+         "distortion_coefficients": [0.0, 0.0, 0.0, 0.0],
+         "distortion_type": "equidistant",
+         "focal_length": [190.0, 190.0],
+         "principal_point": [256.0, 256.0],
+         "projection_opt_mode": "FX_CXY",
+         "extrinsic_opt_mode": "P_CB",
+         "image_delay": 0.0,
+         "image_readout_time": 0.00},
+        {"T_SC":
+             [-1.0, 0.0, 0.0, 0.0,
+              0.0, 0.0, -1.0, 0.0,
+              0.0, -1.0, 0.0, 0.0,
+              0., 0., 0., 1.],
+         "image_dimension": [512, 512],
+         "distortion_coefficients": [0.0, 0.0, 0.0, 0.0],
+         "distortion_type": "equidistant",
+         "focal_length": [190.0, 190.0],
+         "principal_point": [256.0, 256.0],
+         "projection_opt_mode": "FX_CXY",
+         "extrinsic_opt_mode": "P_BC_Q_BC",
+         "image_delay": 0.0,
+         "image_readout_time": 0.00
+         }],
+    "imu_params": {
+        'imu_rate': 200,
+        'g_max': 7.8,
+        'sigma_g_c': 0.004,
+        'sigma_a_c': 0.07,
+        'sigma_gw_c': 4.4e-5,
+        'sigma_aw_c': 1.72e-3,
+        'g': 9.80766,
+        'sigma_TGElement': 5e-3,
+        'sigma_TSElement': 1e-3,
+        'sigma_TAElement': 5e-3, },
+    'ceres_options': {
+        'timeLimit': 1,
+    },
+    "displayImages": "false",
+    "publishing_options": {
+        'publishLandmarks': "false", }
+}
+
 TUMVI_IMAGE_DELAY = 126788 * 1e-9  # nanoseconds
 
-TUMVI_R_SC = np.array(dataset_vio_config.TUMVI_PARAMETERS['cameras'][0]['T_SC']).reshape(4, 4)[:3, :3]
+TUMVI_R_SC = np.array(TUMVI_PARAMETERS['cameras'][0]['T_SC']).reshape(4, 4)[:3, :3]
 
-Nominal_R_SC = np.array(dataset_vio_config.TUMVI_NOMINAL_PARAMETERS['cameras'][0]['T_SC']).reshape(4, 4)[:3, :3]
+Nominal_R_SC = np.array(TUMVI_NOMINAL_PARAMETERS['cameras'][0]['T_SC']).reshape(4, 4)[:3, :3]
 
 TUMVIS_R_NominalS = np.matmul(TUMVI_R_SC, np.transpose(Nominal_R_SC))
 
@@ -195,8 +299,8 @@ def get_ksf_model_parameters(tumvi_imu_parameters):
     ksf_intrinsics['Tg'] = np.matmul(invMg, R_S1S2).reshape(9)
     ksf_intrinsics['Ts'] = np.zeros((3, 3)).reshape(9)
     ksf_intrinsics['Ta'] = np.matmul(invMa, R_S1S2).reshape(9)
-    T_SC0 = np.array(dataset_vio_config.TUMVI_PARAMETERS['cameras'][0]['T_SC']).reshape([4, 4])
-    T_SC1 = np.array(dataset_vio_config.TUMVI_PARAMETERS['cameras'][1]['T_SC']).reshape([4, 4])
+    T_SC0 = np.array(TUMVI_PARAMETERS['cameras'][0]['T_SC']).reshape([4, 4])
+    T_SC1 = np.array(TUMVI_PARAMETERS['cameras'][1]['T_SC']).reshape([4, 4])
     ksf_intrinsics['p_C0B'] = - np.matmul(np.transpose(T_SC0[:3, :3]), T_SC0[:3, 3])
     ksf_intrinsics['p_BC1'] = np.matmul(np.transpose(TUMVIS_R_NominalS), T_SC1[:3, 3])
     ksf_intrinsics['q_BC1'] = dcm2quat(np.matmul(np.transpose(TUMVIS_R_NominalS), T_SC1[:3, :3]))
@@ -206,12 +310,12 @@ def get_ksf_model_parameters(tumvi_imu_parameters):
         distort = np.zeros(4)
         tdtr = np.zeros(2)
 
-        focal_length = dataset_vio_config.TUMVI_PARAMETERS['cameras'][j]['focal_length']
+        focal_length = TUMVI_PARAMETERS['cameras'][j]['focal_length']
         fc[0] = (focal_length[0] + focal_length[1])*0.5
-        fc[1:] = np.array(dataset_vio_config.TUMVI_PARAMETERS['cameras'][j]['principal_point'])
-        distort = np.array(dataset_vio_config.TUMVI_PARAMETERS['cameras'][j]['distortion_coefficients'])
+        fc[1:] = np.array(TUMVI_PARAMETERS['cameras'][j]['principal_point'])
+        distort = np.array(TUMVI_PARAMETERS['cameras'][j]['distortion_coefficients'])
         tdtr[0] = TUMVI_IMAGE_DELAY
-        tdtr[1] = dataset_vio_config.TUMVI_PARAMETERS['cameras'][j]["image_readout_time"]
+        tdtr[1] = TUMVI_PARAMETERS['cameras'][j]["image_readout_time"]
         ksf_intrinsics['fc' + suffix] = fc
         ksf_intrinsics['distort' + suffix] = distort
         ksf_intrinsics['tdtr' + suffix] = tdtr
