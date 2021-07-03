@@ -120,14 +120,14 @@ ylabel('y[m]');
 zlabel('z[m]');
 axis equal;
 grid on;
-outputfig = [outputPath, '/p_GB.eps'];
+outputfig = [outputPath, '/p_GB.pdf'];
 if exist(outputfig, 'file')==2
     delete(outputfig);
 end
 export_fig(outputfig);
 
 if(~isempty(gt))
-    % compute totla distance, max error, rmse
+    % compute total distance, max error, rmse
     distance = totalDistance(gt(assocIndex, gt_index.r));
     errorPosition = data(:,options.r)- gt(assocIndex, gt_index.r);
     absError = sqrt(sum(errorPosition.^2,2));
@@ -138,21 +138,24 @@ if(~isempty(gt))
     
     figure;
     drawMeanAndStdBound(data_diff, options.r, options.r_std, 1, 1);
-    ylabel('$\delta \mathbf{t}_{WB}$ (m)', 'Interpreter', 'Latex');
-    saveas(gcf,[outputPath, '\Error p_WB'],'epsc');
+    xlim(options.xlim);
+    ylabel('$\delta \mathbf{p}_{WB}$ (m)', 'Interpreter', 'Latex');
+    saveas(gcf,[outputPath, '\Error p_WB.pdf']);
     
     figure;
     drawMeanAndStdBound(data_diff, options.q(1:3), ...
         options.q_std, 180/pi, 1);
+    xlim(options.xlim);
     ylabel('$\delta \mathbf{\theta}_{WB}{} (^{\circ})$', 'Interpreter', 'Latex');
-    saveas(gcf,[outputPath, '\Error R_WB'],'epsc');
+    saveas(gcf,[outputPath, '\Error R_WB.pdf']);
     
     figure;
     if size(gt, 2) >= 2 + 7 + 3
         drawMeanAndStdBound(data_diff, options.v, ...
             options.v_std, 1, 1);
+        xlim(options.xlim);
         ylabel('$\delta \mathbf{v}_{WB} (m/s)$', 'Interpreter', 'Latex');
-        saveas(gcf,[outputPath, '\Error v_WB'],'epsc');
+        saveas(gcf,[outputPath, '\Error v_WB.pdf']);
     end
 end
 
@@ -170,39 +173,41 @@ if(~isempty(gt))
 else
     legend('qx', 'qy', 'qz');
 end
+xlim(options.xlim);
 xlabel('time[sec]');
 ylabel('q xyz[1]');
 grid on;
-outputfig = [outputPath, '/qxyz_GB.eps'];
+outputfig = [outputPath, '/qxyz_GB.pdf'];
 if exist(outputfig, 'file')==2
     delete(outputfig);
 end
 export_fig(outputfig);
 
 if options.v_std(1) > size(data, 2)
-figure;
-plot(data(:,1), data(:, options.v(1)), '-r');
-hold on;
-plot(data(:,1), data(:, options.v(2)), '-g');
-plot(data(:,1), data(:, options.v(3)), '-b');
-ylabel('v_{GB}[m/s]');
-
+    figure;
+    plot(data(:,1), data(:, options.v(1)), '-r');
+    hold on;
+    plot(data(:,1), data(:, options.v(2)), '-g');
+    plot(data(:,1), data(:, options.v(3)), '-b');
+    ylabel('v_{GB}[m/s]');
 else
-figure;
-drawMeanAndStdBound(data, options.v, options.v_std);
-if(~isempty(gt))
-    plot(gt(:,1), gt(:,gt_index.v(1)), '-.r');
-    plot(gt(:,1), gt(:,gt_index.v(2)), '-.g');
-    plot(gt(:,1), gt(:,gt_index.v(3)), '-.b');
-    legend('vx', 'vy', 'vz', 'std x', 'std y', 'std z', '-std x', ...
-        '-std y', '-std z', 'gt vx', 'gt vy', 'gt vz');
-end
-ylabel('v_{GB}[m/s]');
-outputfig = [outputPath, '/v_GB.eps'];
-if exist(outputfig, 'file')==2
-    delete(outputfig);
-end
-export_fig(outputfig);
+    figure;
+    drawMeanAndStdBound(data, options.v, options.v_std);
+    if(~isempty(gt))
+        plot(gt(:,1), gt(:,gt_index.v(1)), '-.r');
+        plot(gt(:,1), gt(:,gt_index.v(2)), '-.g');
+        plot(gt(:,1), gt(:,gt_index.v(3)), '-.b');
+        legend('vx', 'vy', 'vz', 'std x', 'std y', 'std z', '-std x', ...
+            '-std y', '-std z', 'gt vx', 'gt vy', 'gt vz');
+    end
+    xlim(options.xlim);
+    ylabel('v_{GB}[m/s]');
+    
+    outputfig = [outputPath, '/v_GB.pdf'];
+    if exist(outputfig, 'file')==2
+        delete(outputfig);
+    end
+    export_fig(outputfig);
 end
 
 plotImuBiases(data, options, outputPath);
@@ -210,8 +215,9 @@ plotImuBiases(data, options, outputPath);
 if ~isempty(options.p_camera)
     figure;
     drawMeanAndStdBound(data, options.p_camera, options.p_camera_std, 100.0);
+    xlim(options.xlim);
     ylabel('p_{camera}[cm]');
-    outputfig = [outputPath, '/p_camera.eps'];
+    outputfig = [outputPath, '/p_camera.pdf'];
     if exist(outputfig, 'file')==2
         delete(outputfig);
     end
@@ -232,38 +238,42 @@ end
 
 function plotImuBiases(data, options, outputPath)
 if options.b_g_std(end) > size(data, 2)
-figure;
-plot(data(:,1), data(:, options.b_g(1)) * 180 / pi, '-r');
-hold on;
-plot(data(:,1), data(:, options.b_g(2)) * 180 / pi, '-g');
-plot(data(:,1), data(:, options.b_g(3)) * 180 / pi, '-b');
-ylabel('b_g [deg/s]');
-
-figure;
-plot(data(:,1), data(:, options.b_a(1)), '-r');
-hold on;
-plot(data(:,1), data(:, options.b_a(2)), '-g');
-plot(data(:,1), data(:, options.b_a(3)), '-b');
-ylabel('b_a[m/s^2]');
-
+    figure;
+    plot(data(:,1), data(:, options.b_g(1)) * 180 / pi, '-r');
+    hold on;
+    plot(data(:,1), data(:, options.b_g(2)) * 180 / pi, '-g');
+    plot(data(:,1), data(:, options.b_g(3)) * 180 / pi, '-b');
+    xlim(options.xlim);
+    ylabel('b_g [deg/s]');
+    
+    figure;
+    plot(data(:,1), data(:, options.b_a(1)), '-r');
+    hold on;
+    plot(data(:,1), data(:, options.b_a(2)), '-g');
+    plot(data(:,1), data(:, options.b_a(3)), '-b');
+    xlim(options.xlim);
+    ylabel('b_a[m/s^2]');
+    
 else
-figure;
-drawMeanAndStdBound(data, options.b_g, options.b_g_std, 180/pi);
-ylabel(['b_g[' char(176) '/s]']);
-outputfig = [outputPath, '/b_g.eps'];
-if exist(outputfig, 'file')==2
-    delete(outputfig);
-end
-export_fig(outputfig);
-
-figure;
-drawMeanAndStdBound(data, options.b_a, options.b_a_std, 1.0);
-ylabel('b_a[m/s^2]');
-outputfig = [outputPath, '/b_a.eps'];
-if exist(outputfig, 'file')==2
-    delete(outputfig);
-end
-export_fig(outputfig);
+    figure;
+    drawMeanAndStdBound(data, options.b_g, options.b_g_std, 180/pi);
+    xlim(options.xlim);
+    ylabel(['b_g[' char(176) '/s]']);
+    outputfig = [outputPath, '/b_g.pdf'];
+    if exist(outputfig, 'file')==2
+        delete(outputfig);
+    end
+    export_fig(outputfig);
+    
+    figure;
+    drawMeanAndStdBound(data, options.b_a, options.b_a_std, 1.0);
+    xlim(options.xlim);
+    ylabel('b_a[m/s^2]');
+    outputfig = [outputPath, '/b_a.pdf'];
+    if exist(outputfig, 'file')==2
+        delete(outputfig);
+    end
+    export_fig(outputfig);
 end
 end
 
@@ -271,14 +281,15 @@ function plotCameraIntrinsics(data, options, outputPath)
 if ~isempty(options.fxy_cxy) && options.fxy_cxy_std(end) < size(data, 2)
     figure;
     data(:, options.fxy_cxy) = data(:, options.fxy_cxy) - ...
-        repmat(options.trueCameraIntrinsics, size(data, 1), 1);
+        repmat(options.trueCamProjectionIntrinsics, size(data, 1), 1);
     drawMeanAndStdBound(data, options.fxy_cxy, ...
         options.fxy_cxy_std);
+    xlim(options.camIntrinsicXlim);
     legend('f_x','f_y','c_x','c_y','3\sigma_f_x','3\sigma_f_y',...
         '3\sigma_c_x','3\sigma_c_y');
     ylabel(['deviation from nominal values ($f_x$, $f_y$), ', ...
         '($c_x$, $c_y$)[px]'], 'Interpreter', 'Latex');
-    outputfig = [outputPath, '/fxy_cxy.eps'];
+    outputfig = [outputPath, '/fxy_cxy.pdf'];
     if exist(outputfig, 'file')==2
         delete(outputfig);
     end
@@ -288,9 +299,10 @@ end
 if ~isempty(options.k1_k2) && options.k1_k2_std(end) < size(data, 2)
     figure;
     drawMeanAndStdBound(data, options.k1_k2, options.k1_k2_std);
+    xlim(options.camIntrinsicXlim);
     ylabel('k_1 and k_2[1]');
     legend('k_1','k_2', '3\sigma_{k_1}', '3\sigma_{k_2}');
-    outputfig = [outputPath, '/k1_k2.eps'];
+    outputfig = [outputPath, '/k1_k2.pdf'];
     if exist(outputfig, 'file')==2
         delete(outputfig);
     end
@@ -301,9 +313,10 @@ if ~isempty(options.p1_p2) && options.p1_p2_std(end) < size(data, 2)
     figure;
     p1p2Scale = 1e2;
     drawMeanAndStdBound(data, options.p1_p2, options.p1_p2_std, p1p2Scale);
+    xlim(options.camIntrinsicXlim);
     ylabel('p_1 and p_2[0.01]');
     legend('p_1','p_2', '3\sigma_{p_1}', '3\sigma_{p_2}');
-    outputfig = [outputPath, '/p1_p2.eps'];
+    outputfig = [outputPath, '/p1_p2.pdf'];
     if exist(outputfig, 'file')==2
         delete(outputfig);
     end
@@ -319,8 +332,9 @@ if ~isempty(options.T_g) && options.T_g_std(end) < size(data, 2)
         - ones(size(data, 1), 3);
     drawMeanAndStdBound(data, options.T_g, ...
         options.T_g_std);
+    xlim(options.xlim);
     ylabel('$\mathbf{T}_g$[1]' , 'Interpreter', 'Latex');
-    outputfig = [outputPath, '/T_g.eps'];
+    outputfig = [outputPath, '/T_g.pdf'];
     if exist(outputfig, 'file')==2
         delete(outputfig);
     end
@@ -329,8 +343,9 @@ if ~isempty(options.T_g) && options.T_g_std(end) < size(data, 2)
     figure;
     drawMeanAndStdBound(data, options.T_s, ...
         options.T_s_std);
+    xlim(options.xlim);
     ylabel('$\mathbf{T}_s$[1]' , 'Interpreter', 'Latex');
-    outputfig = [outputPath, '/T_s.eps'];
+    outputfig = [outputPath, '/T_s.pdf'];
     if exist(outputfig, 'file')==2
         delete(outputfig);
     end
@@ -341,8 +356,9 @@ if ~isempty(options.T_g) && options.T_g_std(end) < size(data, 2)
         - ones(size(data, 1), 3);
     drawMeanAndStdBound(data, options.T_a, ...
         options.T_a_std);
+    xlim(options.xlim);
     ylabel('$\mathbf{T}_a$[1]' , 'Interpreter', 'Latex');
-    outputfig = [outputPath, '/T_a.eps'];
+    outputfig = [outputPath, '/T_a.pdf'];
     if exist(outputfig, 'file')==2
         delete(outputfig);
     end
@@ -355,9 +371,10 @@ if ~isempty(options.td) && options.td_std < size(data, 2)
     figure;
     drawMeanAndStdBound(data, options.td, ...
         options.td_std, 1000);
+    xlim(options.xlim);
     legend('t_d', '3\sigma_t_d');
     ylabel('$t_d$[ms]', 'Interpreter', 'Latex');
-    outputfig = [outputPath, '/t_d.eps'];
+    outputfig = [outputPath, '/t_d.pdf'];
     if exist(outputfig, 'file')==2
         delete(outputfig);
     end
@@ -368,9 +385,10 @@ if ~isempty(options.tr) && options.tr_std <= size(data, 2)
     figure;
     drawMeanAndStdBound(data, options.tr, ...
         options.tr_std, 1000);
+    xlim(options.xlim);
     legend('t_r', '3\sigma_{t_r}');
     ylabel('$t_r$[ms]', 'Interpreter', 'Latex');
-    outputfig = [outputPath, '/t_r.eps'];
+    outputfig = [outputPath, '/t_r.pdf'];
     if exist(outputfig, 'file')==2
         delete(outputfig);
     end

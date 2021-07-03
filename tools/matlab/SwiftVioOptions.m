@@ -1,4 +1,4 @@
-function options = SwiftVioOptions(isfilter, numCameras, stdCamIdx)
+function options = SwiftVioOptions(isfilter, numCameras, stdCamIdx, projectionIntrinsicDim)
 % set variable and standard deviation indices in the swift_vio output.
 % isfilter: is the output from a filter or a smoother?
 % numCameras: how many cameras are in the setup?
@@ -7,14 +7,16 @@ function options = SwiftVioOptions(isfilter, numCameras, stdCamIdx)
 %
 % Note this method assumes full calibration, and does not support reduced
 % camera intrinsic models.
-
+if nargin < 4
+    projectionIntrinsicDim = 4;
+end
 if nargin < 3
     stdCamIdx = 1;
 end
 if nargin < 2
     numCameras = 1;
 end
-projectionIntrinsicDim = 3;
+
 distortionIntrinsicDim = 4;
 if isfilter
     if numCameras == 1
@@ -37,7 +39,8 @@ options.trueq_XC = [1, 0, 0, 0];
 options.trueTimeOffset = 0;
 options.trueReadoutTime = 0;
 
-options.timeAxisPadding = 5; % time axis starts from -timeAxisPadding, and ends with extension timeAxisPadding.
+options.xlim = [-2, 200];
+options.camIntrinsicXlim = [-2, 200];
 
 padding = 2;
 options.r = padding + (1:3);
@@ -78,8 +81,7 @@ switch isfilter
             end
             options.td = options.p1_p2(end) + 1;
             options.tr = options.td + 1;
-            options.std_camera_start_index = options.std_start_index + 15 + 27;
-            options.p_camera_std = options.std_camera_start_index + (1:3);
+            options.p_camera_std = options.std_start_index + 15 + 27 + (1:3);
             options.fxy_cxy_std = options.p_camera_std(end) + (1:projectionIntrinsicDim);
             options.k1_k2_std = options.fxy_cxy_std(end) + (1:2);
             if distortionIntrinsicDim > 2
@@ -102,8 +104,7 @@ switch isfilter
             end
             options.td = options.p1_p2(end) + 1;
             options.tr = options.td + 1;
-            options.std_camera_start_index = options.tr_std + 3 + 3 + projectionIntrinsicDim + distortionIntrinsicDim + 2;
-            options.p_camera_std = options.std_camera_start_index + (1:3);
+            options.p_camera_std = options.tr_std + (1:3);
             options.q_XC_std = options.p_camera_std(end) + (1:3);
             options.fxy_cxy_std = options.q_XC_std(end) + (1:projectionIntrinsicDim);
             options.k1_k2_std = options.fxy_cxy_std(end) + (1:2);
