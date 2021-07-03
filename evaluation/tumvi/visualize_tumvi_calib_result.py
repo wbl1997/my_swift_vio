@@ -282,7 +282,7 @@ def boxplot_block_and_save(data_array, column_indices, xlabels, out_file,
 
 
 def barplot_block_and_save(data_array, value_indices, sigma_indices, xlabels, out_file,
-                           ref_values, component_label, component_label_code, unit_label):
+                           ref_values, component_label, component_label_code, unit_label, aspect):
     """
     draw the 3 sigma bounds for each column of the data_array, and also draw the reference value.
     :param data_array:
@@ -329,7 +329,7 @@ def barplot_block_and_save(data_array, value_indices, sigma_indices, xlabels, ou
     ax.set_xticks(xticklist)
     ax.set_xticklabels(xlabels)
     ax.set_ylabel(component_label_code + ' (' + unit_label + ')')
-
+    ax.set_aspect(aspect)
     fig.tight_layout()
     # plt.show()
     fig.savefig(out_file, bbox_inches="tight", dpi=300, transparent=True)
@@ -338,7 +338,7 @@ def barplot_block_and_save(data_array, value_indices, sigma_indices, xlabels, ou
 
 def draw_barplot_together(blockAIndex, blockBIndex, blockADim, blockBDim,
                           index_ranges, std_index_ranges, segment_list,
-                          estimate_errors, out_file):
+                          estimate_errors, out_file, aspect):
     error_indices = list(index_ranges[blockAIndex][:blockADim])
     error_indices.extend(index_ranges[blockBIndex][:blockBDim])
 
@@ -351,7 +351,7 @@ def draw_barplot_together(blockAIndex, blockBIndex, blockADim, blockBDim,
     dims = [blockADim, blockBDim]
     for index, block in enumerate([blockAIndex, blockBIndex]):
         refvalues = copy.deepcopy(segment_list[block][ktum_reference_value])
-        nominal_value = segment_list[block][knominal_value]
+        nominal_value = segment_list[block][kinitial_value]
         referror = compute_deviation_from_nominal_value(
             segment_list[block][kcomponent_label], refvalues, nominal_value)
         if isinstance(segment_list[block][kscale], list):
@@ -364,7 +364,7 @@ def draw_barplot_together(blockAIndex, blockBIndex, blockADim, blockBDim,
     component_label = segment_list[blockAIndex][kcomponent_label] + segment_list[blockBIndex][kcomponent_label]
     barplot_block_and_save(estimate_errors, error_indices, std_indices,
                            labels, out_file, referrors, component_label, '',
-                           segment_list[blockAIndex][kerror_unit])
+                           segment_list[blockAIndex][kerror_unit], aspect)
 
 
 def select_runs_for_3sigma_bounds_example():
@@ -452,41 +452,39 @@ if __name__ == '__main__':
     kerror_unit = 4
     ksignificant_digits = 5
     kminimal_dim = 6
-    knominal_value = 7
+    kinitial_value = 7
     kcomponent_label = 8
-    kindex_list = 9
-    kstd_index_list = 10
-
+    kaspect = 9
     segment_list = [(r'$\mathbf{b}_g$', [r'$x$', r'$y$', r'$z$'], 180 / math.pi, ksf_params['bg'], r'$^\circ/s$', 3, 3,
-                     np.array([0, 0, 0]), 'bg'),
+                     np.array([0, 0, 0]), 'bg', 0.5),
                     (r'$\mathbf{b}_a$', [r'$x$', r'$y$', r'$z$'], 1.0, ksf_params['ba'], r'$m/s^2$', 3, 3,
-                     np.array([0, 0, 0]), 'ba'),
+                     np.array([0, 0, 0]), 'ba', 0.83),
                     (r'$\mathbf{T}_g$',
                      [r'$1,1$', r'$1,2$', r'$1,3$', r'$2,1$', r'$2,2$', r'$2,3$', r'$3,1$', r'$3,2$', r'$3,3$'],
-                     1000.0, ksf_params['Tg'], '0.001', 2, 9, np.array([1, 0, 0, 0, 1, 0, 0, 0, 1]), 'Tg'),
+                     1000.0, ksf_params['Tg'], '0.001', 2, 9, np.array([1, 0, 0, 0, 1, 0, 0, 0, 1]), 'Tg', 0.05),
                     (r'$\mathbf{T}_s$',
                      [r'$1,1$', r'$1,2$', r'$1,3$', r'$2,1$', r'$2,2$', r'$2,3$', r'$3,1$', r'$3,2$', r'$3,3$'],
                      1000.0, ksf_params['Ts'], r'$0.001 \frac{rad/s}{m/s^2}$', 2, 9,
-                     np.array([0, 0, 0, 0, 0, 0, 0, 0, 0]), 'Ts'),
+                     np.array([0, 0, 0, 0, 0, 0, 0, 0, 0]), 'Ts', 1.3),
                     (r'$\mathbf{T}_a$',
                      [r'$1,1$', r'$1,2$', r'$1,3$', r'$2,1$', r'$2,2$', r'$2,3$', r'$3,1$', r'$3,2$', r'$3,3$'],
-                     1000.0, ksf_params['Ta'], '0.001', 2, 9, np.array([1, 0, 0, 0, 1, 0, 0, 0, 1]), 'Ta'),
+                     1000.0, ksf_params['Ta'], '0.001', 2, 9, np.array([1, 0, 0, 0, 1, 0, 0, 0, 1]), 'Ta', 0.095),
                     ('', [r'$\mathbf{p}_{C0B}(1)$', r'$\mathbf{p}_{C0B}(2)$', r'$\mathbf{p}_{C0B}(3)$'], 100,
-                     ksf_params['p_C0B'], r'$cm$', 2, 3, np.array([0, 0, 0]), 'p_C0B'),
+                     ksf_params['p_C0B'], r'$cm$', 2, 3, np.array([0, 0, 0]), 'p_C0B', 0.5),
                     ('', [r'$f^0$', r'$c_x^0$', r'$c_y^0$'], 1, ksf_params['fc0'], r'$px$', 2, 3, [190, 256, 256],
-                     'fc0'),
+                     'fc0', 0.5),
                     ('', [r'$k_1^0$', r'$k_2^0$', r'$k_3^0$', r'$k_4^0$'], 1000, ksf_params['distort0'], '0.001', 2, 4,
-                     np.array([0, 0, 0, 0]), 'distort0'),
-                    ('', [r'$t_d^0$', r'$t_r^0$'], 1000, ksf_params['tdtr0'], r'$ms$', 2, 2, np.array([0, 0]), 'tdtr0'),
+                     np.array([0, 0, 0, 0]), 'distort0', 0.5),
+                    ('', [r'$t_d^0$', r'$t_r^0$'], 1000, ksf_params['tdtr0'], r'$ms$', 2, 2, np.array([0, 0.02]), 'tdtr0', 0.5),
                     ('', [r'$\mathbf{p}_{BC1}(1)$', r'$\mathbf{p}_{BC1}(2)$', r'$\mathbf{p}_{BC1}$(3)'], 100,
-                     ksf_params['p_BC1'], r'$cm$', 2, 3, np.array([0, 0, 0]), 'p_BC1'),
+                     ksf_params['p_BC1'], r'$cm$', 2, 3, np.array([0, 0, 0]), 'p_BC1', 0.5),
                     (r'$\mathbf{R}_{BC1}$', ['roll', 'pitch', 'yaw', 'w'],
-                     180 / math.pi, ksf_params['q_BC1'], r'$^\circ$', 3, 3, dcm2quat(Nominal_R_SC), 'q_BC1'),
+                     180 / math.pi, ksf_params['q_BC1'], r'$^\circ$', 3, 3, dcm2quat(Nominal_R_SC), 'q_BC1', 1.0),
                     ('', [r'$f^1$', r'$c_x^1$', r'$c_y^1$'], 1, ksf_params['fc1'], r'$px$', 2, 3,
-                     np.array([190, 256, 256]), 'fc1'),
+                     np.array([190, 256, 256]), 'fc1', 0.5),
                     ('', [r'$k_1^1$', r'$k_2^1$', r'$k_3^1$', r'$k_4^1$'], 1000, ksf_params['distort1'], '0.001', 2, 4,
-                     np.array([0, 0, 0, 0]), 'distort1'),
-                    ('', [r'$t_d^1$', r'$t_r^1$'], 1000, ksf_params['tdtr1'], r'$ms$', 2, 2, np.array([0, 0]), 'tdtr1')]
+                     np.array([0, 0, 0, 0]), 'distort1', 0.5),
+                    ('', [r'$t_d^1$', r'$t_r^1$'], 1000, ksf_params['tdtr1'], r'$ms$', 2, 2, np.array([0, 0.02]), 'tdtr1', 0.5)]
 
     index_ranges = list()
     start_index = bg_index
@@ -503,7 +501,7 @@ if __name__ == '__main__':
     # compute the difference between reference values and nominal values
     for index, segment in enumerate(segment_list):
         refvalues = copy.deepcopy(segment[ktum_reference_value])
-        nominal_value = np.array(segment[knominal_value])
+        nominal_value = np.array(segment[kinitial_value])
         referrors = compute_deviation_from_nominal_value(segment[kcomponent_label], refvalues, nominal_value)
         if isinstance(segment[kscale], list):
             for coeff_index, coeff in enumerate(segment[kscale]):
@@ -524,7 +522,7 @@ if __name__ == '__main__':
 
     for index, segment in enumerate(segment_list):
         refvalues = copy.deepcopy(segment[ktum_reference_value])
-        nominal_value = segment[knominal_value]
+        nominal_value = segment[kinitial_value]
         error_indices = index_ranges[index][0:segment[kminimal_dim]]
 
         for j in range(estimate_errors.shape[0]):
@@ -556,21 +554,21 @@ if __name__ == '__main__':
         barplot_block_and_save(estimate_errors[chosen_indices, :], error_indices, std_index_ranges[index],
                                segment[kcolumn_labels][0:segment[kminimal_dim]],
                                out_file, referrors, segment[kcomponent_label], segment[kcomponent_label_code],
-                               segment[kerror_unit])
+                               segment[kerror_unit], segment[kaspect])
 
     # draw p_C0B and p_BC1 together
     out_file = args.plot_dir + '/std_p_C0B_p_BC1' + FORMAT
     draw_barplot_together(5, 9, 3, 3, index_ranges, std_index_ranges, segment_list,
-                          estimate_errors[chosen_indices, :], out_file)
+                          estimate_errors[chosen_indices, :], out_file, 0.4)
     # draw fc0 fc1 together
     out_file = args.plot_dir + '/std_fc0_fc1' + FORMAT
     draw_barplot_together(6, 11, 3, 3, index_ranges, std_index_ranges, segment_list,
-                          estimate_errors[chosen_indices, :], out_file)
+                          estimate_errors[chosen_indices, :], out_file, 0.42)
     # draw distort0 and distort1 together
     out_file = args.plot_dir + '/std_dist0_dist1' + FORMAT
     draw_barplot_together(7, 12, 2, 2, index_ranges, std_index_ranges, segment_list,
-                          estimate_errors[chosen_indices, :], out_file)
+                          estimate_errors[chosen_indices, :], out_file, 0.22)
     # draw td tr together
     out_file = args.plot_dir + '/std_tdtr0_tdtr1' + FORMAT
     draw_barplot_together(8, 13, 2, 2, index_ranges, std_index_ranges, segment_list,
-                          estimate_errors[chosen_indices, :], out_file)
+                          estimate_errors[chosen_indices, :], out_file, 0.18)

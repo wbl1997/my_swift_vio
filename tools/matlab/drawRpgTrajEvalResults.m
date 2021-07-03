@@ -13,6 +13,8 @@ success = 0;
 missing = 0;
 trials = 5;
 sessions = {'room1', 'room2', 'room3', 'room4', 'room5', 'room6'};
+sessions = {'MH_01', 'MH_02', 'MH_03', 'MH_04', 'MH_05'};
+
 numsessions = length(sessions);
 
 
