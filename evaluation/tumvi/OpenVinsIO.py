@@ -86,7 +86,7 @@ def convertOpenVinsToSwiftVioParams(ov_state, ov_std):
     kswf_params['tdtr0'] = [ov_state[OV_TD], 0]
     kswf_params['fc1'] = ov_state[OV_FXY_CXY1_RANGE]
     kswf_params['distort1'] = ov_state[OV_DISTORTION1_RANGE]
-    kswf_params['tdtr1'] = [ov_state[OV_TD], 0]
+    kswf_params['tdtr1'] = [0, 0]
 
     # convert stds
     # openvins keeps covariance for p_CiS and q_CiS, their errors are dp_CiS and theta_CiS
@@ -106,7 +106,7 @@ def convertOpenVinsToSwiftVioParams(ov_state, ov_std):
     kswf_params['std_tdtr0'] = [ov_std[OV_STD_TD], 0]
     kswf_params['std_fc1'] = ov_std[OV_STD_FXY_CXY1_RANGE]
     kswf_params['std_distort1'] = ov_std[OV_STD_DISTORTION1_RANGE]
-    kswf_params['std_tdtr1'] = [ov_std[OV_STD_TD], 0]
+    kswf_params['std_tdtr1'] = [0, 0]
 
     # convert covariance for T_BC1, ignoring the cross terms.
     cov = np.identity(9) # covariance for the errors of X = [R_C0S, R_C1S, p_C1S], dX = [theta_C0S, theta_C1S, theta_C1S]

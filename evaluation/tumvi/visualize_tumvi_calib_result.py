@@ -132,7 +132,7 @@ def boxplot_block_and_save(data_array, column_indices, xlabels, out_file,
 
 def barplot_block_and_save(data_array, value_indices, sigma_indices, xlabels, out_file,
                            ref_values, component_label, component_label_code, unit_label,
-                           aspect, row_ranges):
+                           aspect, row_ranges, leg_labels=None):
     """
     draw the 3 sigma bounds for each column of the data_array, and also draw the reference value.
     :param data_array:
@@ -145,6 +145,7 @@ def barplot_block_and_save(data_array, value_indices, sigma_indices, xlabels, ou
     :param unit_label:
     :param aspect: figure aspect ratio. the ratio of y-unit to x-unit.
     :param row_ranges: draw group of rows in data_array with bars of different colors.
+    :param group_labels: legend labels for each group including reference.
     :return:
     """
 
@@ -161,22 +162,26 @@ def barplot_block_and_save(data_array, value_indices, sigma_indices, xlabels, ou
 
     gap = 1.0
     xscale = 0.2
+    start = 0
     for i in range(dimension):
-        start = (gap + (samples + 1)* xscale) * i  # plus one for the reference values
+        usedSamples = np.count_nonzero(data_array[:, sigma_indices[i]])
         x = start + np.arange(0, samples, 1) * xscale
         y = data_array[:, value_indices[i]]
         yerr = data_array[:, sigma_indices[i]] * 3  # +/-3 \sigma bounds
 
         xlist.append(x)
-        if samples % 2 == 0:
-            xticklist.append(start + ((samples + 1) // 2 - 0.5) * xscale)
+        if usedSamples % 2 == 0:
+            xticklist.append(start + ((usedSamples + 1) // 2) * xscale)
         else:
-            xticklist.append(start + ((samples + 1) // 2) * xscale)
+            xticklist.append(start + ((usedSamples + 1) // 2) * xscale)
         ylist.append(y)
         yerrlist.append(yerr)
+        start += (gap + (usedSamples + 1) * xscale)  # plus one for the reference values
 
     fig, ax = plt.subplots()
+    usedColors = []
     for i in range(dimension):
+        colors = []
         usedRowRange = None
         for j, rowrange in enumerate(row_ranges):
             # skip rowranges with 0 std
@@ -185,8 +190,20 @@ def barplot_block_and_save(data_array, value_indices, sigma_indices, xlabels, ou
             ax.errorbar(xlist[i][rowrange], ylist[i][rowrange], yerr=yerrlist[i][rowrange],
                         ls='', ecolor=PALETTE[j],
                         capsize=2, elinewidth=1, markeredgewidth=1)
+            colors.append(PALETTE[j])
             usedRowRange = rowrange
+        if len(colors) > len(usedColors):
+            usedColors = copy.deepcopy(colors)
         ax.plot(xlist[i][usedRowRange[-1]] + xscale, ref_values[i], color='g', marker='x')
+
+    if leg_labels:
+        leg_handles = []
+        for c in usedColors:
+            leg_line = mlines.Line2D([], [], color=c)
+            leg_handles.append(leg_line)
+        leg_line = plt.plot([], [], marker="x", ms=10, ls="", mec=None, color='g')[0]
+        leg_handles.append(leg_line)
+        ax.legend(leg_handles, leg_labels)
 
     ax.set_xticks(xticklist)
     ax.set_xticklabels(xlabels)
@@ -200,7 +217,7 @@ def barplot_block_and_save(data_array, value_indices, sigma_indices, xlabels, ou
 
 def draw_barplot_together(blockAIndex, blockBIndex, blockADim, blockBDim,
                           index_ranges, std_index_ranges, SegmentList,
-                          estimate_errors, out_file, aspect, row_ranges):
+                          estimate_errors, out_file, aspect, row_ranges, leg_labels=None):
     error_indices = list(index_ranges[blockAIndex][:blockADim])
     error_indices.extend(index_ranges[blockBIndex][:blockBDim])
 
@@ -226,7 +243,7 @@ def draw_barplot_together(blockAIndex, blockBIndex, blockADim, blockBDim,
     component_label = SegmentList[blockAIndex][kcomponent_label] + SegmentList[blockBIndex][kcomponent_label]
     barplot_block_and_save(estimate_errors, error_indices, std_indices,
                            labels, out_file, referrors, component_label, '',
-                           SegmentList[blockAIndex][kerror_unit], aspect, row_ranges)
+                           SegmentList[blockAIndex][kerror_unit], aspect, row_ranges, leg_labels)
 
 
 def select_runs_for_3sigma_bounds_example():
@@ -338,7 +355,7 @@ SegmentList = [('bg', r'$\mathbf{b}_g$', [r'$x$', r'$y$', r'$z$'], 180 / math.pi
                 ('p_BC1', '', [r'$\mathbf{p}_{BC1}(1)$', r'$\mathbf{p}_{BC1}(2)$', r'$\mathbf{p}_{BC1}$(3)'], 100,
                  ReferenceParameters['p_BC1'], r'$cm$', 2, 3, np.array([0, 0, 0]), 0.5),
                 ('q_BC1', r'$\mathbf{R}_{BC1}$', ['roll', 'pitch', 'yaw', 'w'],
-                 180 / math.pi, ReferenceParameters['q_BC1'], r'$^\circ$', 3, 3, mathUtils.dcm2quat(dataParams.TUMVI_NominalS_R_C0), 1.1),
+                 180 / math.pi, ReferenceParameters['q_BC1'], r'$^\circ$', 3, 3, mathUtils.dcm2quat(dataParams.TUMVI_NominalS_R_C0), 1.2),
                 ('fc1', '', [r'$f^1$', r'$c_x^1$', r'$c_y^1$'], 1, ReferenceParameters['fc1'], r'$px$', 2, 3,
                  np.array([190, 256, 256]), 0.5),
                 ('distort1', '', [r'$k_1^1$', r'$k_2^1$', r'$k_3^1$', r'$k_4^1$'], 1000, ReferenceParameters['distort1'], '0.001', 2, 4,
@@ -372,7 +389,6 @@ def convertToSwiftVioArray(paramDicts, index_ranges, std_index_ranges):
             data_array[row, param_range] = params[SegmentList[index][kcomponent_label]]
         for index, param_range in enumerate(std_index_ranges):
             data_array[row, param_range] = params['std_' + SegmentList[index][kcomponent_label]]
-    print('converted openvins data array\n{}'.format(data_array))
     return data_array
 
 
@@ -493,5 +509,6 @@ if __name__ == '__main__':
                           estimate_errors[chosen_indices, :], out_file, 0.25, group_ranges)
     # draw td tr together
     out_file = args.plot_dir + '/std_tdtr0_tdtr1' + FORMAT
+    leg_labels = ["KSWF", "OpenVINS", "TUM VI Ref."]
     draw_barplot_together(8, 13, 2, 2, index_ranges, std_index_ranges, SegmentList,
-                          estimate_errors[chosen_indices, :], out_file, 0.18, group_ranges)
+                          estimate_errors[chosen_indices, :], out_file, 0.15, group_ranges, leg_labels)
