@@ -182,7 +182,7 @@ def barplot_block_and_save(data_array, value_indices, sigma_indices, xlabels, ou
     usedColors = []
     for i in range(dimension):
         colors = []
-        usedRowRange = None
+        usedRowRange = row_ranges[0]
         for j, rowrange in enumerate(row_ranges):
             # skip rowranges with 0 std
             if np.all((yerrlist[i][rowrange] == 0)):
@@ -463,6 +463,7 @@ if __name__ == '__main__':
         mathUtils.compute_mean_and_std(segment[kcomponent_label], estimate_errors, error_indices, segment[kerror_unit],
                              segment[ksignificant_digits])
 
+    chosen_indices = list(range(len(sv_estimate_file_list)))
     chosen_indices = selected_runs_for_3sigma_bounds(sv_estimate_file_list)
     num_chosen_sv_rows = len(chosen_indices)
     group_ranges = [range(num_chosen_sv_rows)]

@@ -53,10 +53,19 @@ def apply_config_to_swiftvio_yaml(config_dict, vio_yaml, debug_output_dir):
     # https://unix.stackexchange.com/questions/403271/sed-replace-only-the-second-match-word
     if "extrinsic_opt_mode_main_camera" in config_dict.keys():
         sed_extrinsicOptMode = 'sed -i "0,/extrinsic_opt_mode/ ' \
+                               's/extrinsic_opt_mode: P_C0B/extrinsic_opt_mode: {}/" {};'.format(
+            config_dict["extrinsic_opt_mode_main_camera"], vio_yaml)
+        sed_cmd += sed_extrinsicOptMode
+        sed_extrinsicOptMode = 'sed -i "0,/extrinsic_opt_mode/ ' \
                                's/extrinsic_opt_mode: FIXED/extrinsic_opt_mode: {}/" {};'.format(
             config_dict["extrinsic_opt_mode_main_camera"], vio_yaml)
         sed_cmd += sed_extrinsicOptMode
     if "extrinsic_opt_mode_other_camera" in config_dict.keys():
+        sed_extrinsicOptMode = \
+            'sed -i "0,/extrinsic_opt_mode/! {{0,/extrinsic_opt_mode/ ' \
+            's/extrinsic_opt_mode: P_C0C_Q_C0C/extrinsic_opt_mode: {}/}}" {};'.format(
+            config_dict["extrinsic_opt_mode_other_camera"], vio_yaml)
+        sed_cmd += sed_extrinsicOptMode
         sed_extrinsicOptMode = \
             'sed -i "0,/extrinsic_opt_mode/! {{0,/extrinsic_opt_mode/ ' \
             's/extrinsic_opt_mode: FIXED/extrinsic_opt_mode: {}/}}" {};'.format(
