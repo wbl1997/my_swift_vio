@@ -189,19 +189,19 @@ def barplot_block_and_save(data_array, value_indices, sigma_indices, xlabels, ou
                 continue
             ax.errorbar(xlist[i][rowrange], ylist[i][rowrange], yerr=yerrlist[i][rowrange],
                         ls='', ecolor=PALETTE[j],
-                        capsize=2, elinewidth=1, markeredgewidth=1)
+                        capsize=0.0, elinewidth=1, markeredgewidth=0.0)
             colors.append(PALETTE[j])
             usedRowRange = rowrange
         if len(colors) > len(usedColors):
             usedColors = copy.deepcopy(colors)
-        ax.plot(xlist[i][usedRowRange[-1]] + xscale, ref_values[i], color='g', marker='x')
+        ax.plot(xlist[i][usedRowRange[-1]] + xscale, ref_values[i], color='r', marker='x', markersize=4)
 
     if leg_labels:
         leg_handles = []
         for c in usedColors:
             leg_line = mlines.Line2D([], [], color=c)
             leg_handles.append(leg_line)
-        leg_line = plt.plot([], [], marker="x", ms=10, ls="", mec=None, color='g')[0]
+        leg_line = plt.plot([], [], marker="x", ms=4, ls="", mec=None, color='r')[0]
         leg_handles.append(leg_line)
         ax.legend(leg_handles, leg_labels)
 
@@ -333,19 +333,19 @@ kaspect = 9
 ReferenceParameters = get_kswf_model_parameters(dataParams.TUMVI_IMU_INTRINSICS)
 # These segments are strictly ordered according to the output of swift vio.
 SegmentList = [('bg', r'$\mathbf{b}_g$', [r'$x$', r'$y$', r'$z$'], 180 / math.pi, ReferenceParameters['bg'], r'$^\circ/s$', 3, 3,
-                 np.array([0, 0, 0]), 0.5),
+                 np.array([0, 0, 0]), 1.0),
                 ('ba', r'$\mathbf{b}_a$', [r'$x$', r'$y$', r'$z$'], 1.0, ReferenceParameters['ba'], r'$m/s^2$', 3, 3,
-                 np.array([0, 0, 0]), 0.83),
+                 np.array([0, 0, 0]), 1.6),
                 ('Tg', r'$\mathbf{T}_g$',
                  [r'$1,1$', r'$1,2$', r'$1,3$', r'$2,1$', r'$2,2$', r'$2,3$', r'$3,1$', r'$3,2$', r'$3,3$'],
-                 1000.0, ReferenceParameters['Tg'], '0.001', 2, 9, np.array([1, 0, 0, 0, 1, 0, 0, 0, 1]), 0.05),
+                 1000.0, ReferenceParameters['Tg'], '0.001', 2, 9, np.array([1, 0, 0, 0, 1, 0, 0, 0, 1]), 0.1),
                 ('Ts', r'$\mathbf{T}_s$',
                  [r'$1,1$', r'$1,2$', r'$1,3$', r'$2,1$', r'$2,2$', r'$2,3$', r'$3,1$', r'$3,2$', r'$3,3$'],
                  1000.0, ReferenceParameters['Ts'], r'$0.001 \frac{rad/s}{m/s^2}$', 2, 9,
-                 np.array([0, 0, 0, 0, 0, 0, 0, 0, 0]), 1.3),
+                 np.array([0, 0, 0, 0, 0, 0, 0, 0, 0]), 2.0),
                 ('Ta', r'$\mathbf{T}_a$',
                  [r'$1,1$', r'$1,2$', r'$1,3$', r'$2,1$', r'$2,2$', r'$2,3$', r'$3,1$', r'$3,2$', r'$3,3$'],
-                 1000.0, ReferenceParameters['Ta'], '0.001', 2, 9, np.array([1, 0, 0, 0, 1, 0, 0, 0, 1]), 0.095),
+                 1000.0, ReferenceParameters['Ta'], '0.001', 2, 9, np.array([1, 0, 0, 0, 1, 0, 0, 0, 1]), 0.17),
                 ('p_C0B',  '', [r'$\mathbf{p}_{C0B}(1)$', r'$\mathbf{p}_{C0B}(2)$', r'$\mathbf{p}_{C0B}(3)$'], 100,
                  ReferenceParameters['p_C0B'], r'$cm$', 2, 3, np.array([0, 0, 0]), 0.5),
                 ('fc0', '', [r'$f^0$', r'$c_x^0$', r'$c_y^0$'], 1, ReferenceParameters['fc0'], r'$px$', 2, 3, [190, 256, 256], 0.5),
@@ -355,7 +355,7 @@ SegmentList = [('bg', r'$\mathbf{b}_g$', [r'$x$', r'$y$', r'$z$'], 180 / math.pi
                 ('p_BC1', '', [r'$\mathbf{p}_{BC1}(1)$', r'$\mathbf{p}_{BC1}(2)$', r'$\mathbf{p}_{BC1}$(3)'], 100,
                  ReferenceParameters['p_BC1'], r'$cm$', 2, 3, np.array([0, 0, 0]), 0.5),
                 ('q_BC1', r'$\mathbf{R}_{BC1}$', ['roll', 'pitch', 'yaw', 'w'],
-                 180 / math.pi, ReferenceParameters['q_BC1'], r'$^\circ$', 3, 3, mathUtils.dcm2quat(dataParams.TUMVI_NominalS_R_C0), 1.2),
+                 180 / math.pi, ReferenceParameters['q_BC1'], r'$^\circ$', 3, 3, mathUtils.dcm2quat(dataParams.TUMVI_NominalS_R_C0), 2.2),
                 ('fc1', '', [r'$f^1$', r'$c_x^1$', r'$c_y^1$'], 1, ReferenceParameters['fc1'], r'$px$', 2, 3,
                  np.array([190, 256, 256]), 0.5),
                 ('distort1', '', [r'$k_1^1$', r'$k_2^1$', r'$k_3^1$', r'$k_4^1$'], 1000, ReferenceParameters['distort1'], '0.001', 2, 4,
@@ -464,7 +464,7 @@ if __name__ == '__main__':
                              segment[ksignificant_digits])
 
     chosen_indices = list(range(len(sv_estimate_file_list)))
-    chosen_indices = selected_runs_for_3sigma_bounds(sv_estimate_file_list)
+    # chosen_indices = selected_runs_for_3sigma_bounds(sv_estimate_file_list)
     num_chosen_sv_rows = len(chosen_indices)
     group_ranges = [range(num_chosen_sv_rows)]
 
@@ -499,17 +499,17 @@ if __name__ == '__main__':
     # draw p_C0B and p_BC1 together
     out_file = args.plot_dir + '/std_p_C0B_p_BC1' + FORMAT
     draw_barplot_together(5, 9, 3, 3, index_ranges, std_index_ranges, SegmentList,
-                          estimate_errors[chosen_indices, :], out_file, 0.6, group_ranges)
+                          estimate_errors[chosen_indices, :], out_file, 1.0, group_ranges)
     # draw fc0 fc1 together
     out_file = args.plot_dir + '/std_fc0_fc1' + FORMAT
     draw_barplot_together(6, 11, 3, 3, index_ranges, std_index_ranges, SegmentList,
-                          estimate_errors[chosen_indices, :], out_file, 0.65, group_ranges)
+                          estimate_errors[chosen_indices, :], out_file, 0.8, group_ranges)
     # draw distort0 and distort1 together
     out_file = args.plot_dir + '/std_dist0_dist1' + FORMAT
     draw_barplot_together(7, 12, 2, 2, index_ranges, std_index_ranges, SegmentList,
-                          estimate_errors[chosen_indices, :], out_file, 0.25, group_ranges)
+                          estimate_errors[chosen_indices, :], out_file, 0.55, group_ranges)
     # draw td tr together
     out_file = args.plot_dir + '/std_tdtr0_tdtr1' + FORMAT
     leg_labels = ["KSWF", "OpenVINS", "TUM VI Ref."]
     draw_barplot_together(8, 13, 2, 2, index_ranges, std_index_ranges, SegmentList,
-                          estimate_errors[chosen_indices, :], out_file, 0.15, group_ranges, leg_labels)
+                          estimate_errors[chosen_indices, :], out_file, 0.35, group_ranges, leg_labels)
