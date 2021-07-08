@@ -288,11 +288,14 @@ bool HybridFilter::addStates(okvis::MultiFramePtr multiFrame,
       if (!success0) return false;
       initialNavState_.updatePose(T_WS, correctedStateTime);
     }
-
+    // TODO(jhuai): initialize biases to zero when the platform starts in motion.
+    okvis::ImuMeasurement biases;
+    Eigen::Vector3d gravityB = T_WS.C().transpose() * imuParametersVec_.at(0).gravity();
+    swift_vio::initBiasesFromStaticImu(imuMeasurements, gravityB, &biases);
     speedAndBias.setZero();
     speedAndBias.head<3>() = initialNavState_.v_WS;
-    speedAndBias.segment<3>(3) = imuParametersVec_.at(0).g0;
-    speedAndBias.tail<3>() = imuParametersVec_.at(0).a0;
+    speedAndBias.segment<3>(3) = biases.measurement.gyroscopes;
+    speedAndBias.tail<3>() = biases.measurement.accelerometers;
   } else {
     // get the previous states
     uint64_t T_WS_id = statesMap_.rbegin()->second.id;
