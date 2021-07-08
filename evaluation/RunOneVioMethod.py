@@ -70,15 +70,13 @@ class RunOneVioMethod(object):
     def get_async_launch_file(self):
         return os.path.join(self.catkin_ws, "src/swift_vio/launch/swift_vio_node_rosbag.launch")
 
-    def create_vio_config_yaml(self, dataset_code, bag_fullname, output_dir_mission):
+    def create_vio_config_yaml(self, output_dir_mission):
         """for each data mission, create a vio config yaml"""
-        if not self.vio_config_template:
+        if not os.path.isfile(self.vio_config_template):
             return ""
         vio_yaml_mission = os.path.join(output_dir_mission, os.path.basename(self.vio_config_template))
-        config_composer = VioConfigComposer.VioConfigComposer(
-            self.vio_config_template, bag_fullname, vio_yaml_mission)
-        # apply sensor calibration parameters
-        config_composer.create_config_for_mission(self.algo_code_flags["algo_code"], dataset_code)
+        shutil.copy2(self.vio_config_template, vio_yaml_mission)
+
         # apply algorithm parameters
         AlgoConfig.apply_config_to_yaml(self.algo_code_flags, vio_yaml_mission, output_dir_mission)
         return vio_yaml_mission
@@ -315,7 +313,7 @@ class RunOneVioMethod(object):
             shutil.copy2(self.eval_cfg_template, eval_config_file)
             rpg_eval_tool_wrap.change_eval_cfg(eval_config_file, gt_align_type, -1)
 
-            custom_vio_config = self.create_vio_config_yaml(dataset_code, bag_fullname, output_dir_mission)
+            custom_vio_config = self.create_vio_config_yaml(output_dir_mission)
             custom_lcd_config = self.create_lcd_config_yaml(output_dir_mission)
 
             for trial_index in range(self.num_trials):

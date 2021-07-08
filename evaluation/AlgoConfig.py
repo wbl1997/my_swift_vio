@@ -1,3 +1,5 @@
+import shutil
+
 import utility_functions
 import os
 
@@ -30,6 +32,26 @@ def sed_line_with_parameter(config_dict, param_name, padding, config_yaml):
         return ""
 
 
+def find_and_replace(variablefile, phrase, newline, which):
+    tempfile = os.path.join(variablefile + ".tmp")
+    output = open(tempfile, "w")
+    count = 0
+    with open(variablefile, "r") as stream:
+        for line in stream:
+            if phrase in line:
+                if count == which:
+                    output.write("{}\n".format(newline))
+                else:
+                    output.write("{}".format(line))
+                count += 1
+            else:
+                output.write("{}".format(line))
+    output.close()
+    os.unlink(variablefile)
+    shutil.copy2(tempfile, variablefile)
+    os.unlink(tempfile)
+
+
 def apply_config_to_swiftvio_yaml(config_dict, vio_yaml, debug_output_dir):
     algo_code = config_dict["algo_code"]
     sed_cmd = r'sed -i "/algorithm/c\    algorithm: {}" {};'. \
@@ -46,31 +68,6 @@ def apply_config_to_swiftvio_yaml(config_dict, vio_yaml, debug_output_dir):
     sed_cmd += sed_line_with_parameter(config_dict, "cameraObservationModelId", padding, vio_yaml)
     sed_cmd += sed_line_with_parameter(config_dict, "useMahalanobisGating", padding, vio_yaml)
     sed_cmd += sed_line_with_parameter(config_dict, "maxProjectionErrorTol", padding, vio_yaml)
-
-    # The fields for extrinsic_opt_mode will become scrabbled in the generated vio config file,
-    # so we look for the string combination of extrinsic_opt_mode + default value.
-    # Another solution is provided at
-    # https://unix.stackexchange.com/questions/403271/sed-replace-only-the-second-match-word
-    if "extrinsic_opt_mode_main_camera" in config_dict.keys():
-        sed_extrinsicOptMode = 'sed -i "0,/extrinsic_opt_mode/ ' \
-                               's/extrinsic_opt_mode: P_C0B/extrinsic_opt_mode: {}/" {};'.format(
-            config_dict["extrinsic_opt_mode_main_camera"], vio_yaml)
-        sed_cmd += sed_extrinsicOptMode
-        sed_extrinsicOptMode = 'sed -i "0,/extrinsic_opt_mode/ ' \
-                               's/extrinsic_opt_mode: FIXED/extrinsic_opt_mode: {}/" {};'.format(
-            config_dict["extrinsic_opt_mode_main_camera"], vio_yaml)
-        sed_cmd += sed_extrinsicOptMode
-    if "extrinsic_opt_mode_other_camera" in config_dict.keys():
-        sed_extrinsicOptMode = \
-            'sed -i "0,/extrinsic_opt_mode/! {{0,/extrinsic_opt_mode/ ' \
-            's/extrinsic_opt_mode: P_C0C_Q_C0C/extrinsic_opt_mode: {}/}}" {};'.format(
-            config_dict["extrinsic_opt_mode_other_camera"], vio_yaml)
-        sed_cmd += sed_extrinsicOptMode
-        sed_extrinsicOptMode = \
-            'sed -i "0,/extrinsic_opt_mode/! {{0,/extrinsic_opt_mode/ ' \
-            's/extrinsic_opt_mode: FIXED/extrinsic_opt_mode: {}/}}" {};'.format(
-            config_dict["extrinsic_opt_mode_other_camera"], vio_yaml)
-        sed_cmd += sed_extrinsicOptMode
 
     sed_cmd += sed_line_with_parameter(config_dict, "sigma_absolute_translation", padding, vio_yaml)
     sed_cmd += sed_line_with_parameter(config_dict, "sigma_absolute_orientation", padding, vio_yaml)
@@ -95,6 +92,16 @@ def apply_config_to_swiftvio_yaml(config_dict, vio_yaml, debug_output_dir):
     sed_cmd += sed_line_with_parameter(config_dict, "g_max", padding, vio_yaml)
     sed_cmd += sed_line_with_parameter(config_dict, "a_max", padding, vio_yaml)
 
+    # To replace specific occurrence of a phrase, an alternative solution is at
+    # https://unix.stackexchange.com/questions/403271/sed-replace-only-the-second-match-word
+    if "extrinsic_opt_mode_main_camera" in config_dict.keys():
+        find_and_replace(vio_yaml, "extrinsic_opt_mode:", " " * 8 + "extrinsic_opt_mode: {},".format(
+            config_dict["extrinsic_opt_mode_main_camera"]), 0)
+
+    if "extrinsic_opt_mode_other_camera" in config_dict.keys():
+        find_and_replace(vio_yaml, "extrinsic_opt_mode:", " " * 8 + "extrinsic_opt_mode: {},".format(
+            config_dict["extrinsic_opt_mode_other_camera"]), 1)
+
     sed_gravity = ""
     param_name = "g: 9"
     if param_name in config_dict.keys():
@@ -107,6 +114,10 @@ def apply_config_to_swiftvio_yaml(config_dict, vio_yaml, debug_output_dir):
 
     sed_cmd += sed_line_with_parameter(config_dict, "stereoMatchWithEpipolarCheck", padding, vio_yaml)
     sed_cmd += sed_line_with_parameter(config_dict, "epipolarDistanceThreshold", padding, vio_yaml)
+
+    sed_cmd += sed_line_with_parameter(config_dict, "maxInStateLandmarks", padding, vio_yaml)
+    sed_cmd += sed_line_with_parameter(config_dict, "maxMarginalizedLandmarks", padding, vio_yaml)
+    sed_cmd += sed_line_with_parameter(config_dict, "maxHibernationFrames", padding, vio_yaml)
     sed_cmd += sed_line_with_parameter(config_dict, "featureTrackingMethod", padding, vio_yaml)
     sed_cmd += sed_line_with_parameter(config_dict, "timeLimit", padding, vio_yaml)
 
