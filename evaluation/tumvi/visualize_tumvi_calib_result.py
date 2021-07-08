@@ -318,7 +318,6 @@ def loadSwiftVioResults(vio_output_dir, seconds_to_end):
 
 
 SWIFTVIO_BG_INDEX = 12 # 0-based index of the first dimension of gyro bias.
-SWIFTVIO_STEREO_COLUMNS = 142  # The intrinsic model of fx, cx, cy + 4 distortion parameters is assumed.
 kcomponent_label = 0
 kcomponent_label_code = 1 # ylabel for bar plots, can be empty.
 kcolumn_labels = 2 # column label for each dimension of the component

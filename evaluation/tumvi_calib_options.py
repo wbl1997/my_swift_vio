@@ -83,15 +83,33 @@ def tumvi_raw_swiftvio_options():
                  "displayImages": "false",
                  "monocular_input": 0,
                  "numImuFrames": 5,
+                 "maxInStateLandmarks": 70,
+                 "maxMarginalizedLandmarks": 50,
+                 "maxHibernationFrames": 5,
+                 "featureTrackingMethod": 0,
                  "extrinsic_opt_mode_main_camera": "p_CB",
-                 "extrinsic_opt_mode_other_camera": "p_BC_q_BC",
+                 "extrinsic_opt_mode_other_camera": "p_C0C_q_C0C",
                  "loop_closure_method": 0},
     }
 
     config_name_to_diffs = {
+        ('SL-KSWF-iekf', 'KSWF'): {
+            "algo_code": "MSCKF",
+            **SWF_TUMVI_RAW_IMU_PARAMETERS,
+            "extra_gflags": "--publish_via_ros=false --skip_first_seconds=0.0 --use_IEKF=true"
+        },
+        ('SL-KSWF', 'KSWF'): {
+            "algo_code": "MSCKF",
+            **SWF_TUMVI_RAW_IMU_PARAMETERS,
+        },
         # This is the best performing setting for KSWF.
-        ('KSWF', 'KSWF'): SWF_TUMVI_RAW_IMU_PARAMETERS,
-        # This settting for KSWF has not been checked.
+        ('KSWF', 'KSWF'): {
+            **SWF_TUMVI_RAW_IMU_PARAMETERS,
+        },
+        ('KSWF_2', 'KSWF'): {
+            **SWF_TUMVI_RAW_IMU_PARAMETERS,
+            "featureTrackingMethod": 2,
+        },
         ('KSWF_1_05', 'KSWF'): {
             "sigma_g_c": 0.004,
             "sigma_a_c": 0.07,
@@ -132,10 +150,6 @@ def tumvi_raw_swiftvio_options():
             "sigma_a_c": 0.07 * 5 * 0.5,
             "sigma_gw_c": 4.4e-5 * 2,
             "sigma_aw_c": 1.72e-3 * 2
-        },
-        ('SL-KSWF', 'KSWF'): {
-            "algo_code": "MSCKF",
-            **SWF_TUMVI_RAW_IMU_PARAMETERS
         },
         ('KSWF_cal_cam', 'KSWF'): {
             **SWF_TUMVI_RAW_IMU_PARAMETERS,
