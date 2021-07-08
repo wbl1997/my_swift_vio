@@ -41,11 +41,11 @@ camera_params:
     sigma_c_relative_translation: 1e-6 # The std. dev. of the cam. extr. transl. change between frames, e.g. 1.0e-6 for adaptive online calib (not less for numerics) [m].
     sigma_c_relative_orientation: 1e-6 # The std. dev. of the cam. extr. orient. change between frames, e.g. 1.0e-6 for adaptive online calib (not less for numerics) [rad].
     timestamp_tolerance: 0.005 # [s] stereo frame out-of-sync tolerance
-    sigma_focal_length: 5.0
-    sigma_principal_point: 5.0
+    sigma_focal_length: 2.0
+    sigma_principal_point: 2.0
     sigma_distortion: [0.02, 0.02, 0.0, 0.0, 0.0]
-    sigma_td: 0.1
-    sigma_tr: 0.05
+    sigma_td: 0.02
+    sigma_tr: 0.02
 
 imu_params:
     a_max: 176.0 # acceleration saturation [m/s^2]
