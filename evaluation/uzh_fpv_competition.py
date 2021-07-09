@@ -72,7 +72,7 @@ if __name__ == '__main__':
                              "sigma_g_c": 0.05,
                              "g_max": 31.4,  # 0.9 x 2000 DPS
                              "a_max": 176.0,  # 1.1 x 16g
-                             "g: 9": 9.807,  # zurich https://units.fandom.com/wiki/Gravity_of_Earth
+                             "g": 9.807,  # zurich https://units.fandom.com/wiki/Gravity_of_Earth
                              "loop_closure_method": 0
                              },
     }

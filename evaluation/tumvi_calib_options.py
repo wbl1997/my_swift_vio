@@ -50,15 +50,41 @@ def tumvi_calibrated_swiftvio_options():
                  "displayImages": "false",
                  "monocular_input": 0,
                  "numImuFrames": 5,
-                 "loop_closure_method": 0},
+                 "loop_closure_method": 0,
+                 "sigma_TGElement": 0.0,
+                 "sigma_TSElement": 0.0,
+                 "sigma_TAElement": 0.0,
+                 "model_type": "BG_BA",
+                 "extrinsic_opt_mode_main_camera": "p_BC_q_BC",
+                 "extrinsic_opt_mode_other_camera": "p_BC_q_BC",
+                 'projection_opt_mode': 'FX_CXY',
+                 },
     }
 
     config_name_to_diffs = {
-        ('KSWF', 'KSWF'): SWF_TUMVI_IMU_PARAMETERS,
-        ('SL-KSWF', 'KSWF'): {
-            "algo_code": "MSCKF",
-            **SWF_TUMVI_IMU_PARAMETERS
-        },
+        ('KSWF', 'KSWF'): {"sigma_g_c": 0.00016,
+                           "sigma_a_c": 0.0028,
+                           "sigma_gw_c": 2.2e-5,
+                           "sigma_aw_c": 8.6e-4,
+                           "featureTrackingMethod": 2,
+                           "stereoMatchWithEpipolarCheck": "true",
+                           "epipolarDistanceThreshold": 10,
+                           "keyframeInsertionMatchingRatioThreshold": 1.0,
+                           "keyframeInsertionOverlapThreshold": 1.0,
+                           "minTrackLengthForSlam": 9,
+                           "threshold": 35.0, },
+        ('SL-KSWF', 'KSWF'): {"algo_code": "MSCKF",
+                              "sigma_g_c": 0.00016,
+                              "sigma_a_c": 0.0028,
+                              "sigma_gw_c": 2.2e-5,
+                              "sigma_aw_c": 8.6e-4,
+                              "featureTrackingMethod": 2,
+                              "stereoMatchWithEpipolarCheck": "true",
+                              "epipolarDistanceThreshold": 10,
+                              "keyframeInsertionMatchingRatioThreshold": 1.0,
+                              "keyframeInsertionOverlapThreshold": 1.0,
+                              "minTrackLengthForSlam": 9,
+                              "threshold": 35.0, },
         ('OKVIS', 'KSWF'): {
             "algo_code": "OKVIS",
             "numImuFrames": 3,
@@ -69,7 +95,6 @@ def tumvi_calibrated_swiftvio_options():
         },
     }
     return algo_option_templates, config_name_to_diffs
-
 
 
 def tumvi_raw_swiftvio_options():

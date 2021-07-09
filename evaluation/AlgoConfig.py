@@ -58,16 +58,50 @@ def apply_config_to_swiftvio_yaml(config_dict, vio_yaml, debug_output_dir):
         format(algo_code, vio_yaml)
 
     padding = ''
+    sed_cmd += sed_line_with_parameter(config_dict, "displayImages", padding, vio_yaml)
+    sed_cmd += sed_line_with_parameter(config_dict, "monocular_input", padding, vio_yaml)
     sed_cmd += sed_line_with_parameter(config_dict, "numImuFrames", padding, vio_yaml)
     sed_cmd += sed_line_with_parameter(config_dict, "numKeyframes", padding, vio_yaml)
-    sed_cmd += sed_line_with_parameter(config_dict, "monocular_input", padding, vio_yaml)
-    sed_cmd += sed_line_with_parameter(config_dict, "displayImages", padding, vio_yaml)
 
     padding = " " * 4
-    sed_cmd += sed_line_with_parameter(config_dict, "landmarkModelId", padding, vio_yaml)
+
+    sed_cmd += sed_line_with_parameter(config_dict, "a_max", padding, vio_yaml)
     sed_cmd += sed_line_with_parameter(config_dict, "cameraObservationModelId", padding, vio_yaml)
-    sed_cmd += sed_line_with_parameter(config_dict, "useMahalanobisGating", padding, vio_yaml)
+    sed_cmd += sed_line_with_parameter(config_dict, "epipolarDistanceThreshold", padding, vio_yaml)
+
+    if "extrinsic_opt_mode_main_camera" in config_dict.keys():
+        find_and_replace(vio_yaml, "extrinsic_opt_mode:", " " * 8 + "extrinsic_opt_mode: {},".format(
+            config_dict["extrinsic_opt_mode_main_camera"]), 0)
+
+    if "extrinsic_opt_mode_other_camera" in config_dict.keys():
+        find_and_replace(vio_yaml, "extrinsic_opt_mode:", " " * 8 + "extrinsic_opt_mode: {},".format(
+            config_dict["extrinsic_opt_mode_other_camera"]), 1)
+    sed_cmd += sed_line_with_parameter(config_dict, "featureTrackingMethod", padding, vio_yaml)
+
+    if "g" in config_dict.keys():
+        find_and_replace(vio_yaml, "  g:", padding + "g: {}".format(
+            config_dict["g"]), 0)
+
+    sed_cmd += sed_line_with_parameter(config_dict, "g_max", padding, vio_yaml)
+
+    sed_cmd += sed_line_with_parameter(config_dict, "keyframeInsertionMatchingRatioThreshold", padding, vio_yaml)
+    sed_cmd += sed_line_with_parameter(config_dict, "keyframeInsertionOverlapThreshold", padding, vio_yaml)
+
+    sed_cmd += sed_line_with_parameter(config_dict, "landmarkModelId", padding, vio_yaml)
+
+    sed_cmd += sed_line_with_parameter(config_dict, "minTrackLengthForSlam", padding, vio_yaml)
+    sed_cmd += sed_line_with_parameter(config_dict, "maxHibernationFrames", padding, vio_yaml)
+    sed_cmd += sed_line_with_parameter(config_dict, "maxInStateLandmarks", padding, vio_yaml)
+    sed_cmd += sed_line_with_parameter(config_dict, "maxMarginalizedLandmarks", padding, vio_yaml)
+    sed_cmd += sed_line_with_parameter(config_dict, "maxOdometryConstraintForAKeyframe", padding, vio_yaml)
     sed_cmd += sed_line_with_parameter(config_dict, "maxProjectionErrorTol", padding, vio_yaml)
+    sed_cmd += sed_line_with_parameter(config_dict, "model_type", padding, vio_yaml)
+
+    if "projection_opt_mode" in config_dict.keys():
+        find_and_replace(vio_yaml, "projection_opt_mode:", " " * 8 + "projection_opt_mode: {},".format(
+            config_dict["projection_opt_mode"]), 0)
+        find_and_replace(vio_yaml, "projection_opt_mode:", " " * 8 + "projection_opt_mode: {},".format(
+            config_dict["projection_opt_mode"]), 1)
 
     sed_cmd += sed_line_with_parameter(config_dict, "sigma_absolute_translation", padding, vio_yaml)
     sed_cmd += sed_line_with_parameter(config_dict, "sigma_absolute_orientation", padding, vio_yaml)
@@ -79,7 +113,6 @@ def apply_config_to_swiftvio_yaml(config_dict, vio_yaml, debug_output_dir):
     sed_cmd += sed_line_with_parameter(config_dict, "sigma_principal_point", padding, vio_yaml)
     sed_cmd += sed_line_with_parameter(config_dict, "sigma_distortion", padding, vio_yaml)
 
-    sed_cmd += sed_line_with_parameter(config_dict, "model_type", padding, vio_yaml)
     sed_cmd += sed_line_with_parameter(config_dict, "sigma_TGElement", padding, vio_yaml)
     sed_cmd += sed_line_with_parameter(config_dict, "sigma_TSElement", padding, vio_yaml)
     sed_cmd += sed_line_with_parameter(config_dict, "sigma_TAElement", padding, vio_yaml)
@@ -89,37 +122,14 @@ def apply_config_to_swiftvio_yaml(config_dict, vio_yaml, debug_output_dir):
     sed_cmd += sed_line_with_parameter(config_dict, "sigma_gw_c", padding, vio_yaml)
     sed_cmd += sed_line_with_parameter(config_dict, "sigma_aw_c", padding, vio_yaml)
 
-    sed_cmd += sed_line_with_parameter(config_dict, "g_max", padding, vio_yaml)
-    sed_cmd += sed_line_with_parameter(config_dict, "a_max", padding, vio_yaml)
-
-    # To replace specific occurrence of a phrase, an alternative solution is at
-    # https://unix.stackexchange.com/questions/403271/sed-replace-only-the-second-match-word
-    if "extrinsic_opt_mode_main_camera" in config_dict.keys():
-        find_and_replace(vio_yaml, "extrinsic_opt_mode:", " " * 8 + "extrinsic_opt_mode: {},".format(
-            config_dict["extrinsic_opt_mode_main_camera"]), 0)
-
-    if "extrinsic_opt_mode_other_camera" in config_dict.keys():
-        find_and_replace(vio_yaml, "extrinsic_opt_mode:", " " * 8 + "extrinsic_opt_mode: {},".format(
-            config_dict["extrinsic_opt_mode_other_camera"]), 1)
-
-    sed_gravity = ""
-    param_name = "g: 9"
-    if param_name in config_dict.keys():
-        sed_gravity = r'sed -i "/{}/c\{}{}: {}" {};'.format(
-            param_name, padding, "g",
-            config_dict[param_name], vio_yaml)
-    sed_cmd += sed_gravity
-
-    sed_cmd += sed_line_with_parameter(config_dict, "maxOdometryConstraintForAKeyframe", padding, vio_yaml)
-
     sed_cmd += sed_line_with_parameter(config_dict, "stereoMatchWithEpipolarCheck", padding, vio_yaml)
-    sed_cmd += sed_line_with_parameter(config_dict, "epipolarDistanceThreshold", padding, vio_yaml)
 
-    sed_cmd += sed_line_with_parameter(config_dict, "maxInStateLandmarks", padding, vio_yaml)
-    sed_cmd += sed_line_with_parameter(config_dict, "maxMarginalizedLandmarks", padding, vio_yaml)
-    sed_cmd += sed_line_with_parameter(config_dict, "maxHibernationFrames", padding, vio_yaml)
-    sed_cmd += sed_line_with_parameter(config_dict, "featureTrackingMethod", padding, vio_yaml)
+    if "threshold" in config_dict.keys():
+        find_and_replace(vio_yaml, "  threshold:", padding + "threshold: {}".format(
+            config_dict["threshold"]), 0)
+
     sed_cmd += sed_line_with_parameter(config_dict, "timeLimit", padding, vio_yaml)
+    sed_cmd += sed_line_with_parameter(config_dict, "useMahalanobisGating", padding, vio_yaml)
 
     out_stream = open(os.path.join(debug_output_dir, "sed_out.log"), 'w')
     err_stream = open(os.path.join(debug_output_dir, "sed_err.log"), 'w')

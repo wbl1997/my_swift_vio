@@ -88,6 +88,8 @@ optimization:
     computeOkvisNees: 0
     useMahalanobisGating: 1
     maxProjectionErrorTol: 7
+    keyframeInsertionMatchingRatioThreshold: 0.2
+    keyframeInsertionOverlapThreshold: 0.6
 
 frontend:
     stereoMatchWithEpipolarCheck: true

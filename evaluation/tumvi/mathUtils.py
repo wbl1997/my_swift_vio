@@ -107,7 +107,7 @@ def compute_mean_and_std(component_label, data_array, column_range, unit, precis
 
 
 def compute_deviation_from_initial_value(component_label, est, initial):
-    if component_label == 'q_BC1':
+    if 'q_BC' in component_label:
         return unskew(np.matmul(quat2dcm(initial), np.transpose(quat2dcm(est))) - np.eye(3))
     else:
         return est - initial
