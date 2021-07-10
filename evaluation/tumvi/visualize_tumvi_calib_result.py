@@ -329,8 +329,8 @@ kminimal_dim = 7
 kinitial_value = 8 # Initial value to the estimators.
 kaspect = 9
 
+# One output format of swift_vio.
 ReferenceParameters = get_kswf_model_parameters(dataParams.TUMVI_IMU_INTRINSICS)
-# These segments are strictly ordered according to the output of swift vio.
 SegmentList = [('bg', r'$\mathbf{b}_g$', [r'$x$', r'$y$', r'$z$'], 180 / math.pi, ReferenceParameters['bg'], r'$^\circ/s$', 3, 3,
                  np.array([0, 0, 0]), 1.0),
                 ('ba', r'$\mathbf{b}_a$', [r'$x$', r'$y$', r'$z$'], 1.0, ReferenceParameters['ba'], r'$m/s^2$', 3, 3,
@@ -360,6 +360,35 @@ SegmentList = [('bg', r'$\mathbf{b}_g$', [r'$x$', r'$y$', r'$z$'], 180 / math.pi
                 ('distort1', '', [r'$k_1^1$', r'$k_2^1$', r'$k_3^1$', r'$k_4^1$'], 1000, ReferenceParameters['distort1'], '0.001', 2, 4,
                  np.array([0, 0, 0, 0]), 0.5),
                 ('tdtr1', '', [r'$t_d^1$', r'$t_r^1$'], 1000, ReferenceParameters['tdtr1'], r'$ms$', 2, 2, np.array([0, 0.02]), 0.5)]
+
+# Another output format
+# ref_T_SC0 = np.array(dataParams.TUMVI_PARAMETERS['cameras'][0]['T_SC']).reshape([4, 4])
+# ref_T_SC1 = np.array(dataParams.TUMVI_PARAMETERS['cameras'][1]['T_SC']).reshape([4, 4])
+#
+# SegmentList = [
+#     ('bg', r'$\mathbf{b}_g$', [r'$x$', r'$y$', r'$z$'], 180 / math.pi, ReferenceParameters['bg'], r'$^\circ/s$', 3, 3,
+#      np.array([0, 0, 0]), 1.0),
+#     ('ba', r'$\mathbf{b}_a$', [r'$x$', r'$y$', r'$z$'], 1.0, ReferenceParameters['ba'], r'$m/s^2$', 3, 3,
+#      np.array([0, 0, 0]), 1.6),
+#     ('p_BC0', '', [r'$\mathbf{p}_{BC0}(1)$', r'$\mathbf{p}_{BC0}(2)$', r'$\mathbf{p}_{BC0}$(3)'], 100,
+#      ref_T_SC0[:3, 3], r'$cm$', 2, 3, np.array([0, 0, 0]), 0.5),
+#     ('q_BC0', r'$\mathbf{R}_{BC0}$', ['roll', 'pitch', 'yaw', 'w'],
+#      180 / math.pi, mathUtils.dcm2quat(ref_T_SC0[:3, :3]), r'$^\circ$', 3, 3,
+#      mathUtils.dcm2quat(dataParams.TUMVI_NominalS_R_C0), 2.2),
+#     ('fc0', '', [r'$f^0$', r'$c_x^0$', r'$c_y^0$'], 1, ReferenceParameters['fc0'], r'$px$', 2, 3, [190, 256, 256], 0.5),
+#     ('distort0', '', [r'$k_1^0$', r'$k_2^0$', r'$k_3^0$', r'$k_4^0$'], 1000, ReferenceParameters['distort0'], '0.001', 2, 4,
+#     np.array([0, 0, 0, 0]), 0.5),
+#     ('tdtr0', '', [r'$t_d^0$', r'$t_r^0$'], 1000, ReferenceParameters['tdtr0'], r'$ms$', 2, 2, np.array([0, 0.02]), 0.5),
+#     ('p_BC1', '', [r'$\mathbf{p}_{BC1}(1)$', r'$\mathbf{p}_{BC1}(2)$', r'$\mathbf{p}_{BC1}$(3)'], 100,
+#      ref_T_SC1[:3, 3], r'$cm$', 2, 3, np.array([0, 0, 0]), 0.5),
+#     ('q_BC1', r'$\mathbf{R}_{BC1}$', ['roll', 'pitch', 'yaw', 'w'],
+#      180 / math.pi, mathUtils.dcm2quat(ref_T_SC1[:3, :3]), r'$^\circ$', 3, 3,
+#      mathUtils.dcm2quat(dataParams.TUMVI_NominalS_R_C0), 2.2),
+#     ('fc1', '', [r'$f^1$', r'$c_x^1$', r'$c_y^1$'], 1, ReferenceParameters['fc1'], r'$px$', 2, 3,
+#      np.array([190, 256, 256]), 0.5),
+#     ('distort1', '', [r'$k_1^1$', r'$k_2^1$', r'$k_3^1$', r'$k_4^1$'], 1000, ReferenceParameters['distort1'], '0.001', 2,
+#     4, np.array([0, 0, 0, 0]), 0.5),
+#     ('tdtr1', '', [r'$t_d^1$', r'$t_r^1$'], 1000, ReferenceParameters['tdtr1'], r'$ms$', 2, 2, np.array([0, 0.02]), 0.5)]
 
 
 def getSwiftVioEstimatesIndexRanges():
