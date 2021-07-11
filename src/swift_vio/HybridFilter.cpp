@@ -1759,6 +1759,7 @@ bool HybridFilter::slamFeatureJacobian(const okvis::MapPoint &mp,
        itObs != iteObs; ++itObs) {
     if (itObs->first.frameId == currFrameId) {
       if (static_cast<int>(itObs->first.cameraIndex) == cameraId) { // avoid double observations.
+//        LOG(WARNING) << "The OKVIS frontend may associate one landmark with two observations in the same image!";
         continue;
       }
       uint64_t poseId = itObs->first.frameId;

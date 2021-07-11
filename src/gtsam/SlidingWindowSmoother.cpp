@@ -759,8 +759,7 @@ bool SlidingWindowSmoother::addLandmarkToGraph(uint64_t lmkId, const Eigen::Vect
       continue;
     }
     if (lastImageId(*obsIter)) {
-      //      LOG(WARNING) << "okvis frontend may associate one landmark two
-      //      observations in the same image!";
+//      LOG(WARNING) << "The OKVIS frontend may associate one landmark with two observations in the same image!";
       continue;
     }
     // get the keypoint measurement
