@@ -782,10 +782,10 @@ void FeatureTracker::undistortPoints(
       0.0, new_intrinsics[1], new_intrinsics[3],
       0.0, 0.0, 1.0);
 
-  if (distortion_model == "radtan") {
+  if (distortion_model == "RadialTangentialDistortion") {
     cv::undistortPoints(pts_in, pts_out, K, distortion_coeffs,
                         rectification_matrix, K_new);
-  } else if (distortion_model == "equidistant") {
+  } else if (distortion_model == "EquidistantDistortion") {
     cv::fisheye::undistortPoints(pts_in, pts_out, K, distortion_coeffs,
                                  rectification_matrix, K_new);
   } else {
@@ -809,12 +809,12 @@ vector<cv::Point2f> FeatureTracker::distortPoints(
                       0.0, 0.0, 1.0);
 
   vector<cv::Point2f> pts_out;
-  if (distortion_model == "radtan") {
+  if (distortion_model == "RadialTangentialDistortion") {
     vector<cv::Point3f> homogenous_pts;
     cv::convertPointsToHomogeneous(pts_in, homogenous_pts);
     cv::projectPoints(homogenous_pts, cv::Vec3d::zeros(), cv::Vec3d::zeros(), K,
                       distortion_coeffs, pts_out);
-  } else if (distortion_model == "equidistant") {
+  } else if (distortion_model == "EquidistantDistortion") {
     cv::fisheye::distortPoints(pts_in, pts_out, K, distortion_coeffs);
   } else {
     std::cerr << "The model " << distortion_model.c_str() 

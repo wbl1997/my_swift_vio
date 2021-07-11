@@ -13,9 +13,7 @@ void loadParameters(const std::shared_ptr<okvis::MultiFrame> multiframe,
   int camId = 0;
   std::string distortionName =
       multiframe->geometryAs<CAMERA_GEOMETRY_T>(camId)->distortionType();
-  feature_tracker->cam0_distortion_model =
-      distortionName.compare("RadialTangentialDistortion") == 0 ? "radtan"
-                                                                : "unknown";
+  feature_tracker->cam0_distortion_model = distortionName;
 
   uint32_t width =
       multiframe->geometryAs<CAMERA_GEOMETRY_T>(camId)->imageWidth();
@@ -52,9 +50,7 @@ void loadParameters(const std::shared_ptr<okvis::MultiFrame> multiframe,
     int camId = 1;
     std::string distortionName =
         multiframe->geometryAs<CAMERA_GEOMETRY_T>(camId)->distortionType();
-    feature_tracker->cam1_distortion_model =
-        distortionName.compare("RadialTangentialDistortion") == 0 ? "radtan"
-                                                                  : "unknown";
+    feature_tracker->cam1_distortion_model = distortionName;
     uint32_t width =
         multiframe->geometryAs<CAMERA_GEOMETRY_T>(camId)->imageWidth();
     uint32_t height =
@@ -146,12 +142,8 @@ int addConstraintToEstimator(
           if (valid && canBeInitialized) {
             estimator.setLandmark(lmId, T_WCa * hP_Ca);
             estimator.setLandmarkInitialized(lmId, true);
-            estimator.replaceEpipolarWithReprojectionErrors(lmId);
             estimator.addObservation<CAMERA_GEOMETRY_T>(lmId, fIdB, im,
                                                         keypointIndex);
-          } else {
-            estimator.addEpipolarConstraint<CAMERA_GEOMETRY_T>(
-                lmId, fIdB, im, keypointIndex, false);
           }
         } else { // The landmark has been initialized.
           estimator.addObservation<CAMERA_GEOMETRY_T>(lmId, fIdB, im,
