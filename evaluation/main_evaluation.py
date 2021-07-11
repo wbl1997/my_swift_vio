@@ -21,6 +21,7 @@ import RunOneVioMethod
 import utility_functions
 
 import euroc_stasis_options
+import homebrew_options
 import sample_eval_options
 import tumrs_calib_options
 import tumvi_calib_options
@@ -92,6 +93,8 @@ if __name__ == '__main__':
         algo_option_templates, config_name_to_diffs = euroc_stasis_options.euroc_stasis_msckfmono_options()
     elif args.test_case == "euroc_stasis_rovio":
         algo_option_templates, config_name_to_diffs = euroc_stasis_options.euroc_stasis_rovio_options()
+    elif args.test_case == "honorv10_1280":
+        algo_option_templates, config_name_to_diffs = homebrew_options.honorv10_1280_options()
     else:
         algo_option_templates, config_name_to_diffs = sample_eval_options.sample_swiftvio_options()
 

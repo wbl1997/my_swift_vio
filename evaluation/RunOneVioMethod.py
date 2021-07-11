@@ -198,6 +198,7 @@ class RunOneVioMethod(object):
             exe_cmd += append_ros_arg_if_exist(self.algo_code_flags, "calib_cam_timeoffset")
             exe_cmd += append_ros_arg_if_exist(self.algo_code_flags, "max_slam")
             exe_cmd += append_ros_arg_if_exist(self.algo_code_flags, "max_slam_in_update")
+            exe_cmd += append_ros_arg_if_exist(self.algo_code_flags, "use_klt")
 
             cmd = src_cmd + exe_cmd
             # We put all commands in a bash script because source

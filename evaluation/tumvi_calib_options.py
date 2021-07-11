@@ -334,9 +334,15 @@ def tumvi_openvins_calib_cam_options():
             "max_cameras": 1,
             "use_stereo": 'false'
         },
-        ('OpenVINS-Stereo', 'OpenVINS'): {
+        ('OpenVINS-Stereo-Desc', 'OpenVINS'): {
             "max_cameras": 2,
-            "use_stereo": 'true'
+            "use_stereo": 'true',
+            "use_klt": "false",
+        },
+        ('OpenVINS-Stereo-KLT', 'OpenVINS'): {
+            "max_cameras": 2,
+            "use_stereo": 'true',
+            "use_klt": "true",
         },
     }
     return algo_option_templates, config_name_to_diffs
