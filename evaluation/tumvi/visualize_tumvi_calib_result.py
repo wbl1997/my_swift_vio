@@ -305,8 +305,15 @@ def loadSwiftVioResults(vio_output_dir, seconds_to_end):
     data_list = list()
     rate = 0
     backrowindex = -1
+
+    usedFileList = []
+
     for estimate_file in estimate_file_list:
-        data = np.loadtxt(estimate_file, delimiter=",", skiprows=1)
+        try:
+            data = np.loadtxt(estimate_file, delimiter=",", skiprows=1)
+        except (ValueError, StopIteration) as err:
+            print("Loading error: {0}, for {1}".format(err, estimate_file))
+            continue
         if rate == 0:
             interval = np.mean(np.diff(data[:, 0]))
             rate = 1.0 / interval
@@ -314,7 +321,8 @@ def loadSwiftVioResults(vio_output_dir, seconds_to_end):
             print('Swift VIO state estimate backrow index {}'.format(backrowindex))
         print('Selected Swift VIO state at {}'.format(data[-backrowindex, 0]))
         data_list.append(data[-backrowindex])
-    return np.array(data_list), estimate_file_list
+        usedFileList.append(estimate_file)
+    return np.array(data_list), usedFileList
 
 
 SWIFTVIO_BG_INDEX = 12 # 0-based index of the first dimension of gyro bias.
@@ -360,6 +368,29 @@ SegmentList = [('bg', r'$\mathbf{b}_g$', [r'$x$', r'$y$', r'$z$'], 180 / math.pi
                 ('distort1', '', [r'$k_1^1$', r'$k_2^1$', r'$k_3^1$', r'$k_4^1$'], 1000, ReferenceParameters['distort1'], '0.001', 2, 4,
                  np.array([0, 0, 0, 0]), 0.5),
                 ('tdtr1', '', [r'$t_d^1$', r'$t_r^1$'], 1000, ReferenceParameters['tdtr1'], r'$ms$', 2, 2, np.array([0, 0.02]), 0.5)]
+
+
+# SegmentList = [('bg', r'$\mathbf{b}_g$', [r'$x$', r'$y$', r'$z$'], 180 / math.pi, ReferenceParameters['bg'], r'$^\circ/s$', 3, 3,
+#                  np.array([0.0, 0.0, 0.0]), 1.0),
+#                 ('ba', r'$\mathbf{b}_a$', [r'$x$', r'$y$', r'$z$'], 1.0, ReferenceParameters['ba'], r'$m/s^2$', 3, 3,
+#                  np.array([0.0, 0.0, 0.0]), 1.6),
+#                 ('Tg', r'$\mathbf{T}_g$',
+#                  [r'$1,1$', r'$1,2$', r'$1,3$', r'$2,1$', r'$2,2$', r'$2,3$', r'$3,1$', r'$3,2$', r'$3,3$'],
+#                  1000.0, ReferenceParameters['Tg'], '0.001', 2, 9, np.array([1, 0, 0, 0, 1, 0, 0, 0, 1]), 0.1),
+#                 ('Ts', r'$\mathbf{T}_s$',
+#                  [r'$1,1$', r'$1,2$', r'$1,3$', r'$2,1$', r'$2,2$', r'$2,3$', r'$3,1$', r'$3,2$', r'$3,3$'],
+#                  1000.0, ReferenceParameters['Ts'], r'$0.001 \frac{rad/s}{m/s^2}$', 2, 9,
+#                  np.array([0, 0, 0, 0, 0, 0, 0, 0, 0]), 2.0),
+#                 ('Ta', r'$\mathbf{T}_a$',
+#                  [r'$1,1$', r'$1,2$', r'$1,3$', r'$2,1$', r'$2,2$', r'$2,3$', r'$3,1$', r'$3,2$', r'$3,3$'],
+#                  1000.0, ReferenceParameters['Ta'], '0.001', 2, 9, np.array([1, 0, 0, 0, 1, 0, 0, 0, 1]), 0.17),
+#                 ('p_C0B',  '', [r'$\mathbf{p}_{C0B}(1)$', r'$\mathbf{p}_{C0B}(2)$', r'$\mathbf{p}_{C0B}(3)$'], 100,
+#                  ReferenceParameters['p_C0B'], r'$cm$', 2, 3, np.array([0.0, 0.0, 0.0]), 0.5),
+#                 ('fc0', '', [r'$f^0$', r'$c_x^0$', r'$c_y^0$'], 1, ReferenceParameters['fc0'], r'$px$', 2, 3, [190, 256, 256], 0.5),
+#                 ('distort0', '', [r'$k_1^0$', r'$k_2^0$', r'$k_3^0$', r'$k_4^0$'], 1000, ReferenceParameters['distort0'], '0.001', 2, 4,
+#                  np.array([0, 0, 0, 0]), 0.5),
+#                 ('tdtr0', '', [r'$t_d^0$', r'$t_r^0$'], 1000, ReferenceParameters['tdtr0'], r'$ms$', 2, 2, np.array([0, 0.02]), 0.5)]
+
 
 # Another output format for BG_BA, P_BC_Q_BC, and P_BC_Q_BC.
 # ref_T_SC0 = np.array(dataParams.TUMVI_PARAMETERS['cameras'][0]['T_SC']).reshape([4, 4])

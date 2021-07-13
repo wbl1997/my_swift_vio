@@ -102,7 +102,7 @@ point_landmark:
     minTrackLengthForSlam: 7
     maxHibernationFrames: 3
     maxInStateLandmarks: 50
-    maxMarginalizedLandmarks: 80
+    maxMarginalizedLandmarks: 50
 
 pose_graph:
     maxOdometryConstraintForAKeyframe: 2

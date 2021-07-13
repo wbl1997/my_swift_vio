@@ -77,6 +77,8 @@ def convertOpenVinsToSwiftVioParams(ov_state, ov_std):
     kswf_params['Tg'] = np.identity(3).reshape(9)
     kswf_params['Ts'] = np.zeros((3, 3)).reshape(9)
     kswf_params['Ta'] = np.identity(3).reshape(9)
+    kswf_params['p_BC0'] = p_SC0
+    kswf_params['q_BC0'] = ov_state[OV_Q_BC0_RANGE]
     kswf_params['p_C0B'] = - np.matmul(R_SC0.T, p_SC0)
     S_R_NominalS = np.matmul(R_SC0, np.transpose(dataParams.TUMVI_NominalS_R_C0))
     kswf_params['p_BC1'] = np.matmul(S_R_NominalS.T, p_SC1)
@@ -101,6 +103,9 @@ def convertOpenVinsToSwiftVioParams(ov_state, ov_std):
     kswf_params['std_Ta'] = np.zeros((3, 3)).reshape(9)
     kswf_params['std_p_C0B'] = ov_std[OV_STD_P_BC0_RANGE]
 
+    kswf_params['std_p_BC0'] = ov_std[OV_STD_P_BC0_RANGE]  # Hack: ov_std[OV_STD_P_BC0_RANGE] is actually STD_P_C0B.
+    kswf_params['std_q_BC0'] = ov_std[OV_STD_Q_BC0_RANGE]  # Hack: ov_std[OV_STD_Q_BC0_RANGE] is actually STD_Q_C0B.
+
     kswf_params['std_fc0'] = ov_std[OV_STD_FXY_CXY0_RANGE]
     kswf_params['std_distort0'] = ov_std[OV_STD_DISTORTION0_RANGE]
     kswf_params['std_tdtr0'] = [ov_std[OV_STD_TD], 0]
@@ -109,7 +114,7 @@ def convertOpenVinsToSwiftVioParams(ov_state, ov_std):
     kswf_params['std_tdtr1'] = [0, 0]
 
     # convert covariance for T_BC1, ignoring the cross terms.
-    cov = np.identity(9) # covariance for the errors of X = [R_C0S, R_C1S, p_C1S], dX = [theta_C0S, theta_C1S, theta_C1S]
+    cov = np.identity(9) # covariance for the errors of X = [R_C0S, R_C1S, p_C1S], dX = [theta_C0S, theta_C1S, p_C1S]
     for i, index in enumerate(OV_STD_Q_BC0_RANGE):
         cov[i, i] = pow(ov_std[index], 2)
     for i, index in enumerate(OV_STD_Q_BC1_RANGE):

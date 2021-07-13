@@ -22,8 +22,8 @@ OKVIS_TUMVI_RAW_IMU_PARAMETERS = {"sigma_g_c": 0.004 * 5,
 # SL-KSWF_n_005_01 &     42.373 &  0.151
 SWF_TUMVI_IMU_PARAMETERS = {"sigma_g_c": 0.004 * 0.2,
                             "sigma_a_c": 0.07 * 0.2,
-                            "sigma_gw_c": 4.4e-5 * 0.25,
-                            "sigma_aw_c": 1.72e-3 * 0.25}
+                            "sigma_gw_c": 4.4e-5 * 0.5,
+                            "sigma_aw_c": 1.72e-3 * 0.5}
 
 # The best IMU parameters for monocular sliding window filters on TUM VI calibrated data are found by a search.
 #       &      Translation (\%) &  Rotation (deg/meter)
@@ -62,16 +62,24 @@ def tumvi_calibrated_swiftvio_options():
     }
 
     config_name_to_diffs = {
+        ('KSWF-mono', 'KSWF'): {"sigma_g_c": 0.00016,
+                                "sigma_a_c": 0.0028,
+                                "sigma_gw_c": 2.2e-5,
+                                "sigma_aw_c": 8.6e-4,
+                                "monocular_input": 1,
+                                "featureTrackingMethod": 0,
+                                "stereoMatchWithEpipolarCheck": "true",
+                                "epipolarDistanceThreshold": 5,
+                                "minTrackLengthForSlam": 7,
+                                "threshold": 35.0, },
         ('KSWF', 'KSWF'): {"sigma_g_c": 0.00016,
                            "sigma_a_c": 0.0028,
                            "sigma_gw_c": 2.2e-5,
                            "sigma_aw_c": 8.6e-4,
-                           "featureTrackingMethod": 2,
+                           "featureTrackingMethod": 0,
                            "stereoMatchWithEpipolarCheck": "true",
-                           "epipolarDistanceThreshold": 10,
-                           "keyframeInsertionMatchingRatioThreshold": 1.0,
-                           "keyframeInsertionOverlapThreshold": 1.0,
-                           "minTrackLengthForSlam": 9,
+                           "epipolarDistanceThreshold": 5,
+                           "minTrackLengthForSlam": 7,
                            "threshold": 35.0, },
         ('SL-KSWF', 'KSWF'): {"algo_code": "MSCKF",
                               "sigma_g_c": 0.00016,
@@ -80,10 +88,8 @@ def tumvi_calibrated_swiftvio_options():
                               "sigma_aw_c": 8.6e-4,
                               "featureTrackingMethod": 2,
                               "stereoMatchWithEpipolarCheck": "true",
-                              "epipolarDistanceThreshold": 10,
-                              "keyframeInsertionMatchingRatioThreshold": 1.0,
-                              "keyframeInsertionOverlapThreshold": 1.0,
-                              "minTrackLengthForSlam": 9,
+                              "epipolarDistanceThreshold": 5,
+                              "minTrackLengthForSlam": 7,
                               "threshold": 35.0, },
         ('OKVIS', 'KSWF'): {
             "algo_code": "OKVIS",
@@ -118,14 +124,13 @@ def tumvi_raw_swiftvio_options():
     }
 
     config_name_to_diffs = {
-        ('SL-KSWF-iekf', 'KSWF'): {
-            "algo_code": "MSCKF",
-            **SWF_TUMVI_RAW_IMU_PARAMETERS,
-            "extra_gflags": "--publish_via_ros=false --skip_first_seconds=0.0 --use_IEKF=true"
-        },
         ('SL-KSWF', 'KSWF'): {
             "algo_code": "MSCKF",
             **SWF_TUMVI_RAW_IMU_PARAMETERS,
+        },
+        ('KSWF-mono', 'KSWF'): {
+            **SWF_TUMVI_MONO_IMU_PARAMETERS,
+            "monocular_input": 1,
         },
         # This is the best performing setting for KSWF.
         ('KSWF', 'KSWF'): {
