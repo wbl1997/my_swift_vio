@@ -222,16 +222,18 @@ int main(int argc, char **argv) {
     return 0;
   }
 
-  okvis::Duration deltaT(FLAGS_skip_first_seconds);
+  okvis::Duration deltaT(0.0);
   const unsigned int numCameras = parameters.nCameraSystem.numCameras();
 
-  // open the bag
   rosbag::Bag bag(FLAGS_bagname, rosbag::bagmode::Read);
+  rosbag::View view(bag);
+  ros::Time bagBeginTime = view.getBeginTime();
+
   std::vector<std::string> camera_topics =
       swift_vio::parseCommaSeparatedTopics(FLAGS_camera_topics);
-  // views on topics. the slash is needs to be correct, it's ridiculous...
   std::string imu_topic = FLAGS_imu_topic;
-  rosbag::View view_imu(bag, rosbag::TopicQuery(imu_topic));
+  ros::Time startTime = bagBeginTime + ros::Duration(FLAGS_skip_first_seconds);
+  rosbag::View view_imu(bag, rosbag::TopicQuery(imu_topic), startTime);
   if (view_imu.size() == 0) {
     LOG(ERROR) << "no imu topic";
     return -1;
@@ -246,7 +248,7 @@ int main(int argc, char **argv) {
   for (size_t i = 0; i < numCameras; ++i) {
     std::string camera_topic = camera_topics[i];
     std::shared_ptr<rosbag::View> view_ptr(
-        new rosbag::View(bag, rosbag::TopicQuery(camera_topic)));
+        new rosbag::View(bag, rosbag::TopicQuery(camera_topic), startTime));
     if (view_ptr->size() == 0) {
       LOG(ERROR) << "no camera topic";
       return 1;

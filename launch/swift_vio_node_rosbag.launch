@@ -8,11 +8,14 @@
   <arg name="output_dir" default=""/>
   <arg name="config_filename" default="$(find swift_vio)/config/config_fpga_p2_euroc.yaml" />
   <arg name="lcd_config_filename" default="$(find swift_vio)/config/lcd_params.yaml" />
+  <arg name="vocabulary_path" default="$(find swift_vio)/vocabulary/ORBvoc.yml" />
   <arg name="start_into_bag" default="0"/>
   <arg name="image_noise_cov_multiplier" default="5.0"/>
   <arg name="play_rate" default="1.0"/>
   <node name="swift_vio_node" pkg="swift_vio" type="swift_vio_node" output="screen" 
-      args="$(arg config_filename) $(arg lcd_config_filename) 
+      args="$(arg config_filename)
+      --lcd_params_yaml=$(arg lcd_config_filename)
+      --vocabulary_path=$(arg vocabulary_path)
       --dump_output_option=$(arg dump_output_option) 
       --load_input_option=$(arg load_input_option)
       --image_noise_cov_multiplier=$(arg image_noise_cov_multiplier)
