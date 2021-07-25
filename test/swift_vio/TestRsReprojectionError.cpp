@@ -10,8 +10,6 @@
 #include <swift_vio/ProjParamOptModels.hpp>
 #include <swift_vio/ceres/RsReprojectionError.hpp>
 
-#include <okvis/FrameTypedefs.hpp>
-#include <okvis/Time.hpp>
 #include <okvis/assert_macros.hpp>
 #include <okvis/cameras/EquidistantDistortion.hpp>
 #include <okvis/cameras/PinholeCamera.hpp>
@@ -23,8 +21,13 @@
 #include <okvis/ceres/ReprojectionError.hpp>
 #include <okvis/ceres/SpeedAndBiasParameterBlock.hpp>
 #include <okvis/kinematics/Transformation.hpp>
+#include <okvis/FrameTypedefs.hpp>
+#include <okvis/Parameters.hpp>
+#include <okvis/Time.hpp>
 
+#include <simul/curves.h>
 #include <simul/numeric_ceres_residual_Jacobian.hpp>
+#include <simul/PointLandmarkSimulationRS.hpp>
 
 // When readout time, tr is non zero, analytic, numeric and automatic Jacobians
 // of the rolling shutter reprojection factor are roughly the same.
@@ -49,25 +52,36 @@ void setupPoseOptProblem(bool perturbPose, bool rollingShutter,
       ::ceres::Ownership::TAKE_OWNERSHIP;
   ::ceres::Problem problem(problemOptions);
 
-  okvis::kinematics::Transformation T_WS;
-  T_WS.setRandom(10.0, M_PI);
-  okvis::kinematics::Transformation T_disturb;
-  T_disturb.setRandom(1, 0.01);
-  okvis::kinematics::Transformation T_WS_init = T_WS;
-  if (perturbPose) {
-    T_WS_init = T_WS * T_disturb;
-  }
-  okvis::kinematics::Transformation private_T_SC;
-  private_T_SC.setRandom(0.2, M_PI);
-  const okvis::kinematics::Transformation T_SC = private_T_SC;
+  okvis::ImuParameters imuParameters;
+  double imuFreq = imuParameters.rate;
+  Eigen::Vector3d ginw(0, 0, -imuParameters.g);
+  std::shared_ptr<simul::CircularSinusoidalTrajectory> cameraMotion(
+      new simul::WavyCircle(imuFreq, ginw));
+  okvis::ImuMeasurementDeque imuMeasurements;
 
   const okvis::Time stateEpoch(2.0);
+  cameraMotion->getTrueInertialMeasurements(stateEpoch - okvis::Duration(1),
+                                            stateEpoch + okvis::Duration(1),
+                                            imuMeasurements);
+  okvis::kinematics::Transformation T_WS = cameraMotion->computeGlobalPose(stateEpoch);
+  Eigen::Vector3d v_WS = cameraMotion->computeGlobalLinearVelocity(stateEpoch);
+
+  okvis::kinematics::Transformation T_disturb;
+  T_disturb.setRandom(1, 0.01);
+  okvis::kinematics::Transformation initial_T_WS = T_WS;
+  if (perturbPose) {
+    initial_T_WS = T_WS * T_disturb;
+  }
+  okvis::kinematics::Transformation T_SC_ref;
+  T_SC_ref.setRandom(0.2, M_PI);
+  const okvis::kinematics::Transformation initial_T_SC = T_SC_ref;
+
   uint64_t id = 1u;
   ::ceres::LocalParameterization* poseLocalParameterization(
       new okvis::ceres::PoseLocalParameterization);
-  okvis::ceres::PoseParameterBlock poseParameterBlock(T_WS_init, id++,
+  okvis::ceres::PoseParameterBlock poseParameterBlock(initial_T_WS, id++,
                                                       stateEpoch);
-  okvis::ceres::PoseParameterBlock extrinsicsParameterBlock(T_SC, id++,
+  okvis::ceres::PoseParameterBlock extrinsicsParameterBlock(initial_T_SC, id++,
                                                             stateEpoch);
   problem.AddParameterBlock(poseParameterBlock.parameters(),
                             poseParameterBlock.dimension(),
@@ -91,9 +105,13 @@ void setupPoseOptProblem(bool perturbPose, bool rollingShutter,
   Eigen::VectorXd intrinsicParams;
   cameraGeometry->getIntrinsics(intrinsicParams);
   double tr = 0;
+  double cameraTimeOffset(0.0);
+  double initialCameraTimeOffset = 0.0;  // camera time offset's latest estimate.
   if (rollingShutter) {
-    tr = 0.033;
+    tr = 0.03;
   }
+  cameraGeometry->setReadoutTime(tr);
+  cameraGeometry->setImageDelay(cameraTimeOffset);
 
   std::string projOptModelName = "FXY_CXY";
   std::string extrinsicOptModelName = "P_BC_Q_BC";
@@ -120,13 +138,14 @@ void setupPoseOptProblem(bool perturbPose, bool rollingShutter,
   problem.AddParameterBlock(trParamBlock.parameters(), 1);
   problem.SetParameterBlockConstant(trParamBlock.parameters());
 
-  double timeOffset(0.0);
-  okvis::ceres::CameraTimeParamBlock tdBlock(timeOffset, id++, stateEpoch);
+  okvis::ceres::CameraTimeParamBlock tdBlock(cameraTimeOffset, id++, stateEpoch);
   problem.AddParameterBlock(tdBlock.parameters(),
                             okvis::ceres::CameraTimeParamBlock::Dimension);
   problem.SetParameterBlockConstant(tdBlock.parameters());
 
-  okvis::ceres::SpeedAndBias sb = okvis::ceres::SpeedAndBias::Random();
+  okvis::SpeedAndBiases sb;
+  sb.head<3>() = v_WS;
+  sb.tail<6>().setZero();
   okvis::ceres::SpeedAndBiasParameterBlock sbBlock(sb, id++, stateEpoch);
   problem.AddParameterBlock(
       sbBlock.parameters(),
@@ -137,24 +156,6 @@ void setupPoseOptProblem(bool perturbPose, bool rollingShutter,
   // and the parameterization for points:
   ::ceres::LocalParameterization* homogeneousPointLocalParameterization(
       new okvis::ceres::HomogeneousPointLocalParameterization);
-  okvis::ImuMeasurementDeque imuMeasDeque;
-
-  // time * 100 Hz imu data centering at stateEpoch
-  double gravity = 9.80665;
-  int frequency = 100;
-  double duration = 2;
-  for (size_t jack = 0; jack < duration * frequency; ++jack) {
-    okvis::Time time =
-        stateEpoch + okvis::Duration(static_cast<double>(jack) /
-                                         static_cast<double>(frequency) -
-                                     duration * 0.5);
-    Eigen::Vector3d gyrMeas = Eigen::Vector3d::Random();
-    Eigen::Vector3d accMeas =
-        Eigen::Vector3d::Random() +
-        T_WS.C().transpose() * Eigen::Vector3d(0, 0, gravity);
-    imuMeasDeque.emplace_back(
-        time, okvis::ImuSensorReadings(gyrMeas, accMeas));
-  }
 
   // get some random points and build error terms
   const size_t N = 100;
@@ -166,10 +167,21 @@ void setupPoseOptProblem(bool perturbPose, bool rollingShutter,
   for (size_t i = 1; i < 100; ++i) {
     Eigen::Vector4d point = cameraGeometry->createRandomVisibleHomogeneousPoint(
         double(i % 10) * 3 + 2.0);
+    Eigen::Vector4d hpW = T_WS * T_SC_ref * point;
+    Eigen::Vector2d kp;
+    okvis::cameras::CameraBase::ProjectionStatus status = simul::PointLandmarkSimulationRS::projectLandmark(
+          cameraMotion, hpW, T_SC_ref, cameraGeometry, stateEpoch, &kp);
+    if (status != okvis::cameras::CameraBase::ProjectionStatus::Successful) {
+      continue;
+    }
+    if (noisyKeypoint) {
+      kp += Eigen::Vector2d::Random();
+    }
+
     okvis::ceres::HomogeneousPointParameterBlock*
         homogeneousPointParameterBlock_ptr(
             new okvis::ceres::HomogeneousPointParameterBlock(
-                T_WS * T_SC * point, i - 1 + id));
+                hpW, i - 1 + id));
     allPointBlocks.emplace_back(homogeneousPointParameterBlock_ptr);
     problem.AddParameterBlock(
         homogeneousPointParameterBlock_ptr->parameters(),
@@ -177,26 +189,18 @@ void setupPoseOptProblem(bool perturbPose, bool rollingShutter,
     problem.SetParameterBlockConstant(
         homogeneousPointParameterBlock_ptr->parameters());
 
-    // get a randomized projection
-    Eigen::Vector2d kp;
-    cameraGeometry->projectHomogeneous(point, &kp);
-    if (noisyKeypoint) {
-      kp += Eigen::Vector2d::Random();
-    }
-
-    // Set up the only cost function (also known as residual).
+    // Set up the only cost function.
     Eigen::Matrix2d covariance = Eigen::Matrix2d::Identity() / 0.36;
-    double tdAtCreation = 0.0;
 
     std::shared_ptr<okvis::ImuMeasurementDeque> imuMeasDequePtr(
-          new okvis::ImuMeasurementDeque(imuMeasDeque));
+          new okvis::ImuMeasurementDeque(imuMeasurements));
     ::ceres::CostFunction* cost_function(
         new okvis::ceres::RsReprojectionError<DistortedPinholeCameraGeometry,
                                               swift_vio::ProjectionOptFXY_CXY,
                                               swift_vio::Extrinsic_p_BC_q_BC>(
             cameraGeometry, kp, covariance, imuMeasDequePtr,
             std::shared_ptr<const Eigen::Matrix<double, 6, 1>>(),
-            stateEpoch, tdAtCreation, gravity));
+            stateEpoch, initialCameraTimeOffset, imuParameters.g));
     allCostFunctions.emplace_back(cost_function);
 
     problem.AddResidualBlock(
@@ -303,15 +307,15 @@ void setupPoseOptProblem(bool perturbPose, bool rollingShutter,
 
     costFuncPtr->EvaluateWithMinimalJacobians(parameters, residuals.data(),
                                               jacobians, jacobiansMinimal);
-    costFuncPtr->EvaluateWithMinimalJacobiansGlobalAutoDiff(
+    costFuncPtr->EvaluateWithMinimalJacobiansAutoDiff(
         parameters, residuals_auto.data(), jacobiansAD, jacobiansMinimalAD);
 
     if (i % 20 == 0) {
       if (expectedZeroResidual) {
         EXPECT_TRUE(residuals.isMuchSmallerThan(1, 1e-8))
-            << "Without noise, residual should be fairly close to zero!";
+            << "Unusually large residual " << residuals.transpose();
         EXPECT_TRUE(residuals_auto.isMuchSmallerThan(1, 1e-8))
-            << "Without noise, residual should be fairly close to zero!";
+            << "Unusually large residual " << residuals.transpose();
       }
       double tol = 1e-8;
       // analytic full vs minimal
@@ -479,7 +483,7 @@ void setupPoseOptProblem(bool perturbPose, bool rollingShutter,
   // print some infos about the optimization
   // std::cout << summary.BriefReport() << "\n";
 
-  std::cout << "initial T_WS : " << T_WS_init.T() << "\n"
+  std::cout << "initial T_WS : " << initial_T_WS.T() << "\n"
             << "optimized T_WS : " << poseParameterBlock.estimate().T() << "\n"
             << "correct T_WS : " << T_WS.T() << "\n";
 

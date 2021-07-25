@@ -1,3 +1,11 @@
+/**
+ * @file   TestSmootherObservationJacobians
+ * @author Jianzhu Huai
+ * @date
+ *
+ * @brief  Test Jacobians of camera observations used by sliding window smoothers based on ceres solver.
+ */
+
 #include <glog/logging.h>
 #include <gtest/gtest.h>
 

@@ -1,3 +1,11 @@
+/**
+ * @file   TestFeatureJacobian
+ * @author Jianzhu Huai
+ * @date
+ *
+ * @brief  Test Jacobians of feature tracks (a list of camera observations) used by filters.
+ */
+
 #include <gtest/gtest.h>
 
 #include <gtsam/VioBackEndParams.h>
@@ -6,6 +14,8 @@
 #include <io_wrap/StreamHelper.hpp>
 #include <simul/VioSimTestSystem.hpp>
 
+
+// TODO(jhuai): This test is broken.
 
 namespace {
 int examinLandmarkStackedJacobian(const okvis::MapPoint& mapPoint,
@@ -75,25 +85,8 @@ int examinLandmarkStackedJacobian(const okvis::MapPoint& mapPoint,
   return 0;
 }
 
-int examineLandmarkMeasurementJacobian(
-    const okvis::MapPoint& mapPoint, std::shared_ptr<swift_vio::MSCKF> estimator) {
-  swift_vio::PointLandmark pointLandmark;
-  Eigen::MatrixXd H_oi;
-  Eigen::Matrix<double, Eigen::Dynamic, 1> r_oi;
-  Eigen::MatrixXd R_oi;
-  bool jacOk = estimator->featureJacobianGeneric(mapPoint, &pointLandmark, H_oi, r_oi, R_oi);
-
-  // init landmark parameterization
-
-  // calculate Jacobians for at least three measurements
-  // compare Jacobians against auto diff
-
-  return jacOk;
-}
-
 enum class EstimatorCheck {
   FEATURE_TRACK_JACOBIAN=0,
-  FEATURE_MEASUREMENT_JACOBIAN,
   NAVSTATE_COVARIANCE,
 };
 
@@ -155,11 +148,8 @@ public:
   }
 
   void examineCase(EstimatorCheck checkCase, int frameCount) {
-    if ((checkCase == EstimatorCheck::FEATURE_TRACK_JACOBIAN ||
-         checkCase == EstimatorCheck::FEATURE_MEASUREMENT_JACOBIAN) &&
-        frameCount == 100)
-      examineJacobian(checkCase ==
-                      EstimatorCheck::FEATURE_MEASUREMENT_JACOBIAN);
+    if (checkCase == EstimatorCheck::FEATURE_TRACK_JACOBIAN && frameCount == 100)
+      examineJacobian();
 
     if (checkCase == EstimatorCheck::NAVSTATE_COVARIANCE && frameCount % 10 == 0) {
       examineCovariance(frameCount);
@@ -170,10 +160,9 @@ public:
    * @brief examineJacobian Check if the Jacobian of a feature measurement or
    *  the Jacobian of a feature track are correct.
    * @warning Assume the MSCKF estimator is used.
-   * @param examineMeasurementJacobian true measurement Jacobian, false track
    * Jacobian.
    */
-  void examineJacobian(bool examineMeasurementJacobian) const {
+  void examineJacobian() const {
     std::shared_ptr<swift_vio::MSCKF> filter =
         std::dynamic_pointer_cast<swift_vio::MSCKF>(estimator);
     {
@@ -198,14 +187,9 @@ public:
         continue; // only examine observations of landmarks disappeared in
                   // current frame.
       }
-      if (examineMeasurementJacobian) {
-        int examined =
-            examineLandmarkMeasurementJacobian(mapPoint, filter);
-        measurementJacobianCount += examined;
-      } else {
-        int examined = examinLandmarkStackedJacobian(mapPoint, filter);
-        featureJacobianLandmarkCount += examined;
-      }
+
+      int examined = examinLandmarkStackedJacobian(mapPoint, filter);
+      featureJacobianLandmarkCount += examined;
     }
     LOG(INFO) << "Examined " << featureJacobianLandmarkCount
               << " stacked landmark Jacobians, and "
@@ -319,24 +303,6 @@ TEST(EstimatorTest, FeatureJacobianVariableTime) {
   EstimatorTest test(projOptModelName, extrinsicModelName, outputFile, 0.0, 0.01);
   test.SetUp();
   test.Run(EstimatorCheck::FEATURE_TRACK_JACOBIAN);
-}
-
-TEST(EstimatorTest, FeatureJacobianSingleChordalDistance) {
-  std::string projOptModelName = "FXY_CXY";
-  std::string extrinsicModelName = "P_CB";
-  std::string outputFile = FLAGS_log_dir + "/MSCKF_Torus_RS_Chordal.txt";
-  EstimatorTest test(projOptModelName, extrinsicModelName, outputFile, 0.0, 0.0, 0, 0);
-  test.SetUp();
-  test.Run(EstimatorCheck::FEATURE_MEASUREMENT_JACOBIAN);
-}
-
-TEST(EstimatorTest, FeatureJacobianChordalDistance) {
-  std::string projOptModelName = "FXY_CXY";
-  std::string extrinsicModelName = "P_CB";
-  std::string outputFile = FLAGS_log_dir + "/MSCKF_Torus_Chordal.txt";
-  EstimatorTest test(projOptModelName, extrinsicModelName, outputFile, 0.0, 0.0, 2, 2);
-  test.SetUp();
-  test.Run(EstimatorCheck::FEATURE_MEASUREMENT_JACOBIAN);
 }
 
 TEST(EstimatorTest, OkvisCovariance) {

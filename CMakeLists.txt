@@ -318,7 +318,7 @@ list(APPEND TEST_SRC_FILES
     test/swift_vio/TestEuclideanParamError.cpp
     test/swift_vio/TestExtrinsicJacobian.cpp
     test/swift_vio/TestFeatureInitialization.cpp
-    test/swift_vio/TestFeatureJacobian.cpp
+    test/swift_vio/TestFeatureTrackJacobian.cpp
     test/swift_vio/TestFilterHelper.cpp
     test/swift_vio/TestHybridFilter.cpp
     test/swift_vio/TestImuOdometry.cpp
@@ -328,11 +328,11 @@ list(APPEND TEST_SRC_FILES
     test/swift_vio/TestOkvisTime.cpp
     test/swift_vio/TestPointLandmark.cpp
     test/swift_vio/TestPointLandmarkSimulationRS.cpp
-    test/swift_vio/TestPointObsJacobian.cpp
+    test/swift_vio/TestFilterObservationJacobians.cpp
     test/swift_vio/TestQuaternionFromSmallAngle.cpp
     test/swift_vio/TestRelativeMotionJacobian.cpp
     test/swift_vio/TestRsReprojectionError.cpp
-    test/swift_vio/TestReprojectionErrorWithPap.cpp
+    test/swift_vio/TestSmootherObservationJacobians.cpp
     test/swift_vio/TestSE3Interpolation.cpp
     src/swift_vio/TimeAndRotationCalibrator.cpp
     test/swift_vio/TestTimeAndRotationCalibrator.cpp

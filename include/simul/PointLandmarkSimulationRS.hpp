@@ -12,6 +12,23 @@ class PointLandmarkSimulationRS
 {
  public:
   /**
+   * @brief project a landmark in the rolling shutter camera.
+   * @param simulatedTrajectory
+   * @param hpW
+   * @param T_SCi
+   * @param cameraGeometry
+   * @param centralRowTime
+   * @param projection
+   * @return status
+   */
+  static okvis::cameras::CameraBase::ProjectionStatus projectLandmark(
+      std::shared_ptr<const simul::CircularSinusoidalTrajectory> simulatedTrajectory,
+      const Eigen::Vector4d& hpW,
+      const okvis::kinematics::Transformation& T_SCi,
+      std::shared_ptr<const okvis::cameras::CameraBase> cameraGeometry,
+      okvis::Time centralRowTime, Eigen::Vector2d* projection);
+
+  /**
    * @brief projectLandmarksToNFrame
    * @param[in] homogeneousPoints
    * @param[in] simulatedTrajectory
