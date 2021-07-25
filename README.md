@@ -173,8 +173,7 @@ rosrun swift_vio swift_vio_test --gtest_filter="*Eigen*"
 # test HybridFilter
 rosrun swift_vio swift_vio_test --log_dir="/swift_vio_sim" \
  --gtest_filter="*HybridFilter.TrajectoryLabel*" --num_runs=10 --noisyInitialSensorParams=true \
- --sim_camera_time_offset_sec=0.5 --sim_frame_readout_time_sec=0.03 --sim_trajectory_label=WavyCircle \
- --zero_imu_intrinsic_param_noise=false --zero_camera_intrinsic_param_noise=false
+ --sim_camera_time_offset_sec=0.5 --sim_frame_readout_time_sec=0.03 --sim_trajectory_label=WavyCircle
 ```
 
 * To test RPGO,

@@ -288,10 +288,16 @@ bool HybridFilter::addStates(okvis::MultiFramePtr multiFrame,
       if (!success0) return false;
       initialNavState_.updatePose(T_WS, correctedStateTime);
     }
-    // TODO(jhuai): initialize biases to zero when the platform starts in motion.
+
     okvis::ImuMeasurement biases;
-    Eigen::Vector3d gravityB = T_WS.C().transpose() * imuParametersVec_.at(0).gravity();
-    swift_vio::initBiasesFromStaticImu(imuMeasurements, gravityB, &biases);
+    // Initialize biases to zero when the platform starts in motion.
+    if (initialNavState_.startInMotion) {
+      biases.measurement.gyroscopes.setZero();
+      biases.measurement.accelerometers.setZero();
+    } else {
+      Eigen::Vector3d gravityB = T_WS.C().transpose() * imuParametersVec_.at(0).gravity();
+      swift_vio::initBiasesFromStaticImu(imuMeasurements, gravityB, &biases);
+    }
     speedAndBias.setZero();
     speedAndBias.head<3>() = initialNavState_.v_WS;
     speedAndBias.segment<3>(3) = biases.measurement.gyroscopes;

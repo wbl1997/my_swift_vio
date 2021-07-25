@@ -358,6 +358,10 @@ void SimFromRealData::navStateAtStart(swift_vio::InitialNavState* initialStateAn
   initialStateAndCov->std_q_WS = Eigen::Vector3d(3 * M_PI / 180, 3 * M_PI / 180, M_PI / 180);
   initialStateAndCov->std_v_WS = Eigen::Vector3d(0.2, 0.2, 0.2);
   initialStateAndCov->initializeToCustomPose = true;
+  if (initialStateAndCov->v_WS.lpNorm<Eigen::Infinity>() > 0.1)
+    initialStateAndCov->startInMotion = true;
+  else
+    initialStateAndCov->startInMotion = false;
 }
 
 CurveData::CurveData(SimulatedTrajectoryType trajectoryType,
@@ -461,6 +465,10 @@ void CurveData::navStateAtStart(swift_vio::InitialNavState* initialStateAndCov) 
   initialStateAndCov->std_q_WS = Eigen::Vector3d(M_PI / 180, M_PI / 180, 1e-5);
   initialStateAndCov->std_v_WS = Eigen::Vector3d(5e-2, 5e-2, 5e-2);
   initialStateAndCov->initializeToCustomPose = true;
+  if (initialStateAndCov->v_WS.lpNorm<Eigen::Infinity>() > 0.1)
+    initialStateAndCov->startInMotion = true;
+  else
+    initialStateAndCov->startInMotion = false;
 }
 
 } // namespace simul

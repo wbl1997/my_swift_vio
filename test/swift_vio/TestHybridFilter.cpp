@@ -84,6 +84,8 @@ TEST(DeadreckoningO, TrajectoryLabel) {
   simSystem.run(testSetting, FLAGS_log_dir);
 }
 
+// If both addImuNoise and addImageNoise are false, the results in different
+// runs by an estimator are almost identical.
 TEST(HybridFilter, TrajectoryLabel) {
   int cameraObservationModelId = 0;
   int landmarkModelId = FLAGS_sim_landmark_model;

@@ -100,6 +100,10 @@ class CameraMeasurementJacobianTest {
 
     swift_vio::InitialNavState pvstd;
     pvstd.initializeToCustomPose = true;
+    if (v_WS.lpNorm<Eigen::Infinity>() > 0.1)
+      pvstd.startInMotion = true;
+    else
+      pvstd.startInMotion = false;
     pvstd.p_WS = p_WS;
     pvstd.q_WS = Eigen::Quaterniond(q_WS);
     pvstd.v_WS = v_WS;
