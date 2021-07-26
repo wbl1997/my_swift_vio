@@ -88,6 +88,28 @@ public:
    return parameters_.data();
  }
 
+ Eigen::VectorXd estimate() const {
+   Eigen::VectorXd result;
+   result.resize(parameters_.size());
+   for (size_t i = 0u; i < parameters_.size(); ++i) {
+     result[i] = parameters_[i];
+   }
+   return result;
+ }
+
+ void setEstimate(const std::vector<double>& params) {
+   parameters_ = params;
+ }
+
+ void setEstimate(const Eigen::VectorXd& params) {
+   parameters_.resize(params.size());
+   for (size_t i = 0u; i < parameters_.size(); ++i) {
+     parameters_[i] = params[i];
+   }
+ }
+
+
+
  int modelId() const {
    return modelId_;
  }

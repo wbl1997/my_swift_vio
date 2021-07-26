@@ -310,6 +310,7 @@ list(APPEND TEST_SRC_FILES
    
     test/loop_closure/TestLcdThirdPartyWrapper.cpp
 
+    test/swift_vio/SmootherJacobianUtilities.cpp
     test/swift_vio/TestBoundedImuDeque.cpp
     test/swift_vio/TestCovarianceEstimation.cpp
     test/swift_vio/TestEkf.cpp

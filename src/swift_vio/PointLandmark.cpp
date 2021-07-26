@@ -1,5 +1,7 @@
 #include <swift_vio/PointLandmark.hpp>
 
+#include <okvis/ceres/HomogeneousPointLocalParameterization.hpp>
+
 #include <swift_vio/FeatureTriangulation.hpp>
 #include <swift_vio/ParallaxAnglePoint.hpp>
 #include <swift_vio/PointLandmarkModels.hpp>
@@ -30,7 +32,7 @@ void decideAnchors(const std::vector<std::pair<uint64_t, size_t>>& frameIds,
       anchorId = orderedCulledFrameIds.back();
       anchorFrameIds.push_back(anchorId);
       break;
-    case swift_vio::HomogeneousPointParameterization::kModelId:
+    case okvis::ceres::HomogeneousPointLocalParameterization::kModelId:
     default:
       break;
   }
@@ -59,7 +61,7 @@ void decideAnchors(const std::vector<std::pair<uint64_t, size_t>>& frameIds,
       anchorIds->emplace_back(frameIds.back().first, frameIds.back().second,
                               frameIds.size() - 1);
       break;
-    case swift_vio::HomogeneousPointParameterization::kModelId:
+    case okvis::ceres::HomogeneousPointLocalParameterization::kModelId:
     default:
       break;
   }

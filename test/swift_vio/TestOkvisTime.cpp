@@ -6,6 +6,6 @@ TEST(OkvisTime, smallMinusLarge) {
     okvis::Duration dura(2, 230);
 
     okvis::Time left = okvis::minusSafe(right, dura);
-    EXPECT_EQ(left.sec, 0);
-    EXPECT_EQ(left.nsec, 0);
+    EXPECT_EQ(left.sec, 0u);
+    EXPECT_EQ(left.nsec, 0u);
 }

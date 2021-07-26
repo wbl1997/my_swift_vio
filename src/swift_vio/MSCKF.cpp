@@ -605,7 +605,7 @@ void MSCKF::optimize(size_t /*numIter*/, size_t /*numThreads*/, bool verbose) {
       std::vector<uint64_t> frameIds;
       std::vector<double> vRi;  // std noise in pixels
 
-      swift_vio::PointLandmark pointLandmark(swift_vio::HomogeneousPointParameterization::kModelId);
+      swift_vio::PointLandmark pointLandmark(okvis::ceres::HomogeneousPointLocalParameterization::kModelId);
       swift_vio::PointSharedData psd;
       swift_vio::TriangulationStatus status =
           triangulateAMapPoint(it->second, obsInPixel, pointLandmark, vRi,

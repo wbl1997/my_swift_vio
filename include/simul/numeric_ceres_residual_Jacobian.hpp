@@ -6,6 +6,8 @@
 #include <okvis/ceres/PoseParameterBlock.hpp>
 #include <okvis/ceres/HomogeneousPointParameterBlock.hpp>
 
+#include <swift_vio/PointLandmark.hpp>
+
 namespace simul {
 #define ARE_MATRICES_CLOSE(ref, computed, tol)                             \
   do {                                                                     \
@@ -54,10 +56,13 @@ namespace simul {
     }                                                                      \
   } while (0)
 
+/**
+ * paramBlock->parameters() is a component of parameters.
+ */
 template <class JacEigenType = Eigen::Matrix<double, Eigen::Dynamic,
                                              Eigen::Dynamic, Eigen::RowMajor>>
 void computeNumericJac(okvis::ceres::ParameterBlock& paramBlock,
-                       okvis::ceres::ErrorInterface* costFuncPtr,
+                       const okvis::ceres::ErrorInterface* costFuncPtr,
                        double const* const* parameters,
                        const Eigen::VectorXd& residuals,
                        JacEigenType* jacNumeric) {
@@ -82,20 +87,25 @@ void computeNumericJac(okvis::ceres::ParameterBlock& paramBlock,
   }
 }
 
+/**
+ * paramBlock->parameters() is a component of parameters.
+ */
 void computeNumericJacPose(okvis::ceres::PoseParameterBlock& paramBlock,
-                           okvis::ceres::ErrorInterface* costFuncPtr,
+                           const okvis::ceres::ErrorInterface* costFuncPtr,
                            double const* const* parameters,
                            const Eigen::VectorXd& residuals,
                            Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic,
                                          Eigen::RowMajor>* jacNumeric,
                            bool minimal);
 
+/**
+ * paramBlock->parameters() is a component of parameters.
+ */
 void computeNumericJacPoint(
-    okvis::ceres::HomogeneousPointParameterBlock& paramBlock,
-    okvis::ceres::ErrorInterface* costFuncPtr, double const* const* parameters,
+    swift_vio::PointLandmark& paramBlock, const ::ceres::LocalParameterization& localParameterization,
+    const okvis::ceres::ErrorInterface* costFuncPtr, double const* const* parameters,
     const Eigen::VectorXd& residuals,
     Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>*
-        jacNumeric,
-    bool minimal);
+        jacNumeric, bool minimal);
 } // namespace simul
 #endif // INCLUDE_SWIFT_VIO_NUMERIC_CERES_RESIDUAL_JACOBIAN_HPP_

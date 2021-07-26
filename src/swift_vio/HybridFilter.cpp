@@ -2854,7 +2854,7 @@ void HybridFilter::initializeLandmarksInFilter() {
           landmarksToAdd[j].setEstimate(ab1rho);
         }
         break;
-      case swift_vio::HomogeneousPointParameterization::kModelId:
+      case okvis::ceres::HomogeneousPointLocalParameterization::kModelId:
         for (size_t j = 0u; j < nNewFeatures; ++j) {
             Eigen::Vector4d pointW = landmarksToAdd[j].estimate();
             pointW[0] += deltaLandmarks[j * 3];

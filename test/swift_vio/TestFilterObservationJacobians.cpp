@@ -383,7 +383,7 @@ TEST(CameraMeasurementJacobianTest, FOV_AIDP_onesided) {
 
 TEST(CameraMeasurementJacobianTest, RadialTangential_HPP) {
   swift_vio::PointLandmarkOptions plOptions;
-  plOptions.landmarkModelId = swift_vio::HomogeneousPointParameterization::kModelId;
+  plOptions.landmarkModelId = okvis::ceres::HomogeneousPointLocalParameterization::kModelId;
   CameraMeasurementJacobianTest cmjt(
       okvis::cameras::NCameraSystem::DistortionType::RadialTangential,
       plOptions);
@@ -392,7 +392,7 @@ TEST(CameraMeasurementJacobianTest, RadialTangential_HPP) {
 
 TEST(CameraMeasurementJacobianTest, FOV_HPP) {
   swift_vio::PointLandmarkOptions plOptions;
-  plOptions.landmarkModelId = swift_vio::HomogeneousPointParameterization::kModelId;
+  plOptions.landmarkModelId = okvis::ceres::HomogeneousPointLocalParameterization::kModelId;
   CameraMeasurementJacobianTest cmjt(
       okvis::cameras::NCameraSystem::DistortionType::FOV,
       plOptions);

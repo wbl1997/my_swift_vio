@@ -8,10 +8,10 @@
     ImuModel, ExtrinsicModel, CameraGeometry, ProjectionIntrinsicModel)       \
   case ProjectionIntrinsicModel::kModelId:                                    \
     switch (pointLandmarkOptions_.landmarkModelId) {                                               \
-      case swift_vio::HomogeneousPointParameterization::kModelId:                 \
+      case okvis::ceres::HomogeneousPointLocalParameterization::kModelId:                 \
         status = computeCameraObservationJacobians<                           \
             CameraGeometry, ProjectionIntrinsicModel, ExtrinsicModel,         \
-            swift_vio::HomogeneousPointParameterization, ImuModel>(               \
+            okvis::ceres::HomogeneousPointLocalParameterization, ImuModel>(               \
             pointLandmark, baseCameraGeometry, obs, obsCov, observationIndex, \
             pointDataPtr, J_X, J_pfi, J_n, residual);                         \
         break;                                                                \

@@ -3,7 +3,7 @@
 
 namespace simul {
 void computeNumericJacPose(okvis::ceres::PoseParameterBlock& paramBlock,
-                           okvis::ceres::ErrorInterface* costFuncPtr,
+                           const okvis::ceres::ErrorInterface* costFuncPtr,
                            double const* const* parameters,
                            const Eigen::VectorXd& residuals,
                            Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic,
@@ -47,22 +47,22 @@ void computeNumericJacPose(okvis::ceres::PoseParameterBlock& paramBlock,
 }
 
 void computeNumericJacPoint(
-    okvis::ceres::HomogeneousPointParameterBlock& paramBlock,
-    okvis::ceres::ErrorInterface* costFuncPtr, double const* const* parameters,
+    swift_vio::PointLandmark& paramBlock, const ::ceres::LocalParameterization& localParameterization,
+    const okvis::ceres::ErrorInterface* costFuncPtr, double const* const* parameters,
     const Eigen::VectorXd& residuals,
     Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>*
         jacNumeric,
     bool minimal) {
   const double epsilon = 1e-6;
   Eigen::VectorXd purturbedResiduals = residuals;
-  Eigen::Vector4d originalEstimate = paramBlock.estimate();
+  Eigen::VectorXd originalEstimate = paramBlock.estimate();
   if (minimal) {
-    for (size_t jack = 0; jack < 3; ++jack) {
-      Eigen::Matrix<double, 3, 1> deltaVec =
-          Eigen::Matrix<double, 3, 1>::Zero();
+    for (int jack = 0; jack < localParameterization.LocalSize(); ++jack) {
+      Eigen::Matrix<double, -1, 1> deltaVec =
+          Eigen::Matrix<double, -1, 1>::Zero(localParameterization.LocalSize());
       deltaVec[jack] = epsilon;
-      Eigen::Vector4d perturbedEstimate = originalEstimate;
-      perturbedEstimate.head<3>() += deltaVec;
+      Eigen::VectorXd perturbedEstimate = originalEstimate;
+      localParameterization.Plus(originalEstimate.data(), deltaVec.data(), perturbedEstimate.data());
       paramBlock.setEstimate(perturbedEstimate);
       costFuncPtr->EvaluateWithMinimalJacobians(
           parameters, purturbedResiduals.data(), NULL, NULL);
@@ -71,8 +71,8 @@ void computeNumericJacPoint(
     }
     return;
   }
-  for (size_t jack = 0; jack < 4; ++jack) {
-    Eigen::Matrix<double, 4, 1> deltaVec = Eigen::Matrix<double, 4, 1>::Zero();
+  for (int jack = 0; jack < originalEstimate.size(); ++jack) {
+    Eigen::Matrix<double, -1, 1> deltaVec = Eigen::Matrix<double, -1, 1>::Zero(originalEstimate.size());
     deltaVec[jack] = epsilon;
     paramBlock.setEstimate(originalEstimate + deltaVec);
     costFuncPtr->EvaluateWithMinimalJacobians(
