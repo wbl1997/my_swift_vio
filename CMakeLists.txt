@@ -8,6 +8,8 @@ IF(CMAKE_BUILD_TYPE MATCHES Release)
   ADD_DEFINITIONS(-DNDEBUG)
 ENDIF()
 
+add_definitions(-w)
+
 message(STATUS "Building swift_vio with ${CMAKE_BUILD_TYPE}")
 
 option(DO_TIMING "Time routines." OFF)
@@ -298,62 +300,63 @@ target_link_libraries(debugEstimatorException ${PROJECT_NAME})
 list(APPEND TEST_SRC_FILES
     test/test_main.cpp
 
-    test/boost/TestBoostAccumulators.cpp
-    test/boost/TestChiSquared.cpp
+    # test/boost/TestBoostAccumulators.cpp
+    # test/boost/TestChiSquared.cpp
 
-    test/eigen/TestEigen2CV.cpp
-    test/eigen/TestEigenMatrixInitialization.cpp
-    test/eigen/TestEigenQR.cpp
-    test/eigen/TestEigenQuaternion.cpp
+    # test/eigen/TestEigen2CV.cpp
+    # test/eigen/TestEigenMatrixInitialization.cpp
+    # test/eigen/TestEigenQR.cpp
+    # test/eigen/TestEigenQuaternion.cpp
 
-    test/io_wrap/TestVioDatasetPlayer.cpp
+    # test/io_wrap/TestVioDatasetPlayer.cpp
    
-    test/loop_closure/TestLcdThirdPartyWrapper.cpp
+    # test/loop_closure/TestLcdThirdPartyWrapper.cpp
 
     test/swift_vio/SmootherJacobianUtilities.cpp
-    test/swift_vio/TestBoundedImuDeque.cpp
-    test/swift_vio/TestCovarianceEstimation.cpp
-    test/swift_vio/TestEkf.cpp
-    test/swift_vio/TestEpipolarFactor.cpp
-    test/swift_vio/TestEpipolarJacobian.cpp
-    test/swift_vio/TestEuclideanParamError.cpp
-    test/swift_vio/TestExtrinsicJacobian.cpp
-    test/swift_vio/TestFeatureInitialization.cpp
-    test/swift_vio/TestFeatureTrackJacobian.cpp
-    test/swift_vio/TestFilterHelper.cpp
-    test/swift_vio/TestHybridFilter.cpp
-    test/swift_vio/TestImuOdometry.cpp
-    test/swift_vio/TestCurves.cpp
-    test/swift_vio/TestMergeTwoLandmarks.cpp
-    test/swift_vio/TestOkvisTriangulateFast.cpp
-    test/swift_vio/TestOkvisTime.cpp
-    test/swift_vio/TestPointLandmark.cpp
-    test/swift_vio/TestPointLandmarkSimulationRS.cpp
-    test/swift_vio/TestFilterObservationJacobians.cpp
-    test/swift_vio/TestQuaternionFromSmallAngle.cpp
-    test/swift_vio/TestRelativeMotionJacobian.cpp
+    # test/swift_vio/TestBoundedImuDeque.cpp
+    # test/swift_vio/TestCovarianceEstimation.cpp
+    # test/swift_vio/TestEkf.cpp
+    # test/swift_vio/TestEpipolarFactor.cpp
+    # test/swift_vio/TestEpipolarJacobian.cpp
+    # test/swift_vio/TestEuclideanParamError.cpp
+    # test/swift_vio/TestExtrinsicJacobian.cpp
+    # test/swift_vio/TestFeatureInitialization.cpp
+    # test/swift_vio/TestFeatureTrackJacobian.cpp
+    # test/swift_vio/TestFilterHelper.cpp
+    # test/swift_vio/TestHybridFilter.cpp
+    # test/swift_vio/TestImuOdometry.cpp
+    # test/swift_vio/TestCurves.cpp
+    # test/swift_vio/TestMergeTwoLandmarks.cpp
+    # test/swift_vio/TestOkvisTriangulateFast.cpp
+    # test/swift_vio/TestOkvisTime.cpp
+    # test/swift_vio/TestPointLandmark.cpp
+    # test/swift_vio/TestPointLandmarkSimulationRS.cpp
+    # test/swift_vio/TestFilterObservationJacobians.cpp
+    # test/swift_vio/TestQuaternionFromSmallAngle.cpp
+    # test/swift_vio/TestRelativeMotionJacobian.cpp
+    # test/swift_vio/TestRsReprojectionError.cpp
+    # test/swift_vio/TestSmootherObservationJacobians.cpp
+    # test/swift_vio/TestSE3Interpolation.cpp
     test/swift_vio/TestRsReprojectionError.cpp
-    test/swift_vio/TestSmootherObservationJacobians.cpp
-    test/swift_vio/TestSE3Interpolation.cpp
     src/swift_vio/TimeAndRotationCalibrator.cpp
-    test/swift_vio/TestTimeAndRotationCalibrator.cpp
-    test/swift_vio/TestTriangulate.cpp
-    test/swift_vio/TestTwoViewPair.cpp
+    # test/swift_vio/TestTimeAndRotationCalibrator.cpp
+    # test/swift_vio/TestTriangulate.cpp
+    # test/swift_vio/TestTwoViewPair.cpp
 
-    test/opencv/TestOpenCVDistortion.cpp
+    # test/opencv/TestOpenCVDistortion.cpp
 
-    test/ros/TestRosbag.cpp
+    # test/ros/TestRosbag.cpp
 
-    test/std/TestBinaryOperators.cpp
-    test/std/TestCallMemberFunctionAtConstruction.cpp
-    test/std/TestConstStaticInBaseClass.cpp
-    test/std/TestDequeIterator.cpp
-    test/std/TestDerivedClass.cpp
-    test/std/TestMapKeyOrder.cpp
-    test/std/TestModifyThisInConstMethod.cpp
-    test/std/TestPointerCompare.cpp
-    test/std/TestSizeof.cpp
-    test/std/TestStdAccumulate.cpp
+    # test/std/TestBinaryOperators.cpp
+    # test/std/TestCallMemberFunctionAtConstruction.cpp
+    # test/std/TestConstStaticInBaseClass.cpp
+    # test/std/TestDequeIterator.cpp
+    # test/std/TestDerivedClass.cpp
+    # test/std/TestMapKeyOrder.cpp
+    # test/std/TestModifyThisInConstMethod.cpp
+    # test/std/TestPointerCompare.cpp
+    # test/std/TestSizeof.cpp
+    # test/std/TestStdAccumulate.cpp
 )
 
 if(GTSAM_FOUND)

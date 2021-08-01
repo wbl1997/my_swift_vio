@@ -143,11 +143,13 @@ void setupPoseOptProblem(bool perturbPose, bool rollingShutter,
 }  // namespace
 
 TEST(CeresErrorTerms, ReprojectionErrorWithPapNoiseFree) {
+   LOG(INFO)<< "1";
   setupPoseOptProblem(false, false, false,
                       swift_vio::cameras::kReprojectionErrorWithPapId);
 }
 
 TEST(CeresErrorTerms, ChordalDistanceNoiseFree) {
+  LOG(INFO)<< "2";
   setupPoseOptProblem(false, false, false, swift_vio::cameras::kChordalDistanceId);
 }
 
@@ -157,11 +159,13 @@ TEST(CeresErrorTerms, ChordalDistance_R_WC_NoiseFree) {
 }
 
 TEST(CeresErrorTerms, ReprojectionErrorWithPapNoisy) {
+  LOG(INFO)<< "3";
   setupPoseOptProblem(true, true, true,
                       swift_vio::cameras::kReprojectionErrorWithPapId);
 }
 
 TEST(CeresErrorTerms, ChordalDistanceNoisy) {
+  LOG(INFO)<< "4";
   setupPoseOptProblem(true, true, true,
                       swift_vio::cameras::kChordalDistanceId);
 }

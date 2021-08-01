@@ -416,7 +416,7 @@ void findSlotsOfFactorsWithKey(
 }  // namespace swift_vio
 #else
 namespace swift_vio {
-class SlidingWindowSmoother : public Estimator {
+class SlidingWindowSmoother : public  okvis::Estimator {
  public:
   OKVIS_DEFINE_EXCEPTION(Exception, std::runtime_error)
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
@@ -429,7 +429,7 @@ class SlidingWindowSmoother : public Estimator {
    */
   SlidingWindowSmoother(const BackendParams& backendParams,
                         std::shared_ptr<okvis::ceres::Map> mapPtr) : Estimator(mapPtr) {}
-}
+};
 }  // namespace swift_vio
 #endif // #ifdef HAVE_GTSAM
 #endif /* INCLUDE_GTSAM_SLIDING_WINDOW_SMOOTHER_HPP_ */

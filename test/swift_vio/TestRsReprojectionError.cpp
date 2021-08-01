@@ -9,6 +9,7 @@
 #include <swift_vio/ExtrinsicModels.hpp>
 #include <swift_vio/ProjParamOptModels.hpp>
 #include <swift_vio/ceres/RsReprojectionError.hpp>
+#include <swift_vio/ceres/RSCameraReprojectionError.hpp>
 
 #include <okvis/assert_macros.hpp>
 #include <okvis/cameras/EquidistantDistortion.hpp>
@@ -49,6 +50,7 @@ void setupPoseOptProblem(bool perturbPose, bool rollingShutter,
 
   swift_vio::CameraObservationJacobianTest jacTest(coo);
 
+
   okvis::ImuParameters imuParameters;
   double imuFreq = imuParameters.rate;
   Eigen::Vector3d ginw(0, 0, -imuParameters.g);
@@ -62,6 +64,7 @@ void setupPoseOptProblem(bool perturbPose, bool rollingShutter,
                                             endEpoch + okvis::Duration(1),
                                             imuMeasurements);
   jacTest.addNavStatesAndExtrinsic(cameraMotion, startEpoch, 0.3);
+  //jacTest.addNavStatesAndExtrinsich(cameraMotion, startEpoch, 0.3);
 
   double tdAtCreation(0.0);  // camera time offset used in initializing the state time.
   double initialCameraTimeOffset(0.0);  // camera time offset's initial estimate.
@@ -93,51 +96,91 @@ void setupPoseOptProblem(bool perturbPose, bool rollingShutter,
             << " visible points and add respective reprojection error terms... "
             << std::endl;
 
+
   for (size_t i = 0u; i < visibleLandmarks.size(); ++i) {
     jacTest.addLandmark(visibleLandmarks[i]);
     for (size_t j = 0; j < pointObservationList[i].size(); ++j) {
       std::shared_ptr<okvis::ImuMeasurementDeque> imuMeasDequePtr(
           new okvis::ImuMeasurementDeque(imuMeasurements));
 
-      std::shared_ptr<::ceres::CostFunction> costFunctionPtr;
-      std::shared_ptr<okvis::ceres::ErrorInterface> errorInterface;
-      std::shared_ptr<okvis::ceres::RsReprojectionError<
-          swift_vio::DistortedPinholeCameraGeometry,
-          swift_vio::ProjectionOptFXY_CXY, swift_vio::Extrinsic_p_BC_q_BC>> localCostFunctionPtr(
-          new okvis::ceres::RsReprojectionError<
-              swift_vio::DistortedPinholeCameraGeometry,
-              swift_vio::ProjectionOptFXY_CXY, swift_vio::Extrinsic_p_BC_q_BC>(
-              cameraGeometry, pointObservationList[i][j], swift_vio::kCovariance,
-              imuMeasDequePtr,
-              std::shared_ptr<const Eigen::Matrix<double, 6, 1>>(),
-              jacTest.stateEpoch(j), tdAtCreation, imuParameters.g));
-      costFunctionPtr = std::static_pointer_cast<::ceres::CostFunction>(localCostFunctionPtr);
-      errorInterface = std::static_pointer_cast<okvis::ceres::ErrorInterface>(localCostFunctionPtr);
-      jacTest.addResidual(costFunctionPtr, j, i);
-      std::shared_ptr<swift_vio::PointSharedData> pointDataPtr;
-      if (i % 20 == 0 && j == 2) {
-        jacTest.verifyJacobians(errorInterface, j, i, pointDataPtr,
-                                cameraGeometry, pointObservationList[i][j]);
+      if (coo.cameraObservationModelId ==
+          swift_vio::cameras::kRsReprojectionErrorId)
+      {
+        std::shared_ptr<::ceres::CostFunction> costFunctionPtr;
+        std::shared_ptr<okvis::ceres::ErrorInterface> errorInterface;
+
+        std::shared_ptr<okvis::ceres::RsReprojectionError<
+            swift_vio::DistortedPinholeCameraGeometry,
+            swift_vio::ProjectionOptFXY_CXY, swift_vio::Extrinsic_p_BC_q_BC>>
+            localCostFunctionPtr(
+                new okvis::ceres::RsReprojectionError<
+                    swift_vio::DistortedPinholeCameraGeometry,
+                    swift_vio::ProjectionOptFXY_CXY, swift_vio::Extrinsic_p_BC_q_BC>(
+                    cameraGeometry, pointObservationList[i][j], swift_vio::kCovariance,
+                    imuMeasDequePtr,
+                    std::shared_ptr<const Eigen::Matrix<double, 6, 1>>(),
+                    jacTest.stateEpoch(j), tdAtCreation, imuParameters.g));
+        costFunctionPtr = std::static_pointer_cast<::ceres::CostFunction>(localCostFunctionPtr);
+        errorInterface = std::static_pointer_cast<okvis::ceres::ErrorInterface>(localCostFunctionPtr);
+        jacTest.addResidual(costFunctionPtr, j, i);
+
+        std::shared_ptr<swift_vio::PointSharedData> pointDataPtr;
+        if (i % 20 == 0 && j == 2)
+        {
+          jacTest.verifyJacobians(errorInterface, j, i, pointDataPtr,
+                                  cameraGeometry, pointObservationList[i][j]);
+        }
+      }
+      else if (coo.cameraObservationModelId ==
+               swift_vio::cameras::kRSCameraReprojectionErrorId)
+      {
+        std::shared_ptr<::ceres::CostFunction> costFunctionPtr;
+        std::shared_ptr<okvis::ceres::ErrorInterface> errorInterface;
+
+        std::shared_ptr<okvis::ceres::RSCameraReprojectionError<
+            swift_vio::DistortedPinholeCameraGeometry>>
+            localCostFunctionPtr(
+                new okvis::ceres::RSCameraReprojectionError<swift_vio::DistortedPinholeCameraGeometry>(
+                    pointObservationList[i][j], swift_vio::kCovariance, cameraGeometry,
+                    imuMeasDequePtr, imuParameters,
+                    jacTest.stateEpoch(j),
+                    //jacTest.stateEpoch(j)
+                    okvis::Time( jacTest.stateEpoch(j) - okvis::Duration(tdAtCreation))
+                    ));
+        costFunctionPtr = std::static_pointer_cast<::ceres::CostFunction>(localCostFunctionPtr);
+        errorInterface = std::static_pointer_cast<okvis::ceres::ErrorInterface>(localCostFunctionPtr);
+        jacTest.addResidual(costFunctionPtr, j, i);
+
+        std::shared_ptr<swift_vio::PointSharedData> pointDataPtr;
+        if (i % 20 == 0 && j == 2)
+        {
+          jacTest.verifyJacobians(errorInterface, j, i, pointDataPtr, cameraGeometry, pointObservationList[i][j]);
+        }
       }
     }
   }
   std::cout << "Successfully constructed ceres solver pose optimization problem." << std::endl;
-
   jacTest.solveAndCheck();
 }
 
+
 TEST(CeresErrorTerms, RsReprojectionErrorNoiseFree) {
+  LOG(INFO)<< "1";
   setupPoseOptProblem(false, false, false, swift_vio::cameras::kRsReprojectionErrorId);
 }
 
 TEST(CeresErrorTerms, RsReprojectionErrorNoisy) {
+  LOG(INFO)<< "2";
   setupPoseOptProblem(true, true, true, swift_vio::cameras::kRsReprojectionErrorId);
 }
 
+
 TEST(CeresErrorTerms, RSCameraReprojectionErrorNoiseFree) {
+  LOG(INFO)<< "3";
   setupPoseOptProblem(false, false, false, swift_vio::cameras::kRSCameraReprojectionErrorId);
 }
 
 TEST(CeresErrorTerms, RSCameraReprojectionErrorNoisy) {
+  LOG(INFO)<< "4";
   setupPoseOptProblem(true, true, true, swift_vio::cameras::kRSCameraReprojectionErrorId);
-}
+}/**/

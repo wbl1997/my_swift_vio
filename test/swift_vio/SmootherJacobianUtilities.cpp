@@ -3,6 +3,7 @@
 
 #include <swift_vio/ceres/ReprojectionErrorWithPap.hpp>
 #include <swift_vio/ceres/RsReprojectionError.hpp>
+#include <swift_vio/ceres/RSCameraReprojectionError.hpp>
 
 namespace swift_vio {
 const double NumericJacobianPAP::h = 1e-5;
@@ -69,50 +70,120 @@ uint64_t CameraObservationJacobianTest::addNavStatesAndExtrinsic(
                               extrinsicLocalParameterization_.get());
   extrinsicBlock_ = extrinsicsParameterBlock;
   problem_->SetParameterBlockConstant(extrinsicsParameterBlock->parameters());
-  return nextBlockIndex_;
+
+ if (coo_.cameraObservationModelId ==
+      swift_vio::cameras::kRSCameraReprojectionErrorId)
+  {
+      std::shared_ptr<okvis::ceres::PoseParameterBlock> extrinsicsParameterBlockh(
+          new okvis::ceres::PoseParameterBlock(T_BC, nextBlockIndex_++,
+                                               startEpoch));
+      problem_->AddParameterBlock(extrinsicsParameterBlockh->parameters(),
+                                  extrinsicsParameterBlockh->dimension(),
+                                  extrinsicLocalParameterization_.get());
+      extrinsicBlockh_ = extrinsicsParameterBlockh;
+      problem_->SetParameterBlockConstant(extrinsicsParameterBlockh->parameters());
+  }
+return nextBlockIndex_;
 }
+
 
 uint64_t CameraObservationJacobianTest::addCameraParameterBlocks(
     const Eigen::VectorXd &intrinsicParams, okvis::Time startEpoch, double tr,
     double timeOffset) {
-  int projOptModelId = swift_vio::ProjectionOptNameToId(coo_.projOptModelName);
-  Eigen::VectorXd projIntrinsics;
-  swift_vio::ProjectionOptGlobalToLocal(projOptModelId, intrinsicParams,
-                                        &projIntrinsics);
+    if (coo_.cameraObservationModelId ==
+        swift_vio::cameras::kRSCameraReprojectionErrorId)
+    {
+        int projOptModelId = swift_vio::ProjectionOptNameToId(coo_.projOptModelName);
+        Eigen::VectorXd projIntrinsics;
+        swift_vio::ProjectionOptGlobalToLocal(projOptModelId, intrinsicParams,
+                                              &projIntrinsics);
 
-  Eigen::VectorXd distortion = intrinsicParams.tail(kDistortionDim);
-  std::shared_ptr<okvis::ceres::EuclideanParamBlock> projectionParamBlock(
-      new okvis::ceres::EuclideanParamBlock(projIntrinsics, nextBlockIndex_++,
-                                            startEpoch, kProjIntrinsicDim));
-  std::shared_ptr<okvis::ceres::EuclideanParamBlock> distortionParamBlock(
-      new okvis::ceres::EuclideanParamBlock(distortion, nextBlockIndex_++,
-                                            startEpoch, kDistortionDim));
+        std::shared_ptr<okvis::ceres::EuclideanParamBlock> intrinsicParamBlock(
+            new okvis::ceres::EuclideanParamBlock(intrinsicParams, nextBlockIndex_++,
+                                                  startEpoch, kProjIntrinsicDim+kDistortionDim));
 
-  std::shared_ptr<okvis::ceres::CameraTimeParamBlock> trParamBlock(
-      new okvis::ceres::CameraTimeParamBlock(tr, nextBlockIndex_++,
-                                             startEpoch));
-  std::shared_ptr<okvis::ceres::CameraTimeParamBlock> tdParamBlock(
-      new okvis::ceres::CameraTimeParamBlock(timeOffset, nextBlockIndex_++,
-                                             startEpoch));
+        std::shared_ptr<okvis::ceres::CameraTimeParamBlock> trParamBlock(
+            new okvis::ceres::CameraTimeParamBlock(tr, nextBlockIndex_++,
+                                                   startEpoch));
+        std::shared_ptr<okvis::ceres::CameraTimeParamBlock> tdParamBlock(
+            new okvis::ceres::CameraTimeParamBlock(timeOffset, nextBlockIndex_++,
+                                                   startEpoch));
 
-  problem_->AddParameterBlock(projectionParamBlock->parameters(),
-                              kProjIntrinsicDim);
-  problem_->SetParameterBlockConstant(projectionParamBlock->parameters());
-  problem_->AddParameterBlock(distortionParamBlock->parameters(),
-                              kDistortionDim);
-  problem_->SetParameterBlockConstant(distortionParamBlock->parameters());
-  problem_->AddParameterBlock(trParamBlock->parameters(), 1);
-  problem_->SetParameterBlockConstant(trParamBlock->parameters());
 
-  problem_->AddParameterBlock(tdParamBlock->parameters(),
-                              okvis::ceres::CameraTimeParamBlock::Dimension);
-  problem_->SetParameterBlockConstant(tdParamBlock->parameters());
+        problem_->AddParameterBlock(intrinsicParamBlock->parameters(),
+                                    kProjIntrinsicDim+kDistortionDim);
+        problem_->SetParameterBlockConstant(intrinsicParamBlock->parameters());
+        
+        problem_->AddParameterBlock(trParamBlock->parameters(), 1);
+        problem_->SetParameterBlockConstant(trParamBlock->parameters());
 
-  cameraParameterBlocks_.push_back(projectionParamBlock);
-  cameraParameterBlocks_.push_back(distortionParamBlock);
-  cameraParameterBlocks_.push_back(trParamBlock);
-  cameraParameterBlocks_.push_back(tdParamBlock);
-  return nextBlockIndex_;
+        problem_->AddParameterBlock(tdParamBlock->parameters(),
+                                    okvis::ceres::CameraTimeParamBlock::Dimension);
+        problem_->SetParameterBlockConstant(tdParamBlock->parameters());
+
+        cameraParameterBlocks_.push_back(intrinsicParamBlock);
+        cameraParameterBlocks_.push_back(trParamBlock);
+        cameraParameterBlocks_.push_back(tdParamBlock);
+
+        //initialization Tg,Ts,Ta:They are not used for the time being, 
+        //and the initialization method is not professional
+        std::shared_ptr<okvis::ceres::EuclideanParamBlock> TgParameterBlocks(
+            new okvis::ceres::EuclideanParamBlock(intrinsicParams, nextBlockIndex_++,
+                                                  startEpoch, kProjIntrinsicDim + kDistortionDim));
+        std::shared_ptr<okvis::ceres::EuclideanParamBlock> TsParameterBlocks(
+            new okvis::ceres::EuclideanParamBlock(intrinsicParams, nextBlockIndex_++,
+                                                  startEpoch, kProjIntrinsicDim + kDistortionDim));
+        std::shared_ptr<okvis::ceres::EuclideanParamBlock> TaParameterBlocks(
+            new okvis::ceres::EuclideanParamBlock(intrinsicParams, nextBlockIndex_++,
+                                                  startEpoch, kProjIntrinsicDim + kDistortionDim));
+        TgParameterBlocks_ = TgParameterBlocks;
+        TsParameterBlocks_ = TsParameterBlocks;
+        TaParameterBlocks_ = TaParameterBlocks;
+
+        return nextBlockIndex_;
+    }
+    else
+    {
+        int projOptModelId = swift_vio::ProjectionOptNameToId(coo_.projOptModelName);
+        Eigen::VectorXd projIntrinsics;
+        swift_vio::ProjectionOptGlobalToLocal(projOptModelId, intrinsicParams,
+                                              &projIntrinsics);
+
+        Eigen::VectorXd distortion = intrinsicParams.tail(kDistortionDim);
+        std::shared_ptr<okvis::ceres::EuclideanParamBlock> projectionParamBlock(
+            new okvis::ceres::EuclideanParamBlock(projIntrinsics, nextBlockIndex_++,
+                                                  startEpoch, kProjIntrinsicDim));
+        std::shared_ptr<okvis::ceres::EuclideanParamBlock> distortionParamBlock(
+            new okvis::ceres::EuclideanParamBlock(distortion, nextBlockIndex_++,
+                                                  startEpoch, kDistortionDim));
+
+        std::shared_ptr<okvis::ceres::CameraTimeParamBlock> trParamBlock(
+            new okvis::ceres::CameraTimeParamBlock(tr, nextBlockIndex_++,
+                                                   startEpoch));
+        std::shared_ptr<okvis::ceres::CameraTimeParamBlock> tdParamBlock(
+            new okvis::ceres::CameraTimeParamBlock(timeOffset, nextBlockIndex_++,
+                                                   startEpoch));
+
+        problem_->AddParameterBlock(projectionParamBlock->parameters(),
+                                    kProjIntrinsicDim);
+        problem_->SetParameterBlockConstant(projectionParamBlock->parameters());
+        problem_->AddParameterBlock(distortionParamBlock->parameters(),
+                                    kDistortionDim);
+        problem_->SetParameterBlockConstant(distortionParamBlock->parameters());
+        problem_->AddParameterBlock(trParamBlock->parameters(), 1);
+        problem_->SetParameterBlockConstant(trParamBlock->parameters());
+
+        problem_->AddParameterBlock(tdParamBlock->parameters(),
+                                    okvis::ceres::CameraTimeParamBlock::Dimension);
+        problem_->SetParameterBlockConstant(tdParamBlock->parameters());
+
+        cameraParameterBlocks_.push_back(projectionParamBlock);
+        cameraParameterBlocks_.push_back(distortionParamBlock);
+        cameraParameterBlocks_.push_back(trParamBlock);
+        cameraParameterBlocks_.push_back(tdParamBlock);
+
+        return nextBlockIndex_;
+    }
 }
 
 void CameraObservationJacobianTest::createLandmarksAndObservations(
@@ -219,13 +290,14 @@ void CameraObservationJacobianTest::addLandmark(
     problem_->SetParameterBlockConstant(pl->data());
     problem_->SetParameterization(pl->data(),
                                   inverseDepthLocalParameterization_.get());
-  } else if (pl->modelId() ==
-                 okvis::ceres::HomogeneousPointLocalParameterization::kModelId) {
-    problem_->AddParameterBlock(
-        pl->data(), okvis::ceres::HomogeneousPointParameterBlock::Dimension);
-    problem_->SetParameterBlockConstant(pl->data());
-    problem_->SetParameterization(pl->data(),
-                                  homogeneousPointLocalParameterization_.get());
+  }else if (pl->modelId() ==
+           okvis::ceres::HomogeneousPointLocalParameterization::kModelId)
+  {
+      problem_->AddParameterBlock(
+          pl->data(), okvis::ceres::HomogeneousPointParameterBlock::Dimension);
+      problem_->SetParameterBlockConstant(pl->data());
+      problem_->SetParameterization(pl->data(),
+                                    homogeneousPointLocalParameterization_.get());
   }
   visibleLandmarks_.push_back(pl);
 }
@@ -313,7 +385,7 @@ void CameraObservationJacobianTest::propagatePoseAndVelocityForMapPoint(
 
 void CameraObservationJacobianTest::addResidual(
     std::shared_ptr<::ceres::CostFunction> costFunctionPtr,
-    int observationIndex, int landmarkIndex) {
+    int observationIndex,  int landmarkIndex, int hostIndex) {
   if (coo_.cameraObservationModelId == swift_vio::cameras::kChordalDistanceId ||
       coo_.cameraObservationModelId ==
           swift_vio::cameras::kReprojectionErrorWithPapId) {
@@ -380,7 +452,7 @@ void CameraObservationJacobianTest::addResidual(
              swift_vio::cameras::kRsReprojectionErrorId) {
     problem_->AddResidualBlock(
         costFunctionPtr.get(), NULL, poseBlocks_[observationIndex]->parameters(),
-        visibleLandmarks_[landmarkIndex]->data(), extrinsicBlock_->parameters(),
+        visibleLandmarks_[landmarkIndex]->data(), extrinsicBlock_->parameters(), 
         cameraParameterBlocks_[0]->parameters(),
         cameraParameterBlocks_[1]->parameters(),
         cameraParameterBlocks_[2]->parameters(),
@@ -389,7 +461,24 @@ void CameraObservationJacobianTest::addResidual(
   } else if (coo_.cameraObservationModelId ==
              swift_vio::cameras::kRSCameraReprojectionErrorId) {
     // TODO(jhuai): Binliang
-
+    if (observationIndex>hostIndex)
+    {
+        problem_->AddResidualBlock(
+            costFunctionPtr.get(), NULL,
+            poseBlocks_[observationIndex]->parameters(),
+            visibleLandmarks_[landmarkIndex]->data(),
+            poseBlocks_[hostIndex]->parameters(),
+            extrinsicBlock_->parameters(),
+            extrinsicBlockh_->parameters(),
+            cameraParameterBlocks_[0]->parameters(),
+            cameraParameterBlocks_[1]->parameters(),
+            cameraParameterBlocks_[2]->parameters(), 
+            speedAndBiasBlocks_[observationIndex]->parameters(),
+            TgParameterBlocks_->parameters(),
+            TsParameterBlocks_->parameters(),
+            TaParameterBlocks_->parameters() 
+            );
+    }
   }
   costFunctions_.push_back(costFunctionPtr);  // remember in order to avert premature cost function destruction.
 }
@@ -399,7 +488,7 @@ void CameraObservationJacobianTest::verifyJacobians(
     int observationIndex, int landmarkIndex,
     std::shared_ptr<swift_vio::PointSharedData> pointDataPtr,
     std::shared_ptr<DistortedPinholeCameraGeometry> cameraGeometry,
-    const Eigen::Vector2d &imagePoint) const {
+    const Eigen::Vector2d &imagePoint, int hostIndex) const {
   if (coo_.cameraObservationModelId == swift_vio::cameras::kChordalDistanceId ||
       coo_.cameraObservationModelId == swift_vio::cameras::kReprojectionErrorWithPapId) {
     verifyJacobiansPAP(costFunctionPtr, observationIndex, landmarkIndex,
@@ -408,10 +497,15 @@ void CameraObservationJacobianTest::verifyJacobians(
              swift_vio::cameras::kRsReprojectionErrorId) {
     verifyJacobiansHPP(costFunctionPtr, observationIndex, landmarkIndex,
                        pointDataPtr, cameraGeometry, imagePoint);
-  } else if (coo_.cameraObservationModelId ==
-             swift_vio::cameras::kRSCameraReprojectionErrorId) {
-    verifyJacobiansAIDP(costFunctionPtr, observationIndex, landmarkIndex,
-                        pointDataPtr, cameraGeometry, imagePoint);
+  }
+  else if (coo_.cameraObservationModelId ==
+           swift_vio::cameras::kRSCameraReprojectionErrorId)
+  {
+      if (observationIndex>hostIndex)
+      {
+          verifyJacobiansAIDP(costFunctionPtr, observationIndex, landmarkIndex,
+                              pointDataPtr, cameraGeometry, imagePoint, hostIndex);
+      }
   }
 }
 
@@ -735,7 +829,7 @@ void CameraObservationJacobianTest::verifyJacobiansHPP(
       swift_vio::Extrinsic_p_BC_q_BC>> costFuncPtr =
       std::static_pointer_cast<const okvis::ceres::RsReprojectionError<
           DistortedPinholeCameraGeometry, swift_vio::ProjectionOptFXY_CXY,
-          swift_vio::Extrinsic_p_BC_q_BC>>(errorPtr);
+          swift_vio::Extrinsic_p_BC_q_BC>>(errorPtr);  
 
   costFuncPtr->EvaluateWithMinimalJacobians(parameters, residuals.data(),
                                             jacobians, jacobiansMinimal);
@@ -885,13 +979,220 @@ void CameraObservationJacobianTest::verifyJacobiansHPP(
 }
 
 void CameraObservationJacobianTest::verifyJacobiansAIDP(
-    std::shared_ptr<const okvis::ceres::ErrorInterface> /*costFunctionPtr*/,
-    int /*observationIndex*/, int /*landmarkIndex*/,
-    std::shared_ptr<swift_vio::PointSharedData> /*pointDataPtr*/,
-    std::shared_ptr<DistortedPinholeCameraGeometry> /*cameraGeometry*/,
-    const Eigen::Vector2d &/*imagePoint*/) const {
-  // TODO(jhuai): binliang
+    std::shared_ptr<const okvis::ceres::ErrorInterface> errorPtr,
+    int observationIndex, int landmarkIndex, 
+    std::shared_ptr<swift_vio::PointSharedData> pointDataPtr,
+    std::shared_ptr<DistortedPinholeCameraGeometry> cameraGeometry,
+    const Eigen::Vector2d & imagePoint, int hostIndex) const {
+    // TODO(jhuai): binliang
+    // compare Jacobians obtained by analytic diff and auto diff.
+
+        double const *const parameters[] = {
+        poseBlocks_[observationIndex]->parameters(),
+        visibleLandmarks_[landmarkIndex]->data(),
+        poseBlocks_[hostIndex]->parameters(),
+        extrinsicBlock_->parameters(),
+        extrinsicBlockh_->parameters(),
+        cameraParameterBlocks_[0]->parameters(),
+        cameraParameterBlocks_[1]->parameters(),
+        cameraParameterBlocks_[2]->parameters(),   
+        speedAndBiasBlocks_[observationIndex]->parameters(),
+        TgParameterBlocks_->parameters(),
+        TsParameterBlocks_->parameters(),
+        TaParameterBlocks_->parameters()};   
+    
+    Eigen::Vector2d residuals;
+    Eigen::Vector2d residuals_auto;
+
+    Eigen::Matrix<double, 2, 7, Eigen::RowMajor> duv_deltaTWSt_auto;
+    Eigen::Matrix<double, 2, 6, Eigen::RowMajor> duv_deltaTWSt_minimal_auto;
+    Eigen::Matrix<double, 2, 4, Eigen::RowMajor> duv_deltahpCh_auto;
+    Eigen::Matrix<double, 2, 3, Eigen::RowMajor> duv_deltahpCh_minimal_auto;  
+    Eigen::Matrix<double, 2, 7, Eigen::RowMajor> duv_deltaTSCt_auto;
+    Eigen::Matrix<double, 2, 6, Eigen::RowMajor> duv_deltaTSCt_minimal_auto;
+
+    Eigen::Matrix<double, 2, 7, Eigen::RowMajor> duv_deltaTWSh_auto;
+    Eigen::Matrix<double, 2, 6, Eigen::RowMajor> duv_deltaTWSh_minimal_auto;
+    Eigen::Matrix<double, 2, 7, Eigen::RowMajor> duv_deltaTSCh_auto;
+    Eigen::Matrix<double, 2, 6, Eigen::RowMajor> duv_deltaTSCh_minimal_auto;
+
+    const int kNumIntrinsics = kProjIntrinsicDim + kDistortionDim;   
+    //Eigen::Matrix<double, 2, Eigen::Dynamic, Eigen::RowMajor> duv_proj_intrinsic_auto(2, kProjIntrinsicDim);
+    //Eigen::Matrix<double, 2, Eigen::Dynamic, Eigen::RowMajor> duv_distortion_auto(2, kDistortionDim);
+    Eigen::Matrix<double, 2, Eigen::Dynamic, Eigen::RowMajor> duv_intrinsic_auto(2, kNumIntrinsics);
+    //Eigen::Matrix<double, 2, Eigen::Dynamic, Eigen::RowMajor> duv_proj_intrinsic_minimal_auto(2, kProjIntrinsicDim);
+    //Eigen::Matrix<double, 2, Eigen::Dynamic, Eigen::RowMajor> duv_distortion_minimal_auto(2, kDistortionDim);
+    Eigen::Matrix<double, 2, Eigen::Dynamic, Eigen::RowMajor> duv_intrinsic_minimal_auto(2, kNumIntrinsics);
+
+    Eigen::Matrix<double, 2, Eigen::Dynamic, Eigen::RowMajor> duv_tr_auto( 2, 1);
+    Eigen::Matrix<double, 2, Eigen::Dynamic, Eigen::RowMajor> duv_tr_minimal_auto( 2, 1);
+    Eigen::Matrix<double, 2, 1> duv_td_auto;
+    Eigen::Matrix<double, 2, 1> duv_td_minimal_auto;
+    Eigen::Matrix<double, 2, 9, Eigen::RowMajor> duv_sb_auto;
+    Eigen::Matrix<double, 2, 9, Eigen::RowMajor> duv_sb_minimal_auto;
+
+    Eigen::Matrix<double, 2, 9, Eigen::RowMajor> duv_Tg_auto;
+    Eigen::Matrix<double, 2, 9, Eigen::RowMajor> duv_Tg_minimal_auto;
+    Eigen::Matrix<double, 2, 9, Eigen::RowMajor> duv_Ts_auto;
+    Eigen::Matrix<double, 2, 9, Eigen::RowMajor> duv_Ts_minimal_auto;
+    Eigen::Matrix<double, 2, 6, Eigen::RowMajor> duv_Ta_auto;
+    Eigen::Matrix<double, 2, 6, Eigen::RowMajor> duv_Ta_minimal_auto;
+
+    double *jacobiansAD[] = {
+        duv_deltaTWSt_auto.data(), 
+        duv_deltahpCh_auto.data(),
+        duv_deltaTWSh_auto.data(), 
+        duv_deltaTSCt_auto.data(),duv_deltaTSCh_auto.data(),
+        duv_intrinsic_auto.data(),
+        duv_tr_auto.data(),
+        duv_td_auto.data(), 
+        duv_sb_auto.data(),
+        duv_Tg_auto.data(),duv_Ts_auto.data(), duv_Ta_auto.data()
+        };
+    double *jacobiansMinimalAD[] = {
+        duv_deltaTWSt_minimal_auto.data(), 
+        duv_deltahpCh_minimal_auto.data(),
+        duv_deltaTWSh_minimal_auto.data(),
+        duv_deltaTSCt_minimal_auto.data(), duv_deltaTSCh_minimal_auto.data(),
+        duv_intrinsic_minimal_auto.data(),
+        duv_tr_minimal_auto.data(),
+        duv_td_minimal_auto.data(),
+        duv_sb_minimal_auto.data(),
+        duv_Tg_minimal_auto.data(),duv_Ts_minimal_auto.data(), duv_Ta_minimal_auto.data()
+        };  
+
+    Eigen::Matrix<double, 2, 7, Eigen::RowMajor> duv_deltaTWSt;
+    Eigen::Matrix<double, 2, 6, Eigen::RowMajor> duv_deltaTWSt_minimal;
+    Eigen::Matrix<double, 2, 4, Eigen::RowMajor> duv_deltahpCh;
+    Eigen::Matrix<double, 2, 3, Eigen::RowMajor> duv_deltahpCh_minimal;  
+    Eigen::Matrix<double, 2, 7, Eigen::RowMajor> duv_deltaTSCt;
+    Eigen::Matrix<double, 2, 6, Eigen::RowMajor> duv_deltaTSCt_minimal;
+
+    Eigen::Matrix<double, 2, 7, Eigen::RowMajor> duv_deltaTWSh;
+    Eigen::Matrix<double, 2, 6, Eigen::RowMajor> duv_deltaTWSh_minimal;
+    Eigen::Matrix<double, 2, 7, Eigen::RowMajor> duv_deltaTSCh;
+    Eigen::Matrix<double, 2, 6, Eigen::RowMajor> duv_deltaTSCh_minimal;
+
+    //Eigen::Matrix<double, 2, kProjIntrinsicDim, Eigen::RowMajor> duv_proj_intrinsic;
+    //Eigen::Matrix<double, 2, kDistortionDim, Eigen::RowMajor> duv_distortion;
+    Eigen::Matrix<double, 2, kNumIntrinsics, Eigen::RowMajor> duv_intrinsic;
+    //Eigen::Matrix<double, 2, kProjIntrinsicDim, Eigen::RowMajor> duv_proj_intrinsic_minimal;
+    //Eigen::Matrix<double, 2, kDistortionDim, Eigen::RowMajor> duv_distortion_minimal;
+    Eigen::Matrix<double, 2, kNumIntrinsics, Eigen::RowMajor> duv_intrinsic_minimal;
+
+    Eigen::Matrix<double, 2, 1> duv_tr;
+    Eigen::Matrix<double, 2, 1> duv_tr_minimal;
+    Eigen::Matrix<double, 2, 1> duv_td;
+    Eigen::Matrix<double, 2, 1> duv_td_minimal;
+    Eigen::Matrix<double, 2, 9, Eigen::RowMajor> duv_sb;
+    Eigen::Matrix<double, 2, 9, Eigen::RowMajor> duv_sb_minimal;
+
+    Eigen::Matrix<double, 2, 9, Eigen::RowMajor> duv_Tg;
+    Eigen::Matrix<double, 2, 9, Eigen::RowMajor> duv_Tg_minimal;
+    Eigen::Matrix<double, 2, 9, Eigen::RowMajor> duv_Ts;
+    Eigen::Matrix<double, 2, 9, Eigen::RowMajor> duv_Ts_minimal;
+    Eigen::Matrix<double, 2, 6, Eigen::RowMajor> duv_Ta;
+    Eigen::Matrix<double, 2, 6, Eigen::RowMajor> duv_Ta_minimal;
+
+    double *jacobians[] = {   
+        duv_deltaTWSt.data(), duv_deltahpCh.data(),
+        duv_deltaTWSh.data(), 
+        duv_deltaTSCt.data(),duv_deltaTSCh.data(),
+        duv_intrinsic.data(),
+        duv_tr.data(),
+        duv_td.data(), 
+        duv_sb.data(),
+        duv_Tg.data(),duv_Ts.data(), duv_Ta.data()
+        };
+    double *jacobiansMinimal[] = {   
+        duv_deltaTWSt_minimal.data(), duv_deltahpCh_minimal.data(),
+        duv_deltaTWSh_minimal.data(),
+        duv_deltaTSCt_minimal.data(), duv_deltaTSCh_minimal.data(),
+        duv_intrinsic_minimal.data(),
+        duv_tr_minimal.data(),
+        duv_td_minimal.data(),
+        duv_sb_minimal.data(),
+        duv_Tg_minimal.data(),duv_Ts_minimal.data(), duv_Ta_minimal.data()
+        };
+
+    std::shared_ptr<const okvis::ceres::RSCameraReprojectionError<
+        DistortedPinholeCameraGeometry>>                    
+        costFuncPtr =
+            std::static_pointer_cast<const okvis::ceres::RSCameraReprojectionError<
+                DistortedPinholeCameraGeometry>>(errorPtr);
+
+    costFuncPtr->EvaluateWithMinimalJacobians(parameters, residuals.data(),
+                                              jacobians, jacobiansMinimal);
+    costFuncPtr->EvaluateWithMinimalJacobiansAutoDiff(
+        parameters, residuals_auto.data(), jacobiansAD, jacobiansMinimalAD);
+
+    if (isZeroResidualExpected())
+    {
+        EXPECT_TRUE(residuals.isMuchSmallerThan(1, 1e-8))
+            << "Unusually large residual " << residuals.transpose();
+        EXPECT_TRUE(residuals_auto.isMuchSmallerThan(1, 1e-8))
+            << "Unusually large residual " << residuals.transpose();
+    }
+    double tol = 1e-8;
+    // analytic full vs minimal
+    //ARE_MATRICES_CLOSE(duv_proj_intrinsic, duv_proj_intrinsic_minimal, tol);
+    //ARE_MATRICES_CLOSE(duv_distortion, duv_distortion_minimal, tol);
+    ARE_MATRICES_CLOSE(duv_intrinsic, duv_intrinsic_minimal, tol);
+    ARE_MATRICES_CLOSE(duv_tr, duv_tr_minimal, tol);
+    ARE_MATRICES_CLOSE(duv_td, duv_td_minimal, tol);
+    ARE_MATRICES_CLOSE(duv_sb, duv_sb_minimal, tol);
+
+    // automatic vs analytic
+    tol = 1e-3;
+    ARE_MATRICES_CLOSE(residuals_auto, residuals, tol);
+    ARE_MATRICES_CLOSE(duv_deltaTWSt_auto, duv_deltaTWSt, tol);
+    ARE_MATRICES_CLOSE(duv_deltaTWSh_auto, duv_deltaTWSh, tol);
+    ARE_MATRICES_CLOSE(duv_deltahpCh_auto, duv_deltahpCh, tol);
+    ARE_MATRICES_CLOSE(duv_deltaTSCt_auto, duv_deltaTSCt, tol);
+    ARE_MATRICES_CLOSE(duv_deltaTSCh_auto, duv_deltaTSCh, tol);
+    ARE_MATRICES_CLOSE(duv_intrinsic_auto, duv_intrinsic, 4e-3);
+    //ARE_MATRICES_CLOSE(duv_proj_intrinsic_auto, duv_proj_intrinsic, 4e-3);
+    //ARE_MATRICES_CLOSE(duv_distortion_auto, duv_distortion, 4e-3);
+
+    if (coo_.rollingShutter)
+    {
+        ARE_MATRICES_CLOSE(duv_tr_auto, duv_tr, 1e-1);
+        ARE_MATRICES_CLOSE(duv_td_auto, duv_td, 1e-1);
+    }
+
+    Eigen::Matrix<double, 2, 3> duv_ds_auto = duv_sb_auto.topLeftCorner<2, 3>();
+    Eigen::Matrix<double, 2, 3> duv_ds = duv_sb.topLeftCorner<2, 3>();
+    ARE_MATRICES_CLOSE(duv_ds_auto, duv_ds, tol);
+    Eigen::Matrix<double, 2, 3> duv_dbg_auto = duv_sb_auto.block<2, 3>(0, 3);
+    Eigen::Matrix<double, 2, 3> duv_dbg = duv_sb.block<2, 3>(0, 3);
+    EXPECT_LT((duv_dbg_auto - duv_dbg).lpNorm<Eigen::Infinity>(), 5e-2)
+        << "duv_dbg_auto:\n"
+        << duv_dbg_auto << "\nduv_dbg\n"
+        << duv_dbg;
+    Eigen::Matrix<double, 2, 3> duv_dba_auto = duv_sb_auto.topRightCorner<2, 3>();
+    Eigen::Matrix<double, 2, 3> duv_dba = duv_sb.topRightCorner<2, 3>();
+    EXPECT_LT((duv_dba_auto - duv_dba).lpNorm<Eigen::Infinity>(), 5e-3)
+        << "duv_dba_auto\n"
+        << duv_dba_auto << "\nduv_dba\n"
+        << duv_dba;
+
+    ARE_MATRICES_CLOSE(duv_deltaTWSt_minimal_auto, duv_deltaTWSt_minimal, 5e-3);
+    ARE_MATRICES_CLOSE(duv_deltaTWSh_minimal_auto, duv_deltaTWSh_minimal, 5e-3);
+    ARE_MATRICES_CLOSE(duv_deltahpCh_minimal_auto, duv_deltahpCh_minimal, tol);
+    ARE_MATRICES_CLOSE(duv_deltaTSCt_minimal_auto, duv_deltaTSCt_minimal, tol);
+    ARE_MATRICES_CLOSE(duv_deltaTSCh_minimal_auto, duv_deltaTSCh_minimal, tol);
+
+    //ARE_MATRICES_CLOSE(duv_proj_intrinsic_minimal_auto,duv_proj_intrinsic_minimal, 4e-3);
+    //ARE_MATRICES_CLOSE(duv_distortion_minimal_auto, duv_distortion_minimal, 4e-3);
+    ARE_MATRICES_CLOSE(duv_intrinsic_minimal_auto,duv_intrinsic_minimal, 4e-3);
+    if (coo_.rollingShutter)
+    {
+        ARE_MATRICES_CLOSE(duv_tr_minimal_auto, duv_tr_minimal, 1e-1);
+        ARE_MATRICES_CLOSE(duv_td_minimal_auto, duv_td_minimal, 1e-1);
+    }
+    ARE_MATRICES_CLOSE(duv_sb_minimal_auto, duv_sb_minimal_auto, tol); 
 }
+
 
 void CameraObservationJacobianTest::solveAndCheck() {
   ::ceres::Solver::Options options;
@@ -917,8 +1218,10 @@ void CameraObservationJacobianTest::solveAndCheck() {
                     .norm(),
             1e-2)
       << "quaternions not close enough";
+
   EXPECT_LT((ref_T_WB_.r() - poseBlocks_[2]->estimate().r()).norm(), 1e-1)
       << "translation not close enough";
+
 }
 
 void NumericJacobianPAP::computeNumericJacobianForPoint(

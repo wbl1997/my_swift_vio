@@ -151,21 +151,21 @@ public:
       std::shared_ptr<swift_vio::PointSharedData> pointDataPtr) const;
 
   void addResidual(std::shared_ptr<::ceres::CostFunction> costFunctionPtr,
-                   int observationIndex, int landmarkIndex);
+                   int observationIndex, int landmarkIndex, int hostIndex  = 0);
 
   void verifyJacobians(
       std::shared_ptr<const okvis::ceres::ErrorInterface> costFunctionPtr,
       int observationIndex, int landmarkIndex,
       std::shared_ptr<swift_vio::PointSharedData> pointDataPtr,
       std::shared_ptr<DistortedPinholeCameraGeometry> cameraGeometry,
-      const Eigen::Vector2d &imagePoint) const;
+      const Eigen::Vector2d &imagePoint, int hostIndex  = 0) const;
 
   void verifyJacobiansAIDP(
       std::shared_ptr<const okvis::ceres::ErrorInterface> costFunctionPtr,
       int observationIndex, int landmarkIndex,
       std::shared_ptr<swift_vio::PointSharedData> pointDataPtr,
       std::shared_ptr<DistortedPinholeCameraGeometry> cameraGeometry,
-      const Eigen::Vector2d &imagePoint) const;
+      const Eigen::Vector2d &imagePoint, int hostIndex  = 0) const;
 
   void verifyJacobiansHPP(
       std::shared_ptr<const okvis::ceres::ErrorInterface> costFunctionPtr,
@@ -208,9 +208,15 @@ private:
 
   /// camera parameters
   std::shared_ptr<okvis::ceres::PoseParameterBlock> extrinsicBlock_;
+  std::shared_ptr<okvis::ceres::PoseParameterBlock> extrinsicBlockh_;
   // projection intrinsics, distortion, readout time, time offset
   std::vector<std::shared_ptr<okvis::ceres::ParameterBlock>>
       cameraParameterBlocks_;
+
+  //T_g,T_s,T_a
+  std::shared_ptr<okvis::ceres::ParameterBlock> TgParameterBlocks_;
+  std::shared_ptr<okvis::ceres::ParameterBlock> TsParameterBlocks_;
+  std::shared_ptr<okvis::ceres::ParameterBlock> TaParameterBlocks_;
 
   std::shared_ptr<::ceres::Problem> problem_;
   uint64_t nextBlockIndex_;
@@ -456,54 +462,59 @@ public:
 
   void computeNumericJacobianForProjectionIntrinsic(
       Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>
-          *de_dProjectionIntrinsic) {
-    Eigen::VectorXd residual(krd_);
-    Eigen::Matrix<double, kProjIntrinsicDim, 1> refProjectionIntrinsic =
-        Eigen::Map<Eigen::Matrix<double, kProjIntrinsicDim, 1>>(
-            cameraParameterBlocks_[0]->parameters());
-    Eigen::VectorXd refIntrinsics(kProjIntrinsicDim + kDistortionDim);
-    cameraGeometryBase_->getIntrinsics(refIntrinsics);
+          *de_dProjectionIntrinsic)
+  {
+      Eigen::VectorXd residual(krd_);
+      Eigen::Matrix<double, kProjIntrinsicDim, 1> refProjectionIntrinsic =
+          Eigen::Map<Eigen::Matrix<double, kProjIntrinsicDim, 1>>(
+              cameraParameterBlocks_[0]->parameters()); //xiugaixiugai
+      Eigen::VectorXd refIntrinsics(kProjIntrinsicDim + kDistortionDim);
+      cameraGeometryBase_->getIntrinsics(refIntrinsics);
 
-    for (int j = 0; j < kProjIntrinsicDim; ++j) {
-      Eigen::Map<Eigen::Matrix<double, kProjIntrinsicDim, 1>>
-          projectionIntrinsic(cameraParameterBlocks_[0]->parameters());
-      projectionIntrinsic[j] += h;
-      Eigen::VectorXd intrinsics = refIntrinsics;
-      intrinsics[j] += h;
-      cameraGeometryBase_->setIntrinsics(intrinsics);
-      costFunctionPtr_->EvaluateWithMinimalJacobians(
-          parameters_, residual.data(), nullptr, nullptr);
-      de_dProjectionIntrinsic->col(j) = (residual - refResidual_) / h;
-      // reset
-      projectionIntrinsic[j] = refProjectionIntrinsic[j];
-      cameraGeometryBase_->setIntrinsics(refIntrinsics);
-    }
+      for (int j = 0; j < kProjIntrinsicDim; ++j)
+      {
+          Eigen::Map<Eigen::Matrix<double, kProjIntrinsicDim, 1>>
+              projectionIntrinsic(cameraParameterBlocks_[0]->parameters());
+          projectionIntrinsic[j] += h;
+          Eigen::VectorXd intrinsics = refIntrinsics;
+          intrinsics[j] += h;
+          cameraGeometryBase_->setIntrinsics(intrinsics);
+          costFunctionPtr_->EvaluateWithMinimalJacobians(
+              parameters_, residual.data(), nullptr, nullptr);
+          de_dProjectionIntrinsic->col(j) = (residual - refResidual_) / h;
+          // reset
+          projectionIntrinsic[j] = refProjectionIntrinsic[j];
+          cameraGeometryBase_->setIntrinsics(refIntrinsics);
+      }
   }
 
   void computeNumericJacobianForDistortion(
       Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>
-          *de_dDistortion) {
-    Eigen::VectorXd residual(krd_);
-    Eigen::Matrix<double, kDistortionDim, 1> refDistortion =
-        Eigen::Map<Eigen::Matrix<double, kDistortionDim, 1>>(
-            cameraParameterBlocks_[1]->parameters());
-    Eigen::VectorXd refIntrinsics(kProjIntrinsicDim + kDistortionDim);
-    cameraGeometryBase_->getIntrinsics(refIntrinsics);
+          *de_dDistortion)
+  {
 
-    for (int j = 0; j < kDistortionDim; ++j) {
-      Eigen::Map<Eigen::Matrix<double, kDistortionDim, 1>> distortion(
-          cameraParameterBlocks_[1]->parameters());
-      distortion[j] += h;
-      Eigen::VectorXd intrinsics = refIntrinsics;
-      intrinsics[j + kProjIntrinsicDim] += h;
-      cameraGeometryBase_->setIntrinsics(intrinsics);
-      costFunctionPtr_->EvaluateWithMinimalJacobians(
-          parameters_, residual.data(), nullptr, nullptr);
-      de_dDistortion->col(j) = (residual - refResidual_) / h;
-      // reset
-      distortion[j] = refDistortion[j];
-      cameraGeometryBase_->setIntrinsics(refIntrinsics);
-    }
+      Eigen::VectorXd residual(krd_);
+      Eigen::Matrix<double, kDistortionDim, 1> refDistortion =
+          Eigen::Map<Eigen::Matrix<double, kDistortionDim, 1>>(
+              cameraParameterBlocks_[1]->parameters()); //xiugaixiugai
+      Eigen::VectorXd refIntrinsics(kProjIntrinsicDim + kDistortionDim);
+      cameraGeometryBase_->getIntrinsics(refIntrinsics);
+
+      for (int j = 0; j < kDistortionDim; ++j)
+      {
+          Eigen::Map<Eigen::Matrix<double, kDistortionDim, 1>> distortion(
+              cameraParameterBlocks_[1]->parameters());
+          distortion[j] += h;
+          Eigen::VectorXd intrinsics = refIntrinsics;
+          intrinsics[j + kProjIntrinsicDim] += h;
+          cameraGeometryBase_->setIntrinsics(intrinsics);
+          costFunctionPtr_->EvaluateWithMinimalJacobians(
+              parameters_, residual.data(), nullptr, nullptr);
+          de_dDistortion->col(j) = (residual - refResidual_) / h;
+          // reset
+          distortion[j] = refDistortion[j];
+          cameraGeometryBase_->setIntrinsics(refIntrinsics);
+      }
   }
 
   void computeNumericJacobianForReadoutTime(
