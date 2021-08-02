@@ -1,0 +1,3 @@
+[submodule "thirdparty/okvis"]
+	path = thirdparty/okvis
+	url = https://github.com/wbl1997/okvis.git
