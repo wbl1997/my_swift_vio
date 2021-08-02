@@ -311,7 +311,16 @@ class VioInterface {
           &fullStateCallbackWithAllCalibration);
   /// \}
 
+  /**
+   * @brief trigger display (needed because OSX won't allow threaded display)
+   */
   virtual void display();
+
+  virtual void saveStatistics(const std::string& /*filename*/) const {}
+
+  virtual std::string headerLine() const { return ""; }
+
+  virtual void appendPgoStateCallback(const StateCallback& /*pgoStateCallback*/) {}
 
  protected:
 

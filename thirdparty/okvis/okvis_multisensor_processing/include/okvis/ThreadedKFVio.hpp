@@ -242,13 +242,13 @@ class ThreadedKFVio : public VioInterface {
   /// \}
 
   /// \brief Trigger display (needed because OSX won't allow threaded display).
-  void display();
+  void display() final;
 
-  void saveStatistics(const std::string& filename) const;
+  void saveStatistics(const std::string& filename) const final;
 
-  std::string headerLine() const { return estimator_->headerLine(); }
+  std::string headerLine() const final { return estimator_->headerLine(); }
 
-  void appendPgoStateCallback(const StateCallback& pgoStateCallback);
+  void appendPgoStateCallback(const StateCallback& pgoStateCallback) final;
 
  private:
   /// \brief Start all threads.

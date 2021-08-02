@@ -12,7 +12,6 @@
 #include <memory>
 #include <ceres/ceres.h>
 #include <okvis/Measurements.hpp>
-#include <okvis/Parameters.hpp>
 
 #include <okvis/assert_macros.hpp>
 #include <okvis/ceres/PoseLocalParameterization.hpp>
@@ -63,102 +62,94 @@
 // R_{WB} = Exp(\theta) \hat{R}_{WB}
 // p = dp + \hat{p}
 
-namespace okvis
-{
-  namespace ceres
-  {
-    template <class GEOMETRY_TYPE>
-    class RS_LocalBearingVector;
-
-    /// \brief The 2D keypoint reprojection error accounting for rolling shutter
-    ///     skew and time offset and camera intrinsics.
-    /// \warning A potential problem with this reprojection error happens when
-    ///     the provided IMU measurements do not cover camera observations to the
-    ///     extent of the rolling shutter effect. This is most likely to occur with
-    ///     observations in the most recent frame.
-    ///     Because MSCKF uses observations up to the second most recent frame,
-    ///     this problem should only happen to optimization-based estimator with
-    ///     undelayed observations.
-    /// \tparam GEOMETRY_TYPE The camera gemetry type.
-    template <class GEOMETRY_TYPE>
-    class RSCameraReprojectionError
-        : public ::ceres::SizedCostFunction<
-              2 /* number of residuals */,
-              7 /* T_WBt */,
-              4 /* hp_Ch */,
-              7 /* T_WBh */,
-              7 /* T_BCt */,
-              7 /* T_BCh */,
-              GEOMETRY_TYPE::NumIntrinsics,
-              1 /* frame readout time: tr*/,
-              1 /* camera time offset: td*/,
-              9 /* speed, bg_i and ba_i */,
-              9 /* T_gi */,
-              9 /* T_si */,
-              6 /* T_ai */
-              >,
-          public ErrorInterface
-    {
-    public:
-      EIGEN_MAKE_ALIGNED_OPERATOR_NEW
-      OKVIS_DEFINE_EXCEPTION(Exception, std::runtime_error)
-
-      /// \brief Make the camera geometry type accessible.
-      typedef GEOMETRY_TYPE camera_geometry_t;
-
-      static const int kDistortionDim = GEOMETRY_TYPE::distortion_t::NumDistortionIntrinsics;
-      static const int kIntrinsicsDim = GEOMETRY_TYPE::NumIntrinsics;
-
-      /// \brief The base class type.
-      typedef ::ceres::SizedCostFunction<
-          2 /* number of residuals */,
-          7 /* T_WBt */,
+namespace okvis {
+namespace ceres {
+/// \brief The 2D keypoint reprojection error accounting for rolling shutter
+///     skew and time offset and camera intrinsics.
+/// \warning A potential problem with this reprojection error happens when
+///     the provided IMU measurements do not cover camera observations to the
+///     extent of the rolling shutter effect. This is most likely to occur with
+///     observations in the most recent frame.
+///     Because MSCKF uses observations up to the second most recent frame,
+///     this problem should only happen to optimization-based estimator with
+///     undelayed observations.
+/// \tparam GEOMETRY_TYPE The camera gemetry type.
+template <class GEOMETRY_TYPE>
+class RSCameraReprojectionError
+    : public ::ceres::SizedCostFunction<
+          2 /* number of residuals */, 
+          7 /* T_WBt */, 
           4 /* hp_Ch */,
           7 /* T_WBh */,
           7 /* T_BCt */,
           7 /* T_BCh */,
-          GEOMETRY_TYPE::NumIntrinsics, //Intrinsics+distortion_t
+          GEOMETRY_TYPE::NumIntrinsics,
+          1 /* frame readout time */,
+          1 /* camera time offset */,
+          9 /* speed, bg_i and ba_i */,
+          9 /* T_gi */,
+          9 /* T_si */,
+          6 /* T_ai */>,
+      public ErrorInterface {
+ public:
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+  OKVIS_DEFINE_EXCEPTION(Exception,std::runtime_error)
+
+  /// \brief Make the camera geometry type accessible.
+  typedef GEOMETRY_TYPE camera_geometry_t;
+
+  static const int kDistortionDim = GEOMETRY_TYPE::distortion_t::NumDistortionIntrinsics;
+  static const int kIntrinsicsDim = GEOMETRY_TYPE::NumIntrinsics;
+
+  /// \brief The base class type.
+  typedef ::ceres::SizedCostFunction<
+          2 /* number of residuals */, 
+          7 /* T_WBt */, 
+          4 /* hp_Ch */,
+          7 /* T_WBh */,
+          7 /* T_BCt */,
+          7 /* T_BCh */,
+          GEOMETRY_TYPE::NumIntrinsics,
           1 /* frame readout time */,
           1 /* camera time offset */,
           9 /* velocity, bg_i and ba_i */,
-          //7 /* IMU i's extrinsic parameters */,
+          7 /* IMU i's extrinsic parameters */,
           9 /* T_gi */,
           9 /* T_si */,
-          6 /* T_ai */
-          > base_t;
+          6 /* T_ai */> base_t;
 
-      enum Index
-      {
-        T_WBt = 0,
-        hp_Ch,
-        T_WBh,
-        T_BCt,
-        T_BCh,
-        Intrinsics,
-        ReadoutTime,
-        CameraTd,
-        SpeedAndBiases,
-        T_gi,
-        T_si,
-        T_ai
-      };
+  enum Index
+  {
+    T_WBt = 0,
+    hp_Ch,
+    T_WBh,
+    T_BCt,
+    T_BCh,
+    Intrinsics,
+    ReadoutTime,
+    CameraTd,
+    SpeedAndBiases,
+    T_gi,
+    T_si,
+    T_ai
+  };
 
-      /// \brief Number of residuals (2)
-      static const int kNumResiduals = 2;
+  /// \brief Number of residuals (2)
+  static const int kNumResiduals = 2;
 
-      /// \brief The keypoint type (measurement type).
-      typedef Eigen::Vector2d keypoint_t;
+  /// \brief The keypoint type (measurement type).
+  typedef Eigen::Vector2d keypoint_t;
 
-      /// \brief Measurement type (2D).
-      typedef Eigen::Vector2d measurement_t;
+  /// \brief Measurement type (2D).
+  typedef Eigen::Vector2d measurement_t;
 
-      /// \brief Covariance / information matrix type (2x2).
-      typedef Eigen::Matrix2d covariance_t;
+  /// \brief Covariance / information matrix type (2x2).
+  typedef Eigen::Matrix2d covariance_t;
 
-      /// \brief Default constructor.
-      RSCameraReprojectionError();
+  /// \brief Default constructor.
+  RSCameraReprojectionError();
 
-      /**
+  /**
    * @brief RSCameraReprojectionError Construct with measurement and information matrix
    * @param measurement
    * @param information The information (weight) matrix.
@@ -166,42 +157,35 @@ namespace okvis
    *     compensating the rolling shutter effect.
    * @param stateEpoch epoch of the pose state and speed and biases
    */
-      RSCameraReprojectionError(
-          const measurement_t &measurement,
-          const covariance_t &covariance,
-          std::shared_ptr<const camera_geometry_t> targetCamera,
-          std::shared_ptr<const okvis::ImuMeasurementDeque> imuMeasCanopy,
-          okvis::ImuParameters imuParameters,
-          okvis::Time targetStateTime, okvis::Time targetImageTime);
+  RSCameraReprojectionError(
+      const measurement_t& measurement,
+      const covariance_t& covariance,
+      std::shared_ptr<const okvis::cameras::CameraGeometryBase> targetCamera,
+      std::shared_ptr<const okvis::ImuMeasurementDeque> imuMeasurementCanopy,
+      std::shared_ptr<const okvis::ImuParameters> imuParameters,
+      okvis::Time targetStateTime, okvis::Time targetImageTime);
 
-      /// \brief Trivial destructor.
-      virtual ~RSCameraReprojectionError()
-      {
-      }
+  /// \brief Trivial destructor.
+  virtual ~RSCameraReprojectionError()
+  {
+  }
 
-      /// \brief Set the information.
-      /// @param[in] information The information (weight) matrix.
-      virtual void setCovariance(const covariance_t &information);
+  /// \brief Set the information.
+  /// @param[in] information The information (weight) matrix.
+  virtual void setCovariance(const covariance_t& information);
 
-      // error term and Jacobian implementation
-      /**
+  // error term and Jacobian implementation
+  /**
    * @brief This evaluates the error term and additionally computes the Jacobians.
    * @param parameters Pointer to the parameters (see ceres)
    * @param residuals Pointer to the residual vector (see ceres)
    * @param jacobians Pointer to the Jacobians (see ceres)
    * @return success of th evaluation.
    */
-      virtual bool Evaluate(double const *const *parameters, double *residuals,
-                            double **jacobians) const;
+  virtual bool Evaluate(double const* const * parameters, double* residuals,
+                        double** jacobians) const;
 
-      //my_add
-      void setCameraGeometry(
-          std::shared_ptr<const camera_geometry_t> cameraGeometry)
-      {
-        cameraGeometryBase_ = cameraGeometry;
-      }
-
-      /**
+  /**
    * @brief This evaluates the error term and additionally computes
    *        the Jacobians in the minimal internal representation.
    * @param parameters Pointer to the parameters (see ceres)
@@ -210,111 +194,68 @@ namespace okvis
    * @param jacobiansMinimal Pointer to the minimal Jacobians (equivalent to jacobians).
    * @return Success of the evaluation.
    */
-      virtual bool EvaluateWithMinimalJacobians(double const *const *parameters,
-                                                double *residuals,
-                                                double **jacobians,
-                                                double **jacobiansMinimal) const;
+  virtual bool EvaluateWithMinimalJacobians(double const* const * parameters,
+                                            double* residuals,
+                                            double** jacobians,
+                                            double** jacobiansMinimal) const;
 
-      bool EvaluateWithMinimalJacobiansAnalytic(double const *const *parameters,
-                                                double *residuals,
-                                                double **jacobians,
-                                                double **jacobiansMinimal) const;
+  bool EvaluateWithMinimalJacobiansAnalytic(double const* const * parameters,
+                                            double* residuals,
+                                            double** jacobians,
+                                            double** jacobiansMinimal) const;
 
-      bool EvaluateWithMinimalJacobiansAutoDiff(double const *const *parameters,
-                                                double *residuals,
-                                                double **jacobians,
-                                                double **jacobiansMinimal) const;
+  bool EvaluateWithMinimalJacobiansAutoDiff(double const* const * parameters,
+                                            double* residuals,
+                                            double** jacobians,
+                                            double** jacobiansMinimal) const;
 
-      void setJacobiansZero(double **jacobians, double **jacobiansMinimal) const;
+  void setJacobiansZero(double** jacobians, double** jacobiansMinimal) const;
 
-      // sizes
-      /// \brief Residual dimension.
-      size_t residualDim() const
-      {
-        return kNumResiduals;
-      }
+  // sizes
+  /// \brief Residual dimension.
+  size_t residualDim() const
+  {
+    return kNumResiduals;
+  }
 
-      /// \brief Number of parameter blocks.
-      size_t parameterBlocks() const
-      {
-        return base_t::parameter_block_sizes().size();
-      }
+  /// \brief Number of parameter blocks.
+  size_t parameterBlocks() const
+  {
+    return base_t::parameter_block_sizes().size();
+  }
 
-      /// \brief Dimension of an individual parameter block.
-      /// @param[in] parameterBlockId ID of the parameter block of interest.
-      /// \return The dimension.
-      size_t parameterBlockDim(size_t parameterBlockId) const
-      {
-        return base_t::parameter_block_sizes().at(parameterBlockId);
-      }
+  /// \brief Dimension of an individual parameter block.
+  /// @param[in] parameterBlockId ID of the parameter block of interest.
+  /// \return The dimension.
+  size_t parameterBlockDim(size_t parameterBlockId) const
+  {
+    return base_t::parameter_block_sizes().at(parameterBlockId);
+  }
 
-      /// @brief Residual block type as string
-      virtual std::string typeInfo() const
-      {
-        return "RSCameraReprojectionError";
-      }
+  /// @brief Residual block type as string
+  virtual std::string typeInfo() const
+  {
+    return "RSCameraReprojectionError";
+  }
+ protected:
+  measurement_t measurement_; ///< The (2D) measurement.
 
-       void assignJacobians(
-            double const *const *parameters, double **jacobians,
-            double **jacobiansMinimal,
-            const Eigen::Matrix<double, 2, 4> &Jh_weighted,
-            const Eigen::Matrix<double, 2, Eigen::Dynamic> &Jpi_weighted,
-            const Eigen::Matrix<double, 4, 6> &dhC_deltaTWSt,
-            const Eigen::Matrix<double, 4, 6> &dhC_deltaTWSh,
-            const Eigen::Matrix<double, 4, 4> &dhC_deltahpCh,
-            const Eigen::Matrix<double, 4, 6> &dhC_dExtrinsict,
-            const Eigen::Matrix<double, 4, 6> &dhC_dExtrinsich,
-            const Eigen::Vector4d &dhC_td, double kpN,
-            const Eigen::Matrix<double, 4, 9> &dhC_sb) const;
+  std::shared_ptr<const okvis::ImuMeasurementDeque> imuMeasCanopy_;
+  std::shared_ptr<const okvis::ImuMeasurementDeque> imuParameters_;
 
-      friend class RS_LocalBearingVector<GEOMETRY_TYPE>; //my_add
-    protected:
-      measurement_t measurement_; ///< The (2D) measurement.
+  std::shared_ptr<const okvis::cameras::CameraGeometryBase> targetCamera_;
 
-      std::shared_ptr<const camera_geometry_t> cameraGeometryBase_;
+  // weighting related
+  covariance_t information_; ///< The 2x2 information matrix.
+  covariance_t squareRootInformation_; ///< The 2x2 square root information matrix.
+  covariance_t covariance_; ///< The 2x2 covariance matrix.
 
-      std::shared_ptr<const okvis::ImuMeasurementDeque> imuMeasCanopy_;
-      okvis::ImuParameters imuParameters_;
+  okvis::Time targetStateTime_; ///< Timestamp of the target pose, T_WBt.
+  okvis::Time targetImageTime_; ///< Raw timestamp of the target image.
+};
 
-      std::shared_ptr<const camera_geometry_t> targetCamera_;
-
-      // weighting related
-      covariance_t information_;           ///< The 2x2 information matrix.
-      covariance_t squareRootInformation_; ///< The 2x2 square root information matrix.
-      covariance_t covariance_;            ///< The 2x2 covariance matrix.
-
-      okvis::Time targetStateTime_; ///< Timestamp of the target pose, T_WBt.
-      okvis::Time targetImageTime_; ///< Raw timestamp of the target image.
-    };
-
-    // For testing only
-    // Calculate the Jacobians of the homogeneous landmark coordinates in the
-    // camera frame, hp_C, relative to the states.
-    // AutoDifferentiate will invoke Evaluate() if the Functor is a ceres::CostFunction
-    // see ceres-solver/include/ceres/internal/variadic_evaluate.h
-    // so we have to separate operator() from Evaluate()
-    //my_add
-    template <class GEOMETRY_TYPE>
-    class RS_LocalBearingVector
-    {
-    public:
-      EIGEN_MAKE_ALIGNED_OPERATOR_NEW
-      RS_LocalBearingVector(const RSCameraReprojectionError<GEOMETRY_TYPE> &rsre);
-      template <typename Scalar>
-      bool operator()(const Scalar *const T_WS, const Scalar *const hp_W,const Scalar *const T_WSh,
-                      const Scalar *const extrinsic,const Scalar *const extrinsich, const Scalar *const t_r,
-                      const Scalar *const t_d, const Scalar *const speedAndBiases,
-                      const Scalar *const deltaT_WS,const Scalar *const deltaT_WSh,
-                      const Scalar *const deltaExtrinsic,const Scalar *const deltaExtrinsich, 
-                      const Scalar *const T_g, const Scalar *const T_s, const Scalar *const T_a,
-                      Scalar *hp_C) const;
-
-    private:
-      const RSCameraReprojectionError<GEOMETRY_TYPE> &rsre_;
-    };
-
-  } // namespace ceres
-} // namespace okvis
+}  // namespace ceres
+}  // namespace okvis
 
 #include "implementation/RSCameraReprojectionError.hpp"
 #endif /* INCLUDE_SWIFT_VIO_RSCAMERA_REPROJECTION_ERROR_HPP_ */
