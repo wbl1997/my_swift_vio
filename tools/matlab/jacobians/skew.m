@@ -1,0 +1,6 @@
+function res=skew(inp_vr)
+res=[0 			-inp_vr(3)	inp_vr(2); ...
+    inp_vr(3)	0			-inp_vr(1);...
+    -inp_vr(2)	inp_vr(1)	0];
+end
+
